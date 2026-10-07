@@ -38,14 +38,14 @@ Funk über SRS auf Englisch mit Ground, Tower, Approach, ATIS, AWACS und Tankern
 
 ## Install / Installation
 
-1. Close DCS, unzip, run `DCS-ATC-Setup.exe` (no admin rights needed, one Windows prompt for `MissionScripting.lua`).
+1. Close DCS, unzip, run `DCS-ATC-Setup.exe` and pick English or German (no admin rights needed, one Windows prompt for `MissionScripting.lua`).
 2. SmartScreen may warn because the setup is new and unsigned: *More info → Run anyway*. Windows Defender finds nothing; verify the file with the SHA256 checksum (`Get-FileHash`).
 3. At the end: set keys for the radio wheel and push-to-talk.
 4. Done – DCS-ATC starts with every mission.
 
 ---
 
-1. DCS beenden, ZIP entpacken, `DCS-ATC-Setup.exe` starten (keine Adminrechte, eine Windows-Abfrage für `MissionScripting.lua`).
+1. DCS beenden, ZIP entpacken, `DCS-ATC-Setup.exe` starten und Deutsch oder Englisch wählen (keine Adminrechte, eine Windows-Abfrage für `MissionScripting.lua`).
 2. SmartScreen kann warnen (neu, nicht signiert): *Weitere Informationen → Trotzdem ausführen*. Defender findet nichts; Prüfsumme mit `Get-FileHash` prüfen.
 3. Am Ende Tasten für Funkrad und Push-to-Talk festlegen.
 4. Fertig – DCS-ATC startet mit jeder Mission.
@@ -55,7 +55,7 @@ Funk über SRS auf Englisch mit Ground, Tower, Approach, ATIS, AWACS und Tankern
 - Windows 10/11 64-bit, DCS World with the Caucasus map
 - [SRS](https://github.com/ciribob/DCS-SimpleRadio-Standalone) in its default folder `C:\Program Files\DCS-SimpleRadio-Standalone`
 - Microphone (radio calls in English), ~1.2 GB disk; speech recognition runs on the CPU
-- Program menus and readme are German for now – English UI comes with the next version / Menüs und Anleitung vorerst auf Deutsch, Englisch folgt
+- English or German user interface – choose at the start of the setup / Oberfläche Englisch oder Deutsch – Auswahl am Anfang des Setups
 
 ## Bug reports / Fehler melden
 
