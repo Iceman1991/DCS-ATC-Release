@@ -9,6 +9,23 @@ Funk über SRS auf Englisch mit Ground, Tower, Approach, ATIS, AWACS und Tankern
 > ⚠️ **ALPHA** – early test version. Expect bugs (wrong or duplicate calls, odd headings, hangs). Use at your own risk, no warranty. Feedback and logs welcome.
 > ⚠️ **ALPHA** – frühe Testversion. Es wird Fehler geben. Nutzung auf eigene Gefahr, ohne Gewähr. Rückmeldungen und Logs willkommen.
 
+**Goal: replace DCS's built-in radio** (airfield ATC, AWACS, tankers, Supercarrier comms) with controllers you can actually talk to. / **Ziel: ersetzt den Standard-Funk von DCS.**
+
+## Features
+
+- **All 21 Caucasus airfields**, each on its own frequency: ATIS, Ground, Tower, Approach. Runway by wind and terrain, ILS where available.
+- **Ground:** startup, taxi, taxi conflicts ("hold position, give way"), taxi back to parking.
+- **Tower:** takeoff/landing clearances, line up and wait, overhead break, straight-in, pattern work (touch-and-go, low approach), landing sequence, wake turbulence.
+- **Approach:** radar vectors with headings, step-downs and speeds around terrain, holding with altitude stack and EAT, traffic advisories and alerts, ILS/straight-in in bad weather, final approach monitoring.
+- **Emergencies:** mayday / pan-pan get priority, everyone else waits. **Landing grade** after every touchdown.
+- **Carrier:** Marshal, Tower and LSO (Paddles) for carriers in the mission – Case I and Case III, marshal stack, final bearing, TACAN/ICLS, LSO calls, wave-off, bolter, grade.
+- **AWACS Overlord:** check in/out, picture, bogey dope (BRAA), declare, sort, spiked, threat calls, nearest tanker, vector to nearest field.
+- **Tankers Texaco/Arco:** rendezvous, sequence, pre-contact, contact/disconnect, refueling coaching.
+- **AI on the radio:** AI traffic talks to ATC; AI flights call Fox, Splash, Defending, Bingo, Winchester and Guard emergencies.
+- **Crew chief** on your SRS intercom, ground crew with fuel/ammo trucks and fire service.
+- **Three ways to talk:** voice over SRS, radio wheel (keyboard or HOTAS), F10 menu. Own voice per controller, radio effects, text in game.
+- **Multiplayer** (you host): every player has their own flow, other players count as traffic.
+
 ## Video
 
 [![DCS-ATC video](https://img.youtube.com/vi/JDQSN2WmkFo/hqdefault.jpg)](https://youtu.be/JDQSN2WmkFo)
