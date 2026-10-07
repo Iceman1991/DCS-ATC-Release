@@ -21,9 +21,9 @@ Funk über SRS auf Englisch mit Ground, Tower, Approach, ATIS, AWACS und Tankern
 - **Approach:** radar vectors with headings, step-downs and speeds around terrain, holding with altitude stack and EAT, traffic advisories and alerts, ILS/straight-in in bad weather, final approach monitoring.
 - **Emergencies:** mayday / pan-pan get priority, everyone else waits. **Landing grade** after every touchdown.
 - **Carrier:** Marshal, Tower and LSO (Paddles) for carriers in the mission – Case I and Case III, marshal stack, final bearing, TACAN/ICLS, LSO calls, wave-off, bolter, grade.
-- **AWACS Overlord:** check in/out, picture, bogey dope (BRAA), declare, sort, spiked, threat calls, nearest tanker, vector to nearest field.
-- **Tankers Texaco/Arco:** rendezvous, sequence, pre-contact, contact/disconnect, refueling coaching.
-- **AI on the radio:** AI traffic talks to ATC; AI flights call Fox, Splash, Defending, Bingo, Winchester and Guard emergencies.
+- **AWACS** (of your mission, also when spawned later): check in/out, picture, bogey dope (BRAA), declare, sort, spiked, threat calls, nearest tanker, vector to nearest field.
+- **Tankers** of your mission: rendezvous, sequence, pre-contact, contact/disconnect, refueling coaching.
+- **AI on the radio:** the mission's AI traffic talks to ATC (DCS-ATC spawns no aircraft itself); AI flights call Fox, Splash, Defending, Bingo, Winchester and Guard emergencies.
 - **Crew chief** on your SRS intercom, ground crew with fuel/ammo trucks and fire service.
 - **Three ways to talk:** voice over SRS, radio wheel (keyboard or HOTAS), F10 menu. Own voice per controller, radio effects, text in game.
 - **Multiplayer** (you host): every player has their own flow, other players count as traffic.
