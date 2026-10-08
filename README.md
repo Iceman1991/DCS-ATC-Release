@@ -5,13 +5,9 @@
 **Voice ATC for DCS World – every airfield on every DCS map (tested on Caucasus), fully offline.**
 Talk to Ground, Tower, Approach, ATIS, AWACS and tankers over SRS in English; the controllers answer with their own voices. Speech recognition (Whisper) and voices (Piper) run on your PC – no cloud, no API keys. Works in any mission on any map (only Caucasus is tested so far), also multiplayer (host or dedicated server).
 
-**Sprechende Flugsicherung für DCS World – jeder Platz auf jeder DCS-Karte (getestet im Kaukasus), komplett offline.**
-Funk über SRS auf Englisch mit Ground, Tower, Approach, ATIS, AWACS und Tankern; die Lotsen antworten mit eigener Stimme. Spracherkennung (Whisper) und Stimmen (Piper) laufen auf deinem PC – keine Cloud, keine API-Schlüssel. Jede Mission auf jeder Karte (bisher nur Kaukasus getestet), auch Mehrspieler (Host oder Dedicated Server).
-
 > ⚠️ **ALPHA** – early test version. Expect bugs (wrong or duplicate calls, odd headings, hangs). Use at your own risk, no warranty. Feedback and logs welcome.
-> ⚠️ **ALPHA** – frühe Testversion. Es wird Fehler geben. Nutzung auf eigene Gefahr, ohne Gewähr. Rückmeldungen und Logs willkommen.
 
-**Goal: replace DCS's built-in radio** (airfield ATC, AWACS, tankers, Supercarrier comms) with controllers you can actually talk to. / **Ziel: ersetzt den Standard-Funk von DCS.**
+**Goal: replace DCS's built-in radio** (airfield ATC, AWACS, tankers, Supercarrier comms) with controllers you can actually talk to.
 
 📖 **[Manual (English)](docs/MANUAL.md)** · **[Handbuch (Deutsch)](docs/ANLEITUNG.md)** – installation, first flight, every radio call, carrier, AWACS/tankers, multiplayer, dedicated server, own frequencies, other maps.
 
@@ -39,34 +35,28 @@ Funk über SRS auf Englisch mit Ground, Tower, Approach, ATIS, AWACS und Tankern
 
 ## Download
 
-➡️ **[Download (latest release)](../../releases/latest)** – click the ZIP under "Assets" / unter „Assets“ die ZIP anklicken.
+➡️ **[Download (latest release)](../../releases/latest)** – click the ZIP under "Assets".
 
-## Install / Installation
+## Install
 
 1. Close DCS, unzip, run `DCS-ATC-Setup.exe` and pick English or German (no admin rights needed, one Windows prompt for `MissionScripting.lua`).
 2. SmartScreen may warn because the setup is new and unsigned: *More info → Run anyway*. Windows Defender finds nothing; verify the file with the SHA256 checksum (`Get-FileHash`).
 3. At the end: set keys for the radio wheel and push-to-talk, then the settings window opens (voices, speech speed, altimeter hPa/inHg, runway lights, AWACS range).
 4. Done – DCS-ATC starts with every mission. Dedicated server: tick "Dedicated server" in the setup (see the manual).
 
----
 
-1. DCS beenden, ZIP entpacken, `DCS-ATC-Setup.exe` starten und Deutsch oder Englisch wählen (keine Adminrechte, eine Windows-Abfrage für `MissionScripting.lua`).
-2. SmartScreen kann warnen (neu, nicht signiert): *Weitere Informationen → Trotzdem ausführen*. Defender findet nichts; Prüfsumme mit `Get-FileHash` prüfen.
-3. Am Ende Tasten für Funkrad und Push-to-Talk festlegen, danach öffnen sich die Einstellungen (Stimmen, Sprechtempo, Höhenmesser hPa/inHg, Platzbefeuerung, AWACS-Reichweite).
-4. Fertig – DCS-ATC startet mit jeder Mission. Dedicated Server: im Setup „Dedicated Server“ anhaken (siehe Handbuch).
-
-## Requirements / Voraussetzungen
+## Requirements
 
 - Windows 10/11 64-bit, DCS World (any map; tested on Caucasus)
-- [SRS](https://github.com/ciribob/DCS-SimpleRadio-Standalone) in any folder or drive – found automatically, or choose it in the settings / in beliebigem Ordner, wird automatisch gefunden oder in den Einstellungen gewählt
+- [SRS](https://github.com/ciribob/DCS-SimpleRadio-Standalone) in any folder or drive – found automatically, or choose it in the settings
 - Microphone (radio calls in English), ~1.2 GB disk; speech recognition runs on the CPU
-- English or German user interface – choose at the start of the setup / Oberfläche Englisch oder Deutsch – Auswahl am Anfang des Setups
+- English or German user interface – choose at the start of the setup
 
-## Bug reports / Fehler melden
+## Bug reports
 
 Open an [issue](../../issues) with time, airfield, a short description and `atc-log.txt` plus `atc-debug.txt` from `%LOCALAPPDATA%\Programs\DCS-ATC`. A short video with SRS audio helps most.
 
-## Licenses / Lizenzen
+## Licenses
 
 Free, non-commercial (one bundled voice is CC BY-NC-SA 4.0). Bundles Whisper/whisper.cpp, Piper and voices from rhasspy/piper-voices, FFmpeg, espeak-ng, NAudio – see `THIRD-PARTY-NOTICES.txt` in the install folder.
 Unofficial fan project, not affiliated with Eagle Dynamics or the SRS project.
