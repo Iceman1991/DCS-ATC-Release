@@ -162,6 +162,7 @@ Tower: Enfield one one, after departure exit via C R P west, not above … until
 - **Ausflugrichtung wählen.** Mit Richtung bestimmst du den Meldepunkt: „ready for departure, north“.
 - **Bahn nicht frei.** Mit Verkehr im Endanflug oder auf der Bahn kommt „hold short runway two five, traffic …“ oder „line up and wait“. Tower gibt dich von selbst frei, sobald die Bahn frei ist.
 - **Zu früh.** Meldest du „ready“ vor dem Rollhalt, kommt „negative, you are not at the holding point“.
+- **Parallelbahn kreuzen.** Liegt zwischen Vorfeld und Startbahn eine Parallelbahn (etwa 03L vor 03R), endet die Rollfreigabe mit „hold short runway zero three left“. Am Haltepunkt dort meldest du „holding short runway 03L, request crossing“ (das Funkrad schlägt es vor; „ready for departure“ dort bekommt dieselbe Antwort): „cross runway zero three left, hold short runway zero three right“. An der Parallelbahn gibt es keine Startfreigabe. Ist sie belegt, kommt „hold short runway zero three left, traffic …“ und die Freigabe zum Kreuzen folgt von selbst, sobald sie frei ist. Wer ohne Freigabe kreuzt, bekommt „You are not cleared onto runway …“.
 
 **6. Abflug (Approach).** Beim Steigen durch etwa 500 ft über Grund:
 
@@ -317,8 +318,8 @@ Diese Sprüche gehen bei jedem Platzlotsen:
 
 Worauf der Lotse nicht antwortet:
 
-- **Readbacks bleiben unbeantwortet.** Wie im echten Funk heißt Stille: Readback in Ordnung. Als Readback gilt ein Spruch mit „wilco“, „roger“, „copy“, „cleared“ oder „report …“ oder einer, der die Werte des Lotsen wiederholt (hold short, contact, squawk, QNH bzw. altimeter, heading). Ein Readback einer IFR-Freigabe mit richtigem Squawk bekommt *„readback correct.“*
-- **Dieselbe Anfrage innerhalb von 30 Sekunden noch einmal gilt als Readback.**
+- **Readbacks bleiben unbeantwortet.** Wie im echten Funk heißt Stille: Readback in Ordnung. Als Readback gilt ein Spruch mit „wilco“, „roger“, „copy“, „cleared“, „approved“ oder „report …“, einer, der die Werte des Lotsen wiederholt (hold short, contact, squawk, QNH bzw. altimeter, heading oder nur die Zahlen: „Tower 134.0, Enfield 1-1“), oder nur dein Rufzeichen, auch mit „starting up“, „taxiing“, „lining up“, „rolling“ oder „switching“ („Start up approved, Enfield 1-1“, „Enfield 1-1“). Ein Readback einer IFR-Freigabe mit richtigem Squawk bekommt *„readback correct.“*
+- **Dieselbe Anfrage innerhalb von 30 Sekunden nach dem Ende der Lotsenantwort noch einmal gilt als Readback.**
 
 Willst du eine Antwort, beginne mit dem Stationsnamen („Kutaisi Tower, …“) oder nimm „request“, „confirm“, „verify“, „say“ oder „again“ in den Spruch.
 
@@ -1352,7 +1353,7 @@ Schlüsselwörter werden überall im Spruch erkannt. Beginne mit „<Platz> <Lot
 | „radio check“, „how do you read“ | Alle | „read you five“ |
 | „request weather“, „QNH“, „wind“, „which runway“, „runway in use“ | Alle | Wind, QNH, aktive Bahn |
 | „good day“, „thanks“, „bye“ | Alle | „good day“ |
-| „roger“, „wilco“, „copy“, Readback von Zahlen | Alle | Keine Antwort |
+| „roger“, „wilco“, „copy“, „start up approved“, nur das Rufzeichen, Readback von Zahlen | Alle | Keine Antwort |
 
 Enter im Rad sendet immer den vorgeschlagenen nächsten Spruch oder die Antwort auf die letzte Frage des Lotsen.
 

@@ -160,6 +160,7 @@ Tower: Enfield one one, after departure exit via C R P west, not above … until
 - **Choosing your exit.** Add a direction to pick the reporting point: "ready for departure, north".
 - **If the runway isn't free.** With traffic on final or on the runway you get "hold short runway two five, traffic …" or "line up and wait". Tower clears you by itself as soon as the runway is free.
 - **Too early.** If you call "ready" before you reach the holding point, you get "negative, you are not at the holding point".
+- **Crossing a parallel runway.** If a parallel runway lies between the ramp and your departure runway (e.g. 03L before 03R), the taxi clearance ends with "hold short runway zero three left". At that holding point report "holding short runway 03L, request crossing" (the radio wheel suggests it; "ready for departure" there gets the same answer): "cross runway zero three left, hold short runway zero three right". There is no takeoff clearance at the parallel runway. If it is busy you get "hold short runway zero three left, traffic …" and the crossing clearance follows by itself once it is clear. Cross without clearance and you get "You are not cleared onto runway …".
 
 **6. Departure (Approach).** When you climb through about 500 ft above the ground:
 
@@ -315,8 +316,8 @@ These phrases work with every airfield controller:
 
 Calls the controller doesn't answer:
 
-- **Readbacks get no reply.** As in real radio, silence means your readback was fine. A call counts as a readback when it contains "wilco", "roger", "copy", "cleared" or "report …", or when it repeats the controller's values (hold short, contact, squawk, QNH or altimeter, heading). A readback of an IFR clearance with the correct squawk gets *"readback correct."*
-- **Repeating the same request within 30 seconds counts as a readback.**
+- **Readbacks get no reply.** As in real radio, silence means your readback was fine. A call counts as a readback when it contains "wilco", "roger", "copy", "cleared", "approved" or "report …", when it repeats the controller's values (hold short, contact, squawk, QNH or altimeter, heading, or just the numbers: "Tower 134.0, Enfield 1-1"), or when it is only your callsign, optionally with "starting up", "taxiing", "lining up", "rolling" or "switching" ("Start up approved, Enfield 1-1", "Enfield 1-1"). A readback of an IFR clearance with the correct squawk gets *"readback correct."*
+- **Repeating the same request within 30 seconds after the controller's reply has been spoken counts as a readback.**
 
 If you need an answer, start the call with the station name ("Kutaisi Tower, …") or include "request", "confirm", "verify", "say" or "again".
 
@@ -1350,7 +1351,7 @@ Keywords are recognised anywhere in your call. Start with "<Airfield> <Controlle
 | "radio check", "how do you read" | Any | "read you five" |
 | "request weather", "QNH", "wind", "which runway", "runway in use" | Any | Wind, QNH, runway in use |
 | "good day", "thanks", "bye" | Any | "good day" |
-| "roger", "wilco", "copy", readback of numbers | Any | No answer |
+| "roger", "wilco", "copy", "start up approved", just your callsign, readback of numbers | Any | No answer |
 
 Pressing Enter in the wheel always sends the suggested next call, or the answer to the controller's last question.
 

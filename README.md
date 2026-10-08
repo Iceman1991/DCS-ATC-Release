@@ -20,7 +20,7 @@ Funk über SRS auf Englisch mit Ground, Tower, Approach, ATIS, AWACS und Tankern
 - **Every airfield on every map** (tested on Caucasus), each on its own frequency – tune it and that airfield answers: ATIS, Ground, Tower, Departure, Approach. Runway by wind and terrain, ILS where available. Own frequencies per airfield in `frequencies.jsonc` (created automatically with every airfield of your maps).
 - **Realistic military radio – you report, the controller reacts:** initial, overhead, base, final, ball call, commencing … If you don't report, the controller asks once, then the real consequence follows (go around, wave off, no clearance).
 - **Ground:** startup, taxi, taxi conflicts ("hold position, give way"), taxi back to parking.
-- **Tower:** takeoff/landing clearances, line up and wait, overhead break, straight-in, parallel runways with L/R, pattern work (touch-and-go, low approach), landing sequence, wake turbulence.
+- **Tower:** takeoff/landing clearances, line up and wait, overhead break, straight-in, parallel runways with L/R (incl. crossing the parallel runway), pattern work (touch-and-go, low approach), landing sequence, wake turbulence.
 - **Approach:** radar vectors with headings, step-downs and speeds around terrain, holding with altitude stack and EAT, traffic advisories and alerts, ILS/straight-in in bad weather, final approach monitoring.
 - **Airspace:** control zone per airfield, calls only when you could get in the way of traffic, unknown aircraft on guard, zone transit, VFR flight following, deviations in the debriefing.
 - **Emergencies:** mayday / pan-pan get priority, everyone else waits. **Landing grade** after every touchdown.
