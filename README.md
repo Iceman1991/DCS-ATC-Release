@@ -17,8 +17,9 @@ Funk über SRS auf Englisch mit Ground, Tower, Approach, ATIS, AWACS und Tankern
 
 - **Every airfield on every map** (tested on Caucasus), each on its own frequency – tune it and that airfield answers: ATIS, Ground, Tower, Approach. Runway by wind and terrain, ILS where available.
 - **Ground:** startup, taxi, taxi conflicts ("hold position, give way"), taxi back to parking.
-- **Tower:** takeoff/landing clearances, line up and wait, overhead break, straight-in, pattern work (touch-and-go, low approach), landing sequence, wake turbulence.
+- **Tower:** takeoff/landing clearances, line up and wait, overhead break, straight-in, parallel runways with L/R, pattern work (touch-and-go, low approach), landing sequence, wake turbulence.
 - **Approach:** radar vectors with headings, step-downs and speeds around terrain, holding with altitude stack and EAT, traffic advisories and alerts, ILS/straight-in in bad weather, final approach monitoring.
+- **Airspace:** control zone per airfield, calls only when you could get in the way of traffic, unknown aircraft on guard, zone transit, VFR flight following, deviations in the debriefing.
 - **Emergencies:** mayday / pan-pan get priority, everyone else waits. **Landing grade** after every touchdown.
 - **Carrier:** Marshal, Tower and LSO (Paddles) for carriers in the mission – Case I and Case III, marshal stack, final bearing, TACAN/ICLS, LSO calls, wave-off, bolter, grade.
 - **AWACS** (of your mission, also when spawned later): check in/out, picture, bogey dope (BRAA), declare, sort, spiked, threat calls, nearest tanker, vector to nearest field.
@@ -53,13 +54,13 @@ Funk über SRS auf Englisch mit Ground, Tower, Approach, ATIS, AWACS und Tankern
 ## Requirements / Voraussetzungen
 
 - Windows 10/11 64-bit, DCS World (any map; tested on Caucasus)
-- [SRS](https://github.com/ciribob/DCS-SimpleRadio-Standalone) in its default folder `C:\Program Files\DCS-SimpleRadio-Standalone`
+- [SRS](https://github.com/ciribob/DCS-SimpleRadio-Standalone) in any folder or drive – found automatically, or choose it in the settings / in beliebigem Ordner, wird automatisch gefunden oder in den Einstellungen gewählt
 - Microphone (radio calls in English), ~1.2 GB disk; speech recognition runs on the CPU
 - English or German user interface – choose at the start of the setup / Oberfläche Englisch oder Deutsch – Auswahl am Anfang des Setups
 
 ## Bug reports / Fehler melden
 
-Open an [issue](../../issues) with time, airfield, a short description and `atc-log.txt` from `%LOCALAPPDATA%\Programs\DCS-ATC`. A short video with SRS audio helps most.
+Open an [issue](../../issues) with time, airfield, a short description and `atc-log.txt` plus `atc-debug.txt` from `%LOCALAPPDATA%\Programs\DCS-ATC`. A short video with SRS audio helps most.
 
 ## Licenses / Lizenzen
 
