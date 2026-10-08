@@ -54,7 +54,7 @@ Setup installs to `%LOCALAPPDATA%\Programs\DCS-ATC` and creates these Start-menu
 | Start DCS-ATC | Starts the app manually. Normally not needed. |
 | Set keys (radio wheel, push-to-talk) | Opens the key prompt from step 4. |
 | Settings (callsign, volume, radio) | Opens the settings window. |
-| Ground crew, fog (defaults) | Opens `DcsAtcOptions.lua` in Notepad. |
+| Ground crew (default) | Opens `DcsAtcOptions.lua` in Notepad. |
 | Repair after DCS update | Patches `MissionScripting.lua` again (admin prompt). |
 | Readme | Opens the short readme. |
 | Uninstall DCS-ATC | Removes DCS-ATC, including the lines it added to `MissionScripting.lua` and `Export.lua`. |
@@ -213,7 +213,7 @@ Tower: Enfield one one, runway two five, wind …, cleared to land.
 
 - **Gear check.** If your gear is still up and you didn't say "gear down", Tower answers "check wheels down".
 - **Wrong runway.** If you are lined up for the wrong runway, Tower calls "check runway!".
-- **Other options.** Say "touch and go", "low approach" or "the option" instead of "full stop" (Radio wheel → Tower → "Final, touch and go").
+- **Other options.** Say "touch and go", "low approach" or "the option" instead of "full stop" (Radio wheel → Tower → "Base, touch and go").
 - **Going around.** If you go around, say "going around".
 
 You must report base or final yourself; Tower never clears you to land without that call. If you don't call, Tower asks once at about 2.5 NM (or on base): "Enfield one one, report final." If you still have no landing clearance inside 0.8 NM or below 300 ft, you are sent around: "go around, no landing clearance, climb and maintain 2000 feet, join left hand downwind runway two five, report base." This is also a deviation in the debriefing.
@@ -415,17 +415,18 @@ ENTER always offers the call you are expected to make next.
 | "report visual" (tanker) | `Tanker: visual` |
 | "report commencing" | `Carrier: commencing, angels 6, state 5.4` |
 | "report see me" (Case I) | `Carrier: see you at angels 2` |
+| "update state" (Case I, Marshal) | `Carrier: state 5.4` |
 | "report see you at ten" (Case II) | `Carrier: see you at ten` |
 | "report off" / "Report IP." (range) | `Range: off` / `Range: IP inbound` |
 
-If the question came with a handover ("contact Kutaisi Tower …, report four miles final"), ENTER sends the answer to the new controller. After the handover to an airfield's own Departure frequency, the suggestion is labelled `Departure: …`, and ENTER sends it to Departure.
+If the question came with a handover ("contact Kutaisi Tower …, report initial for overhead break"), ENTER sends the answer to the new controller. After the handover to an airfield's own Departure frequency, the suggestion is labelled `Departure: …`, and ENTER sends it to Departure.
 
 **2. Otherwise, the next step of your flight:**
 
 - Parked: `request startup` (in IFR weather: `request IFR clearance`), then `request taxi`
 - At the holding point: `ready for departure`
 - After takeoff: `airborne, climbing`; still inside the zone after "report leaving the control zone": `leaving the control zone`
-- Inbound: `inbound for landing`; near the CRP (Kutaisi): `C R P`; after the handoff to Tower: `inbound` while still far out, then `initial`, `overhead` or `four mile final, gear down`
+- Inbound: `inbound for landing`; near the CRP (Kutaisi): `C R P`; after the handoff to Tower: established on a long final (up to 12 NM, on the centreline) `9 mile final, gear down, full stop` (with your distance; Tower answers with the landing clearance, or "number 2, …" with traffic ahead); otherwise `inbound` while still far out, then `initial`, `overhead` or `four mile final, gear down`. Approach's handoff to Tower on a straight-in no longer contains a reporting point ("contact Kutaisi Tower."), Tower gives it; a "final" call on the extended centreline within 12 NM counts as final
 - In the pattern: `base, gear down`, then on final `final, gear down, full stop` (or `final, touch and go` during pattern work)
 - After a missed approach: `missed approach`
 - After landing: `runway vacated, request taxi to parking`
@@ -437,74 +438,80 @@ This follows the mandatory position reports (see [Mandatory reports](#mandatory-
 
 #### All wheel entries
 
-Some entries are hidden when they don't apply:
+The wheel shows only the entries that fit your situation right now, so "Report airspeed" appears only after "say airspeed" and "Airborne" only just after takeoff. The numbers 1–9 count the entries you see. The "Shown" column below says when an entry appears. If a controller has no fitting entry, it is not on the top level (for example Ground in the air, Tower after landing). Without a flight state (not in an aircraft yet, preview) the wheel shows everything. General, Emergency and Select airfield are always shown.
+
+Whole controllers are also hidden when they don't apply:
 
 - **Range:** only when the mission has a range.
 - **AWACS:** only when an AWACS of your side is airborne or your side has a GCI radar.
 - **Tanker:** only when a tanker of your side is airborne that your aircraft can refuel from.
 - **Carrier:** only when the mission has a carrier.
 
-Each level has at most 9 entries.
+Each level shows at most 9 entries.
 
 **Ground**
 
-| Entry | Sends |
-|---|---|
-| Request startup | `request startup` |
-| IFR clearance → *Next in departure direction* / *airfield …* | `request IFR clearance` / `request IFR clearance to <airfield>` |
-| Request taxi | `request taxi` |
-| Vacated, taxi to parking | `runway vacated, request taxi to parking` |
-| Progressive taxi | `request progressive taxi` |
-| Hot brakes | `hot brakes` |
+| Entry | Sends | Shown |
+|---|---|---|
+| Request startup | `request startup` | On the ground, parked |
+| IFR clearance → *Next in departure direction* / *airfield …* | `request IFR clearance` / `request IFR clearance to <airfield>` | On the ground before takeoff |
+| Request taxi | `request taxi` | On the ground before the holding point |
+| Vacated, taxi to parking | `runway vacated, request taxi to parking` | On the ground after landing |
+| Progressive taxi | `request progressive taxi` | On the ground |
+| Hot brakes | `hot brakes` | On the ground |
 
 The IFR clearance list shows nearby airfields; carriers and your current airfield are not listed.
 
 **Tower**
 
-| Entry | Sends |
-|---|---|
-| Ready for departure | `ready for departure` |
-| Ready, closed pattern | `ready for departure, closed pattern` |
-| Initial | `initial` |
-| Overhead | `overhead` |
-| Base, gear down | `base, gear down` |
-| Final, gear down, full stop | `final, gear down, full stop` |
-| Final, touch and go | `final, gear down, touch and go` |
-| Going around | `going around` |
-| Closed / SFO → *Request closed / Request SFO / High key / Low key, gear down* | `request closed traffic` / `request S F O` / `high key` / `low key, gear down` |
+| Entry | Sends | Shown |
+|---|---|---|
+| Ready for departure | `ready for departure` | On the ground before takeoff |
+| Ready, closed pattern | `ready for departure, closed pattern` | On the ground before takeoff |
+| Initial | `initial` | In the air |
+| Overhead | `overhead` | In the air |
+| Base, gear down | `base, gear down` (Enter suggestion adds your intention: `base, gear down, full stop` / `touch and go`) | In the air |
+| Final, gear down, full stop | `final, gear down, full stop` | In the air |
+| Base, touch and go | `base, gear down, touch and go` | In the air |
+| Going around | `going around` | In the air |
+| Closed / SFO → *Request closed / Request SFO* | `request closed traffic` / `request S F O` | In the air |
+| Closed / SFO → *High key / Low key, gear down* | `high key` / `low key, gear down` | After "request S F O" (or when asked for it) |
+| Closed / SFO → *Ready, practice approach* | `ready for departure, practice approach` | On the ground before takeoff |
 
 **Approach**
 
-| Entry | Sends |
-|---|---|
-| Airborne (after takeoff) | `airborne, climbing` |
-| Inbound for landing | `inbound for landing` |
-| Inbound, pattern work | `inbound for pattern work, touch and go` |
-| Request ILS / straight in | `request straight in` |
-| Flight following | `request flight following` |
-| Cancel approach | `cancel approach` |
-| Traffic → Traffic in sight | `traffic in sight` |
-| Traffic → Negative contact | `negative contact` |
-| C R P | `C R P` |
-| Report airspeed | Your IAS rounded to 10 kt, for example `250 knots` |
+| Entry | Sends | Shown |
+|---|---|---|
+| Airborne (after takeoff) | `airborne, climbing` | Just after takeoff, until you have checked in |
+| Inbound for landing | `inbound for landing` | In the air |
+| Inbound, pattern work | `inbound for pattern work, touch and go` | In the air |
+| Request ILS / straight in | `request straight in` | In the air |
+| Flight following | `request flight following` | In the air |
+| Cancel approach | `cancel approach` | In the air, not before the check-in after takeoff |
+| Traffic → Traffic in sight | `traffic in sight` | Up to 2 minutes after a traffic advisory to you |
+| Traffic → Negative contact | `negative contact` | Up to 2 minutes after a traffic advisory to you |
+| C R P | `C R P` | After "report C R P", or near the CRP on a CRP arrival |
+| Report airspeed | Your IAS rounded to 10 kt, for example `250 knots` | After "say airspeed" |
+| Say again | `say again` (to Approach) | Always, when there is room (max. 9) |
+| Request higher | `request higher` | In the air, when there is room (max. 9) |
 
-**Range:** Check in (`checking in`), IP inbound, In hot, Off safe, Check out (`checking out`), Check out, hung ordnance (`checking out, hung ordnance`)
+**Range:** Check in (`checking in`) in the air until you are checked in; then IP inbound, In hot, Off safe, Check out (`checking out`), Check out, hung ordnance (`checking out, hung ordnance`).
 
 **AWACS**
 
-| Entry | Sends |
-|---|---|
-| Check in | `checking in` |
-| Picture | `request picture` |
-| Bogey dope | `bogey dope` |
-| Sort | `request sort` |
-| Nearest tanker | `vector to tanker` (the answer names the tanker and its frequency) |
-| Vector nearest airfield | `vector to nearest airfield` |
-| Check out | `checking out` |
+| Entry | Sends | Shown |
+|---|---|---|
+| Check in | `checking in` | In the air, not checked in |
+| Picture | `request picture` | In the air |
+| Bogey dope | `bogey dope` | In the air |
+| Sort | `request sort` | In the air |
+| Nearest tanker | `vector to tanker` (the answer names the tanker and its frequency) | In the air |
+| Vector nearest airfield | `vector to nearest airfield` | In the air |
+| Check out | `checking out` | Checked in |
 
-**Tanker:** Request rejoin, Visual, Observation, Pre-contact (`pre contact`), Refuel complete
+**Tanker:** Request rejoin (in the air, before the rejoin), Visual (during the rejoin), Observation (during the rejoin and in observation), Pre-contact (`pre contact`) and Refuel complete (after "cleared to join").
 
-**Carrier:** Marshal check in (DCS-ATC fills in your full check-in), See you at (`see you at angels`), Initial, Commencing, Platform, Ball, Clara, Pigeons. Details in [Carrier operations](#carrier-operations).
+**Carrier:** Marshal check in (in the air, DCS-ATC fills in your full check-in) and Pigeons (in the air); after the Marshal check-in: See you at (`see you at angels`), Initial, Commencing, Platform, Ball, Clara. Details in [Carrier operations](#carrier-operations).
 
 **Emergency**
 
@@ -514,6 +521,7 @@ The IFR clearance list shows nearby airfields; carriers and your current airfiel
 | PAN PAN → *the same kinds without Fuel* | `pan pan, pan pan, pan pan, <kind>, request priority landing` |
 | Minimum fuel | `minimum fuel` (no emergency, no priority) |
 | Hung ordnance | `hung ordnance` (to Approach) |
+| Flameout, high key | `flameout, high key` (to Tower; real flameout, counts as an emergency; then Enter: `low key, gear down`) |
 | Cancel emergency | `cancel emergency` |
 
 The pilot voice adds your position, altitude and heading, and DCS-ATC picks the nearest suitable friendly airfield (with a runway of at least 1800 m if possible):
@@ -535,7 +543,7 @@ The pilot voice adds your position, altitude and heading, and DCS-ATC picks the 
 
 #### Radio wheel in multiplayer (clients)
 
-Other players who have DCS-ATC installed also get the wheel (same key). Their requests go to the host through the DCS chat, and nobody sees those chat lines. This also works on a dedicated server. The client wheel has no ENTER suggestion, shows no frequencies (only the host knows the airfield and `frequencies.jsonc` frequencies), has no Range or Carrier entries and no in-game VR text. See [Client mode](#client-mode-other-players-with-their-own-dcs-atc).
+Other players who have DCS-ATC installed also get the wheel (same key). Their requests go to the host through the DCS chat, and nobody sees those chat lines. This also works on a dedicated server. The client wheel has no ENTER suggestion, shows no frequencies (only the host knows the airfield and `frequencies.jsonc` frequencies), has no Range or Carrier entries and no in-game VR text. It doesn't know your flight state either, so it shows all entries as before (Approach without Say again and Request higher, max. 9). See [Client mode](#client-mode-other-players-with-their-own-dcs-atc).
 
 ### Radio wheel as text in the game (VR)
 
@@ -567,13 +575,13 @@ In every mission with DCS-ATC, each player group gets **F10 Other → ATC**. If 
 
 | Submenu | Entries |
 |---|---|
-| Ground | Request startup · Request taxi · Runway vacated, taxi to parking · Progressive taxi · IFR clearance → *Next in departure direction* / up to 8 friendly or neutral airfields, nearest first |
-| Tower | Ready for departure · Ready, closed pattern · Initial · Overhead · Base, gear down · Final, gear down, full stop · Final, touch and go · Going around · Request closed |
+| Ground | Request startup · Request taxi · Runway vacated, taxi to parking · Progressive taxi · Hot brakes · IFR clearance → *Next in departure direction* / up to 8 friendly or neutral airfields, nearest first |
+| Tower | Ready for departure · Ready, closed pattern · Initial · Overhead · Base, gear down · Final, gear down, full stop · Base, touch and go · Going around · Request closed |
 | Approach | Airborne (after takeoff) · Inbound for landing · Inbound, pattern work · Request straight in · C R P |
 | AWACS / Tanker | AWACS: picture · AWACS: bogey dope · AWACS: nearest tanker · Tanker: request rejoin · Tanker: pre-contact |
-| Emergency | MAYDAY → kind · PAN PAN → kind · Cancel emergency (kinds: engine failure, fuel, hydraulic failure, battle damage, medical) |
+| Emergency | MAYDAY → kind · PAN PAN → kind · Minimum fuel · Hung ordnance · Flameout, high key · Cancel emergency (kinds: engine failure, fuel (MAYDAY only), hydraulic failure, battle damage, medical, bird strike) |
 | General | Radio check · Say again · QNH / weather · Listen to ATIS · Request zone transit · Debriefing |
-| Settings | Ground crew on/off · Random fog on/off · Show |
+| Settings | Ground crew on/off · Show |
 
 F10 calls are handled like wheel calls, including the pilot voice and the choice of airfield. The F10 menu has fewer entries than the wheel: there is no Range, no Carrier, no AWACS check-in/out or sort, and no flight following. Use the wheel or your voice for those.
 
@@ -605,7 +613,8 @@ Enfield 1-1: Kutaisi Tower, Enfield 1 1, ready for departure.
 - **Who sees it:** only groups with a player tuned to that frequency in SRS. If SRS doesn't know your radios, you see everything. Guard reaches everyone.
 - **How long it stays:** at least 20 seconds, longer for long texts. AI flight chatter stays only 6–8 seconds.
 - **Hints are text only, never spoken:** wrong frequency, hostile airfield, "ATC: now …", debriefing, refuelling via the DCS ground crew, and similar.
-- **Late calls become text only:** if a call would come too late (more than 45 seconds in the queue, or 20 seconds for an AWACS call), you only see it as text.
+- **Late calls become text only:** if a call would come too late (more than 45 seconds in the queue, or 20 seconds for an AWACS call; 12 seconds for AWACS threat, merged, leaker and furball calls), you only see it as text.
+- **Order on a busy frequency:** emergencies and *defending* first, then the short combat calls of the flights (*fox*, *pitbull*, *splash* …), then AWACS *threat*/*merged*/*leaker*/*furball*/*pop-up*, then *commit*/*targeting* and answers, then picture, new group, faded and on-station calls, then other AI chatter. A long picture waiting in the queue doesn't hold up a *pitbull* any more.
 
 ### Voices, radio effect and speech pace
 
@@ -796,10 +805,6 @@ If the visibility is below 5 km or the ceiling is below 1,000 ft, the controller
 
 At **night** (sun more than 6° below the horizon), and for types that don't fly an overhead break, "inbound" gets a straight-in or instrument approach. These types are helicopters, C-130/C-17, C-47, An-/Il-/Tu-, B-1/B-52, KC tankers, E-2/E-3 and S-3. Say "overhead", "VFR" or "cancel IFR" to get the overhead break anyway. ("request visual approach" gives you a visual straight-in approach.)
 
-**Random fog**
-
-The F10 menu has **ATC → Settings → Random fog on/off**.
-
 ### Ground
 
 All Ground requests work only within 5 km of the airfield. Farther away you get a note to call Approach after takeoff.
@@ -835,7 +840,7 @@ These phrases count as a start-up request: "request startup", "start up", "reque
 - **Route:** only Kutaisi gives taxiway names. Other airfields say "taxi to holding point runway two five".
 - **QNH:** given only on the first call, and only if you didn't give the ATIS letter. "request startup and taxi" answers both requests at once.
 - **Squawk:** a VFR squawk comes with the taxi clearance. If you have an IFR clearance, you already have a squawk.
-- **Separate Tower frequency:** "Hold short, contact Kutaisi Tower … when ready for departure."
+- **Separate Tower frequency:** "Hold short runway two five, contact Kutaisi Tower … when ready for departure."
 - **Progressive taxi:** while taxiing, "request progressive taxi" gets directions to the holding point, such as "holding point runway two five at your 2 o'clock, 450 meters". The directions are updated each time the distance halves and end with "…, hold short of runway two five".
 
 **Ground warnings while you taxi**
@@ -880,7 +885,8 @@ You can say "ready", "ready for departure", "holding short" or "holding point". 
 | VFR with direction, other airfields ("request taxi, departure north") | "leave the control zone northbound, not above …" |
 | VFR without direction, other airfields | "own navigation, not above … until leaving the control zone" |
 | IFR clearance | "fly runway heading, climb and maintain 3000 feet" |
-| Closed pattern ("ready for departure, closed pattern") | "join left hand downwind, 2000 feet, …, cleared for takeoff. Report final." |
+| Closed pattern ("ready for departure, closed pattern") | "runway two five, wind …, cleared for takeoff, left closed traffic approved, report base." |
+| Practice approaches in instrument conditions ("ready for departure, practice approach") | "after departure fly runway heading, climb and maintain 3000 feet, …, cleared for takeoff", after liftoff "contact Approach", after "airborne, climbing" radar vectors. A plain "closed pattern": "closed traffic not approved, I F R conditions." |
 
 **When Tower holds you**
 
@@ -975,14 +981,14 @@ Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the t
 #### Straight-in
 
 > **You:** Kutaisi Approach, Enfield 1-1, request straight in.  
-> **Approach:** Enfield one one, Kutaisi Approach, straight in approach runway two five approved, QNH one zero one three. Fly heading two four zero for six mile final. Maintain 2500 feet. Contact Kutaisi Tower, report four miles final.  
+> **Approach:** Enfield one one, Kutaisi Approach, straight in approach runway two five approved, QNH one zero one three. Fly heading two four zero for six mile final. Maintain 2500 feet. Contact Kutaisi Tower.  
 > **You:** Kutaisi Tower, Enfield 1-1, four miles final, gear down.  
 > **Tower:** Enfield one one, runway two five, wind …, cleared to land.
 
 - **How you are routed:** within 8 NM, if the terrain is clear, you go direct to a 6-mile final. Otherwise Approach gives you radar vectors to final.
 - **Altitude:** on or below the glide path, but never below terrain clearance.
 - **ILS runways:** "maintain 2500 feet until established, cleared ILS approach runway two five, localizer …"
-- **Calling "initial" on a straight-in** gets "you are cleared straight in, continue approach runway two five, report four miles final."
+- **Calling "initial" on a straight-in** gets "make straight in runway two five, report four miles final."
 
 #### Pattern work
 
@@ -1010,7 +1016,7 @@ Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the t
 
 | Situation | Controller |
 |---|---|
-| You: "going around" / "go around" (VFR) | "roger, go around. Climb 2000 feet runway heading, join left hand downwind runway two five, report final." |
+| You: "going around" / "go around" (VFR) | "roger, climb and maintain 2000 feet, join left hand downwind runway two five, report base." (with pattern work: "roger, left closed traffic approved, report base.") |
 | You: "going around" / "missed approach" (IFR or straight-in) | "roger, go around. Fly runway heading, climb and maintain 3000 feet, contact Kutaisi Approach." (see Missed approach below) |
 | Runway blocked or MAYDAY traffic inside 4 NM, and you are inside 0.8 NM | "go around, I say again, go around, traffic on runway, climb and maintain 2000 feet, join left hand downwind runway two five, report base." |
 | Going around without a call while you hold a landing clearance (300 m past the threshold, still above 200 ft) | "I show you going around, confirm? Climb and maintain 2000 feet, join left hand downwind runway two five, report base." The landing clearance is cancelled, plus a deviation. IFR or straight-in: the same question, then the missed approach. |
@@ -1032,7 +1038,7 @@ Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the t
   - Straight-in or IFR: to the final approach course, with a gate at 10, 8, 6 or 4 NM.
 - **Terrain:** the plan uses the terrain map and never descends you below the minimum vectoring altitude: terrain plus 1,000 ft, or plus 2,000 ft in mountains. If terrain blocks the active runway, the plan may use the opposite runway (up to 10 kt tailwind) or a circling approach: "Due to terrain, expect …".
 - **When Approach talks:** every call gives a heading. Distance, altitude, speed and leg are mentioned only when they change. Descents come in steps along a 2.5° profile. When the sequence changes, Approach says "No traffic ahead, you are number one" or "You are number 2, 1 aircraft ahead".
-- **Handoff to Tower:** once you are on the centreline, VFR traffic gets "on course, 6 miles from initial, maintain 2000 feet, contact Kutaisi Tower, report initial for overhead break." IFR traffic gets the approach clearance (below).
+- **Handoff to Tower:** only shortly before the gate (within 2 NM of it, at most 1,000 ft above the gate altitude) or at the gate at the latest. If you join the centreline farther out, Approach keeps you, steps you down along the profile ("descend and maintain 4000 feet", the gate altitude only once the profile at your position gets there) and hands you off near the gate. VFR traffic gets "on course, 6 miles from initial, maintain 2000 feet, contact Kutaisi Tower, report initial for overhead break." IFR traffic gets the approach clearance (below).
 - **Kutaisi CRPs:** North and South are always allowed, West only for runway 07 and East only for runway 25. If you fly to one yourself, report it ("C R P south"). Approach then sends you to initial or overhead and hands you to Tower. A CRP that isn't allowed gets "negative, C R P east is not available for runway zero seven. Enter via C R P …". Other airfields have no CRPs: "negative, no reporting points at Senaki Kolkhi", followed by vectors.
 
 #### Altitude and speed instructions
@@ -1062,7 +1068,7 @@ Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the t
 
   | Deviation | Approach says |
   |---|---|
-  | Large (more than 30° or 1,000 ft) | Repeats the heading, or says "check altitude, climb and maintain …" or "expedite descent, maintain …" |
+  | Large (more than 30° or 1,000 ft) | Repeats the heading, or says "check altitude, climb and maintain …" or, if you are too high: climbed without clearance "verify altitude, maintain …", the second time "climb not authorized, descend and maintain …"; not yet down from a descent "descend and maintain …" again; "expedite descent, maintain …" only when traffic is at your altitude |
   | The same correction ignored three or more times | "verify heading/altitude" → new vectors or "… immediately" → "say intentions" → "you are not following instructions, you are removed from the sequence. Approach cancelled …" (deviation) |
 
 #### Requests under vectors
@@ -1071,7 +1077,7 @@ Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the t
 |---|---|
 | "request direct" | Approved only if you are number one, the terrain is clear and you are not too high: "direct approved, turn left heading …". Otherwise "unable, …" |
 | "request heading 270" under vectors | "unable, …" (vectors continue) |
-| "request higher" / "request lower" / "request 6000 feet" / "request flight level 200" | "climb/descend and maintain …". After a climb, the descent profile is held for 2 min. Or "unable, minimum altitude …" / "unable, traffic". In the hold: "unable, maintain … in the hold, I will call you." Once you have been handed to Tower: "negative, continue as cleared." |
+| "request higher" / "request lower" / "request 6000 feet" / "request flight level 200" | "climb/descend and maintain …". Higher under radar vectors: far out (more than 25 NM track to the gate) approved in one block – if you are already above, your present altitude ("maintain 14000 feet"), otherwise up to FL200 (props 10,000 ft), but only as high as still lets you make the gate on the normal profile; the altitude stays until the profile needs the descent, which then comes as "descend at pilot's discretion, maintain …". Closer in: "unable higher, expect lower shortly, maintain …" (traffic: "unable higher, traffic, maintain …"); a request for higher never gets "descend". "request descent at pilot's discretion": "descend at pilot's discretion, maintain …" (down to 1,000 ft above the gate altitude); until 10 NM before the gate you descend when you like, no reminders. Or "unable, minimum altitude …" / "unable, traffic". In the hold: "unable, maintain … in the hold, I will call you." Once you have been handed to Tower: "negative, continue as cleared." |
 | "request runway 07" | "runway zero seven approved." The plan is rebuilt |
 | "VFR", "cancel IFR", "visual recovery" (VFR weather) | "roger" (with "cancel IFR": "roger, I F R cancelled"), then "Expect vectors to initial …" |
 | "request straight in" while being vectored | "roger, straight in approach approved." The plan is rebuilt |
@@ -1080,7 +1086,7 @@ Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the t
 
 **ILS** (the runway has a localizer in the map data):
 
-> **Approach:** Enfield one one, 12 miles from touchdown, maintain 3000 feet until established, cleared ILS approach runway two five, QNH one zero one three, contact Kutaisi Tower, report four miles final.
+> **Approach:** Enfield one one, 12 miles from touchdown, maintain 3000 feet until established, cleared ILS approach runway two five, QNH one zero one three, contact Kutaisi Tower.
 
 The controller only monitors an ILS approach: no glide-path calls, just the one low-altitude alert.
 
@@ -1095,7 +1101,7 @@ Glide-path terms: "well/slightly above/below glidepath". Corrections: "increase 
 > **You:** Kutaisi Approach, Enfield 1-1, request visual approach.  
 > **Approach:** Enfield one one, Kutaisi Approach, radar contact, 15 miles west of the field, QNH …. Expect visual approach runway two five, report field in sight.  
 > **You:** Field in sight.  
-> **Approach:** Enfield one one, Kutaisi Approach, cleared visual approach runway two five, QNH …. Contact Kutaisi Tower, report four miles final.
+> **Approach:** Enfield one one, Kutaisi Approach, cleared visual approach runway two five, QNH …. Contact Kutaisi Tower.
 
 - If you already said "field in sight" in the request, you are cleared at once.
 - "negative field in sight" gets "roger, report field in sight."
@@ -1229,14 +1235,15 @@ With `"AirspaceWatch": false`, only the safety calls remain. There are no "possi
 | You say | Response |
 |---|---|
 | "mayday mayday mayday, engine failure, request immediate landing" within 5 NM, or on a final inside 6 NM | **Tower:** "roger mayday, runway two five, wind …, QNH …, cleared to land, emergency services standing by." You may land on any runway you are lined up on |
-| Same, farther out | **Approach:** "roger mayday, all traffic is holding. Turn …, descend at your discretion, maintain … Runway two five available, QNH …, say fuel remaining and persons on board." Tower clears you to land at about 5 NM. Any answer to the question gets "roger" |
-| Emergency call on the ground | "roger mayday, emergency services are on the way. Hold position, say nature of emergency." |
+| Same, farther out | **Approach:** "roger mayday, all traffic is holding. Turn …, descend at your discretion, maintain … Runway two five available, QNH …, say souls on board and fuel remaining." (not after a wheel/F10 call, it already names both). Tower clears you to land at about 5 NM. Any answer to the question gets "roger"; Enter suggests "25 minutes fuel, one soul on board" |
+| Emergency call on the ground | The wheel/F10 call is "MAYDAY MAYDAY MAYDAY, Kutaisi Ground, Enfield 1 1, engine failure, shutting down." Answer: "roger mayday, emergency services are on the way. Hold position." Without the kind of emergency: "…, say nature of emergency." |
 | "pan pan, pan pan, pan pan, …" | Same procedure: you get priority, but other traffic doesn't hold |
 | A second emergency call while your emergency is running | "roger mayday, continue as cleared." |
-| "cancel emergency" | "roger, emergency cancelled, continue as cleared." From the pattern: "Join left hand downwind, 2000 feet, report final." |
+| "high key" / "flameout, high key" during your own emergency (real flameout, also in IMC) | "report low key." At "low key, gear down": "runway two five, wind …, cleared to land." (SFO practice: only VMC and without another emergency) |
+| "cancel emergency" | Under radar vectors: "roger, emergency cancelled, continue as cleared." With landing clearance: "roger, emergency cancelled, runway two five, cleared to land." From the initial or the pattern: "Join left hand downwind, 2000 feet, report base." Otherwise (far out, no emergency running) just "roger." |
 | "minimum fuel", "low fuel", "bingo" | "roger minimum fuel, number 2, expect approach in 3 minutes." or "…, expect no delay." No priority |
 
-- **Wheel and F10:** **Emergency → MAYDAY / PAN PAN →** engine failure, fuel, hydraulic failure, battle damage, medical.
+- **Wheel and F10:** **Emergency → MAYDAY / PAN PAN →** engine failure, fuel (MAYDAY only), hydraulic failure, battle damage, medical, bird strike.
 - **Which airfield:** if you haven't named or selected an airfield and aren't tuned to one, the emergency goes to the nearest suitable friendly or neutral airfield. Runways of 1,800 m or longer are preferred.
 
 **What a MAYDAY means for everyone else at the airfield**
@@ -1425,7 +1432,7 @@ While a player is in the recovery or launching, or mission AI is landing on the 
 - after "say needles" it sends what your ACLS needles should show;
 - after "report see me" it sends *see you at angels N*, after "report commencing" *commencing, angels N, state X*, after "report see you at ten" *see you at ten*.
 
-Otherwise ENTER follows the recovery: *Marshal, checking in* → *see you at angels* (Case I) or *commencing* (Case II/III) → *platform* → *see you at ten* (Case II, within 12 NM of the ship) → *ball* (after "call the ball"). In Case I there is nothing to send after Charlie (zip lip). After a Case II/III cat shot, ENTER sends *airborne*, then *on top, angels N*. On the deck it sends nothing.
+Otherwise ENTER follows the recovery: *Marshal, checking in* → *see you at angels* (Case I) or *commencing* (Case II/III) → *platform* → *see you at ten* (Case II, within 12 NM of the ship) → *ball* (after "call the ball"). Each report is offered only once: after "see you at" ENTER offers nothing more in the holding, and *platform* only until Approach has radar contact (not again after a bolter). In Case I there is nothing to send after Charlie (zip lip). After a Case II/III cat shot, ENTER sends *airborne*, then *on top, angels N*. On the deck it sends nothing.
 
 The fuel state in the check-in and the ball call is filled in only for carrier types with a known fuel capacity: Hornet, Tomcat, Viking, Hawkeye and Harrier.
 
@@ -1459,7 +1466,7 @@ Calls you can make while holding:
 
 | You say | Reply |
 |---|---|
-| Case I: "Enfield 1-1, see you at angels 2" (answer to "report see me") | "Enfield one one, update state, switch Tower." Then give your fuel: "Enfield 1-1, 5.9" → "Enfield one one, Marshal, roger, state five point niner." |
+| Case I: "Enfield 1-1, see you at angels 2" (answer to "report see me") | "Enfield one one, update state, switch Tower." Then give your fuel: "Enfield 1-1, 5.9" → "Enfield one one, Marshal, roger, state five point niner." (ENTER offers `state 5.9`). With your fuel already in the call ("see you at angels 2, state 5.9"): "Enfield one one, roger, switch Tower." From then on Tower answers you (a second "see you at" gets "roger"). |
 | Case II/III: "see you at angels 6", or *established*, *holding*, *in the stack* | "Enfield one one, roger." |
 | Case II/III readback: "Enfield 1-1, 165 radial, 21 DME, angels 6" | "Enfield one one, readback correct." A wrong value is corrected: "Enfield one one, negative, angels 6." A readback is not a new check-in; your EAT stays. |
 | "Enfield 1-1, state 4.5" | "Enfield one one, Marshal, roger, state four point five." (below bingo: your bingo signal, see below) |
@@ -1482,7 +1489,9 @@ If your Charlie time is 1 minute past while you are not in the holding (more tha
 
 > **Marshal:** "Enfield one one, signal Delta, expected Charlie two zero."
 
-**2. Initial and break: zip lip.** Case I is flown in radio silence. You do not call "initial". DCS-ATC recognises the initial when you are 1.5–6 NM astern, within 1 NM of the ship's axis and below 1500 ft. It then shows only a text hint: *Initial: zip lip, no radio until your own ball call (about 3/4 NM: "Hornet ball, 5.2").* If you say or select "initial", you get the same text and no radio reply.
+If the deck is the reason for the delay (the ship is still turning into the wind, or two or more AI aircraft are in the pattern), Marshal tells everyone once: "99, signal Delta." Keep holding: the order of the stack and your Charlie time stay the same.
+
+**2. Initial and break: zip lip.** Case I is flown in radio silence. You do not call "initial". DCS-ATC recognises the initial when you are 1.5–6 NM astern, within 1 NM of the ship's axis and below 1500 ft. It then shows only a text hint: *Initial: zip lip, no radio until your own ball call (about 3/4 NM: "Hornet ball, 5.2").* If you say or select "initial" after Charlie, you get the same text and no radio reply. Before Charlie (still holding) it is refused and you keep your place: "Enfield one one, negative, not Charlie, hold angels 2, expected Charlie zero seven."
 
 **3. Groove and ball call.** Roll into the groove and call the ball yourself at about ¾ NM:
 
@@ -1508,15 +1517,17 @@ A ball call counts only in the groove: up to 1.5 NM astern, within 0.3 NM of the
 **2. Commencing.** Marshal doesn't call you at your EAT. Leave the marshal point at your EAT and report:
 
 > **You:** "Marshal, Enfield 1-1, commencing, angels 6, altimeter 29.92, state 5.2."
-> **Marshal:** "Enfield one one, radar contact, final bearing three four five."
+> **Marshal:** "Enfield one one, radar contact, final bearing three four five, switch Approach."
 > *(Text: 4000 ft/min to 5000 ft, call "platform" there; then 2000 ft/min to 1200 ft; at 10 DME gear/flaps/hook down.)*
 
-If you are at the marshal point but haven't reported 60 s after your EAT, Marshal asks once: "Enfield one one, Marshal, report commencing." 2 minutes after your EAT you get a new time at the back of the stack ("Enfield one one, Marshal, new expected approach time …") and a deviation.
+If you are at the marshal point but haven't reported 60 s after your EAT, Marshal asks once: "Enfield one one, Marshal, report commencing." 2 minutes after your EAT you get a new time at the back of the stack ("Enfield one one, Marshal, new expected approach time …") and a deviation. ENTER offers *commencing* from 15 s before your EAT, when Marshal accepts it. Earlier, Marshal answers "Enfield one one, negative, your expected approach time is zero seven." and you keep holding.
 
 **3. Platform.** At 5000 ft:
 
 > **You:** "Enfield 1-1, platform."
-> **Approach:** "Enfield one one, roger." (or "radar contact, N miles" if you have not been identified yet)
+> **Approach:** "Enfield one one, Approach, radar contact, 19 miles." (later "platform" calls, e.g. after a bolter: "Enfield one one, roger.")
+
+If you don't call Approach, Approach identifies you by itself once you are below 4500 ft or within 12 NM. Approach gives no course corrections before radar contact.
 
 **4. Final and ACLS.** On the final bearing (within 2 NM of it and heading toward the ship), Approach guides you:
 
@@ -1577,7 +1588,7 @@ A wave-off is mandatory. If you ignore it, Paddles repeats it up to twice before
 After a bolter or wave-off:
 
 - **Case I:** no radio. Climb out, re-enter the pattern and fly another pass. "Call the ball" comes again.
-- **Case II/III:** "Enfield one one, Approach, radar contact, turn left heading 165, maintain 1200, downwind." About 5 NM astern: "Enfield one one, Approach, turn left heading 345, intercept final." The ACLS and mile calls then start again.
+- **Case II/III:** Departure: "Enfield one one, Departure, radar contact, turn left heading 165, maintain 1200, downwind." About 5 NM astern, Approach: "Enfield one one, Approach, turn left heading 345, intercept final." The ACLS and mile calls then start again.
 
 ### Bingo and divert
 
@@ -1627,9 +1638,12 @@ There is **no radio on the deck**. Any call on the deck only shows the hint *No 
 
 **Case II/III departure:**
 
-> *(Text: call "airborne", climb straight ahead, at 7 DME arc at 10 DME to the 354 radial, call "on top" above the clouds.)*
+> *(Text Case III: call "airborne", climb straight ahead, at 7 DME arc at 10 DME to the 024 departure radial, then outbound on it, call "on top" above the clouds.)*
+> *(Text Case II: call "airborne", straight ahead parallel to BRC 354 staying visual, at 7 DME arc at 10 DME to the 024 departure radial, climb through the clouds only on it, call "on top" above the clouds.)*
 > **You:** "Enfield 1-1, airborne."
-> **Departure:** "Enfield one one, Departure, radar contact."
+> **Departure:** "Enfield one one, Departure, radar contact, departure radial zero two four."
+
+DCS-ATC always uses BRC + 30° as the departure radial, so the arc never leads to the radial you are already on after the launch.
 > **You:** "Enfield 1-1, on top, angels 8."
 > **Departure:** "Enfield one one, Departure, switch Overlord 251.5." (without an AWACS: "Enfield one one, Departure, cleared to switch.")
 
@@ -1637,7 +1651,7 @@ Other departure reports on the way ("passing 2.5", "arcing", "established outbou
 
 ### Formation flights and other traffic
 
-- **Wingmen:** while flying in formation with their lead (airborne, not on the deck), wingmen share the lead's Marshal check-in and Charlie or approach time. After that, each wingman flies their own break and groove and gets their own LSO calls and grade. If a wingman leaves the formation while holding, they get their own place in the stack.
+- **Wingmen:** while flying in formation with their lead (airborne, not on the deck), in Case I wingmen share the lead's Marshal check-in and Charlie time. After that, each wingman flies their own break and groove and gets their own LSO calls and grade. If a wingman leaves the formation while holding, they get their own place in the stack. Case II/III approaches are flown one by one: when the lead checks in, each wingman gets their own Marshal assignment (next angels, marshal point 1 DME farther out, approach time 1 minute after the lead) and reports "commencing" themselves.
 - **No check-in:** any friendly aircraft in the groove with its gear down gets the LSO ("Enfield one two, call the ball.", calls and grade), even without a check-in.
 - **Mission AI:** mission AI aircraft that have a landing waypoint on the carrier make their own ball call ("Hornet ball, 5.4." → "Roger ball."). They stay silent while a player is in the groove. An AI aircraft that goes around three times is sent to the nearest airfield. This chatter follows `"AiChatter"` (default `true`).
 - **Airspace watch:** if you fly toward a friendly carrier without checking in, Marshal warns you. This happens below 2500 ft within 5 NM while heading for the ship, or below 1500 ft in the recovery sector astern (±30° of the final bearing, up to 10 NM). For example: "Enfield one one, Marshal, you are approaching a warship, turn left heading 260, remain clear of the carrier by 5 miles." If nobody in your flight has talked to a controller yet, the call starts with "Unidentified aircraft …" and asks you to identify yourself. The call goes out on Guard if you aren't tuned to the carrier. Switch: `"AirspaceWatch"` (default `true`).
@@ -1652,15 +1666,15 @@ Other departure reports on the way ("passing 2.5", "arcing", "established outbou
 | Case II/III holding | readback "165 radial, 21 DME, angels 6" | Marshal: "readback correct" (or "negative, …" with the right value) |
 | Holding | "state 4.5" | Marshal: "roger, state four point five" (or bingo signal) |
 | Any time | "pigeons" / "TACAN" / "say position" | Marshal: bearing and distance to mother, BRC, TACAN, ICLS |
-| Case I | (nothing, wait) | Tower: "signal Charlie" (or Marshal: "signal Delta, expected Charlie …") |
-| Case I initial | (zip lip; "initial" only gives a text hint) | – |
-| Case II/III | "commencing, angels 6, state 5.2" | Marshal: "radar contact, final bearing …" |
-| Case II/III | "platform" | Approach: "roger" |
+| Case I | (nothing, wait) | Tower: "signal Charlie" (or Marshal: "signal Delta, expected Charlie …"; deck delayed: "99, signal Delta") |
+| Case I initial | (zip lip; "initial" only gives a text hint) | – (before Charlie: "negative, not Charlie, hold angels 2, expected Charlie …") |
+| Case II/III | "commencing, angels 6, state 5.2" | Marshal: "radar contact, final bearing …, switch Approach" |
+| Case II/III | "platform" | Approach: "Approach, radar contact, N miles" (later: "roger") |
 | Case II/III | "up and on" / "down and left" / "on and on" … | Approach: "concur" or "disregard needles, …" |
 | Case II | "see you at ten" | Approach: "roger, switch Tower" |
 | Groove | "Hornet ball, 5.2" (*ball*) | Paddles: "Roger ball." (Case III: "Roger ball, 25 knots, axial.") |
 | Groove | "Clara" (*Clara / Clarence*) | Paddles: "roger Clara, keep it coming." |
-| Launch II/III | "airborne" | Departure: "radar contact" |
+| Launch II/III | "airborne" | Departure: "radar contact, departure radial …" |
 | Launch II/III | "passing 2.5" / "arcing" / "established outbound" / "Kilo" | Departure: "roger" |
 | Launch II/III | "on top, angels 8" | Departure: "switch Overlord 251.5" (without AWACS: "cleared to switch") |
 | Unclear call | – | Marshal: "Enfield one one, say again." (in the groove: no reply, except an unclear ball call, which counts) |
@@ -1697,9 +1711,9 @@ Marshal:  Enfield one one, Marshal, case three recovery, CV-1 approach, expected
           one six five radial, 21 DME, angels 6. Expected approach time two two.
    ... holding at the marshal point ...
 You:      Marshal, Enfield 1 1, commencing, angels 6, state 5.2.
-Marshal:  Enfield one one, radar contact, final bearing three four five.
+Marshal:  Enfield one one, radar contact, final bearing three four five, switch Approach.
 You:      Enfield 1 1, platform.
-Approach: Enfield one one, roger.
+Approach: Enfield one one, Approach, radar contact, 19 miles.
 Approach: Enfield one one, left of course, fly heading three five five.
 Approach: Enfield one one, Approach, ACLS lock on, say needles.
 You:      Enfield 1 1, up and on.
@@ -1713,7 +1727,7 @@ Paddles:  Roger ball, 25 knots, axial.
    ... touchdown, hook skips ...
 Paddles:  Bolter, bolter, bolter.
           (text: LSO: B, groove 12 s (2.5 points))
-Approach: Enfield one one, Approach, radar contact, turn left heading one six five,
+Departure: Enfield one one, Departure, radar contact, turn left heading one six five,
           maintain 1200, downwind.
 Approach: Enfield one one, Approach, turn left heading three four five, intercept final.
 ```
@@ -1755,6 +1769,7 @@ If you say *"radio check"* or *"how do you read"* to any of these stations, the 
 - **Callsign:** taken from the DCS callsign of the mission's AWACS (Magic, Overlord, Darkstar, Wizard, Focus …). A numeric callsign is read digit by digit ("two four seven"). If there is none, the AWACS is called **Overlord**.
 - **GCI:** if your side has no AWACS but has an early-warning radar, a GCI answers instead: **Magic** for blue, **Moscow** for red.
 - **What it can see:** only aircraft that your side's sensors have actually detected, within 250 NM of you. A contact that is detected but not identified is called a **bogey** and has no type.
+- **Bogey, then hostile:** every new contact starts as a **bogey**. Once its type is known and the AWACS has tracked it for about 40 s (the ID criteria), or at once if it fires on your side, the AWACS declares it to everyone on the frequency: *"Overlord, north group, hostile."* A *declare* answers with the current state.
 - **Handover after departure:** when an AWACS or GCI is up, the tower or departure controller hands you over with *"leaving control zone, contact Overlord 251.5."*
 
 #### Check-in and check-out
@@ -1782,10 +1797,10 @@ While you are checked in with AWACS, the airfield's zone guard only watches the 
 | **declare** with no position and no lock | Nearest group, including neutral aircraft. |
 | **spike** / **spiked 270** (magnetic bearing; you can speak the digits one by one) | *"spike 270, group BRAA …, hostile …"* or *"spike 270, nothing known."* If you give no bearing: *"say spike bearing."* |
 | **sort**, **request sort**, **targeting**, **request target** | Targets per element, from left to right: *"Enfield one one, Overlord, target lead group BRAA … Enfield one three, target trail group BRAA …"*. A 2-ship gets one group and a 4-ship gets two. |
-| **committing**, **targeted**, **engaged**, **engaging** (optionally with a group name such as *"north group"*, or a direction *north/south/east/west*) | Confirms that group with its BRAA, otherwise the nearest group. |
-| **splash** / **splash 2** / **kill** | *"Overlord copies splash two."*, plus *", picture clean"* if nothing is left. |
+| **committing**, **targeting**, **targeted**, **engaged**, **engaging** (optionally with a group name such as *"north group"*, or a direction *north/south/east/west*) | Confirms that group with its BRAA, otherwise the nearest group: *"Enfield one one, Overlord, north group BRAA 354, 20, 20 thousand, hot."* If you name an unnamed group by its direction first, that name sticks. From then on the group is yours: no more threat calls for it, only short target updates at 20 and 10 NM. If another friendly flight (player or AI) already has that group, the AWACS refuses: *"Enfield one one, Overlord, skip it, north group Ford one targeted."* |
+| **splash** / **splash 2** / **kill** | *"Overlord copies splash two, west group. East group remains."* (the group that was shot down, then what is left: one or two group names, or *"3 groups remain"*), or *"Overlord copies splash two, picture clean."* if nothing is left. Nobody repeats the *picture clean* later, also not after a friendly AI fighter's *"Overlord copies, splash, picture clean."* |
 | **winchester**, **RTB**, **tally** | *"Overlord copies."* |
-| **tanker**, **texaco**, **shell**, **arco** (e.g. *"request nearest tanker"*) | *"nearest tanker Texaco, bearing 084, 30 miles, angels 22, TACAN 52 X-ray, contact Texaco 255.5."* (For the player on the DCS-ATC PC, whose tanker calls go through DCS's own tanker dialog, the "contact …" part is left out.) Other possible answers: *"no tanker airborne"*, or *"negative, no compatible tanker airborne"* if no tanker matches your aircraft (boom vs. basket). |
+| **tanker**, **texaco**, **shell**, **arco** (e.g. *"request nearest tanker"*) | *"nearest tanker Texaco, bearing 084, 30 miles, angels 22, TACAN 52 X-ray, contact Texaco 255.5."* Other possible answers: *"no tanker airborne"*, or *"negative, no compatible tanker airborne"* if no tanker matches your aircraft (boom vs. basket). |
 | **vector**, **home plate**, **bingo**, **nearest airfield**, **recovery**, **divert** (you can add an airfield name) | *"Kutaisi bears 245, 38 miles."* Only friendly or neutral airfields. If you name an airfield, you get that one, otherwise the nearest. |
 | **mayday** / **pan pan** | *"roger mayday. Nearest friendly field Kutaisi, bearing 245, 38 miles, contact Kutaisi Approach two six three decimal zero. Say intentions."* DCS-ATC then selects that airfield for you, and its Approach controller takes over the emergency. |
 | anything else | *"say again."* |
@@ -1793,25 +1808,32 @@ While you are checked in with AWACS, the airfield's zone guard only watches the 
 #### Picture format
 
 - **BRAA** is given from your position: the magnetic bearing read digit by digit, the range in NM, the altitude ("20 thousand", "5 hundred"), then the aspect: **hot**, **flank** + direction, **beam** + direction, **drag** + direction.
-- **Bullseye instead of BRAA:** set `"AwacsBullseye": true` (default `false`). You also get the track direction, for example *"bullseye 030, 45, 20 thousand, track south"*. This setting needs a bullseye in the mission. Threat calls always stay in BRAA.
+- **Bullseye for everyone, BRAA for you:** the picture and situation updates (new group, split, combined, picture clean) go to everyone on the frequency in bullseye format with the track direction, *"Overlord, new group, bullseye 030, 45, 20 thousand, track south, hostile, single."* Calls meant for one flight (threat, bogey dope, snap, spike, commit, pop-up) stay in BRAA from you. Needs a bullseye in the mission, otherwise everything is BRAA. `"AwacsBullseye": false` (default `true`) switches back to BRAA from you for everything.
 - **Groups:** contacts within 3 NM of each other form one group. The picture names up to three groups:
   - 1 group: *single group*
   - 2 groups: *azimuth* (side by side) or *range* (one behind the other)
   - 3 groups: *wall*, *ladder*, *vic* or *champagne*
   - more than 3: *"5 groups"*, followed by the three nearest
-- **Group names** (north group, lead group, trail group, east lead group …) are used again in later calls until the next picture.
+- **Group names** (north group, lead group, trail group, east lead group …) are used again in later calls until the next picture. They belong to your side, not to you: every player and every friendly AI flight on that AWACS uses the same name for the same group. The only group on the scope is the *single group*; a group that wasn't named in a picture gets a name from where it is relative to the others (*"north group"*) the first time it is called, and keeps it.
 - **Fill-ins:** *hostile / bogey / neutral*; *single / two contacts / heavy, N contacts*; *fast* (600 kt or more) / *very fast* (over 900 kt); *high* (above 40,000 ft) / *low* (below 1,000 ft above ground). The type comes last: NATO names for eastern types (Flanker, Fulcrum, Fishbed …) and nicknames for western types (Hornet, Viper, Eagle …).
+- **Who has which group:** if another friendly flight has a group, the picture, bogey dope and snap say so at the end, *"…, hostile, single, Fishbed, Ford one targeted."*
+- **Short follow-up calls:** you hear the full fill-ins the first time a group is called to you, and in every picture and every answer to bogey dope, declare, snap and spike. Unprompted follow-ups (threat, commit, split …) give only name, position, altitude and aspect, *"threat, north group BRAA 354, 15, 20 thousand, hot."*, plus whatever has changed since (*"single"* after a kill, a new type, *"hostile"* after the declaration). The AWACS voice speaks briskly, so a follow-up call takes about 5 seconds.
 
 #### Calls the AWACS makes on its own (only after check-in)
 
 | Call | When |
 |---|---|
-| *"threat, group BRAA …, hot, hostile …"* | A group pointing at you (hot or flank) within 30 NM. Called again at each closer step (20/10/5 NM), and every 45 s while it stays hot within 10 NM. |
-| *"commit, trail group BRAA …"* | A hot group within 40 NM that hasn't been called as a threat yet. |
-| *"new group, BRAA …"* / *"pop-up group, BRAA …"* | A group is detected for the first time within `"AwacsNewGroupNm"` (default 200, range 40–200). It is a pop-up if it first appears within 30 NM. |
-| *"west group split, new group, BRAA …"* / *"north and south groups combined, BRAA …"* | After the change has been stable for 12 s, at most once a minute per group. |
-| *"merged."* | A group within 3 NM of you and less than 5,000 ft above or below you. |
-| *"picture clean."* | There has been no group on the radar for 2 minutes. After that, every group counts as "new" again. |
+| *"threat, group BRAA …, hot, hostile …"* | An **untargeted** group pointing at you (hot or flank) within 30 NM. Called again at each closer step (20/10/5 NM), and every 45 s while it stays hot within 10 NM. No threat calls for a group that you or another friendly flight has committed on or targeted. |
+| *"commit east group, BRAA …"* / *"maintain CAP."* | The AWACS acts as air battle manager for your side: it shares out the hostile groups between the fighters on station, i.e. friendly AI fighters and players who have reported **on station** (a CAP tasking, e.g. *"Overlord, Enfield 1-1, on station"*). Each group that comes hot within 40 NM gets one flight, a heavy group (3 or more contacts) gets two; the AWACS picks the nearest flight with missiles (Fox 3 first) and fuel. The other flights hear *"maintain CAP."* An assignment stays until the group is shot down or fades, or the flight goes RTB, bingo or winchester. Without "on station" you get threat calls only and hear the assignments of the others. "RTB", "bingo", "off station" or "checking out" end the tasking. |
+| *"east group BRAA 012, 19, 26 thousand, hot."* | Short target update on **your** group (committed or targeted) at 20 and 10 NM, without fill-ins. |
+| *"reset."* / *"picture clean, reset."* | Your group is shot down or has faded: back to your CAP. About a minute later you can be given the next open group: *"recommit west group, BRAA …"* |
+| *"Overlord, new group, bullseye …"* (to everyone) / *"pop-up group, BRAA …"* (to you) | A group is detected for the first time within `"AwacsNewGroupNm"` (default 200, range 40–200). It is a pop-up if it first appears within 30 NM of you. |
+| *"Overlord, west group split, 2 groups azimuth 6, east group bullseye …, west group bullseye …"* / *"Overlord, north and south groups combined, bullseye …"* (to everyone) | After the change has been stable for 12 s, at most once a minute per group. |
+| *"north group merged."* | A group within 3 NM of you and less than 5,000 ft above or below you. With the group name from the picture; an unnamed group is just *"merged."* |
+| *"Overlord, west group faded, last known bullseye 336, 63."* (to everyone) | A group that was called is no longer detected for 30 s and wasn't shot down. If it comes back it is a *new group* (or *pop-up*) again. |
+| *"Overlord, furball, bullseye 354, 20."* (to everyone; without a bullseye to you in BRAA) | A friendly fighter and a hostile group are within 5 NM of each other. Once per group every 2 minutes; while it lasts there are no single threat calls for that group. |
+| *"Overlord, leaker, north group, bullseye 040, 20, 15 thousand, track east, hostile."* (to everyone) | A hostile group that nobody has targeted is past the CAP (closer to the nearest friendly airfield than every fighter on station) and is heading for that airfield. Once per group; only when there is a CAP. |
+| *"Overlord, picture clean."* (to everyone) | There has been no group on the radar for 2 minutes. After that, every group counts as "new" again. Not if *picture clean* was just said after a splash. |
 
 - **Urgent calls on Guard:** if you aren't tuned to the AWACS frequency, threat and merged calls are repeated on Guard (243.0 / 121.5), at most once a minute: *"Enfield one one, Overlord on guard, threat, … Contact Overlord 251.5."*
 - **Several players on the same AWACS frequency:** a "new group" or "picture clean" call that another player just heard isn't repeated for you.
@@ -1821,17 +1843,19 @@ While you are checked in with AWACS, the airfield's zone guard only watches the 
 #### Example
 
 ```
-You:      Overlord, Enfield 1-1, checking in, angels 22.
+You:      Overlord, Enfield 1-1, on station, angels 22.
 Overlord: Enfield one one, Overlord, radar contact, picture, 2 groups azimuth 10.
-          East group, BRAA 010, 45, 26 thousand, hot, hostile, two contacts, Flanker.
-          West group, BRAA 350, 44, 25 thousand, hot, hostile, single, Fulcrum.
+          East group, bullseye 040, 60, 26 thousand, track west, hostile, two contacts, Flanker.
+          West group, bullseye 020, 58, 25 thousand, track south, hostile, single, Fulcrum.
 ...
-Overlord: Enfield one one, Overlord, commit, east group BRAA 012, 38, 26 thousand, hot, hostile, two contacts, Flanker.
+Overlord: Ford one, Overlord, commit west group, BRAA 290, 35, 25 thousand, hot.
+Overlord: Enfield one one, Overlord, commit east group, BRAA 012, 38, 26 thousand, hot.
 You:      Overlord, Enfield 1-1, committing east group.
-Overlord: Enfield one one, Overlord, east group BRAA 012, 36, 26 thousand, hot, hostile, two contacts, Flanker.
-Overlord: Enfield one one, Overlord, threat, east group BRAA 013, 28, 26 thousand, hot, hostile, two contacts, Flanker.
+Overlord: Enfield one one, Overlord, east group BRAA 012, 36, 26 thousand, hot.
+Overlord: Enfield one one, Overlord, east group BRAA 013, 19, 26 thousand, hot.
 You:      Overlord, Enfield 1-1, splash two.
 Overlord: Enfield one one, Overlord copies splash two.
+Overlord: Enfield one one, Overlord, reset.
 You:      Overlord, Enfield 1-1, bingo, request vectors to Kutaisi.
 Overlord: Enfield one one, Overlord, Kutaisi bears 245, 62 miles.
 ```
@@ -1846,28 +1870,25 @@ Overlord: Enfield one one, Overlord, Kutaisi bears 245, 62 miles.
 - **Boom or basket:** boom tankers (KC-135, KC-10) serve the F-16, F-15, F-4, A-10, B-1, B-52, C-17 and E-3. Basket tankers (KC-135MPRS, KC-10 with drogue and others) serve everything else.
 - **No air refueling:** aircraft without a refueling probe or receptacle get *"negative, no compatible tanker"*. That includes helicopters, the MiG-15/19/21/29, F-5, F-86, Su-27, Su-25 (not the Su-25T), trainers and warbirds.
 
-#### Who does the talking (single player / host vs. multiplayer)
+#### Who does the talking, basket and boom
 
-DCS only operates the basket or boom through its own F-menu tanker dialog. So for **the player on the PC that runs DCS-ATC**, DCS-ATC operates the DCS radio menu for you: *Intent to refuel* when you make your request, *Ready pre-contact* when you call "pre-contact". **DCS's own tanker voice** then answers.
+**DCS-ATC's tanker** always does the talking, even when the mission has its own DCS tanker. It runs the whole sequence as described below. DCS's own tankers stay silent.
 
-In that mode, DCS-ATC's tanker stays silent except for:
+DCS still only operates the basket or boom through its own F-menu tanker dialog. So for **the player on the PC that runs DCS-ATC**, DCS-ATC presses the DCS radio menu for you in the background: *Intent to refuel* when you make your request, *Ready pre-contact* when you call "pre-contact". The DCS tanker doesn't answer out loud.
 
-- coaching calls
-- turn calls
-- breakaway
-- the warning when you join without clearance
-
-This uses `"CommsKey"` (the DCS radio menu key as a scan code, default `43`, which is `\` on US and `#` on German keyboards). Set it to `0` to switch this off; DCS-ATC's tanker then does all the talking. **Other players** in multiplayer always get DCS-ATC's tanker voice, as described below.
+- With Easy Communication, DCS then tunes your radio to the tanker's mission frequency by itself. DCS-ATC's tanker also talks on that frequency. If the tanker shares it with an airfield (e.g. 261.0 = Senaki UHF), DCS-ATC doesn't switch you to that airfield.
+- This uses `"CommsKey"` (the DCS radio menu key as a scan code, default `43`, which is `\` on US and `#` on German keyboards). With `0`, DCS-ATC doesn't press the menu.
+- **Other players** in multiplayer operate the DCS tanker menu themselves.
 
 #### Calls you can make
 
 | You say (recognised words) | Tanker answers |
 |---|---|
 | **request rejoin**, *join*, *rendezvous*, *refuel*, *fuel*, *tank*, *gas*, *AAR*, *checking in* | Rendezvous: *"Enfield one one, Texaco, bearing 084, 30 miles, angels 22, track north, 280 knots, TACAN 52 X-ray. Expect the join in 5 minutes, 1000 feet below, report visual."* |
-| **visual** (*tally*, *in sight*, *judy*), more than 8 NM away | *"continue, 20 miles, report 1 mile."* |
+| **visual** (*tally*, *in sight*, *judy*), more than 8 NM away | *"continue, 20 miles, report visual."* |
 | **visual**, within 8 NM | *"cleared to join, observation left wing, number 1."* If several aircraft are waiting: *"number 2. Enfield one two first, then Enfield one one."* |
-| **observation** / **left wing** / **joined** (once joined) | *"cleared pre-contact."* If others are ahead: *"stabilize observation left wing, number 2."* |
-| **pre-contact** (*precontact*, *in position*, *ready for contact*, *stabilized*, *ready to refuel*) | *"Enfield one one, cleared contact, basket ready."* or *"boom ready"*. More than 2 NM away: *"negative, bearing 084, 12 miles, report visual."* Not your turn yet: *"negative, hold observation left wing, number 2."* |
+| **observation** / **left wing** / **joined** | Once joined: *"cleared pre-contact."* If others are ahead: *"stabilize observation left wing, number 2."* Not yet cleared to join (within 2 NM): *"cleared to join, left observation, number 1."* |
+| **pre-contact** (*precontact*, *in position*, *ready for contact*, *stabilized*, *ready to refuel*) | *"Enfield one one, cleared contact, basket ready."* or *"boom ready"*. More than 2 NM away: *"negative, bearing 084, 12 miles, report visual."* Not your turn yet: *"negative, hold observation left wing, number 2."* Not yet cleared to join: *"negative, not cleared pre-contact, cleared to join, left observation, number 1."* |
 | **disconnect** | *"copy disconnect, move to the right wing."* |
 | **right wing** | *"roger, report complete or request more."* |
 | **complete** / *thanks* / *good day* / *departing* / *leaving* | *"total offload 5.4, cleared to depart, contact Overlord 251.5."* (offload in thousands of lb). Without AWACS: *"… frequency change approved."* |
@@ -1879,7 +1900,7 @@ DCS-ATC reacts to the real DCS refueling contact:
 
 - **Contact:** *"Contact."*
 - **Disconnect before the tank is full** (falling off the basket): *"disconnect, return to pre-contact."* You keep your place in line, and if you reconnect within 2 minutes, the same refueling continues.
-- **Disconnect with a full tank:** *"Enfield one one, disconnect, you received 6200 pounds. Clear right wing. Report pre-contact for more, or complete."* The next aircraft in line then gets its own *"Enfield one two, Texaco, cleared pre-contact."*
+- **Disconnect with a full tank:** *"Enfield one one, disconnect, you received 6200 pounds. Clear right wing. Report complete, or pre-contact for more."* The next aircraft in line then gets its own *"Enfield one two, Texaco, cleared pre-contact."*
 - **Order in line:** set by who reached the tanker first, not by who asked first.
 
 #### Join vectors and coaching
@@ -1890,7 +1911,7 @@ DCS-ATC reacts to the real DCS refueling contact:
   - *"stabilize."*
   - Boom only: *"forward 80."* (feet)
 - **Tanker turns:** sent once to all receivers: *"Texaco, turning right."*
-- **Breakaway:** *"breakaway, breakaway, breakaway."* if you get too close, close too fast, or leave the refueling envelope while in contact. It is repeated every 15 s and counted in the debriefing.
+- **Breakaway:** *"breakaway, breakaway, breakaway."* if you get too close, close too fast, or leave the refueling envelope while in contact. It is repeated every 15 s and counted in the debriefing. After a breakaway you are back in observation: no *"return to pre-contact"*, report *pre-contact* again for a new *"cleared contact"*.
 - **Joining without clearance:** if you haven't asked for refueling and come within 3 NM and ±1,000 ft of a friendly tanker, you hear *"Enfield one one, Texaco, you are not cleared to join, remain 1000 feet below, report ready for rejoin."* This happens at most once every 3 minutes and goes into the debriefing as a deviation. It doesn't happen in these cases:
   - You join from behind on the tanker's heading.
   - Your flight lead is already cleared.
@@ -1917,7 +1938,7 @@ Texaco:  Enfield one one, Texaco, cleared pre-contact.
 You:     Texaco, Enfield 1-1, pre-contact.
 Texaco:  Enfield one one, cleared contact, basket ready.
 Texaco:  Contact.
-Texaco:  Enfield one one, disconnect, you received 6200 pounds. Clear right wing. Report pre-contact for more, or complete.
+Texaco:  Enfield one one, disconnect, you received 6200 pounds. Clear right wing. Report complete, or pre-contact for more.
 You:     Texaco, Enfield 1-1, refuel complete.
 Texaco:  Enfield one one, Texaco, total offload 6.2, cleared to depart, contact Overlord 251.5.
 ```
@@ -1937,10 +1958,10 @@ A range controller exists only when the mission has a trigger zone whose name st
 | **checking in** (*check in*, *inbound*, *request entry*, *entering*, *with you*, *request range*) | *"Enfield one one, Range Alpha, altimeter two niner niner two, wind on target two seven zero at one zero, range is cold. Range bears one eight zero, 12 miles. Enter from the north, run-in headings one six zero to two zero zero, minimum altitude 1500 feet. Report IP."* If another aircraft is hot: *"…, one aircraft in."* instead of *"range is cold"*. |
 | **IP inbound** (after the check-in) | *"Enfield one one, continue."* Before the check-in: *"negative, you are not checked in. Report check in."* |
 | **in hot** (*rolling in*, *inbound hot*, *in from the north*, *in heading 360*, *in now*, *ready in*, or a call ending in "in") | *"cleared hot."* (see conditions below) |
-| **in dry** | *"cleared dry."* A dry pass doesn't block the range. |
-| **off** (*off safe*, *off west* …) | *"Enfield one one, pass 2, 3 impacts, best 12 meters at 6 o'clock, 2 gun hits. Report in hot or checking out."* If you weren't hot: *"roger, range is cold."* |
+| **in dry** | *"cleared dry."* Same conditions as "cleared hot" (below). A dry pass holds the range until you call *off* (or until it is released automatically like a hot pass), but it isn't scored. |
+| **off** (*off safe*, *off west* …) | *"Enfield one one, pass 2, 3 impacts, best 12 meters at 6 o'clock, 2 gun hits. Report in hot or checking out."* If you weren't hot (or were dry): *"roger, range is cold."* With *hung ordnance* or *hot gun* in this or an earlier call: *"pass 2, copy hung ordnance, check switches safe, no further hot passes, report checking out."* |
 | **winchester** | *"pass 2, …, check switches safe, report checking out."* |
-| **checking out** (*check out*, *leaving*, *departing*, *good day*) | *"check switches safe. 2 passes, best impact 12 meters at 6 o'clock. Cleared off the range to the north, contact Overlord 251.5, good day."* With *hung ordnance* or *hot gun* in the call: *"copy hung ordnance, check switches safe. … Cleared off the range to the north via the hung ordnance route, advise Approach, good day."* |
+| **checking out** (*check out*, *leaving*, *departing*, *good day*) | *"check switches safe. 2 passes, best impact 12 meters at 6 o'clock. Cleared off the range to the north, contact Overlord 251.5, good day."* With *hung ordnance* or *hot gun* in the call (or reported earlier on this visit): *"copy hung ordnance, check switches safe. … Cleared off the range to the north via the hung ordnance route, advise Approach, good day."* |
 | anything else | *"say again. Report check in, in hot, off, or checking out."* |
 
 Notes on the check-in answer:
@@ -1954,9 +1975,10 @@ Notes on the check-in answer:
 | Situation | Answer |
 |---|---|
 | Not checked in | *"negative, you are not checked in. Report check in."* |
+| Hung ordnance or hot gun reported | *"negative, hung ordnance, report checking out."* |
 | On the ground or more than 10 NM out | *"continue, report in inside 10 miles."* |
 | Outside the zone and not pointing at it | *"continue dry."* |
-| Another aircraft is hot | *"continue, one aircraft in."* As soon as the range is free, you get *"cleared hot"* without calling again, if your position and heading still fit. |
+| Another aircraft is hot or dry | *"continue, one aircraft in."* As soon as the range is free, you get *"cleared hot"* (or *"cleared dry"*) without calling again, if your position and heading still fit. |
 
 #### Scoring and enforcement
 
@@ -1994,25 +2016,31 @@ Range:  Enfield one one, Range Alpha, check switches safe. 1 pass, best impact 1
 
 ### AI flights on the radio
 
-Friendly AI flights within 60 NM of a player on their side talk on the radio during combat. These are the mission's own flights, not airfield traffic and not your own AI wingmen. They speak on the tactical net, which is the AWACS frequency (from the mission or the config). Calls within their own flight (defending, hit, joker) go out only on that flight's frequency from the Mission Editor, and only if it differs from the AWACS frequency. If the mission's AWACS or GCI is up, it acknowledges.
+Friendly AI flights within 60 NM of a player on their side talk on the radio during combat. These are the mission's own flights, not airfield traffic and not your own AI wingmen. They speak on the tactical net, which is the AWACS frequency (from the mission or the config). Calls within their own flight (defending, spike, naked, hit, joker, ops check) go out only on that flight's frequency from the Mission Editor, and only if it differs from the AWACS frequency. If the mission's AWACS or GCI is up, it acknowledges.
 
 | Event | AI call |
 |---|---|
-| Air-to-air missile launch | *"Viper one one, engaged, fox three, north."* (fox one / fox two / fox three; "engaged" at most every 3 min) · *"maddog."* (active missile with no target) |
+| Fighter flight levelled off (first time 60 s within ±500 ft above 10,000 ft; only with AWACS/GCI) | *"Overlord, Ford one, on station, bullseye 040, 35, angels 25."* → AWACS: *"Ford one, Overlord, picture clean."* (or *"picture, single group BRAA …"*) |
+| Hostile group hot within 40 NM (the AWACS assigns: each group to the best free flight on station, a heavy group to two, no back-and-forth) | AWACS: *"Ford one, Overlord, commit north group, bullseye 040, 65, 23 thousand, hostile, two contacts, Flanker."* → *"Ford one, committing."* → *"Ford one, targeted north group."* (the location was already in the commit); with two or more contacts in that group then *"Ford one, sorted."* (each element has its own target). If another free group is hot within 40 NM, the second element takes it: *"Ford one one, targeted north group."* / *"Ford one two, targeted south group."* (in a four-ship *"Ford one three"*). Other flights near an assigned group: *"Dodge one, Overlord, maintain CAP."* → *"Dodge one."*; a flight that wants a taken group: *"skip it, north group Ford one targeted."* → *"Dodge one."*; group gone: *"Ford one, Overlord, reset."* (or *"picture clean, reset."*) → *"Ford one, resetting."*, back on station later *"recommit …"*. Group names are the AWACS names of your side (as in the picture); without one *"commit group, …"* and *"Ford one, targeted."*. Without AWACS the flight commits on its own: *"Ford one, committing."* → *"Ford one, targeted group bullseye …"*. Committing/targeted are dropped if they shoot first; bingo, winchester and RTB free the assignment. |
+| Air-to-air missile launch | *"Viper one one, fox three, north group."* (fox one / fox two / fox three; the AWACS group name; with only one group just *"fox three."*; without a picture name the direction, *"fox three, north."*). Before the first shot at a group the flight has not already called targeted: *"Viper one, engaged north group."* as a call of its own (once per group in 3 min) · *"maddog."* (active missile with no target) |
 | Air-to-ground launch | *"magnum"* (anti-radiation), *"bruiser"* (anti-ship), *"rifle"* (other missiles), *"bombs away"* · *"guns."* · *"shack."* (bomb hit on a ground target) |
-| Missile goes active / is defeated | *"pitbull."* · *"trashed."* |
+| Missile goes active / is defeated / time is up | *"pitbull."* · *"trashed."* · *"timeout."* (expected time of flight over without a hit, roughly 5 s + 3 s per NM range at launch; then no "trashed" for that missile) · lead turns more than 120° away from the target within 2 min after the shot: *"Ford one, out south."* |
+| Enemy radar locks them (radar warning, flight frequency) | air: *"Viper one two, spike two six four, Flanker."* (magnetic bearing, type if known) · surface: *"Viper one two, mud spike, SA-6, east."* · lock gone: *"naked."* (a lock that is gone before the call is said gives neither) |
 | Missile fired at them | *"Viper one two, SAM west, defending."* / *"launch north, defending."* |
 | Kill | *"Viper one one, splash two, Flanker."* → AWACS: *"Overlord copies, splash, picture clean."* |
 | Hit | *"I'm hit."* · badly hit, on Guard: *"Mayday, mayday, mayday, Viper one two, hit, RTB, bullseye 084, 12."* |
 | Shot down / ejection | *"one two is down, good chute, bullseye …"* or *"no chute"* · *"ejecting, ejecting."* · emergency beacon on Guard · 90 s later on Guard: *"Mayday …, on the ground, bullseye …, uninjured."* → AWACS: *"copy, SAR notified, monitor guard."* (this also happens when **you** eject) |
 | Fuel / weapons | *"joker."* (below 35 %) · *"bingo, RTB."* (below 22 %) → AWACS: *"copy bingo."* · *"winchester."* |
+| Every 15 min in the air (flight frequency; not right after their own shot) | *"Ford, ops check, one, six point two, four and two."* – *"two, five point nine, four and two."* (fuel in thousand lb, then Fox-3 and Fox-2) |
+| You ask: *"Ford one, say status"* (or *"Ford one two, say status"* for one element; on the AWACS/tactical net) | tactical frequency: *"Ford one, engaged north group, six point two, four and two."* (engaged / targeted / on station, lowest fuel in the flight, Fox-3 and Fox-2 summed) |
+| Heading home (after "on station": for 60 s more than 40 NM from the station, heading for the nearest friendly airfield and 20 NM closer to it; not after bingo or a shot in the last 5 min) | *"Overlord, Ford one, RTB."* → AWACS: *"Ford one, Overlord, copy."* |
 | Merge | *"merged."* (within 3 NM and less than 5,000 ft altitude difference) |
 
 **Settings** (`config.jsonc`, or "AI flights in combat" in the settings window):
 
 | Key | Default | Meaning |
 |---|---|---|
-| `"AiFlightComms"` | `"voll"` | `"voll"` = all calls; `"taktisch"` = only fox, splash, trashed, bingo, defending, merged, down and Guard calls; `"aus"` = off |
+| `"AiFlightComms"` | `"voll"` | `"voll"` = all calls; `"taktisch"` = only fox, engaged, timeout, out, splash, trashed, bingo, defending, merged, down and Guard calls; `"aus"` = off |
 | `"AiFlightRadiusNm"` | `60` | Only AI flights within this distance of a player on their side talk |
 | `"AiOwnWingmen"` | `false` | Your own AI wingmen also talk (DCS already voices them) |
 
@@ -2043,7 +2071,7 @@ The crew chief's voice is set in `config.jsonc` → `"Voices"` → `"Crew"` (def
 
 | Station | Say | Gets you |
 |---|---|---|
-| AWACS | checking in · picture · bogey dope · declare [bullseye 030 45] · spiked 270 · request sort · committing north group · splash one · request nearest tanker · bingo, vectors to Kutaisi · mayday · checking out | check-in with picture · picture · nearest group BRAA · ID · spike source · targets per element · confirmation · copy · tanker position and TACAN · bearing and distance to the field · nearest field and handover · no more unprompted calls |
+| AWACS | checking in · picture · bogey dope · declare [bullseye 030 45] · spiked 270 · request sort · committing north group · splash one · request nearest tanker · bingo, vectors to Kutaisi · mayday · checking out · Ford one, say status (AI flight) | check-in with picture · picture · nearest group BRAA · ID · spike source · targets per element · confirmation · copy · tanker position and TACAN · bearing and distance to the field · nearest field and handover · no more unprompted calls · the AI flight answers with its status |
 | Tanker | request rejoin · visual · observation · pre-contact · disconnect · right wing · refuel complete | rendezvous · cleared to join / number · cleared pre-contact · cleared contact · move to the right wing · report complete or request more · total offload, cleared to depart |
 | Range | checking in · in hot · in dry · off safe · winchester · checking out | range briefing · cleared hot · cleared dry · pass result · switches safe · summary and exit |
 
@@ -2155,7 +2183,7 @@ On a dedicated server, these files apply to all players:
 
 - `%LOCALAPPDATA%\Programs\DCS-ATC\config.jsonc` on the server PC: frequencies, voices, AWACS options
 - `%LOCALAPPDATA%\Programs\DCS-ATC\frequencies.jsonc` on the server PC: own airfield frequencies
-- `<server Saved Games>\Scripts\DcsAtc\DcsAtcOptions.lua`: default mission options (ground crew, fog)
+- `<server Saved Games>\Scripts\DcsAtc\DcsAtcOptions.lua`: default mission options (ground crew)
 
 **After a DCS server update**
 
@@ -2208,7 +2236,7 @@ By default each airfield uses the frequency that DCS gives it on the map, the on
 **What changes with custom frequencies**
 
 - **Calling a frequency reaches that controller.** A call on the Ground frequency goes to Ground and a call on the Tower frequency goes to Tower, whatever you say. On a shared map frequency, DCS-ATC still works out the controller from what you say.
-- **Handoffs name the right frequency.** For example, Ground's taxi clearance ends with "Hold short, contact Nellis Tower three two seven decimal zero when ready for departure." Controllers who tell you that you called the wrong station also name the right frequency.
+- **Handoffs name the right frequency.** For example, Ground's taxi clearance ends with "Hold short runway zero three right, contact Nellis Tower three two seven decimal zero when ready for departure." Controllers who tell you that you called the wrong station also name the right frequency.
 - **Departure becomes its own controller.** After takeoff Tower says "…contact Nellis Departure two seven three decimal five five". Departure then works you on 273.55, gives you "radar contact" and releases you at the edge of its airspace. Departure uses the Approach voice. An IFR clearance names "departure frequency two seven three decimal five five".
 - **ATIS** transmits on its own frequency and names the Tower frequency.
 - **The radio wheel, kneeboard and SRS listening** use the new frequencies. The wheel shows the Departure frequency while you are departing, and the ENTER suggestion is then labelled `Departure: …`.
@@ -2219,7 +2247,7 @@ Example exchange at Nellis with the file above:
 (on 275.8)  Nellis Ground, Enfield 1-1, radio check
             Enfield one one, Nellis Ground, read you five.          ← Ground answers on 275.8
             …
-            Ground: … Hold short, contact Nellis Tower three two seven decimal zero when ready for departure.
+            Ground: … Hold short runway zero three right, contact Nellis Tower three two seven decimal zero when ready for departure.
 (on 327.0)  Nellis Tower, Enfield 1-1, holding short runway …, ready for departure
             …
             Tower: … contact Nellis Departure two seven three decimal five five
@@ -2364,10 +2392,10 @@ Own frequencies per airfield and controller are not in `config.jsonc` but in the
 | Key | Default | Meaning |
 |---|---|---|
 | `AiChatter` | `true` | The mission's AI flights talk audibly with the airfield (request, answer, readback). |
-| `AiFlightComms` | `"voll"` | AI flights in combat: `"voll"` (full: Fox, Splash, Tally …), `"taktisch"` (only fox, splash, trashed, bingo, defending, merged, down and Guard calls), `"aus"` (off). The values are German words; use them exactly as written. |
+| `AiFlightComms` | `"voll"` | AI flights in combat: `"voll"` (full: Fox, Splash, Tally …), `"taktisch"` (only fox, engaged, timeout, out, splash, trashed, bingo, defending, merged, down and Guard calls), `"aus"` (off). The values are German words; use them exactly as written. |
 | `AiFlightRadiusNm` | `60` | AI combat chatter comes only from flights within this distance of a player of the same side. |
 | `AiOwnWingmen` | `false` | Your own AI wingmen also talk. DCS already voices them. |
-| `AwacsBullseye` | `false` | AWACS picture as bullseye instead of BRAA from you. |
+| `AwacsBullseye` | `true` | Picture and updates to everyone in bullseye format; `false` = everything in BRAA from you. |
 | `AwacsNewGroupNm` | `200` | AWACS calls new groups (and "picture clean") within this range, 40–200 NM. |
 | `TankerVectors` | `true` | The tanker gives join vectors (heading, distance, altitude) until you call "visual". `false` = only the first bearing. |
 | `OnSpeedAoa` | `{ "FA-18": 8.1 }` | LSO: on-speed angle of attack in degrees per aircraft type prefix, used for "you're fast/slow". Other types get no speed calls. Derive values from the log line `[LSO] AoA im Mittel`. |
@@ -2382,11 +2410,11 @@ Own frequencies per airfield and controller are not in `config.jsonc` but in the
 | `AltimeterUnit` | `"auto"` | Altimeter setting in calls. `"auto"`: western types get "altimeter two niner niner two" (inHg), others "QNH one zero one three" (hPa); ATIS gives both. Or `"hpa"`, `"inhg"`. |
 | `DebugLog` | `true` | Write `atc-debug.txt`. |
 
-**Per-mission options.** Ground crew (fuel/ammo trucks, fire service) and occasional fog are mission options, not part of `config.jsonc`:
+**Per-mission options.** Ground crew (fuel/ammo trucks, fire service) is a mission option, not part of `config.jsonc`:
 
 - **In the game:** F10 → ATC → Settings.
-- **Default for all missions:** `Saved Games\DCS\Scripts\DcsAtc\DcsAtcOptions.lua` (`crew = false`, `fog = true`).
-- **Different values for one mission:** in the Mission Editor, add a trigger "Mission Start" → DO SCRIPT: `DCSATC_OPTIONS = { crew = true, fog = false }`.
+- **Default for all missions:** `Saved Games\DCS\Scripts\DcsAtc\DcsAtcOptions.lua` (`crew = false`).
+- **Different values for one mission:** in the Mission Editor, add a trigger "Mission Start" → DO SCRIPT: `DCSATC_OPTIONS = { crew = true }`.
 
 ### Log files
 
