@@ -56,6 +56,20 @@ Talk to Ground, Tower, Approach, ATIS, AWACS and tankers over SRS in English; th
 
 Open an [issue](../../issues) with time, airfield, a short description and `atc-log.txt` plus `atc-debug.txt` from `%LOCALAPPDATA%\Programs\DCS-ATC`. A short video with SRS audio helps most.
 
+## Technology and AI
+
+**At runtime DCS-ATC uses exactly two AI models. Both run locally on your CPU, so no cloud, no API key, and nothing leaves your PC:**
+
+| Purpose | Software | Model | License |
+|---|---|---|---|
+| Speech recognition (your voice → text) | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | OpenAI [Whisper](https://github.com/openai/whisper) `small.en` | MIT |
+| Voices (text → speech) | [Piper](https://github.com/rhasspy/piper) with ONNX Runtime and espeak-ng | [piper-voices](https://huggingface.co/rhasspy/piper-voices): ryan, joe, alan, ljspeech, bryce | per voice; ryan is CC BY-NC-SA 4.0 (non-commercial) |
+| Radio sound, audio | FFmpeg, NAudio | – | GPL-3.0, MIT |
+
+**The controllers are not an AI chatbot (no LLM).** Every reply comes from fixed rules in the code, so the same situation always gets the same answer. The rules are built from real phraseology and procedures: FAA JO 7110.65, AIM, ICAO Doc 4444, CV NATOPS, ATP 1-02.1 brevity, ATP-56 and others. Speech recognition only turns your call into text; the rules then decide what the controller says.
+
+**Development:** DCS-ATC is developed with an AI coding assistant ([Claude](https://claude.ai) by Anthropic), which helps write the code, tests and documentation. Ideas, decisions and the testing in DCS are mine.
+
 ## Licenses
 
 Free, non-commercial (one bundled voice is CC BY-NC-SA 4.0). Bundles Whisper/whisper.cpp, Piper and voices from rhasspy/piper-voices, FFmpeg, espeak-ng, NAudio – see `THIRD-PARTY-NOTICES.txt` in the install folder.
