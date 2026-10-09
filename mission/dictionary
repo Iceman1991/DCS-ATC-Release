@@ -1,0 +1,32 @@
+dictionary=
+{
+	["DictKey_Translation_1"]="KAUKASUS TRAININGS-RANGE\
+\
+Freie Trainingsmission ab Kutaisi. Alle Ziele werden über das Funkmenü gesteuert:\
+F10 -> Trainings-Range\
+\
+Schwierigkeit: Anfänger / Normal / Veteran / Ass (Skill der KI, Flugabwehr an der Range, ROE von SAMs und Banditen).\
+Anfänger: SAMs strahlen nur (ideal für HARM/RWR-Training), Banditen sind wehrlos.",
+	["DictKey_Translation_2"]="WEGPUNKTE (Jets)\
+WP1 RANGE ALPHA – Bodenziele auf offenem Feld in der Rioni-Ebene östlich Lanchkhuti (Panzer, Schützenpanzer, Trucks, je nach Stufe AAA/MANPADS)\
+WP2 SEAD IP GORI – Ingress-Punkt 25 km westlich der SAM-Zone\
+WP3 SEAD ZONE – SA-2/3/6/8/11/15 spawnbar, EWR aktiv\
+WP4 A2A ARENA – über dem Schwarzen Meer, MiG-21/F-5/MiG-23/MiG-29/Su-27 spawnbar\
+WP5 KUTAISI – Landung\
+\
+HELIKOPTER: WP1 Range IP, WP2 Range Alpha, dann Kutaisi.\
+\
+SUPPORT\
+AWACS Overlord: 251.0 AM\
+Tanker Shell (Boom, KC-135): 260.0 AM, TACAN 51X, FL200\
+Tanker Texaco (Korb, KC-135MPRS): 261.0 AM, TACAN 52X, FL180\
+\
+Kutaisi: unbegrenzte Munition & Treibstoff. Bewaffnung über die Bodencrew (Kaltstart).\
+ATC MIT SRS: Kutaisi Tower 265.000 AM (eigene DCS-ATC-App, per Sprache anfunken), ATIS 131.500 AM.\
+Ohne SRS/Freischaltung: automatisch Text-Tower (F10 -> Kutaisi Tower).\
+KI-VERKEHR: Jets und Transporter starten und landen in Kutaisi (F10 -> KI-Verkehr Kutaisi).\
+Splash Damage 3.4.7 ist aktiv (realistischere Explosionen, Cook-offs). Einstellungen: F10 -> Splash Damage Settings.\
+Dynamic Spawn ist aktiv: Über die Kutaisi-Slots kann jedes Muster gewählt werden, Heißstart erlaubt.",
+	["DictKey_Translation_3"]="Kein roter Spielerslot – reine Trainingsmission.",
+	["DictKey_Translation_4"]="Kaukasus Trainings-Range"
+}

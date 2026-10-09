@@ -1,0 +1,45 @@
+DCS-ATC – mitgelieferte Fremdsoftware und Lizenzen
+==================================================
+
+DCS-ATC ist ein inoffizielles Fan-Projekt und nicht mit Eagle Dynamics (DCS World) oder dem
+SRS-Projekt (DCS-SimpleRadio-Standalone) verbunden. Alle Marken gehören ihren Inhabern.
+
+DCS-ATC selbst steht unter der GNU GPL 3.0 (LICENSE.txt), Quellcode: https://github.com/Iceman1991/DCS-ATC-Release
+
+Die folgenden Programme, Bibliotheken und Modelle werden unverändert mitgeliefert.
+Lizenztexte und Quelltext unter den genannten Adressen.
+
+Programm-Laufzeit (in DcsAtc.exe)
+  .NET 8 Runtime ................ MIT ............ https://github.com/dotnet/runtime
+  NAudio / NAudio.WinMM 2.2.1 ... MIT ............ https://github.com/naudio/NAudio
+
+Spracherkennung (tools\whisper)
+  whisper.cpp / ggml ............ MIT ............ https://github.com/ggml-org/whisper.cpp
+  SDL2 .......................... zlib ........... https://github.com/libsdl-org/SDL
+  Modell ggml-small.en .......... MIT (OpenAI Whisper)
+                                  https://huggingface.co/ggerganov/whisper.cpp · https://github.com/openai/whisper
+
+Sprachausgabe (tools\piper)
+  Piper, piper-phonemize ........ MIT ............ https://github.com/rhasspy/piper
+  ONNX Runtime .................. MIT ............ https://github.com/microsoft/onnxruntime
+  libtashkeel-Modell ............ MIT ............ https://github.com/mush42/libtashkeel
+  espeak-ng (espeak-ng.dll, espeak-ng-data)
+                                  GPL-3.0-or-later  https://github.com/espeak-ng/espeak-ng
+
+Stimmen (models, Piper-Stimmen von https://huggingface.co/rhasspy/piper-voices)
+  en_US-ryan-medium ............. CC BY-NC-SA 4.0 (Datensatz RyanSpeech,
+                                  https://www.kaggle.com/datasets/roholazandie/ryanspeech)
+                                  -> nur nicht-kommerziell: DCS-ATC darf deshalb nicht verkauft werden.
+  en_US-joe-medium .............. CC0
+  en_GB-alan-medium ............. Lizenz laut Modellkarte (MODEL_CARD) im Repository oben, Ordner en/en_GB/alan/medium
+  en_US-bryce-medium ............ Public Domain
+  en_US-ljspeech-medium ......... Public Domain (LJ Speech Dataset, https://keithito.com/LJ-Speech-Dataset/)
+
+Audio (tools\ffmpeg)
+  FFmpeg (ffmpeg.exe, Build N-125365-g9a01c1cb6a von BtbN)
+                                  GPL-3.0 (gebaut mit --enable-gpl --enable-version3)
+                                  https://ffmpeg.org · Build: https://github.com/BtbN/FFmpeg-Builds
+                                  Quelltext dieser Version: https://github.com/FFmpeg/FFmpeg/commit/9a01c1cb6a
+
+GPL-Komponenten (espeak-ng, FFmpeg) sind eigenständige Programme bzw. Bibliotheken, die DCS-ATC als
+separate Prozesse aufruft. Lizenztext GPL 3.0: https://www.gnu.org/licenses/gpl-3.0.html

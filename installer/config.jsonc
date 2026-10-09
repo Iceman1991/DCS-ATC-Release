@@ -1,0 +1,71 @@
+{
+  // Push-to-Talk Tastatur: Virtual-Key-Code. 163 = Strg rechts, 165 = Alt rechts, 161 = Shift rechts,
+  // 112-123 = F1-F12. Tipp: dieselbe Taste wie die SRS-PTT nehmen.
+  "PttKey": 163,
+
+  // Push-to-Talk am Joystick/HOTAS: "DcsAtc.exe --buttons" starten, Knopf drücken, Werte hier eintragen.
+  // -1 = aus
+  "PttJoystick": -1,
+  "PttButton": 1,
+
+  // Funkrad (wie BMS): Taste öffnet/schließt, nur wenn DCS vorn ist. 222 = ' (Apostroph), 0 = aus
+  // Am HOTAS: Joystick/Knopf wie bei PTT ermitteln; Coolie-Hat hoch/runter markiert, rechts wählt, links zurück.
+  "WheelKey": 222,
+  "WheelJoystick": -1,
+  "WheelButton": 1,
+  // Funkradgröße: Anteil der DCS-Fensterhöhe; im offenen Rad mit + / - verstellen (wird hier gespeichert)
+  "WheelSize": 0.45,
+  // Funkrad zusätzlich als Text im Spiel (VR-Headset zeigt das Desktop-Rad nicht): "auto" = wenn DCS im VR-Modus (Option VR oder Startparameter --force_enable_VR), "on", "off"
+  "WheelInGame": "auto",
+
+  // Teil des Mikrofon-Namens (z. B. "FDUCE"), leer = Windows-Standardmikrofon
+  "MicName": "",
+
+  // Nur ohne Missionsdaten (sonst Rufzeichen aus dem DCS-Slot)
+  "Callsign": "Enfield 1-1",
+  // Eigenes Rufzeichen statt dem aus dem DCS-Slot, "" = aus DCS (auch im Einstellungen-Fenster)
+  "MyCallsign": "",
+
+  // Lotsen-Frequenzen (MHz) – alle gleich setzen = alles auf einer Frequenz
+  "Frequencies": { "ATIS": 263.5, "Ground": 264.5, "Tower": 265.0, "Approach": 266.5,
+                   "Range": 267.5, "AWACS": 251.5, "Tanker": 255.5 },
+  "AwacsBullseye": true,     // AWACS-Picture und Lage-Updates an alle als Bullseye (Mission mit Bullseye); false = alles BRAA vom Spieler
+  "AwacsNewGroupNm": 200,    // AWACS meldet neue Gruppen von selbst bis zu dieser Entfernung (40-200 NM), auch Umkreis für "picture clean"
+  "Modulation": "AM",
+  "Coalition": 2,            // SRS-Seite nur für Stationen ohne eigene Seite (Plätze, AWACS, Tanker, KI senden mit ihrer Seite; 1 rot, 2 blau)
+
+  // Piper-Stimmen aus dem Ordner models, "@0.88" = tiefer (weitere: huggingface.co/rhasspy/piper-voices)
+  "Voices": {
+    "Tower": "en_US-ryan-medium|en_US-ljspeech-medium",   // mit | mehrere: je Platz/Station fest eine, abwechselnd
+    "Ground": "en_US-bryce-medium",
+    "Approach": "en_US-ryan-medium@1.05",
+    "ATIS": "en_US-ryan-medium@0.94",
+    "Range": "en_US-ryan-medium@1.06",
+    "AWACS": "en_GB-alan-medium|en_US-ljspeech-medium",   // AWACS/Träger ohne die Pilotenstimme (joe), damit man Lotse und Pilot hört
+    "Tanker": "en_US-bryce-medium",
+    "Crew": "en_US-ryan-medium"   // Crew Chief am Parkplatz, spricht auf deinem Intercom
+  },
+  "PilotVoice": "en_US-joe-medium",   // spricht deine Menü-/Rad-Anfragen vor der Antwort, "" = aus
+
+  "RadioFx": true,   // Funkklang: Bandpass, leises Rauschen, Squelch am Ende
+  "Volume": 0.6,     // Lautstärke der Lotsen in SRS (0–1), zu laut/schmerzhaft -> kleiner
+  "AiFlightComms": "voll",   // KI-Flights im Funk (Fox, Splash, Defending, Bingo …): voll / taktisch / aus
+  "AiFollowAwacs": true,   // KI-Jäger fliegen die Gruppe an, die ihnen das AWACS zuweist, das AWACS weicht Bedrohungen aus; false: KI fliegt die Mission, der Funk folgt ihr
+  "AiFlightRadiusNm": 60,     // nur KI im Umkreis eigener Spieler
+  "AiOwnWingmen": false,      // eigene KI-Wingmen mitfunken lassen (DCS spricht sie schon selbst)
+  "OnSpeedAoa": { "FA-18": 8.1 },   // LSO: On-speed-AoA in Grad je Typ-Anfang (Paddles: You're fast/slow); anderer Typ = keine Speed-Calls, Wert aus dem Log "[LSO] AoA im Mittel" ableiten
+  "TankerVectors": true,     // Tanker führt zum Join mit Steuerkurs/Entfernung/Höhe bis "visual" (false = nur die erste Peilung)
+  "SpeechRate": 0.85,   // Sprechtempo der Lotsen: 1 = Piper-Standard, kleiner = schneller
+  "ReplyPause": 1.5,   // Sekunden Pause zwischen zwei Funksprüchen auf einer Frequenz (Pilot -> Lotse -> Rücklesen)
+  "AiChatter": true,   // KI-Flüge funken hörbar mit (Anfrage, Antwort, Rücklesen)
+  "SrsListen": true,   // alle Spieler sprechen direkt über SRS auf der Lotsen-Frequenz (PTT-Taste oben nur ohne SRS)
+  "SrsAutoConnect": true,   // SRS-Client nach dem Start automatisch mit dem lokalen SRS-Server verbinden (127.0.0.1, Port aus der server.cfg), nur wenn er noch nicht verbunden ist; false = selbst verbinden
+  "Atis": true,      // ATIS-Dauersendung für Plätze mit Spielern im Umkreis von 40 NM
+  "RunwayLights": "silent",   // Bahnbefeuerung nachts über das DCS-ATC-Menü: "silent" (Platz bleibt stumm), "dcs" (DCS-Lotse antwortet 15 s hörbar), "off"
+  "AirspaceWatch": true,   // Kontrollzonen überwachen (Einflug ohne Kontakt wird angerufen) und Verstöße ansagen ("possible pilot deviation", z. B. Start ohne Freigabe) und ins Debriefing; false = nur Sicherheitswarnungen
+  "AltimeterUnit": "auto",   // Höhenmesser-Einstellung im Funk: "auto" (nach eigenem Flugzeugtyp: westliche Typen "altimeter two niner niner two" in inHg, sonst "QNH one zero one three" in hPa; ATIS nennt beides), "hpa", "inhg"
+  "DebugLog": true,   // ausführliches Protokoll atc-debug.txt für Fehlerberichte (Spracherkennung, Platzwahl, Phasen, Telemetrie alle 10 s), höchstens 2 × 20 MB; false = aus
+  "Dedicated": false,   // Dedicated Server ohne Spieler am PC: kein Funkrad, keine Tasten, kein Mikrofon, nur SRS + Missionsdaten; läuft DCS_server.exe ohne DCS.exe, gilt das automatisch
+
+  "SrsPath": "C:\\Program Files\\DCS-SimpleRadio-Standalone"   // SRS-Ordner (mit ExternalAudio); stimmt er nicht, nimmt DCS-ATC die SRS-Installation aus der Registry bzw. das laufende SRS. Auch im Einstellungsfenster wählbar
+}

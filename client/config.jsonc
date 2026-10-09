@@ -1,0 +1,14 @@
+{
+  // DCS-ATC für Mitspieler: nur das Funkrad. Anfragen gehen über DCS an den Host (dort läuft das ATC).
+  "Mode": "client",
+
+  // Funkrad: Taste öffnet/schließt, nur wenn DCS vorn ist. 222 = ' (Apostroph), 0 = aus
+  // Am HOTAS: "DcsAtc.exe --buttons" starten, Knopf drücken, Joystick/Knopf hier eintragen; Coolie hoch/runter, rechts wählt, links zurück.
+  "WheelKey": 222,
+  "WheelJoystick": -1,
+  "WheelButton": 1,
+
+  // nur zur Anzeige im Rad
+  "Frequencies": { "ATIS": 263.5, "Ground": 264.5, "Tower": 265.0, "Approach": 266.5,
+                   "Range": 267.5, "AWACS": 251.5, "Tanker": 255.5 }
+}

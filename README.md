@@ -22,6 +22,7 @@ Talk to Ground, Tower, Approach, ATIS, AWACS and tankers over SRS in English; th
 - **Emergencies:** mayday / pan-pan get priority, everyone else waits. **Landing grade** after every touchdown.
 - **Carrier:** Marshal, Tower and LSO (Paddles) for carriers in the mission – Case I and Case III, marshal stack, final bearing, TACAN/ICLS, LSO calls, wave-off, bolter, grade.
 - **AWACS** (of your mission, also when spawned later): check in/out, picture, bogey dope (BRAA), declare, sort, spiked, threat calls, nearest tanker, vector to nearest field.
+- **Air combat with the AWACS (ATP 1-02.1 brevity):** the AWACS runs the fight – commits flights, assigns targets, skip it / reset / recommit, leakers, splash. AI fighters actually fly what it says (attack the assigned group, break off on reset), check in and out, and go home to land under DCS-ATC. You can answer: unable, fox, defensive, request support, winchester, say again – by voice or radio wheel.
 - **Tankers** of your mission: rendezvous, sequence, pre-contact, contact/disconnect, refueling coaching.
 - **AI on the radio:** the mission's AI traffic talks to ATC (DCS-ATC spawns no aircraft itself); AI flights call Fox, Splash, Defending, Bingo, Winchester and Guard emergencies.
 - **Crew chief** on your SRS intercom, ground crew with fuel/ammo trucks and fire service.
@@ -70,7 +71,15 @@ Open an [issue](../../issues) with time, airfield, a short description and `atc-
 
 **Development:** DCS-ATC is developed with an AI coding assistant ([Claude](https://claude.ai) by Anthropic), which helps write the code, tests and documentation. Ideas, decisions and the testing in DCS are mine.
 
+## Source code
+
+The full source is in this repository under the GNU GPL 3.0 ([LICENSE](LICENSE)): the app in C# (.NET 8, `src/DcsAtc`), the DCS hook and mission scripts in Lua (`mod/`, `hooks/`, `mission/`, `export/`), tests (`tests/`) and the installer (`installer/`). Forks and pull requests welcome.
+
+- Build: .NET 8 SDK, `dotnet build src/DcsAtc -c Release`
+- Self-tests (no DCS needed): `DcsAtc.exe --selftest`, `--anflugtest`, `--mptest`
+- Installer: `installer\build.cmd` (Inno Setup 6, FFmpeg in PATH). It also needs the Whisper model in `models\`, the Piper voices in `models\`, and whisper.cpp/Piper in `tools\` – not in this repository because of their size; sources in `installer/THIRD-PARTY-NOTICES.txt`, layout in `installer/DcsAtc.iss`.
+
 ## Licenses
 
-Free, non-commercial (one bundled voice is CC BY-NC-SA 4.0). Bundles Whisper/whisper.cpp, Piper and voices from rhasspy/piper-voices, FFmpeg, espeak-ng, NAudio – see `THIRD-PARTY-NOTICES.txt` in the install folder.
+DCS-ATC is free software under the GNU GPL 3.0. Bundled third-party software keeps its own license: Whisper/whisper.cpp, Piper and voices from rhasspy/piper-voices (the ryan voice is CC BY-NC-SA 4.0, non-commercial), FFmpeg, espeak-ng, NAudio – see `installer/THIRD-PARTY-NOTICES.txt` (also in the install folder).
 Unofficial fan project, not affiliated with Eagle Dynamics or the SRS project.

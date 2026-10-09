@@ -1,0 +1,110 @@
+DCS-ATC 0.9.9 ALPHA – sprechende Flugsicherung für DCS World (alle Karten, getestet im Kaukasus)
+=====================================================================
+
+!! ALPHA-VERSION !!
+  Frühe Testversion: Es wird Fehler geben (falsche oder doppelte Funksprüche, seltsame Kurse, Hänger).
+  Nutzung auf eigene Gefahr, ohne Gewähr. Vorher am besten Saved Games\DCS\Scripts sichern.
+  Fehler bitte mit Uhrzeit, Platz, kurzer Beschreibung und den Dateien atc-log.txt und atc-debug.txt melden
+  (liegt im Installationsordner: %LOCALAPPDATA%\Programs\DCS-ATC).
+  Inoffizielles Fan-Projekt, nicht verbunden mit Eagle Dynamics oder dem SRS-Projekt.
+
+Was es macht
+  Tower, Ground, Approach, ATIS, AWACS, Tanker und Crew Chief sprechen über SRS mit dir – an jedem Platz
+  jeder DCS-Karte, komplett offline (Spracherkennung und Stimmen laufen auf deinem PC).
+  Dazu Bodenpersonal mit Tank-/Munitions-Lkw und Träger-Funk (Marshal, Tower, LSO) für Träger aus der Mission.
+  DCS-ATC spawnt keine Flugzeuge: Es macht nur den Funk für AWACS, Tanker und Verkehr deiner Mission (auch nachträglich gespawnte).
+  Funktioniert in jeder Mission auf jeder Karte, auch im Mehrspieler. In VR erscheint das Funkrad als Text im Spiel.
+
+Voraussetzungen
+  - Windows 10/11 (64 Bit), DCS World (jede Karte; getestet bisher im Kaukasus)
+  - SRS (DCS-SimpleRadio-Standalone) im Standardordner C:\Program Files\DCS-SimpleRadio-Standalone.
+    DCS-ATC startet SRS-Server und -Client selbst (anderer Ordner: "SrsPath" in den Einstellungen).
+    Ein noch nicht verbundener SRS-Client wird automatisch mit dem lokalen SRS-Server verbunden
+    (über die Auto-Connect-Funktion von SRS; abschalten: "SrsAutoConnect": false in config.jsonc).
+  - Mikrofon; gefunkt wird auf Englisch
+  - ca. 1,2 GB Platz. Die Spracherkennung läuft auf der CPU (ein paar Sekunden pro Funkspruch).
+
+Installation
+  1. DCS beenden, DCS-ATC-Setup.exe starten. Keine Adminrechte nötig – nur eine Windows-Abfrage für
+     MissionScripting.lua (siehe "Was das Setup an DCS ändert").
+  2. Am Ende "Tasten festlegen": Taste fürs Funkrad und Push-to-Talk (Tastatur oder HOTAS).
+  3. Fertig. DCS-ATC startet ab jetzt mit jeder Mission von selbst (kleines Fenster in der Taskleiste).
+  Sprache: Das Setup fragt am Anfang nach der Sprache (Deutsch oder Englisch). Später wechseln: Setup erneut
+  starten und die andere Sprache wählen.
+
+Benutzung
+  1. DCS starten, beliebige Mission fliegen.
+  2. Funkgeräte in SRS (AM): jeder Platz auf seiner DCS-Frequenz (wie F10-Karte), Ground, Tower und Approach
+     gemeinsam, UHF oder VHF – z. B. Kutaisi 263.0 / 134.0, Senaki 261.0 / 132.0, Batumi 260.0 / 131.0.
+     Das Funkrad zeigt die Frequenz des aktuellen Platzes. Dazu: ATIS 263.5 · AWACS 251.5 · Tanker 255.5
+  3. Sprechen: SRS-Sprechtaste auf der Frequenz, englisch, z. B.
+       "Kutaisi Ground, Enfield 1-1, request startup"  ·  "Overlord, Enfield 1-1, request picture"
+     Oder ohne Sprechen: Funkrad mit Taste ' (Apostroph) bzw. F10-Menü -> ATC.
+     Funkrad: 1–9 wählen, Enter = vorgeschlagener Funkspruch, Rücktaste zurück, Esc zu.
+     Bei offenem Funkrad speichert die Druck-Taste einen Screenshot mit Rad unter Bilder\DCS-ATC.
+     In VR wird das Funkrad als Text im Spiel angezeigt (Einstellungen -> "Funkrad im Spiel (VR)").
+     AWACS und Tanker stehen nur im Funkrad, wenn einer deiner Seite in der Luft ist.
+     Funkrad und F10 sprechen mit dem Platz, dessen Frequenz du in SRS gerastet hast (260.0 -> Batumi), sonst
+     mit dem nächsten. Funkrad -> Allgemein -> "Platz wählen": anderen Flugplatz ansprechen (bis zur Landung).
+  Anflug: bei Approach "inbound" melden -> Radarführung mit Kursen, Sinkflugstufen und Geschwindigkeit.
+     Sicht: Overhead-Break (Initial -> Break über der Schwelle -> Gegenanflug -> Endanflug); "initial" meldest du
+     dem Tower, sobald du auf der verlängerten Pistenachse anfliegst. Lieber gerade rein: "request straight in".
+     Schlechtes Wetter: ILS bzw. Geradeaus-Anflug. Auf dem Endanflug überwacht der Lotse nur (wie beim ILS) und
+     meldet sich, wenn du deutlich vom Kurs oder Gleitweg abweichst oder zu tief bist.
+     Wer Anweisungen grob ignoriert (Kurs/Höhe weit daneben, dreimal), fliegt aus der Reihenfolge.
+  Nach der Landung lotst Ground mit Richtung und Entfernung zurück zu deiner Startposition.
+
+Einstellungen
+  Im Spiel: F10 -> ATC -> Einstellungen (Bodenpersonal).
+  Standard für alle Missionen: Saved Games\DCS\Scripts\DcsAtc\DcsAtcOptions.lua
+  Rufzeichen, Lautstärke, Funk, Funkrad, Sprache: Startmenü -> DCS-ATC -> Einstellungen (Fenster, wirkt sofort)
+  Stimmen, Frequenzen und alles andere: im Einstellungen-Fenster "Alle Optionen (config.jsonc)"
+  Eigene Platzfrequenzen (z. B. wie im echten Leben, je Lotse eine) in frequencies.jsonc im DCS-ATC-Ordner, statt der
+     DCS-Karte. DCS-ATC legt sie beim ersten Start an, je Platz aller installierten Karten eine auskommentierte Zeile
+     mit den heutigen Werten; // entfernen und Zahlen ändern, z. B.
+       "Nellis": { "ATIS": 270.1, "Ground": 275.8, "Tower": 327.0, "Departure": 273.55, "Approach": 379.0 },
+     Je Lotse eine Frequenz oder eine Liste [UHF, VHF]. Auf einem Server gilt sie für alle Spieler. Gilt nach dem
+     Speichern; ungültige Einträge werden ignoriert und in atc-log.txt genannt. Neue Karten/Plätze werden ergänzt,
+     deine Zeilen bleiben unverändert.
+  Eine einzelne Mission anders (Missions-Editor, Trigger "Mission Start" -> DO SCRIPT):
+       DCSATC_OPTIONS = { crew = true }
+
+Mehrspieler
+  Alle installieren DCS-ATC. Wer die Mission hostet, ist automatisch die Flugsicherung; Mitspieler sprechen
+  einfach über SRS (gleicher SRS-Server) oder nutzen ihr Funkrad.
+
+Dedicated Server
+  DCS-ATC kann auf dem PC eines DCS Dedicated Servers (DCS_server.exe) laufen, ohne Spieler an diesem PC.
+  - Voraussetzungen: SRS-Server auf demselben PC (DCS-ATC startet ihn bei Bedarf), alle Mitspieler mit SRS. Den Server
+    vor der Installation einmal starten, damit sein Saved-Games-Ordner existiert (DCS.server, DCS.dcs_serverrelease oder der Name nach -w).
+  - Setup: "Dedicated Server" ankreuzen, seinen Saved-Games-Ordner bestätigen und, falls gefragt, seinen Installationsordner wählen.
+    Das Setup legt Hook und Missionsskript dort ab und passt die MissionScripting.lua des Servers an.
+  - Danach startet DCS-ATC mit jeder Mission des Servers und läuft im Hintergrund: kein Funkrad, keine Tasten, kein Mikrofon
+    (automatisch, wenn DCS_server.exe ohne DCS.exe läuft; oder "Dedicated": true in config.jsonc). Mitspieler sprechen über SRS
+    auf den Lotsen-Frequenzen; Text im Spiel geht an die Gruppe des jeweiligen Spielers.
+  - Optional: Mitspieler mit installiertem DCS-ATC nutzen ihr Funkrad (Client-Modus, Anfragen per DCS-Chat an den Server).
+  Noch nicht auf einem echten Dedicated Server getestet – Rückmeldungen willkommen.
+
+Was das Setup an DCS ändert
+  - Saved Games\DCS\Scripts\Hooks\DcsAtcHook.lua: startet DCS-ATC mit der Mission, Funkrad der Mitspieler
+  - Saved Games\DCS\Scripts\DcsAtc\: Missionsskript, Standard-Einstellungen und Sprache
+  - Saved Games\DCS\Scripts\DcsAtcExport.lua und eine Zeile am Ende von Export.lua (eigenes Flugzeug an DCS-ATC;
+    andere Export-Skripte wie SRS oder Tacview bleiben unberührt)
+  - <DCS-Ordner>\Scripts\MissionScripting.lua: eine Zeile, die nur das DCS-ATC-Skript lädt
+    (Sicherung daneben: MissionScripting.lua.vor-dcsatc). Missionen selbst bleiben gesperrt (kein Dateizugriff).
+  Verschobenes Saved Games (anderes Laufwerk) findet das Setup selbst; sonst fragt es nach dem DCS-Ordner in Saved Games.
+  Deinstallieren (Windows "Apps" oder Startmenü -> DCS-ATC deinstallieren) nimmt alles wieder heraus.
+
+Nach einem DCS-Update
+  DCS setzt dabei Scripts\MissionScripting.lua zurück. DCS-ATC merkt das und fragt einmal nach Admin-Rechten,
+  oder: Startmenü -> DCS-ATC -> "Nach DCS-Update reparieren". Danach Mission neu starten.
+
+Bekannte Grenzen
+  - Alle Karten werden unterstützt, getestet ist bisher nur der Kaukasus. Programm auf Deutsch oder Englisch (Auswahl im Setup), Funk auf Englisch.
+  - Genaue An- und Abflugverfahren nur für Kutaisi; alle anderen Plätze generisch (Bahnen, Höhe, Gelände aus DCS).
+  - Mehrspieler nur, wenn du die Mission hostest.
+  - Die Spracherkennung versteht nicht alles – im Zweifel Funkrad oder F10-Menü.
+
+Lizenzen
+  DCS-ATC: GNU GPL 3.0 (LICENSE.txt), Quellcode: https://github.com/Iceman1991/DCS-ATC-Release
+  Mitgelieferte Fremdsoftware (Whisper, Piper und Stimmen, FFmpeg, espeak-ng …): THIRD-PARTY-NOTICES.txt

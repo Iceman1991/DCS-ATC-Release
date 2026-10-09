@@ -1,0 +1,23 @@
+# Build / runtime
+src/DcsAtc/bin/
+src/DcsAtc/obj/
+app/
+dist/
+tmp/
+debrief/
+atc-log.txt
+.vs/
+*.user
+
+# Third-party files (Whisper, Piper, models, ffmpeg) – see README "Source code"
+models/
+tools/
+
+# Personal files, voice samples, SRS files
+backup/
+stimmen/
+demo.wav
+default.cfg
+global.cfg
+hooks/DCS-SRS-AutoConnectGameGUI.lua
+frequencies.jsonc

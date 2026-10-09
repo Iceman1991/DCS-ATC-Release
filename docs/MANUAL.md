@@ -613,7 +613,7 @@ Enfield 1-1: Kutaisi Tower, Enfield 1 1, ready for departure.
 - **Who sees it:** only groups with a player tuned to that frequency in SRS. If SRS doesn't know your radios, you see everything. Guard reaches everyone.
 - **How long it stays:** at least 20 seconds, longer for long texts. AI flight chatter stays only 6–8 seconds.
 - **Hints are text only, never spoken:** wrong frequency, hostile airfield, "ATC: now …", debriefing, refuelling via the DCS ground crew, and similar.
-- **Late calls become text only:** if a call would come too late (more than 45 seconds in the queue, or 20 seconds for an AWACS call; 12 seconds for AWACS threat, merged, leaker and furball calls), you only see it as text.
+- **Late calls become text only:** if a call would come too late (more than 45 seconds in the queue, or 20 seconds for an AWACS call; 12 seconds for AWACS threat, merged, leaker and furball calls), you only see it as text. An AWACS call with a BRAA that had to wait is spoken with bearing and range as of the moment it goes out; after a *fox* or *defensive* only urgent calls go out for 5 seconds.
 - **Order on a busy frequency:** emergencies and *defending* first, then the short combat calls of the flights (*fox*, *pitbull*, *splash* …), then AWACS *threat*/*merged*/*leaker*/*furball*/*pop-up*, then *commit*/*targeting* and answers, then picture, new group, faded and on-station calls, then other AI chatter. A long picture waiting in the queue doesn't hold up a *pitbull* any more.
 
 ### Voices, radio effect and speech pace
@@ -1755,7 +1755,7 @@ Radio wheel entries:
 | Submenu | Entries |
 |---|---|
 | Range | Check in · In hot · Off safe · Check out |
-| AWACS | Check in · Picture · Bogey dope · Sort · Nearest tanker · Vector nearest airfield · Check out |
+| AWACS | Check in · Picture · Bogey dope · Sort · Nearest tanker · Vector nearest airfield · Check out · Combat (Committing · Fox three · Splash · Defending · Request support · Unable · Winchester · Bingo, RTB · Say again) |
 | Tanker | Request rejoin · Visual · Observation · Pre-contact · Refuel complete |
 
 The centre of the wheel suggests the answer to whatever the controller just asked for. For example, after *"Report in hot"* it suggests **Range: in hot**, after *"cleared pre-contact"* it suggests **Tanker: pre contact**, and after *"report complete or request more"* it suggests **Tanker: complete**.
@@ -1767,7 +1767,8 @@ If you say *"radio check"* or *"how do you read"* to any of these stations, the 
 #### Name and frequency
 
 - **Callsign:** taken from the DCS callsign of the mission's AWACS (Magic, Overlord, Darkstar, Wizard, Focus …). A numeric callsign is read digit by digit ("two four seven"). If there is none, the AWACS is called **Overlord**.
-- **GCI:** if your side has no AWACS but has an early-warning radar, a GCI answers instead: **Magic** for blue, **Moscow** for red.
+- **GCI:** if your side has no AWACS but has an early-warning radar, a GCI answers instead: **Magic** for blue, **Moscow** for red. If the AWACS is shot down or lands, the GCI takes over and gives everyone checked in *"radar contact"* and a picture.
+- **Radar sweep:** new and faded groups are reported with the next sweep of the AWACS radar (every 10 s); a pop-up group close to you at once.
 - **What it can see:** only aircraft that your side's sensors have actually detected, within 250 NM of you. A contact that is detected but not identified is called a **bogey** and has no type.
 - **Bogey, then hostile:** every new contact starts as a **bogey**. Once its type is known and the AWACS has tracked it for about 40 s (the ID criteria), or at once if it fires on your side, the AWACS declares it to everyone on the frequency: *"Overlord, north group, hostile."* A *declare* answers with the current state.
 - **Handover after departure:** when an AWACS or GCI is up, the tower or departure controller hands you over with *"leaving control zone, contact Overlord 251.5."*
@@ -1795,11 +1796,19 @@ While you are checked in with AWACS, the airfield's zone guard only watches the 
 | **declare** + position: *"declare bullseye 030 45"*, or *"declare 0 3 0 for 4 5"* (bearing/range from you) | Looks within 5 NM of that point and answers *"bullseye 030, 45, hostile, single, Fulcrum"*, *"friendly"*, *"furball"* (hostile and friendly mixed), *"neutral …"* or *"clean"*. |
 | **declare** with no position, with a radar lock | Your locked target, within 3 NM and ±5,000 ft. Can also return *"bogey"* (an aircraft is there but the AWACS hasn't detected it). Works only for the player on the PC that runs DCS-ATC. |
 | **declare** with no position and no lock | Nearest group, including neutral aircraft. |
-| **spike** / **spiked 270** (magnetic bearing; you can speak the digits one by one) | *"spike 270, group BRAA …, hostile …"* or *"spike 270, nothing known."* If you give no bearing: *"say spike bearing."* |
+| **spike** / **spiked 270** (magnetic bearing; you can speak the digits one by one) | *"spike 270, group BRAA …, hostile …"* or *"spike 270, nothing known."* A friendly fighter in that direction: *"spike 270, buddy spike, BRAA 265, 15, 25 thousand, hot."* If you give no bearing: *"say spike bearing."* |
 | **sort**, **request sort**, **targeting**, **request target** | Targets per element, from left to right: *"Enfield one one, Overlord, target lead group BRAA … Enfield one three, target trail group BRAA …"*. A 2-ship gets one group and a 4-ship gets two. |
 | **committing**, **targeting**, **targeted**, **engaged**, **engaging** (optionally with a group name such as *"north group"*, or a direction *north/south/east/west*) | Confirms that group with its BRAA, otherwise the nearest group: *"Enfield one one, Overlord, north group BRAA 354, 20, 20 thousand, hot."* If you name an unnamed group by its direction first, that name sticks. From then on the group is yours: no more threat calls for it, only short target updates at 20 and 10 NM. If another friendly flight (player or AI) already has that group, the AWACS refuses: *"Enfield one one, Overlord, skip it, north group Ford one targeted."* |
 | **splash** / **splash 2** / **kill** | *"Overlord copies splash two, west group. East group remains."* (the group that was shot down, then what is left: one or two group names, or *"3 groups remain"*), or *"Overlord copies splash two, picture clean."* if nothing is left. Nobody repeats the *picture clean* later, also not after a friendly AI fighter's *"Overlord copies, splash, picture clean."* |
-| **winchester**, **RTB**, **tally** | *"Overlord copies."* |
+| **winchester**, **RTB**, **tally** | *"Overlord copies."* | winchester also frees your assignment.
+| **unable** (with a reason: *"unable, winchester / bingo / defensive"*) | *"copy."* The group goes to the next free flight; with winchester or bingo you are no longer tasked. If you do not answer a commit, the AWACS asks once after 10 s (*"commit north group, how copy?"*) and gives the group to the next flight after 25 s; after two unanswered commits you are not tasked again until you speak. A short acknowledgement (*"Enfield one one."*, *"resetting"*, *"copy"*) after a directive gets no reply, nor does *"committing"* right after the commit (no echo). |
+| **fox one/two/three** (optionally with the group) | No reply. The group is yours: a friendly AI flight on it hears *"Ford one, Overlord, skip it, north group Enfield one targeted."* |
+| **defensive** / **defending** / **missile** | No reply; your group gets a second flight. |
+| **request support** (optionally with the group) | *"copy, north group."* and a second flight is committed. |
+| **judy** (or *"targeted north group"*) | *judy*: no answer. From then on no more range updates on that group – you run the intercept, the AWACS keeps the frequency clear. |
+| **merged** | no answer, and the AWACS no longer calls *"merged"* itself for that group. |
+| **fox …** / **defensive** | for 5 s only urgent calls (threats, defending) go out on the frequency; picture, answers and chatter wait. |
+| **say again** | The last AWACS call to you again. |
 | **tanker**, **texaco**, **shell**, **arco** (e.g. *"request nearest tanker"*) | *"nearest tanker Texaco, bearing 084, 30 miles, angels 22, TACAN 52 X-ray, contact Texaco 255.5."* Other possible answers: *"no tanker airborne"*, or *"negative, no compatible tanker airborne"* if no tanker matches your aircraft (boom vs. basket). |
 | **vector**, **home plate**, **bingo**, **nearest airfield**, **recovery**, **divert** (you can add an airfield name) | *"Kutaisi bears 245, 38 miles."* Only friendly or neutral airfields. If you name an airfield, you get that one, otherwise the nearest. |
 | **mayday** / **pan pan** | *"roger mayday. Nearest friendly field Kutaisi, bearing 245, 38 miles, contact Kutaisi Approach two six three decimal zero. Say intentions."* DCS-ATC then selects that airfield for you, and its Approach controller takes over the emergency. |
@@ -1824,9 +1833,12 @@ While you are checked in with AWACS, the airfield's zone guard only watches the 
 | Call | When |
 |---|---|
 | *"threat, group BRAA …, hot, hostile …"* | An **untargeted** group pointing at you (hot or flank) within 30 NM. Called again at each closer step (20/10/5 NM), and every 45 s while it stays hot within 10 NM. No threat calls for a group that you or another friendly flight has committed on or targeted. |
-| *"commit east group, BRAA …"* / *"maintain CAP."* | The AWACS acts as air battle manager for your side: it shares out the hostile groups between the fighters on station, i.e. friendly AI fighters and players who have reported **on station** (a CAP tasking, e.g. *"Overlord, Enfield 1-1, on station"*). Each group that comes hot within 40 NM gets one flight, a heavy group (3 or more contacts) gets two; the AWACS picks the nearest flight with missiles (Fox 3 first) and fuel. The other flights hear *"maintain CAP."* An assignment stays until the group is shot down or fades, or the flight goes RTB, bingo or winchester. Without "on station" you get threat calls only and hear the assignments of the others. "RTB", "bingo", "off station" or "checking out" end the tasking. |
+| *"commit east group, BRAA …"* / *"maintain CAP."* | The AWACS acts as air battle manager for your side: it shares out the hostile groups between the fighters on station, i.e. friendly AI fighters and players who have reported **on station** (a CAP tasking, e.g. *"Overlord, Enfield 1-1, on station"*). Each group that comes hot within 60 NM (40 NM for a flight with Fox 2 only) gets one flight, a leaker one regardless of its aspect, a heavy group (3 or more contacts) gets two; the AWACS picks the nearest flight with missiles (Fox 3 first) and fuel. The other flights hear *"maintain CAP."* An assignment stays until the group is shot down or fades, or the flight goes RTB, bingo or winchester. Without "on station" you get threat calls only and hear the assignments of the others. "RTB", "bingo", "off station" or "checking out" end the tasking. |
 | *"east group BRAA 012, 19, 26 thousand, hot."* | Short target update on **your** group (committed or targeted) at 20 and 10 NM, without fill-ins. |
-| *"reset."* / *"picture clean, reset."* | Your group is shot down or has faded: back to your CAP. About a minute later you can be given the next open group: *"recommit west group, BRAA …"* |
+| *"reset."* / *"picture clean, reset."* | Your group is shot down or has faded – or has been dragging away for 2 minutes beyond your commit range + 10 NM: back to your CAP. About a minute later you can be given the next open group: *"recommit west group, BRAA …"* |
+| *"north group, flank west."* | Your group has turned by 45° or more: its new aspect to you (hot, flank, beam, drag and its heading). |
+| *"Overlord, north group, 45 miles from Overlord, hot, Overlord moving south."* (to all) | A group is heading for the AWACS within 50 NM: it is assigned first (like a leaker), and the AWACS moves 40 NM away for 10 minutes. |
+| *"picture, 2 groups …"* (instead of *"new group"*) | A second group appeared and your *"single group"* got a new name (e.g. *"west group"*); at most once a minute. |
 | *"Overlord, new group, bullseye …"* (to everyone) / *"pop-up group, BRAA …"* (to you) | A group is detected for the first time within `"AwacsNewGroupNm"` (default 200, range 40–200). It is a pop-up if it first appears within 30 NM of you. |
 | *"Overlord, west group split, 2 groups azimuth 6, east group bullseye …, west group bullseye …"* / *"Overlord, north and south groups combined, bullseye …"* (to everyone) | After the change has been stable for 12 s, at most once a minute per group. |
 | *"north group merged."* | A group within 3 NM of you and less than 5,000 ft above or below you. With the group name from the picture; an unnamed group is just *"merged."* |
@@ -2020,20 +2032,23 @@ Friendly AI flights within 60 NM of a player on their side talk on the radio dur
 
 | Event | AI call |
 |---|---|
-| Fighter flight levelled off (first time 60 s within ±500 ft above 10,000 ft; only with AWACS/GCI) | *"Overlord, Ford one, on station, bullseye 040, 35, angels 25."* → AWACS: *"Ford one, Overlord, picture clean."* (or *"picture, single group BRAA …"*) |
+| Fighter flight levelled off (first time 60 s within ±500 ft above 10,000 ft; only with AWACS/GCI) | *"Overlord, Ford one, on station, bullseye 040, 35, angels 25."* → AWACS: *"Ford one, Overlord, picture clean."* (or *"picture, single group BRAA …"*); first the lead calls *"Ford, fence in."* on the flight frequency (*"fence out."* when going home) |
 | Hostile group hot within 40 NM (the AWACS assigns: each group to the best free flight on station, a heavy group to two, no back-and-forth) | AWACS: *"Ford one, Overlord, commit north group, bullseye 040, 65, 23 thousand, hostile, two contacts, Flanker."* → *"Ford one, committing."* → *"Ford one, targeted north group."* (the location was already in the commit); with two or more contacts in that group then *"Ford one, sorted."* (each element has its own target). If another free group is hot within 40 NM, the second element takes it: *"Ford one one, targeted north group."* / *"Ford one two, targeted south group."* (in a four-ship *"Ford one three"*). Other flights near an assigned group: *"Dodge one, Overlord, maintain CAP."* → *"Dodge one."*; a flight that wants a taken group: *"skip it, north group Ford one targeted."* → *"Dodge one."*; group gone: *"Ford one, Overlord, reset."* (or *"picture clean, reset."*) → *"Ford one, resetting."*, back on station later *"recommit …"*. Group names are the AWACS names of your side (as in the picture); without one *"commit group, …"* and *"Ford one, targeted."*. Without AWACS the flight commits on its own: *"Ford one, committing."* → *"Ford one, targeted group bullseye …"*. Committing/targeted are dropped if they shoot first; bingo, winchester and RTB free the assignment. |
 | Air-to-air missile launch | *"Viper one one, fox three, north group."* (fox one / fox two / fox three; the AWACS group name; with only one group just *"fox three."*; without a picture name the direction, *"fox three, north."*). Before the first shot at a group the flight has not already called targeted: *"Viper one, engaged north group."* as a call of its own (once per group in 3 min) · *"maddog."* (active missile with no target) |
 | Air-to-ground launch | *"magnum"* (anti-radiation), *"bruiser"* (anti-ship), *"rifle"* (other missiles), *"bombs away"* · *"guns."* · *"shack."* (bomb hit on a ground target) |
-| Missile goes active / is defeated / time is up | *"pitbull."* · *"trashed."* · *"timeout."* (expected time of flight over without a hit, roughly 5 s + 3 s per NM range at launch; then no "trashed" for that missile) · lead turns more than 120° away from the target within 2 min after the shot: *"Ford one, out south."* |
+| Missile goes active / is defeated / time is up | *"pitbull."* · *"trashed."* · *"timeout."* (expected time of flight over without a hit, roughly 5 s + 3 s per NM range at launch; then no "trashed" for that missile) · lead turns more than 120° away from the target within 2 min after the shot: *"Ford one, pump south."* (fuel above joker and Fox 3 left: it will come back) or *"Ford one, out south."* |
 | Enemy radar locks them (radar warning, flight frequency) | air: *"Viper one two, spike two six four, Flanker."* (magnetic bearing, type if known) · surface: *"Viper one two, mud spike, SA-6, east."* · lock gone: *"naked."* (a lock that is gone before the call is said gives neither) |
 | Missile fired at them | *"Viper one two, SAM west, defending."* / *"launch north, defending."* |
 | Kill | *"Viper one one, splash two, Flanker."* → AWACS: *"Overlord copies, splash, picture clean."* |
 | Hit | *"I'm hit."* · badly hit, on Guard: *"Mayday, mayday, mayday, Viper one two, hit, RTB, bullseye 084, 12."* |
 | Shot down / ejection | *"one two is down, good chute, bullseye …"* or *"no chute"* · *"ejecting, ejecting."* · emergency beacon on Guard · 90 s later on Guard: *"Mayday …, on the ground, bullseye …, uninjured."* → AWACS: *"copy, SAR notified, monitor guard."* (this also happens when **you** eject) |
-| Fuel / weapons | *"joker."* (below 35 %) · *"bingo, RTB."* (below 22 %) → AWACS: *"copy bingo."* · *"winchester."* |
+| Fuel / weapons | *"joker."* (below 35 %) · *"bingo."* of an element on the flight frequency, then the lead for the whole flight *"Ford one, bingo, RTB."* (below 22 %) → AWACS: *"Ford one, Overlord, copy bingo."* · *"winchester."* |
 | Every 15 min in the air (flight frequency; not right after their own shot) | *"Ford, ops check, one, six point two, four and two."* – *"two, five point nine, four and two."* (fuel in thousand lb, then Fox-3 and Fox-2) |
 | You ask: *"Ford one, say status"* (or *"Ford one two, say status"* for one element; on the AWACS/tactical net) | tactical frequency: *"Ford one, engaged north group, six point two, four and two."* (engaged / targeted / on station, lowest fuel in the flight, Fox-3 and Fox-2 summed) |
-| Heading home (after "on station": for 60 s more than 40 NM from the station, heading for the nearest friendly airfield and 20 NM closer to it; not after bingo or a shot in the last 5 min) | *"Overlord, Ford one, RTB."* → AWACS: *"Ford one, Overlord, copy."* |
+| You ask: *"Ford one, Dagger one, say position"* | *"Ford one, bullseye 260, 25, angels 25."* |
+| Lead to lead: *"Ford one, Dagger one, targeted south group."* | *"Ford one."* – the south group is yours, Ford drops it (*"skip it"*) and takes another; if Ford already has another group: *"Ford one, targeted north group."* |
+| Heading home (after "on station": for 60 s more than 40 NM from the station, heading for the nearest friendly airfield and 20 NM closer to it; not after bingo or a shot in the last 5 min) | *"Overlord, Ford one, RTB, checking out."* → AWACS: *"Ford one, Overlord, check out approved."* The flight then lands at the nearest friendly airfield as an arrival under DCS-ATC (Approach, Tower; also after bingo). |
+| Climbing through 10,000 ft (with an AWACS) | *"Overlord, Ford one, checking in as fragged, flight of two, angels 20, playtime 55."* (playtime: minutes until bingo) → AWACS: *"Ford one, Overlord, radar contact."* |
 | Merge | *"merged."* (within 3 NM and less than 5,000 ft altitude difference) |
 
 **Settings** (`config.jsonc`, or "AI flights in combat" in the settings window):
@@ -2043,6 +2058,7 @@ Friendly AI flights within 60 NM of a player on their side talk on the radio dur
 | `"AiFlightComms"` | `"voll"` | `"voll"` = all calls; `"taktisch"` = only fox, engaged, timeout, out, splash, trashed, bingo, defending, merged, down and Guard calls; `"aus"` = off |
 | `"AiFlightRadiusNm"` | `60` | Only AI flights within this distance of a player on their side talk |
 | `"AiOwnWingmen"` | `false` | Your own AI wingmen also talk (DCS already voices them) |
+| `"AiFollowAwacs"` | `true` | Friendly AI fighters actually fly the group the AWACS commits them on (AttackGroup in the mission script); *skip it* / *reset* takes it away again. The AWACS also moves 40 NM away from a group heading for it (10 min). A fighter shot at attacks the shooter's group at once. `false`: the AI flies its mission; the AWACS does not commit AI flights, a flight calls "Overlord, Ford one, committing." itself when a group is hot within 40 NM |
 
 To keep the frequency usable, at most 10 low-priority and 16 normal calls are sent per minute on each frequency. Extra low-priority calls are dropped.
 
@@ -2395,6 +2411,7 @@ Own frequencies per airfield and controller are not in `config.jsonc` but in the
 | `AiFlightComms` | `"voll"` | AI flights in combat: `"voll"` (full: Fox, Splash, Tally …), `"taktisch"` (only fox, engaged, timeout, out, splash, trashed, bingo, defending, merged, down and Guard calls), `"aus"` (off). The values are German words; use them exactly as written. |
 | `AiFlightRadiusNm` | `60` | AI combat chatter comes only from flights within this distance of a player of the same side. |
 | `AiOwnWingmen` | `false` | Your own AI wingmen also talk. DCS already voices them. |
+| `AiFollowAwacs` | `true` | Friendly AI fighters fly the group the AWACS commits them on. The AWACS evades threats. `false`: the AI flies its mission, the radio follows it. |
 | `AwacsBullseye` | `true` | Picture and updates to everyone in bullseye format; `false` = everything in BRAA from you. |
 | `AwacsNewGroupNm` | `200` | AWACS calls new groups (and "picture clean") within this range, 40–200 NM. |
 | `TankerVectors` | `true` | The tanker gives join vectors (heading, distance, altitude) until you call "visual". `false` = only the first bearing. |

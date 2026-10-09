@@ -1,0 +1,21 @@
+DCS-ATC für Mitspieler
+======================
+
+Das ATC (Lotsen, KI-Verkehr, Range, AWACS, Tanker) läuft beim Host. Du brauchst nur:
+
+1. SRS (DCS-SimpleRadio-Standalone), mit dem SRS-Server des Hosts verbunden
+   (Radmin VPN: 26.200.225.238:5002 – kommt beim Einstieg in den Server meist als Autoconnect-Abfrage).
+2. Funkgeräte auf die Lotsen-Frequenzen (AM):
+   ATIS 263.5 · Ground 264.5 · Tower 265.0 · Approach 266.5 · Range 267.5 · AWACS 251.5 · Tanker 255.5
+
+Sprechen: einfach mit deiner SRS-Sprechtaste auf der Frequenz des Lotsen, englisch,
+z. B. "Kutaisi Ground, Enfield 1-2, request startup" oder "Overlord, Enfield 1-2, request picture".
+
+Funkrad (optional, wie BMS):
+1. Einmalig Installieren.cmd ausführen (kopiert DcsAtcHook.lua nach Saved Games\DCS\Scripts\Hooks), DCS neu starten.
+2. Vor dem Flug DcsAtc.exe starten (Fenster offen lassen).
+3. Im Spiel Taste ' (Apostroph) -> 1–9 wählen, Rücktaste zurück, Esc zu.
+   Deine Anfrage wird mit Pilotenstimme gesprochen, die Antwort kommt über SRS und als Text.
+
+Voraussetzung für DcsAtc.exe: .NET 8 Desktop Runtime (Windows x64) von Microsoft,
+falls beim Start eine entsprechende Meldung erscheint.
