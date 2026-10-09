@@ -63,6 +63,7 @@ static partial class Program
             "Approach: airborne, climbing" => airb,
             "Approach: cancel approach" => air && !airb,
             "Approach: inbound for landing" or "Approach: inbound for pattern work, touch and go" or "Approach: request straight in" or "Approach: request flight following" or "Approach: request higher" => air,
+            "Approach: request zone transit" => air && ph is null or Phase.Away or Phase.Departing,   // R389: not in the landing flow, not on the ground
             "Approach: traffic in sight" or "Approach: negative contact" => Now() - h.TrafficAt < 120,
             "Approach: C R P" => ask.Contains("c r p") || flow == "crp",   // Reporting obligation: only on call or at the CRP
             "Approach: report airspeed" => ask == "say airspeed" || flow == "report airspeed",
@@ -108,8 +109,8 @@ static partial class Program
                 if (t == null) return null;
                 int h = ((int)Math.Round(t.Hdg * 180 / Math.PI - (f?.MagVar ?? 0)) % 360 + 360) % 360;
                 return $"heading {(h == 0 ? 360 : h):000}";
-            case "say position": return t == null || f == null ? null : $"{Tower.Miles(Dist(t.X, t.Z, f.X, f.Z))} miles {Tower.Dir8(Tower.Bearing(f.X, f.Z, t.X, t.Z))} of {f.Name.Replace('-', ' ')}";
-            case "say intentions": return t != null && !Tower.OnGround(t) ? (Tower.Ifr && f != null ? $"request vectors to {f.Name.Replace('-', ' ')}, full stop" : "full stop") : flow?.Text;   // "full stop": Tower understands it (inbound), AWACS the "vectors"
+            case "say position": return t == null || f == null ? null : $"{Tower.MilesTxt(Dist(t.X, t.Z, f.X, f.Z))} {Tower.Dir8(Tower.Bearing(f.X, f.Z, t.X, t.Z))} of {f.Name.Replace('-', ' ')}";
+            case "say intentions": return t != null && !Tower.OnGround(t) ? (f != null && Tower.IfrAt(f) ? $"request vectors to {f.Name.Replace('-', ' ')}, full stop" : "full stop") : flow?.Text;   // "full stop": Tower understands it (inbound), AWACS the "vectors"
             case "say state": return state == null ? null : $"state {state}";
             case "say souls on board and fuel remaining": return FuelSouls(p);   // R300 (R243 callback); "say nature of emergency" is known only to the pilot: procedure
             case "say needles": return p.Boat.NeedlesSay(t);
@@ -163,11 +164,11 @@ static partial class Program
         tracedReq[p.Unit] = ("Tower: ready for departure", Now());
         var again = H("Colt three two, say again.", "Tower");
         var cap = H("Colt three two, Kutaisi Approach, cleared ILS runway two five. Contact Kutaisi Tower two six three decimal zero, report four miles final.", "Approach");   // "Contact" capitalized: to the Tower
-        var ifr = Tower.Ifr;
-        (p.Active, Tower.Ifr) = (new Tower("Colt 3-2"), true);
+        var ifr = Tower.ForceIfr;
+        (p.Active, Tower.ForceIfr) = (new Tower("Colt 3-2"), true);
         var intent = H("Colt three two, roger, say intentions.", "Tower");
         intent += " / " + p.Active.IntentOf(intent[7..], p.Tel);   // the Tower must understand
-        (p.Active, Tower.Ifr) = (null, ifr);
+        (p.Active, Tower.ForceIfr) = (null, ifr);
         // AirfieldFrequencies: after the handoff to Departure (own frequency) Enter shows and sends "Departure: …" (expectation as Approach, Tower.Dep in departure -> Departure; radio wheel FreqOf, Request)
         var kd = Airfield.Kutaisi();
         (kd.Own["Departure"], kd.Own["Approach"]) = (new[] { 273.55 }, new[] { 379.0 });
@@ -251,6 +252,40 @@ static partial class Program
             throw new Exception("Funkrad-Vorschlag (Erwartung): " + all);
         Console.WriteLine("OK   Funkrad Enter: say airspeed -> IAS (Approach versteht es als Fahrtmeldung), call the ball -> Hornet ball mit Sprit, report initial (nach contact Tower) -> Tower initial, nach contact Departure bzw. von Departure -> Departure: … auf der Departure-Frequenz, say again -> letzte Anfrage, sonst/abgelaufen Ablauf; Meldepflicht: contact Departure now -> Departure: airborne, going around confirm -> going around, report base/final/low key -> mit gear down, overhead, C R P, high key, four miles final, leaving the control zone, clear of the zone, commencing (angels, state), see you at ten, see me, update state -> state, call the ball, off, IP -> IP inbound, in inside 10 miles -> in hot (R284), visual; jeder Vorschlag vom Lotsen verstanden");
         WheelFitsTest();
+        ModulesTest();
+        F10ParityTest();
+    }
+
+    /// Selftest R390: F10 menu of the mission script (Lua MENU) against the radio wheel – same names and texts, deliberate omissions on a list
+    /// (wheel: Settings window; Select airfield has no text; F10 has its own Settings below ATC). Skipped without the mod folder (installed app).
+    static void F10ParityTest()
+    {
+        string? lua = null;
+        for (var d = new DirectoryInfo(AppContext.BaseDirectory); d != null && lua == null; d = d.Parent)
+            if (File.Exists(Path.Combine(d.FullName, "mod", "Scripts", "DcsAtc", "DcsAtcMission.lua"))) lua = Path.Combine(d.FullName, "mod", "Scripts", "DcsAtc", "DcsAtcMission.lua");
+        if (lua == null) { Console.WriteLine("SKIP F10-Paritaet (R390): DcsAtcMission.lua nicht gefunden"); return; }
+        var src = File.ReadAllText(lua);
+        var a = src.IndexOf("local MENU = {", StringComparison.Ordinal);
+        var menu = src[a..src.IndexOf("local function prune", a, StringComparison.Ordinal)];
+        // entries { "label", "text" } and { L("de", "en"), "text" }; groups ({ "label", nil, { … } }) have no text
+        var f10 = Regex.Matches(menu, "\\{\\s*(?:L\\(\"([^\"]*)\",\\s*\"([^\"]*)\"\\)|\"([^\"]*)\")\\s*,\\s*\"([^\"]*)\"")
+            .Select(m => (Label: m.Groups[3].Success ? m.Groups[3].Value : L(m.Groups[1].Value, m.Groups[2].Value), Text: m.Groups[4].Value)).ToList();
+        var wheel = new List<(string Label, string Text)>();
+        void Walk(IEnumerable<Wheel.Item> xs) { foreach (var i in xs) { if (i.Text != null) wheel.Add((i.Label, i.Text)); if (i.Sub != null) Walk(i.Sub); } }
+        Walk(Wheel.All);
+        var err = new List<string>();
+        var kind = new Regex(@"^(?:mayday mayday mayday|pan pan, pan pan, pan pan)(?: fuel)?, (.+), request (?:immediate|priority) landing$");
+        string[] sig = { "mayday mayday mayday", "pan pan, pan pan, pan pan" }, omitted = { "settings" };   // F10: the emergency type comes as a submenu (KINDS), built from the signal text
+        foreach (var f in f10)
+            if (!sig.Contains(f.Text) && !wheel.Contains(f)) err.Add($"F10 '{f.Label}' -> '{f.Text}' nicht im Funkrad");
+        foreach (var w in wheel)
+        {
+            if (kind.Match(w.Text) is { Success: true } k) { if (!src.Contains($"\"{k.Groups[1].Value}\"")) err.Add($"F10 Notfallart '{k.Groups[1].Value}' fehlt"); }
+            else if (!omitted.Contains(w.Text) && !f10.Contains(w)) err.Add($"Funkrad '{w.Label}' -> '{w.Text}' fehlt im F10");
+        }
+        if (f10.Count < 70) err.Add("F10-Einträge nicht gelesen: " + f10.Count);
+        if (err.Count > 0) throw new Exception("R390 F10-Menü: " + string.Join(" | ", err));
+        Console.WriteLine($"OK   R390 F10-Menü wie Funkrad: {f10.Count} Einträge mit gleichem Namen und Text, nur Einstellungen (eigenes F10-Menü) und Platz wählen ausgelassen");
     }
 
     /// Selftest R307: radio wheel shows only matching entries (Wheel.Vis with WheelFits), each level at most 9.
@@ -290,6 +325,14 @@ static partial class Program
         Heard(new Tx("Colt three two, turn left heading two seven zero, say airspeed.", "Approach", "", 9));
         Want(Sub("Approach") is var a4 && a4.Contains("Approach: report airspeed") && a4.Contains(L("Verkehr", "Traffic")) && a4.Contains("Approach: say again") && a4.Contains("Approach: request higher"), "Anflug Approach nach Frage/Verkehr", a4);
         Want(Sub("Approach", L("Verkehr", "Traffic")) is var tr && tr.SequenceEqual(new[] { "Approach: traffic in sight", "Approach: negative contact" }), "Verkehr", tr);
+        // R389: zone transit only in the air outside the landing flow (not parked, not inbound/pattern, but away/departing)
+        string[] zt = Sub(L("Allgemein", "General"));
+        Want(!zt.Contains("Approach: request zone transit"), "Anflug ohne zone transit", zt);
+        Ph(Phase.Away, air);
+        Want(Sub(L("Allgemein", "General")) is var zt2 && zt2.Contains("Approach: request zone transit"), "Away mit zone transit", zt2);
+        Ph(Phase.Parked, gnd);
+        Want(Sub(L("Allgemein", "General")) is var zt3 && !zt3.Contains("Approach: request zone transit"), "geparkt ohne zone transit", zt3);
+        Ph(Phase.Inbound, air);
         // SFO: High/Low key only after "request S F O"
         Want(Sub("Tower", "Closed / SFO") is var s1 && s1.Contains("Tower: request S F O") && !s1.Contains("Tower: high key"), "Closed/SFO ohne SFO", s1);
         p.Active.OnTranscript("Kutaisi Tower, Colt 3-2, request S F O", air, new List<Traffic>(), Now());
@@ -303,5 +346,34 @@ static partial class Program
         Pilots.Remove(p.Unit);
         if (err.Count > 0) throw new Exception("R307 Funkrad: " + string.Join(" | ", err));
         Console.WriteLine("OK   R307 Funkrad nur passende Einträge: geparkt Startup/Taxi/Ready, kein Airborne/Fahrt; nach dem Start Airborne + Request higher, kein Ground; Fahrt melden nur nach say airspeed, Traffic nur nach Verkehrshinweis; High/Low key nach SFO; gelandet Vacated, kein Tower; ohne Zustand alles; je Ebene max. 9");
+    }
+
+    /// Selftest modules (installer/settings, modules.txt): deselected = no wheel entry, frequency not monitored, request dropped; missing file = all on.
+    static void ModulesTest()
+    {
+        var kd = Airfield.Kutaisi();
+        var p = new Pilot { Unit = "MOD1", Callsign = "Colt 3-2", Gid = 9, Tel = new(kd.Elev, 0, 0, 0, kd.X, kd.Z, 0, 0, 0) };
+        p.Active = new Tower(kd, "Colt 3-2");
+        Pilots[p.Unit] = p;
+        int Said(string text) { while (SayQueue.TryTake(out _)) { } Request(p, text, "wheel", true); int n = 0; while (SayQueue.TryTake(out _)) n++; return n; }
+        string Top() => string.Join(",", Wheel.Mod(Wheel.All).Select(i => i.Label));
+        string Sub(string l) => string.Join(",", Wheel.Mod(Wheel.All.First(i => i.Label == l).Sub!).Select(i => i.Text ?? i.Label));
+        double aw = Cfg.Frequencies["AWACS"], tk = Cfg.Frequencies["Tanker"];
+        var err = new List<string>();
+        void Want(bool ok, string what) { if (!ok) err.Add(what); }
+        var all = (Top(), ListenFreqs(new()).ToArray(), Said("Ground: request startup"));
+        Want(all.Item1 == string.Join(",", Wheel.All.Select(i => i.Label)) && all.Item2.Contains(aw) && all.Item3 > 0, $"ohne Datei alles an: {all.Item1}, {all.Item3} Sprüche");
+        LoadModules("core,atc,tanker");
+        Want(!Top().Contains("AWACS") && Top().Contains("Tanker") && !ListenFreqs(new()).Contains(aw) && ListenFreqs(new()).Contains(tk), "awacs aus: Funkrad/Frequenz " + Top());
+        Want(!RoleOn("AWACS") && !RoleOn("Flight") && RoleOn("Tower") && !On("crew"), "awacs aus: Rollen");
+        LoadModules("awacs");
+        Want(Top() == "AWACS,Allgemein" || Top() == "AWACS,General", "nur awacs: Oberebene " + Top());
+        Want(Sub("AWACS") is var a && a.Contains("AWACS: request picture") && !a.Contains("AWACS: vector to tanker"), "nur awacs: kein nearest tanker " + Sub("AWACS"));
+        Want(Sub(L("Allgemein", "General")) == "radio check,say again,debrief,settings", "nur awacs: Allgemein " + Sub(L("Allgemein", "General")));
+        Want(Said("Ground: request startup") == 0 && !RoleOn("Tower"), "atc aus: Ground antwortet");
+        LoadModules(null);
+        Pilots.Remove(p.Unit);
+        if (err.Count > 0) throw new Exception("Module: " + string.Join(" | ", err));
+        Console.WriteLine("OK   Module: ohne modules.txt alles an; awacs aus -> kein AWACS im Funkrad, Frequenz nicht abgehört; nur awacs -> Oberebene AWACS/Allgemein, kein nearest tanker, Allgemein nur radio check/say again/debrief/settings; atc aus -> Ground schweigt");
     }
 }

@@ -137,6 +137,12 @@ static class Settings
         var awNm = new Slider(40, 200, 10, cfg.AwacsNewGroupNm, "0' NM'");
         Row(L("AWACS meldet neue Gruppen bis", "AWACS calls new groups within"), awNm);
 
+        Group(left, L("Module", "Modules"));   // like the installer: modules.txt (app) and DcsAtcModules.txt (F10 menu)
+        var mods = Program.Modules.Select(m => { var b = Check(L(m.De, m.En), Program.On(m.Id)); grid.SetColumnSpan(b, 1); return (m.Id, Box: b); }).ToArray();
+        var mnote = new Label { Text = L("abgewählt: kein Funk, kein Eintrag im Funkrad und F10-Menü (F10 ab der nächsten Mission)", "unticked: no radio, no entry in the wheel and F10 menu (F10 from the next mission)"),
+                                AutoSize = true, MaximumSize = new Size(520, 0), ForeColor = Wheel.Grey, Margin = new Padding(0, 4, 0, 2) };
+        grid.Controls.Add(mnote); grid.SetColumnSpan(mnote, 2);
+
         Group(right, L("Funk & Verkehr", "Radio & traffic"));
         var chat = Check(L("KI-Verkehr funkt hörbar mit", "Hear AI traffic on frequency"), cfg.AiChatter);
         string[] modes = { "voll", "taktisch", "aus" };
@@ -220,6 +226,10 @@ static class Settings
             };
             try
             {
+                var dcs = Path.Combine(Program.SavedGamesDcs(), "Scripts", "DcsAtc");
+                var ml = string.Join(",", mods.Where(m => m.Box.Checked).Select(m => m.Id));   // before config.jsonc: its reload reads modules.txt
+                File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "modules.txt"), ml);
+                if (Directory.Exists(dcs)) File.WriteAllText(Path.Combine(dcs, "DcsAtcModules.txt"), ml);
                 var text = File.ReadAllText(Program.ConfigPath);
                 foreach (var s in set) text = Program.WithConfigValue(text, s.Key, s.Value, s.After);
                 File.WriteAllText(Program.ConfigPath, text);
@@ -227,7 +237,6 @@ static class Settings
                 {
                     var code = lang.SelectedIndex == 1 ? "en" : "de";
                     File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "lang.txt"), code);
-                    var dcs = Path.Combine(Program.SavedGamesDcs(), "Scripts", "DcsAtc");
                     if (Directory.Exists(dcs)) File.WriteAllText(Path.Combine(dcs, "DcsAtcLang.txt"), code);
                 }
             }

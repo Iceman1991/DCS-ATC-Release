@@ -36,13 +36,15 @@ class Carrier
 
     public static List<Boat> Boats = new();
     public static double Clock = -1;   // Mission clock in s since midnight, -1 = unknown
+    public static double Skew;   // R366: mission clock minus real time at the last Y line (Program); Charlie/EAT run in mission time
     public static double Sun = double.NaN;   // Sun elevation in degrees at the carrier (Y line), NaN = unknown
     public static (bool Clouds, double BaseM, double VisM) Sky = (false, 0, 80000);   // Weather (Program, G line)
+    public static bool Ceiling = true;   // R367: lowest layer BKN/OVC (G line); FEW/SCT is no ceiling for the Case; true when the mission does not send it
 
     /// Case by weather and time: I with ceiling 3000 ft or more and 5 NM visibility by day, II from 1000 ft, otherwise and at night III.
     public static int CaseNow()
     {
-        double ceil = Sky.Clouds ? Sky.BaseM / Ft : 99999, vis = Sky.VisM / NM;
+        double ceil = Sky.Clouds && Ceiling ? Sky.BaseM / Ft : 99999, vis = Sky.VisM / NM;
         bool night = !double.IsNaN(Sun) ? Sun < -6 : Clock >= 0 && (Clock < 6.5 * 3600 || Clock > 18.5 * 3600);   // Night = sun below -6° (civil twilight); without sun elevation fixed time of day
         return night || ceil < 1000 || vis < 5 ? 3 : ceil < 3000 ? 2 : 1;
     }
@@ -67,6 +69,7 @@ class Carrier
     string boat = "", cs = "";
     int launch;                // R24: 1 on the deck, 2 Case II/III departure (Departure until "on top" or 20 NM)
     double depRad;             // R283: departure radial (true), set at takeoff
+    double deckAt; (double Along, double Lat) deckPos; bool trapped, deckWind;   // R364: last move on the deck (ship frame), landed here (no launch window until airborne), launch window open
     public bool Launching => launch > 0;
     public bool OnDeck => launch == 1;
     /// R231: leading station (handoffs Marshal -> Approach or Tower in Case I, departure Departure).
@@ -75,7 +78,7 @@ class Carrier
     bool follow;               // R26: stage taken over from the lead (not in the stack)
     int dcsWire;               // R27: wire from the DCS event (LANDING_QUALITY_MARK), 0 = none
     public static bool WireEvents;   // R27: mission reports wires (Program: mission data), then the grade waits briefly for it
-    public string BoatGroup => Stage > 0 || launch > 0 ? boat : "";   // Ship on which this player is currently in the recovery or taking off (Program: ship into the wind)
+    public string BoatGroup => Stage > 0 || launch == 2 || launch == 1 && deckWind ? boat : "";   // Ship on which this player is currently in the recovery or taking off (Program: ship into the wind)
     /// R24: on the deck of an own carrier (on the ground, under 300 m from the ship).
     public static Boat? Deck(Telemetry? t, int side) => t != null && OnGround(t) ? Boats.FirstOrDefault(b => b.Coalition == side && Dist(t.X, t.Z, b.X, b.Z) < 300) : null;
     static readonly Dictionary<string, List<Carrier>> stack = new();   // Holding per ship, first to check in comes first
@@ -179,6 +182,7 @@ class Carrier
     public List<Ops.Call> OnTranscript(string text, Ops.Me me, double now, bool unsure = false)
     {
         var n = Normalize(text.Contains(':') ? text[(text.IndexOf(':') + 1)..] : text);
+        now = Mt(now);   // R366: only Charlie/EAT use the time here
         var b = Mine ?? Nearest(me);
         if (b == null) return new();
         boat = b.Group;
@@ -211,13 +215,13 @@ class Carrier
         {
             // Review l4: too early (before EAT, tolerance 15 s as usual in fleet operations, ±10–15 s at the push point): Marshal declines, gives the time, the flight stays in holding
             if (Stage == 1 && now < charlieAt - CommenceEarly)
-                return new() { Say("Marshal", Clock >= 0 ? $"{c}, negative, your expected approach time is {Digits(((int)((Clock + charlieAt - now) / 60) % 60).ToString("00"))}."
+                return new() { Say("Marshal", Clock >= 0 ? $"{c}, negative, your expected approach time is {Mm()}."
                                                          : $"{c}, negative, continue holding, {Math.Max(1, (int)Math.Round((charlieAt - now) / 60))} minutes to your approach time.", b) };
             Stage = 2; OffStack(); radar = false; fbSaid = b.ExpFb; delta = false;   // R282: radar = contact with Approach, only on its first report
             return new() { Say("Marshal", $"{c}, radar contact, final bearing {Mag(b.ExpFb)}, switch Approach.", b), Hint(DescendIII) };
         }
         if (caseNo == 1 && Stage == 1 && Has(n, "initial"))   // R278: no initial without Charlie: rejection, holding, stack and Charlie time stay (CV NATOPS Case I)
-            return new() { Say(Station, $"{c}, negative, not Charlie, hold angels {angels}{(Clock >= 0 ? ", expected Charlie " + Mm(now) : "")}.", b) };
+            return new() { Say(Station, $"{c}, negative, not Charlie, hold angels {angels}{(Clock >= 0 ? ", expected Charlie " + Mm() : "")}.", b) };
         if (caseNo == 1 && Has(n, "initial"))   // R1: only Case I jumps to Paddles (zip lip, text only, P3-T5), from Charlie (stage 2)
         {
             Stage = 3; OffStack();
@@ -269,6 +273,8 @@ class Carrier
             if (Signal(me, b, "Marshal", false, state * 1000) is { } sg) return sg;   // R23: reported fuel below bingo
             return new() { Say("Marshal", $"{c}, Marshal, roger{(fuel != "" ? ", state " + fuel : "")}.", b) };
         }
+        if (Stage == 1 && Has(n, "marshal", "mother") && !Has(n, "check in", "checking in", "inbound", "recovery"))   // R368: repeated call in holding -> Marshal repeats the assignment, stack and EAT stay
+            return Instr(me, b);
         if (Has(n, "marshal", "mother", "check in", "checking in", "inbound", "recovery", "state"))
         {
             state = FuelSlot(n) ?? double.NaN;
@@ -281,23 +287,30 @@ class Carrier
     }
 
     /// Charlie time or EAT as minute of the hour ("zero seven"), "" without mission clock.
-    string Mm(double now) => Clock >= 0 ? Digits(((int)((Clock + charlieAt - now) / 60) % 60).ToString("00")) : "";
+    string Mm() => Clock >= 0 ? Digits(((int)(charlieAt / 60) % 60).ToString("00")) : "";   // R366: charlieAt is mission time
+    static double Mt(double now) => Clock >= 0 ? now + Skew : now;
+    static double Minute(double t) => Clock >= 0 ? Math.Ceiling(t / 60) * 60 : t;   // R365: EAT/Charlie on a full mission minute
     static string Word(int caseNo) => caseNo switch { 1 => "one", 2 => "two", _ => "three" };
     static string Alt(Ops.Me me, Boat b) => (b.Pa > 0 ? b.Pa / 100 : me.Tel != null && Baro(me.Tel) is { } q ? q.Qnh : 0) is > 0 and var qnh ? ", " + QnhSay(qnh, InHg(me.Type)) : "";
     /// Check-in or new Case in holding (R229): slot in the stack, angels, Charlie time or EAT, Marshal instruction.
     List<Ops.Call> Assign(Ops.Me me, Boat b, double now)
     {
-        var c = cs;
         seeMe = false;
         var st = Stack(b.Group);
         if (!st.Contains(this)) st.Add(this);
         int low = caseNo == 1 ? 2 : 6, gap = caseNo == 1 ? 90 : 60;   // Case I from angels 2, Charlie every 1.5 min; II/III from angels 6, EAT every minute
         angels = Enumerable.Range(low, 30).First(a => !st.Any(o => o != this && o.angels == a));
         double eta = me.Tel == null ? 0 : Math.Max(0, Dist(me.Tel.X, me.Tel.Z, b.X, b.Z) - (caseNo == 1 ? 5 : angels + 15) * NM) / Math.Max(me.Tel.Ias, 100);   // until holding
-        charlieAt = Math.Max(now + Math.Max(caseNo == 1 ? 120 : 300, eta + (caseNo == 1 ? 60 : 120)), st.Where(o => o != this).Select(o => o.charlieAt + gap).DefaultIfEmpty(0).Max());
+        charlieAt = Minute(Math.Max(now + Math.Max(caseNo == 1 ? 120 : 300, eta + (caseNo == 1 ? 60 : 120)), st.Where(o => o != this).Select(o => o.charlieAt + gap).DefaultIfEmpty(0).Max()));
+        return Instr(me, b);
+    }
+    /// Marshal instruction for the assigned slot; R368: repeated unchanged on "say again" in holding.
+    List<Ops.Call> Instr(Ops.Me me, Boat b)
+    {
+        var c = cs;
         fbSaid = caseNo >= 2 ? b.ExpFb : double.NaN;   // R228
         var alt = Alt(me, b);
-        var mm = Clock >= 0 ? Digits(((int)((Clock + charlieAt - now) / 60) % 60).ToString("00")) : "";
+        var mm = Mm();
         if (caseNo == 1)
             return new() { Say("Marshal", $"{c}, Marshal, case one recovery, expected BRC {Mag(b.ExpBrc)}{alt}, hold angels {angels}{(mm != "" ? $", expected Charlie {mm}" : "")}, report see me.", b),   // R232
                            Hint(L($"Holding über dem Schiff in Angels {angels}, Linkskreise (ca. 5 NM Ø). Warten auf „signal Charlie“.", $"Hold overhead the ship at angels {angels}, left-hand circles (about 5 NM wide). Wait for \"signal Charlie\".")) };
@@ -320,15 +333,22 @@ class Carrier
     /// Player gone (left slot, crashed).
     public void Leave()   // R2: everything per approach reset, otherwise "call the ball" is missing in the next recovery or an old waveoff keeps counting
     {
-        OffStack(); Stage = ladder = passes = launch = dcsWire = 0; needlesAsked = ballAsked = balled = foul = noGear = noBall = waved = bolterTold = delta = radar = follow = seeMe = false; cca = double.MaxValue; fbSaid = double.NaN;
+        OffStack(); Stage = ladder = passes = launch = dcsWire = 0; needlesAsked = ballAsked = balled = foul = noGear = noBall = waved = bolterTold = delta = radar = follow = seeMe = trapped = false; cca = double.MaxValue; fbSaid = double.NaN;
         groove.Clear(); touchAt = -1; steerAt = -99;
     }
 
     /// R24: takeoff from the deck. Nothing on the deck; after takeoff Case I text only (500 ft parallel to BRC up to 7 NM),
     /// Case II/III Departure ("airborne" -> radar contact, "on top" or 20 NM -> AWACS). null = no takeoff.
-    List<Ops.Call>? Launch(Ops.Me me, Telemetry t)
+    List<Ops.Call>? Launch(Ops.Me me, Telemetry t, double now)
     {
-        if (Deck(t, me.Coalition) is { } db) { (launch, boat, cs) = (1, db.Group, SpokenCallsign(me.Callsign)); return new(); }
+        if (Deck(t, me.Coalition) is { } db)   // R364: ship into the wind only while taxiing or up to 10 min after spawn/last move, not after a trap
+        {
+            var p = Rel(db, t, db.Brc);
+            if (launch != 1 || Math.Abs(p.Along - deckPos.Along) + Math.Abs(p.Lat - deckPos.Lat) > 50) (deckAt, deckPos) = (now, p);   // ponytail: 50 m against position jitter on the moving ship; shorter taxi moves do not reopen the window
+            (launch, boat, cs, deckWind) = (1, db.Group, SpokenCallsign(me.Callsign), !trapped && now - deckAt < 600);
+            return new();
+        }
+        trapped = false;
         if (launch == 0 || Mine is not { } b) { launch = 0; return null; }
         if (launch == 1)
         {
@@ -360,7 +380,7 @@ class Carrier
     string Contact(Ops.Me me, Boat b)
     {
         radar = true;
-        return $"{cs}, Approach, radar contact{(me.Tel is { } t ? $", {Math.Max(1, (int)Math.Round(Dist(t.X, t.Z, b.X, b.Z) / NM))} miles" : "")}.";
+        return $"{cs}, Approach, radar contact{(me.Tel is { } t ? $", {MilesTxt(Dist(t.X, t.Z, b.X, b.Z))}" : "")}.";
     }
 
     /// R23: alternate airfield (Program: nearest own/neutral with a long runway, N1); replaced in the self-test.
@@ -378,7 +398,7 @@ class Carrier
         var name = f.StationOf("").Trim();
         int nm = Math.Max(1, (int)Math.Round(d));
         Leave(); Gone = true;
-        return new() { Say(station, $"{cs}, your signal is {(bingo ? "bingo" : "divert")}, pigeons {name} {Mag(brg)}, {nm} miles.", b),
+        return new() { Say(station, $"{cs}, your signal is {(bingo ? "bingo" : "divert")}, pigeons {name} {Mag(brg)}, {(nm == 1 ? "1 mile" : $"{nm} miles")}.", b),
                        Hint(L($"{(bingo ? "Bingo" : "Divert")}: {name}, Kurs {MagNum(brg):000}, {nm} NM. Recovery beendet.", $"{(bingo ? "Bingo" : "Divert")}: {name}, heading {MagNum(brg):000}, {nm} NM. Recovery ended.")) };
     }
     public bool Gone;   // A21: leave recovery (50 NM or ashore): Program releases OnBoat, airfield radio back to the Tower
@@ -392,13 +412,14 @@ class Carrier
     public List<Ops.Call> Tick(Ops.Me me, double now)
     {
         var t = me.Tel;
-        seenAt = now;
+        double mt = Mt(now);   // R366: Charlie/EAT in mission time, LSO timing in real time
+        seenAt = mt;
         if (t == null) return new();
         if (Lead is { Stage: 1 or 2, caseNo: >= 2 } lw && (Stage == 0 || follow) && !OnGround(t) && Boats.FirstOrDefault(x => x.Group == lw.boat) is { } lb)   // R279: Case II/III single approach: own check-in (angels, EAT one minute behind the lead), take nothing over from the lead
         {
             (Stage, caseNo, boat, cs, ladder, launch, follow, radar, delta) = (1, lw.caseNo, lw.boat, SpokenCallsign(me.Callsign), 0, 0, false, false, false);
             OffStack();
-            return Assign(me, lb, now);
+            return Assign(me, lb, mt);
         }
         if (Lead is { Stage: 1 or 2, caseNo: 1 } l && Stage < l.Stage && !OnGround(t))   // R26: flight in formation, Case I: check-in or Charlie of the lead applies to the flight (radio via the lead); not on the deck (lead circles above)
         {
@@ -410,7 +431,7 @@ class Carrier
             follow = false;
             if (Stage == 1 && Stack(boat) is var st && !st.Contains(this)) st.Insert(st.FindLastIndex(o => o.charlieAt <= charlieAt) + 1, this);   // behind the lead (same time)
         }
-        if (Stage == 0 && Launch(me, t) is { } lc) return lc;
+        if (Stage == 0 && Launch(me, t, now) is { } lc) return lc;
         if (Stage == 0 && Nearest(me) is { } gb && Landing(gb, t) is var (gd, gl) && gd is > -NM and < -0.5 * NM && Math.Abs(gl) < 0.2 * NM && t.AltMsl < 1000 * Ft
             && t.Ias < GrooveIas && t.Gear is < 0 or >= 0.5 && HdgDiff(t.Hdg * 180 / Math.PI, gb.Fb) <= 15)   // R26: without check-in/Charlie in the groove: LSO looks after every own aircraft
             (Stage, caseNo, boat, cs, launch) = (3, CaseNow(), gb.Group, SpokenCallsign(me.Callsign), 0);
@@ -424,7 +445,7 @@ class Carrier
             if (dcsWire > 0) wire = dcsWire;
             var note = waved ? Note("cut") : groove.Count > 0 ? Note("trap") : "";   // R103: waveoff ignored and landed = cut pass (LSO NATOPS), also without samples
             LatLog = FormattableString.Invariant($"[LSO] {me.Callsign}: Lat beim Trap {Landing(b, t).Lat:+0.0;-0.0} m ({b.Type}, SternLat {b.SternLat})");
-            Leave();   // also noGear: waveoff ignored and landed, do not carry the reason into the next approach
+            Leave(); trapped = true;   // also noGear: waveoff ignored and landed, do not carry the reason into the next approach
             return new() { new("Info", "", note != "" ? $"LSO: {note}" : L($"Träger: gelandet auf {b.Unit}.", $"Carrier: landed on {b.Unit}."), 0) };
         }
         double dist = Dist(t.X, t.Z, b.X, b.Z);
@@ -461,42 +482,41 @@ class Carrier
                 res.Add(Say("Marshal", $"99, Marshal, case {Word(cn)} recovery, {(cn >= 2 ? $"CV-1 approach, expected final bearing {Mag(b.ExpFb)}" : $"expected BRC {Mag(b.ExpBrc)}")}{Alt(me, b)}.", b) with { All = true });
             }
             caseNo = cn; delta = false;
-            res.AddRange(Assign(me, b, now));
+            res.AddRange(Assign(me, b, mt));
             return res;
         }
-        if (caseNo == 1 && Stage == 1 && Stack(b.Group).FirstOrDefault(o => o.inHold) == this && now >= charlieAt && (b.NoTurn || HdgDiff(b.Brc, b.ExpBrc) < 10 || now >= charlieAt + 300) && AiPattern(b) < 2)   // A20: whoever is not in holding is skipped; AI in the pattern: wait; R135: only when the ship is into the wind, at the latest 5 min after the Charlie time
+        if (caseNo == 1 && Stage == 1 && Stack(b.Group).FirstOrDefault(o => o.inHold) == this && mt >= charlieAt && (b.NoTurn || HdgDiff(b.Brc, b.ExpBrc) < 10 || mt >= charlieAt + 300) && AiPattern(b) < 2)   // A20: whoever is not in holding is skipped; AI in the pattern: wait; R135: only when the ship is into the wind, at the latest 5 min after the Charlie time
         {
             Stage = 2; OffStack(); deckDelta.Remove(b.Group);
             return new() { Say("Tower", $"{c}, signal Charlie.", b),
                            Hint(L($"Sinken zum Initial: 3 NM hinter dem Heck, 800 ft, Kurs {MagNum(b.ExpBrc):000}, 350 kt; Break über dem Bug nach links, Downwind 600 ft.",
                                     $"Descend to the initial: 3 NM astern, 800 ft, heading {MagNum(b.ExpBrc):000}, 350 kt; break left over the bow, downwind 600 ft.")) };
         }
-        if (caseNo == 1 && Stage == 1 && inHold && !follow && now > charlieAt + 60 && deckDelta.Add(b.Group))   // R276: in holding, deck delayed (ship turning, AI in the pattern): once per ship to all, order and times stay (CV NATOPS)
+        if (caseNo == 1 && Stage == 1 && inHold && !follow && mt > charlieAt + 60 && deckDelta.Add(b.Group))   // R276: in holding, deck delayed (ship turning, AI in the pattern): once per ship to all, order and times stay (CV NATOPS)
             return new() { Say("Marshal", "99, signal Delta.", b) with { All = true } };
-        if (caseNo == 1 && Stage == 1 && !inHold && !delta && !follow && now > charlieAt + 60)   // A20: not in holding and Charlie time exceeded by 1 min -> Delta once with new time (as at check-in, behind the last)
+        if (caseNo == 1 && Stage == 1 && !inHold && !delta && !follow && mt > charlieAt + 60)   // A20: not in holding and Charlie time exceeded by 1 min -> Delta once with new time (as at check-in, behind the last)
         {
             delta = true;
             var st = Stack(b.Group);
-            charlieAt = Math.Max(now + Math.Max(90, Math.Max(0, dist - 5 * NM) / Math.Max(t.Ias, 100) + 60), st.Where(o => o != this).Select(o => o.charlieAt + 90).DefaultIfEmpty(0).Max());
+            charlieAt = Minute(Math.Max(mt + Math.Max(90, Math.Max(0, dist - 5 * NM) / Math.Max(t.Ias, 100) + 60), st.Where(o => o != this).Select(o => o.charlieAt + 90).DefaultIfEmpty(0).Max()));
             st.Remove(this); st.Add(this);   // to the end: the stack stays ordered by Charlie time
-            var mm = Clock >= 0 ? $", expected Charlie {Digits(((int)((Clock + charlieAt - now) / 60) % 60).ToString("00"))}" : "";
-            return new() { Say("Marshal", $"{c}, signal Delta{mm}.", b) };
+            return new() { Say("Marshal", $"{c}, signal Delta{(Clock >= 0 ? ", expected Charlie " + Mm() : "")}.", b) };
         }
-        if (caseNo >= 2 && Stage == 1 && !follow && now >= charlieAt)   // EAT reached: Marshal transmits nothing, the pilot reports "commencing" (#17/R224; R26: wingmen come via the lead)
+        if (caseNo >= 2 && Stage == 1 && !follow && mt >= charlieAt)   // EAT reached: Marshal transmits nothing, the pilot reports "commencing" (#17/R224; R26: wingmen come via the lead)
         {
             // Approach start at the Marshal point (radial ExpFb+180, angels+15 DME): farther than 5 NM from it and outside the DME immediately new time (A73);
             // there without report after 1 min once "report commencing", after 2 min new time at the back and violation into the debriefing
             var (ea, el) = Rel(b, t, b.ExpFb);
             double fixM = (angels + 15) * NM, toFix = Math.Sqrt(Sq(ea + fixM) + Sq(el));
             bool away = toFix > 5 * NM && dist > fixM;
-            if (!away && !delta && now >= charlieAt + 60) { delta = true; return new() { Say("Marshal", $"{c}, Marshal, report commencing.", b) }; }
-            if (away || now >= charlieAt + 120)
+            if (!away && !delta && mt >= charlieAt + 60) { delta = true; return new() { Say("Marshal", $"{c}, Marshal, report commencing.", b) }; }
+            if (away || mt >= charlieAt + 120)
             {
                 delta = false;
                 var st = Stack(b.Group);
-                charlieAt = Math.Max(now + toFix / Math.Max(t.Ias, 100) + 120, st.Where(o => o != this).Select(o => o.charlieAt + 60).DefaultIfEmpty(0).Max());   // as at check-in: toward the fix + 2 min, one minute after the last
+                charlieAt = Minute(Math.Max(mt + toFix / Math.Max(t.Ias, 100) + 120, st.Where(o => o != this).Select(o => o.charlieAt + 60).DefaultIfEmpty(0).Max()));   // as at check-in: toward the fix + 2 min, one minute after the last
                 st.Remove(this); st.Add(this);
-                var mm = Clock >= 0 ? Digits(((int)((Clock + charlieAt - now) / 60) % 60).ToString("00")) : "";
+                var mm = Mm();
                 return new() { Say("Marshal", $"{c}, Marshal, new expected approach time{(mm != "" ? " " + mm : "")}.", b),
                                away ? Hint(L($"Noch nicht am Marshal-Punkt (Radial {MagNum(b.ExpFb + 180):000}, {angels + 15} DME, Angels {angels}): neue Approach-Zeit abwarten.",
                                              $"Not at the marshal point yet (radial {MagNum(b.ExpFb + 180):000}, {angels + 15} DME, angels {angels}): wait for the new approach time."))
@@ -560,12 +580,13 @@ class Carrier
         if (Stage >= 3 && al > 0.5 * NM)   // passed in front: bolter, waveoff or went around himself -> new attempt in the pattern
         {
             var note = groove.Count > 0 ? Note(touchAt > 0 ? "bolter" : waved ? "wo" : "owo") : "";
+            bool wofd = foul;   // R363: foul deck is not the pilot's failed attempt
             if (foul) { note = L("WOFD (Deck nicht frei), keine Wertung", "WOFD (foul deck), no grade"); foul = waved = false; }
             if (noGear) { note = (note != "" ? note : "WO") + L(", Fahrwerk oben", ", gear up"); noGear = waved = false; }   // reason into the grade; waves off even without groove
             if (noBall) { note = L("WO (kein Ball-Call)", "WO (no ball call)") + (note.StartsWith("WO") ? note[2..] : ""); noBall = waved = false; }   // #16
             ballAsked = balled = false; Stage = 3;
             var res = note != "" ? new List<Ops.Call> { new("Info", "", $"LSO: {note}", 0) } : new();
-            if (note != "" && Signal(me, b, caseNo >= 2 ? "Approach" : "Tower", ++passes >= 3, Lb(me)) is { } sg) return res.Concat(sg).ToList();   // R23: bingo or third failed attempt -> alternate instead of new attempt
+            if (note != "" && Signal(me, b, caseNo >= 2 ? "Approach" : "Tower", !wofd && ++passes >= 3, Lb(me)) is { } sg) return res.Concat(sg).ToList();   // R23: bingo or third failed attempt -> alternate instead of new attempt
             if (caseNo >= 2 && ladder >= 2)   // CV-1: straight ahead to 1200 ft, Departure leads to the downwind (R281), Approach back to final (stage 2, new calls)
             {
                 Stage = 2; ladder = -1; needlesAsked = false; radar = true;   // -1: downwind, vector to final pending
@@ -723,8 +744,8 @@ class Carrier
     /// Landing area occupied (AI or player on the angled deck up to 250 m before the stern).
     static bool FoulDeck(Boat b) => Air.Concat(Decks).Any(a => a.Coalition == b.Coalition && a.AltMsl < DeckH + 8 &&
                                                  Landing(b, AsTel(a)) is var (d, l) && d is > -10 and < 250 && Math.Abs(l) < 15);
-    static readonly Dictionary<int, (bool Astern, int Passes)> aiPass = new();
-    /// Guard against endless waveoffs: AI that goes around three times from the groove over the bow -> divert (Program: DIVERT).
+    static readonly Dictionary<int, (bool Astern, int Passes, bool Foul)> aiPass = new();
+    /// Guard against endless waveoffs: AI that goes around three times from the groove over the bow -> divert (Program: DIVERT); go-arounds at foul deck do not count (R363).
     public static List<string> Divert()
     {
         var res = new List<string>();
@@ -734,8 +755,8 @@ class Carrier
             if (b == null || Dist(a.X, a.Z, b.X, b.Z) > 2 * NM) continue;
             var (d, l) = Landing(b, AsTel(a));
             var s = aiPass.GetValueOrDefault(a.Id);
-            if (d is > -0.5 * NM and < 0 && Math.Abs(l) < 100) s.Astern = true;
-            else if (s.Astern && d > 400) s = (false, s.Passes + 1);
+            if (d is > -0.5 * NM and < 0 && Math.Abs(l) < 100) { s.Astern = true; s.Foul |= FoulDeck(b); }
+            else if (s.Astern && d > 400) s = (false, s.Passes + (s.Foul ? 0 : 1), false);
             if (s.Passes >= 3) { aiPass.Remove(a.Id); res.Add(a.Group); }
             else aiPass[a.Id] = s;
         }
@@ -795,8 +816,8 @@ class Carrier
         var far = At(-35 * NM, 0, 18000);
         var m1 = S(c1, "Enfield 1-1", "Marshal, Enfield 1-1, mother's 360 for 35, angels 18, state 6.2", far, 0);
         var m2 = S(c2, "Enfield 1-2", "Marshal, Enfield 1-2, checking in", far, 10);
-        check(m1 == "Marshal: Enfield one one, Marshal, case one recovery, expected BRC three five four, altimeter two niner niner two, hold angels 2, expected Charlie zero seven, report see me. | : Träger: Holding über dem Schiff in Angels 2, Linkskreise (ca. 5 NM Ø). Warten auf „signal Charlie“."
-              && m2.Contains("hold angels 3, expected Charlie zero eight") && c1.Wants(Normalize("Enfield 1-1, see you at 2")), $"Träger: Marshal -> {m1} | {m2}");
+        check(m1 == "Marshal: Enfield one one, Marshal, case one recovery, expected BRC three five four, altimeter two niner niner two, hold angels 2, expected Charlie zero eight, report see me. | : Träger: Holding über dem Schiff in Angels 2, Linkskreise (ca. 5 NM Ø). Warten auf „signal Charlie“."
+              && m2.Contains("hold angels 3, expected Charlie one zero") && c1.Wants(Normalize("Enfield 1-1, see you at 2")), $"Träger: Marshal -> {m1} | {m2}");
         // Into the wind: west wind 10 m/s (19.4 kt) -> heading 270 + 9.1 (angled deck), 7.6 kt speed; Marshal gives the BRC into the wind
         var bw = b with { Wz = 10, Pa = 100000 };
         Boats = new() { bw };
@@ -833,9 +854,9 @@ class Carrier
               "Träger R16/R231 unsicher: " + string.Join(" / ", un.Concat(un2).Select(x => x.Station + ": " + x.Text)));
         var hold = At(0, -2 * NM, 2000);
         string Tk(Carrier c, string cs, Telemetry t, double now) => string.Join(" | ", c.Tick(M(cs, t), now).Select(x => $"{x.Station}: {x.Text}"));
-        var ch1 = Tk(c1, "Enfield 1-1", hold, 400) + "/" + Tk(c1, "Enfield 1-1", hold, 431);
-        var sya = S(c1, "Enfield 1-1", "Enfield 1-1, see you at angels", hold, 432);
-        var ch2 = Tk(c2, "Enfield 1-2", hold, 431) + "/" + Tk(c2, "Enfield 1-2", far, 521) + "/" + Tk(c2, "Enfield 1-2", hold, 522);   // 35 NM away: no Charlie yet
+        var ch1 = Tk(c1, "Enfield 1-1", hold, 400) + "/" + Tk(c1, "Enfield 1-1", hold, 481);
+        var sya = S(c1, "Enfield 1-1", "Enfield 1-1, see you at angels", hold, 482);
+        var ch2 = Tk(c2, "Enfield 1-2", hold, 481) + "/" + Tk(c2, "Enfield 1-2", far, 601) + "/" + Tk(c2, "Enfield 1-2", hold, 602);   // 35 NM away: no Charlie yet
         check(ch1.StartsWith("/Tower: Enfield one one, signal Charlie. | : Träger: Sinken zum Initial: 3 NM hinter dem Heck, 800 ft, Kurs 354, 350 kt") && sya == "Tower: Enfield one one, roger." && ch2.StartsWith("//Tower: Enfield one two, signal Charlie."), $"Träger: Charlie nach Stack, Zeit und Holding -> {ch1} | {sya} | {ch2}");
         var ini = Tk(c1, "Enfield 1-1", At(-3 * NM, 0, 800), 600);
         var g34 = At(-0.75 * NM * Math.Cos(9.1 * Math.PI / 180), 0.75 * NM * Math.Sin(9.1 * Math.PI / 180), 350);
@@ -864,8 +885,8 @@ class Carrier
         var away = At(-100 * NM, 0, 18000);
         S(da, "Enfield 2-1", "Marshal, Enfield 2-1, checking in", away, 1000);
         S(db, "Enfield 2-2", "Marshal, Enfield 2-2, checking in", hold, 1000);
-        var dl = Tk(da, "Enfield 2-1", away, 2323) + "/" + Tk(db, "Enfield 2-2", hold, 2323) + "/" + Tk(da, "Enfield 2-1", away, 2324);
-        check(dl.StartsWith("Marshal: Enfield two one, signal Delta, expected Charlie two zero./Tower: Enfield two two, signal Charlie.") && dl.EndsWith("/") && da.Stage == 1 && db.Stage == 2,
+        var dl = Tk(da, "Enfield 2-1", away, 2400) + "/" + Tk(db, "Enfield 2-2", hold, 2400) + "/" + Tk(da, "Enfield 2-1", away, 2401);
+        check(dl.StartsWith("Marshal: Enfield two one, signal Delta, expected Charlie zero one./Tower: Enfield two two, signal Charlie.") && dl.EndsWith("/") && da.Stage == 1 && db.Stage == 2,
               $"Träger A20: Charlie an den Ersten im Holding, Delta -> {dl}");
         da.Leave(); db.Leave();
         // A21: stage 1, 60 NM away -> recovery ends (Gone for OnBoat), advisory or with AWACS "switch Overlord"; 49 NM stays; check-in from 100 NM (above) stays
@@ -889,7 +910,7 @@ class Carrier
         S(c278, "Enfield 1-1", "Marshal, Enfield 1-1, checking in", hold, 5000);
         var (ca278, ix278) = (c278.charlieAt, Stack("CVN").IndexOf(c278));
         var i278 = S(c278, "Enfield 1-1", "Enfield 1-1, initial", hold, 5010);
-        check(i278 == $"Marshal: Enfield one one, negative, not Charlie, hold angels {c278.angels}, expected Charlie {c278.Mm(5010)}." && c278.Stage == 1 && c278.charlieAt == ca278 && ix278 >= 0 && Stack("CVN").IndexOf(c278) == ix278,
+        check(i278 == $"Marshal: Enfield one one, negative, not Charlie, hold angels {c278.angels}, expected Charlie {c278.Mm()}." && c278.Stage == 1 && c278.charlieAt == ca278 && ix278 >= 0 && Stack("CVN").IndexOf(c278) == ix278,
               $"Träger R278: initial ohne Charlie -> {i278} (Stufe {c278.Stage})");
         c278.Leave();
         // Initial: 800 ft, 150 m/s over the ship -> no LSO calls, no waveoff
@@ -1015,6 +1036,8 @@ class Carrier
         var dv = new List<string>();
         for (int k = 0; k < 3; k++)
             foreach (var d in new[] { -0.3 * NM, 500 }) { Air = new[] { Ai(92, G(d, 0, 70) with { AltMsl = 100 }) }; dv.AddRange(Divert()); }
+        for (int k = 0; k < 3; k++)   // R363: go-arounds at foul deck do not count
+            foreach (var d in new[] { -0.3 * NM, 500 }) { Air = new[] { Ai(96, G(d, 0, 70) with { AltMsl = 100 }), Ai(91, G(120, 0, 5)) }; dv.AddRange(Divert()); }
         Air = Array.Empty<Traffic>();
         Decks = new[] { Ai(95, G(120, 0, 5)) };   // player stands on the angled deck
         var fdp = Pass(d => G(d, 0, 70));
@@ -1110,6 +1133,8 @@ class Carrier
         // M6: Case by weather/time; Case III: Marshal (radial, DME, EAT), commence, ACLS/needles, three miles, ¾ mile
         Sky = (true, 600, 20000);
         int cII = CaseNow();
+        Ceiling = false; int cFew = CaseNow(); Ceiling = true;   // R367: FEW/SCT at 600 m is no ceiling -> Case I
+        check(cFew == 1 && cII == 2, $"Träger R367: Wolken ohne BKN/OVC -> Case {cFew}, mit Untergrenze Case {cII}");
         Sky = (true, 200, 20000);
         int cIII = CaseNow();
         Clock = 22 * 3600; Sky = (false, 0, 80000);
@@ -1140,12 +1165,23 @@ class Carrier
             lad.Add(Tk(k1, "Enfield 1-1", G(dk, 0, 70), 400 + dk / 100));
         var ndl = S(k1, "Enfield 1-1", "Enfield 1-1, on and on", G(-5 * NM, 0, 70), 330);   // exactly on glide path and centerline
         lad.RemoveAll(x => x == "");
-        check(eatFar == "/Marshal: Enfield one one, Marshal, new expected approach time zero five. | : Träger: Noch nicht am Marshal-Punkt (Radial 165, 21 DME, Angels 6): neue Approach-Zeit abwarten.//" &&
+        check(eatFar == "/Marshal: Enfield one one, Marshal, new expected approach time one one. | : Träger: Noch nicht am Marshal-Punkt (Radial 165, 21 DME, Angels 6): neue Approach-Zeit abwarten.//" &&
               eat.StartsWith("/Marshal: Enfield one one, Marshal, report commencing.//Marshal: Enfield one one, Marshal, new expected approach time ") && eat.Contains(". | : Verstoß: Approach-Zeit ohne „commencing“ verstrichen/Marshal: Enfield one one, radar contact, final bearing three four five, switch Approach. | : Träger: 4000 ft/min auf 5000 ft") && eat.EndsWith("/2")
               && com.StartsWith("Marshal: Enfield one two, radar contact, final bearing three four five, switch Approach. | : Träger: 4000") &&
               string.Join(" | ", lad) == "Approach: Enfield one one, Approach, radar contact, 10 miles. | Approach: Enfield one one, Approach, ACLS lock on, say needles. | Approach: Enfield one one, three miles, on glidepath, on course. | " +
                                          "Approach: Enfield one one, one and a half miles, on glidepath, on course. | Approach: Enfield one one, three quarter mile, call the ball." && ndl == "Approach: Enfield one one, concur.",
               $"Träger Case III: EAT, CV-1 -> {eatFar} | {eat} | {com} | {string.Join(" | ", lad)} | {ndl}");
+        // R365/R366: EAT on a full mission minute (check-in at 10:00:10); mission clock twice as fast as real time -> rejection and acceptance by mission time
+        double Ms(double mission) { double rt = (mission - 36010) / 2; (Clock, Skew) = (mission, mission - rt); return rt; }
+        var k3 = new Carrier();
+        var mk3 = S(k3, "Enfield 1-3", "Marshal, Enfield 1-3, checking in", far, Ms(36010));
+        double e3 = k3.charlieAt;
+        var mm3 = Digits(((int)(e3 / 60) % 60).ToString("00"));
+        var neg3 = S(k3, "Enfield 1-3", "Enfield 1-3, commencing", far, Ms(e3 - 20)) + "/" + k3.Stage;
+        var ok3 = S(k3, "Enfield 1-3", "Enfield 1-3, commencing", far, Ms(e3)) + "/" + k3.Stage;
+        (Clock, Skew) = (10 * 3600, 0);
+        check(e3 % 60 == 0 && e3 > 36010 && mk3.Contains($"Expected approach time {mm3}.") && neg3 == $"Marshal: Enfield one three, negative, your expected approach time is {mm3}./1"
+              && ok3.StartsWith("Marshal: Enfield one three, radar contact, final bearing") && ok3.EndsWith("/2"), $"Träger R365/R366: EAT Missionszeit -> {e3} {mk3} | {neg3} | {ok3}");
         // A129: needles against the offset (1.5° too high, 1° right of the line: fly-to needles "down and left"); wrong report -> disregard + offset
         double off = (5 * NM + Aim) * Math.Tan(Math.PI / 180);
         var hiRt = G(-5 * NM, 1.5, 70);
@@ -1165,6 +1201,14 @@ class Carrier
         var rbBad = S(rbk, "Enfield 1-9", $"Marshal, Enfield 1-9, 165 radial, {rbAng + 15} DME, angels {rbAng + 3}", far, 3120);
         rbk.Leave();
         check(rbOk == "Marshal: Enfield one niner, readback correct." && rbBad == $"Marshal: Enfield one niner, negative, angels {rbAng}." && rbk.charlieAt == rbEat, $"Träger R226: Readback -> {rbOk} | {rbBad}");
+        // R368: "Marshal, …, say again" in holding repeats the assignment (EAT, angels), no new check-in (EAT and stack slot stay)
+        var c368 = new Carrier();
+        var a368 = S(c368, "Enfield 1-9", "Marshal, Enfield 1-9, checking in", far, 3100);
+        var (e368, i368) = (c368.charlieAt, Stack("CVN").IndexOf(c368));
+        var r368 = S(c368, "Enfield 1-9", "Marshal, Enfield 1-9, say again", far, 3200);
+        var k368 = (c368.charlieAt == e368, Stack("CVN").IndexOf(c368) == i368, c368.Stage);
+        c368.Leave();
+        check(r368 == a368 && r368.Contains("Expected approach time ") && k368 == (true, true, 1), $"Träger R368: say again im Holding -> {r368} | {k368}");
         // R228: Final Bearing changes (ship without wind to 010) -> "final bearing" once, not again afterwards
         var bFb = b with { Hdg = 10 * Math.PI / 180, NoTurn = true };
         var cfb = new Carrier { Stage = 2, caseNo = 3, boat = "CVN", cs = "Enfield one one", radar = true, fbSaid = b.ExpFb };
@@ -1259,22 +1303,30 @@ class Carrier
         var bg = S(cb23, "Enfield 1-8", "Marshal, Enfield 1-8, state 2.6", hold, 905) + "/" + S(cb23, "Enfield 1-8", "Marshal, Enfield 1-8, state 1.8", hold, 910);
         var bgDone = cb23.Stage == 0 && cb23.Gone && !Stack("CVN").Contains(cb23);
         var cdv = new Carrier { Stage = 3, boat = "CVN", cs = "Enfield one one", balled = true };   // ball reported per pass (#16)
-        var dvl = new List<string>();
+        var (dvl, fdl) = (new List<string>(), new List<string>());
         double tdv = 2000;
-        for (int k = 0; k < 3; k++, cdv.balled = true)
-            for (double d = -NM; d < 1200; d += 17.5, tdv += 0.25)
-            {
-                var pt = d < 150 ? G(d, 0, 70) : G(d, 0, 70) with { AltMsl = 60 };
-                cdv.Sample(pt, tdv);
-                if (tdv % 1 == 0) dvl.Add(Tk(cdv, "Enfield 1-1", pt, tdv));
-            }
+        void Bolters(List<string> into)
+        {
+            for (int k = 0; k < 3; k++, cdv.balled = true)
+                for (double d = -NM; d < 1200; d += 17.5, tdv += 0.25)
+                {
+                    var pt = d < 150 ? G(d, 0, 70) : G(d, 0, 70) with { AltMsl = 60 };
+                    cdv.Sample(pt, tdv);
+                    if (tdv % 1 == 0) into.Add(Tk(cdv, "Enfield 1-1", pt, tdv));
+                }
+        }
+        Decks = new[] { Ai(95, G(120, 0, 5)) };   // R363: three passes at foul deck first -> no failed attempt, no divert
+        Bolters(fdl);
+        Decks = Array.Empty<Traffic>();
+        var fd363 = (cdv.passes, fdl.Count(x => x.Contains("LSO: WOFD")), fdl.Any(x => x.Contains("your signal")));
+        Bolters(dvl);
         dvl.RemoveAll(x => x == "");
         Alternate = (_, _) => null;
         var lb23 = (cb23.Lb(new Ops.Me("x", null, "FA-18C_hornet", 2, 1, 0.15)), new Carrier { state = 2.5 }.Lb(M("x", far)), new Carrier().Lb(M("x", far)));
         check(st23 == 1 && bg == $"Marshal: Enfield one eight, Marshal, roger, state two point six./Marshal: Enfield one eight, your signal is bingo, pigeons Kobuleti {Mag(90)}, 44 miles. | : Träger: Bingo: Kobuleti, Kurs {MagNum(90):000}, 44 NM. Recovery beendet."
               && bgDone && dvl.Count(x => x.Contains("LSO: B,")) == 3 && dvl[^1].Contains("Tower: Enfield one one, your signal is divert, pigeons Kobuleti ") && dvl.Count(x => x.Contains("your signal")) == 1 && cdv.Stage == 0 && cdv.Gone
-              && Math.Abs(lb23.Item1 - 1620) < 1 && lb23.Item2 == 2500 && double.IsNaN(lb23.Item3),
-              $"Träger R23: Bingo/Divert -> {st23} {bg} | {string.Join(" / ", dvl)} | {lb23}");
+              && Math.Abs(lb23.Item1 - 1620) < 1 && lb23.Item2 == 2500 && double.IsNaN(lb23.Item3) && fd363 == (0, 3, false),
+              $"Träger R23/R363: Bingo/Divert -> {st23} {bg} | Foul Deck {fd363} | {string.Join(" / ", dvl)} | {lb23}");
         // P3-T2: bolter call already on sliding through on the deck (180 m behind the stern, still fast), not in the rollout after the catch (slow)
         string Roll(double ias)
         {
@@ -1357,6 +1409,13 @@ class Carrier
         check(dk1 == "/-/CVN/: Träger: Auf dem Deck kein Funk (kein Land-Tower): Anlassen, Rollen und Katapult nach Zeichen der Deckcrew." && up1.StartsWith(": Träger: Case-I-Abflug: geradeaus parallel zum BRC") && up1.EndsWith("/False")
               && up3.StartsWith(": Träger: Case-III-Abflug: „airborne“ melden, geradeaus steigen, bei 7 DME auf den 10-DME-Bogen zum Abflugradial 024,") && up3.EndsWith("/airborne/Departure: Enfield three two, Departure, radar contact, departure radial zero two four./on top, angels 8/Departure: Enfield three two, roger./Departure: Enfield three two, Departure, cleared to switch./False")
               && up2.StartsWith(": Träger: Case-II-Abflug: „airborne“ melden, geradeaus parallel zum BRC 354 in Sicht bleiben, bei 7 DME auf den 10-DME-Bogen zum Abflugradial 024") && far3 == "/Departure: Enfield three three, Departure, cleared to switch./", $"Träger R24: Start vom Deck -> {dk1} | {up1} | {up3} | {up2} | {far3}");
+        // R364: parked on the deck -> ship into the wind only up to 10 min after spawn or the last taxi move; after a trap none until airborne again
+        var (l364, t364) = (new Carrier(), new Carrier { Stage = 3, boat = "CVN", cs = "Enfield three six" });
+        var bg364 = new List<string>();
+        foreach (var (tel, now) in new[] { (dkT, 100.0), (dkT, 701), (dkT with { X = dkT.X + 60 }, 702) }) { Tk(l364, "Enfield 3-5", tel, now); bg364.Add(l364.BoatGroup); }
+        var trT = new Telemetry(DeckH + 2, 0, 10, 0, -50, 0, 0, 0, 0);
+        bg364.Add(Tk(t364, "Enfield 3-6", trT, 800) + "/" + Tk(t364, "Enfield 3-6", trT, 801) + "/" + t364.BoatGroup + "/" + t364.OnDeck);
+        check(string.Join("|", bg364) == "CVN||CVN|: Träger: gelandet auf CVN-73.///True", "Träger R364: Deck geparkt/rollend/nach Trap -> " + string.Join("|", bg364));
         // R26: wingman in formation takes over check-in (not in the stack, no own Delta) and Charlie of the lead, then flies himself (initial, LSO);
         // leaving formation in holding -> own slot in the stack; without check-in in the groove (gear down, on the FB) -> LSO ("call the ball"), gear up not
         stack.Clear();

@@ -79,6 +79,17 @@ local function start()
   local LANG = "de"
   pcall(function() local h = io.open(lfs.writedir() .. "Scripts\\DcsAtc\\DcsAtcLang.txt", "r") if h then local s = h:read("*a") or "" h:close() if s:match("^%s*(.-)%s*$") == "en" then LANG = "en" end end end)
   local function L(de, en) return LANG == "en" and en or de end
+  -- Modules picked in the installer or settings window (DcsAtcModules.txt: "atc,awacs,…"); missing file = all on
+  local MODS
+  pcall(function() local h = io.open(lfs.writedir() .. "Scripts\\DcsAtc\\DcsAtcModules.txt", "r") if h then MODS = {} for w in (h:read("*a") or ""):lower():gmatch("%a+") do MODS[w] = true end h:close() end end)
+  local function on(m) return not MODS or MODS[m] == true end
+  if not on("crew") then OPT.crew = false end
+  local function textOn(t)   -- like Program.TextOn (radio wheel): prefix = module, unprefixed = ATC; radio check, say again, debrief always
+    local p = t:match("^(%a+):")
+    if p == "Range" then return on("range") elseif p == "AWACS" then return on("awacs") and (not t:find("tanker") or on("tanker"))
+    elseif p == "Tanker" then return on("tanker") elseif p == "Carrier" then return on("carrier") end
+    return t == "radio check" or t == "say again" or t == "debrief" or on("atc")
+  end
   local onOpt = {}   -- [name] = function() – apply immediately
 
   local function writeFile(file, text)
@@ -168,33 +179,68 @@ local function start()
     return side == 1 and country.id.RUSSIA or country.id.USA
   end
 
-  -- F10 menu per player group (same entries as the app's radio wheel) --------------------------------
+  -- F10 menu per player group (same entries and names as the app's radio wheel, Wheel.cs; parity test in the app's selftest) --------------
+  -- Entry: { label, text } = command; { label, nil, { entries } } = group; { label, text, nil, "immediate"|"priority" } = emergency with type submenu;
+  -- ifr = true: airfield list instead of a fixed command (R8). F10 allows 9 entries per level (R390): longer lists go into subgroups.
+  -- Deliberately not here: "Select airfield" and "Settings" of the wheel (own windows of the app; F10 has "Settings" below ATC).
+  local HAS = {}   -- range zone / carrier in the mission (set below): the groups only appear then, like in the wheel
   local MENU = {
-    { "Ground", "Ground: ", {
-      { "Request startup", "request startup" }, { "Request taxi", "request taxi" },
-      { "Runway vacated, taxi to parking", "runway vacated, request taxi to parking" }, { "Progressive taxi", "request progressive taxi" },
-      { "Hot brakes", "hot brakes" } } },   -- R251/R297
-    { "Tower", "Tower: ", {
-      { "Ready for departure", "ready for departure" }, { "Ready, closed pattern", "ready for departure, closed pattern" },
-      { "Initial", "initial" }, { "Overhead", "overhead" }, { "Base, gear down", "base, gear down" },
-      { "Final, gear down, full stop", "final, gear down, full stop" }, { "Final, touch and go", "final, gear down, touch and go" },
-      { "Going around", "going around" }, { "Request closed", "request closed traffic" } } },
-    { "Approach", "Approach: ", {
-      { L("Airborne (nach Start)", "Airborne (after takeoff)"), "airborne, climbing" }, { "Inbound for landing", "inbound for landing" }, { "Inbound, pattern work", "inbound for pattern work, touch and go" },
-      { "Request straight in", "request straight in" }, { "C R P", "C R P" } } },
-    { "AWACS / Tanker", "", {
-      { "AWACS: picture", "AWACS: request picture" }, { "AWACS: bogey dope", "AWACS: request bogey dope" },
-      { "AWACS: nearest tanker", "AWACS: request nearest tanker" },
-      { "Tanker: request rejoin", "Tanker: request rejoin" }, { "Tanker: pre-contact", "Tanker: ready pre-contact" } } },
-    { L("Notfall", "Emergency"), "", {
-      { "MAYDAY", "mayday mayday mayday", "immediate" }, { "PAN PAN", "pan pan, pan pan, pan pan", "priority" },
+    { "Ground", nil, {
+      { "Request startup", "Ground: request startup" }, { "IFR clearance", "Ground: request IFR clearance", ifr = true },
+      { "Request taxi", "Ground: request taxi" }, { "Vacated, taxi to parking", "Ground: runway vacated, request taxi to parking" },
+      { "Progressive taxi", "Ground: request progressive taxi" }, { "Hot brakes", "Ground: hot brakes" } } },   -- R251/R297
+    { "Tower", nil, {
+      { "Ready for departure", "Tower: ready for departure" }, { "Ready, closed pattern", "Tower: ready for departure, closed pattern" },
+      { "Initial", "Tower: initial" }, { "Overhead", "Tower: overhead" }, { "Base, gear down", "Tower: base, gear down" },
+      { "Final, gear down, full stop", "Tower: final, gear down, full stop" }, { "Base, touch and go", "Tower: base, gear down, touch and go" },
+      { "Going around", "Tower: going around" },
+      { "Closed / SFO", nil, {   -- R202/R204/R253
+        { "Request closed", "Tower: request closed traffic" }, { "Request SFO", "Tower: request S F O" }, { "High key", "Tower: high key" },
+        { "Low key, gear down", "Tower: low key, gear down" }, { "Ready, practice approach", "Tower: ready for departure, practice approach" } } } } },
+    { "Approach", nil, {
+      { L("Airborne (nach Start)", "Airborne (after takeoff)"), "Approach: airborne, climbing" }, { "Inbound for landing", "Approach: inbound for landing" },
+      { "Inbound, pattern work", "Approach: inbound for pattern work, touch and go" }, { "Request ILS / straight in", "Approach: request straight in" },
+      { "Flight following", "Approach: request flight following" }, { L("Abmelden (cancel approach)", "Cancel approach"), "Approach: cancel approach" },
+      { L("Verkehr", "Traffic"), nil, { { "Traffic in sight", "Approach: traffic in sight" }, { "Negative contact", "Approach: negative contact" } } },
+      { "C R P", "Approach: C R P" },
+      { L("Mehr", "More"), nil, {
+        { L("Fahrt melden", "Report airspeed"), "Approach: report airspeed" }, { "Say again", "Approach: say again" }, { "Request higher", "Approach: request higher" } } } } },
+    { "Range", nil, {
+      { "Check in", "Range: checking in" }, { "IP inbound", "Range: IP inbound" }, { "In hot", "Range: in hot" }, { "Off safe", "Range: off safe" },
+      { "Check out", "Range: checking out" }, { "Check out, hung ordnance", "Range: checking out, hung ordnance" } }, need = "range" },
+    { "AWACS / Tanker", nil, {
+      { "AWACS", nil, {
+        { "Check in", "AWACS: checking in" }, { "Picture", "AWACS: request picture" }, { "Bogey dope", "AWACS: bogey dope" }, { "Sort", "AWACS: request sort" },
+        { L("Nächster Tanker", "Nearest tanker"), "AWACS: vector to tanker" }, { L("Vektor nächster Platz", "Vector nearest airfield"), "AWACS: vector to nearest airfield" },
+        { "Check out", "AWACS: checking out" },
+        { L("Gefecht", "Combat"), nil, {   -- LD17
+          { "Committing", "AWACS: committing" }, { "Fox three", "AWACS: fox three" }, { "Splash", "AWACS: splash one" },
+          { "Defending", "AWACS: missile, defending" }, { "Request support", "AWACS: request support" }, { "Unable", "AWACS: unable" },
+          { "Winchester", "AWACS: winchester" }, { "Bingo, RTB", "AWACS: bingo, RTB" }, { "Say again", "AWACS: say again" } } } } },
+      { "Tanker", nil, {
+        { "Request rejoin", "Tanker: request rejoin" }, { "Visual", "Tanker: visual" }, { "Observation", "Tanker: observation" },
+        { "Pre-contact", "Tanker: pre contact" }, { "Refuel complete", "Tanker: refuel complete" } } } } },
+    { "Carrier", nil, {
+      { "Marshal check in", "Carrier: Marshal, checking in" }, { "See you at", "Carrier: see you at angels" },
+      { "Initial", "Carrier: initial" }, { "Commencing", "Carrier: commencing" }, { "Platform", "Carrier: platform" },
+      { "Ball", "Carrier: ball" }, { "Clara", "Carrier: Clara" }, { "Pigeons", "Carrier: pigeons" } }, need = "carrier" },
+    { L("Notfall", "Emergency"), nil, {
+      { "MAYDAY", "mayday mayday mayday", nil, "immediate" }, { "PAN PAN", "pan pan, pan pan, pan pan", nil, "priority" },
       { L("Spritmangel", "Minimum fuel"), "minimum fuel" },   -- R297 like the radio wheel (Wheel.cs): R245 minimum fuel, R251 hung ordnance, R296 Flameout
       { "Hung ordnance", "Approach: hung ordnance" }, { "Flameout, high key", "Tower: flameout, high key" },
       { L("Notfall beenden", "Cancel emergency"), "cancel emergency" } } },
-    { L("Allgemein", "General"), "", {
+    { L("Allgemein", "General"), nil, {
       { "Radio check", "radio check" }, { "Say again", "say again" }, { "QNH / weather", "request weather" },
       { L("ATIS hören", "Listen to ATIS"), "atis" }, { "Request zone transit", "Approach: request zone transit" }, { "Debriefing", "debrief" } } },
   }
+  local function prune(items)   -- modules: drop entries of deselected modules, then empty groups
+    for j = #items, 1, -1 do
+      local c = items[j]
+      if c[3] then prune(c[3]) end
+      if (c[3] and #c[3] == 0) or (not c[3] and not textOn(c[2])) then table.remove(items, j) end
+    end
+  end
+  prune(MENU)
   -- R297: like Wheel.Kinds; fuel only as MAYDAY ("mayday mayday mayday fuel, emergency fuel", R245), never as PAN
   local KINDS = { { L("Triebwerksausfall", "Engine failure"), "engine failure" }, { L("Treibstoff", "Fuel"), "emergency fuel" },
     { L("Hydraulik", "Hydraulic failure"), "hydraulic failure" }, { L("Gefechtsschaden", "Battle damage"), "battle damage" },
@@ -233,36 +279,38 @@ local function start()
     missionCommands.addCommandForGroup(gid, L("Anzeigen", "Show"), m, showOpt, gid)
   end
   local built, roots = {}, {}
-  local function addMenu(gid, parent, gname, unit, u)
-    for _, m in ipairs(MENU) do
-      local sub = missionCommands.addSubMenuForGroup(gid, m[1], parent)
-      for _, c in ipairs(m[3]) do
-        if c[3] then   -- Emergency: submenu with the type (like the radio wheel), position/altitude/heading added by the app
-          local k = missionCommands.addSubMenuForGroup(gid, c[1], sub)
-          for _, x in ipairs(KINDS) do
-            local fuel = x[2] == "emergency fuel"
-            if not fuel or c[3] == "immediate" then
-              missionCommands.addCommandForGroup(gid, x[1], k, send, { gid = gid, gname = gname, unit = unit, text = c[2] .. (fuel and " fuel" or "") .. ", " .. x[2] .. ", request " .. c[3] .. " landing" })
-            end
+  local function addItems(gid, parent, items, gname, unit, u)
+    for _, c in ipairs(items) do
+      local a = { gid = gid, gname = gname, unit = unit, text = c[2] }
+      if c.need and not HAS[c.need] then   -- Range / Carrier only if the mission has one
+      elseif c[3] then addItems(gid, missionCommands.addSubMenuForGroup(gid, c[1], parent), c[3], gname, unit, u)
+      elseif c[4] then   -- Emergency: submenu with the type (like the radio wheel), position/altitude/heading added by the app
+        local k = missionCommands.addSubMenuForGroup(gid, c[1], parent)
+        for _, x in ipairs(KINDS) do
+          local fuel = x[2] == "emergency fuel"
+          if not fuel or c[4] == "immediate" then
+            missionCommands.addCommandForGroup(gid, x[1], k, send, { gid = gid, gname = gname, unit = unit, text = c[2] .. (fuel and " fuel" or "") .. ", " .. x[2] .. ", request " .. c[4] .. " landing" })
           end
-        else
-          missionCommands.addCommandForGroup(gid, c[1], sub, send, { gid = gid, gname = gname, unit = unit, text = m[2] .. c[2] })
         end
-      end
-      if m[1] == "Ground" then   -- R8: en-route clearance with destination: own/neutral airfields by distance from spawn, first without destination (app: nearest in departure direction)
-        local k, p, side, l = missionCommands.addSubMenuForGroup(gid, "IFR clearance", sub), u:getPoint(), u:getCoalition(), {}
+      elseif c.ifr then   -- R8: en-route clearance with destination: own/neutral airfields by distance from spawn, first without destination (app: nearest in departure direction)
+        local k, p, side, l = missionCommands.addSubMenuForGroup(gid, c[1], parent), u:getPoint(), u:getCoalition(), {}
         for _, f in ipairs(fields) do
-          local c = f.ab:getCoalition()
-          if (c == side or c == 0) and d2(f.p, p) > 5000 ^ 2 then l[#l + 1] = { f = f, d = d2(f.p, p) } end
+          local fc = f.ab:getCoalition()
+          if (fc == side or fc == 0) and d2(f.p, p) > 5000 ^ 2 then l[#l + 1] = { f = f, d = d2(f.p, p) } end
         end
-        table.sort(l, function(a, b) return a.d < b.d end)
-        missionCommands.addCommandForGroup(gid, L("Nächster in Abflugrichtung", "Next in departure direction"), k, send, { gid = gid, gname = gname, unit = unit, text = "Ground: request IFR clearance" })
+        table.sort(l, function(x, y) return x.d < y.d end)
+        missionCommands.addCommandForGroup(gid, L("Nächster in Abflugrichtung", "Next in departure direction"), k, send, a)
         for i = 1, math.min(8, #l) do
-          missionCommands.addCommandForGroup(gid, l[i].f.name, k, send, { gid = gid, gname = gname, unit = unit, text = "Ground: request IFR clearance to " .. l[i].f.name })
+          missionCommands.addCommandForGroup(gid, l[i].f.name, k, send, { gid = gid, gname = gname, unit = unit, text = c[2] .. " to " .. l[i].f.name })
         end
+      else
+        missionCommands.addCommandForGroup(gid, c[1], parent, send, a)
       end
     end
-    if not unit then optMenu(gid, parent) end
+  end
+  local function addMenu(gid, parent, gname, unit, u)
+    addItems(gid, parent, MENU, gname, unit, u)
+    if not unit and on("crew") then optMenu(gid, parent) end
   end
   local function buildMenu(g, u)
     local gid, gname = g:getID(), g:getName()
@@ -276,7 +324,7 @@ local function start()
     local key = u:getName()   -- several players in a group: one submenu per player
     if built[key] then return end
     built[key] = true
-    if not roots[gid] then roots[gid] = missionCommands.addSubMenuForGroup(gid, "ATC"); optMenu(gid, roots[gid]) end
+    if not roots[gid] then roots[gid] = missionCommands.addSubMenuForGroup(gid, "ATC"); if on("crew") then optMenu(gid, roots[gid]) end end
     local cs = (tostring(u:getCallsign() or key):gsub("^(%a+)(%d)(%d)$", "%1 %2-%3"))
     addMenu(gid, missionCommands.addSubMenuForGroup(gid, cs, roots[gid]), gname, key, u)
   end
@@ -285,6 +333,9 @@ local function start()
   local wx = env.mission.weather or {}
   local cl = wx.clouds or {}
   local cover = (cl.preset and 1) or (((cl.density or 0) > 0) and 1 or 0)
+  -- R367: ceiling only with BKN/OVC in the lowest layer; presets 1-5 are FEW/SCT (METAR in Config/Effects/clouds.lua), SCT/BKN counts as ceiling; legacy clouds from density 5/10
+  local fewSct = { Preset1 = true, Preset2 = true, Preset3 = true, Preset4 = true, Preset5 = true }
+  local ceil = cl.preset and (fewSct[cl.preset] and 0 or 1) or (((cl.density or 0) >= 5) and 1 or 0)
   local beacons = {}
   local function scan(t, gname)
     for _, v in pairs(t) do
@@ -329,6 +380,8 @@ local function start()
       end
     end
   end
+  local gtask = {}   -- group -> editor task (R376: only CAP/sweep/escort/intercept flights check in and commit)
+  HAS.carrier = next(boats) ~= nil   -- R390: F10 shows Carrier only then
   for _, coa in pairs(env.mission.coalition or {}) do
     for _, ctry in pairs(coa.country or {}) do
       for _, cat in ipairs({ "plane", "helicopter" }) do
@@ -337,6 +390,7 @@ local function start()
             if p.type == "Land" and (cvUnits[p.linkUnit] or cvUnits[p.helipadId]) then cvBound[g.name] = true end
           end
           gfreq[g.name] = tonumber(g.frequency) or 0
+          gtask[g.name] = g.task or ""
         end
       end
     end
@@ -352,7 +406,7 @@ local function start()
   local function isAi(o) return air(o) and not o:getPlayerName() end
   local function uname(o) local ok, n = pcall(function() return o:getName() end) return ok and clean(n) or "" end
   local function gname(o) local ok, n = pcall(function() return o:getGroup():getName() end) return ok and clean(n) or "" end
-  local ammo, tracked, fmax = {}, {}, {}   -- fmax: unit -> internal tank kg (LK15); ammo: unit -> "fox3/fox1/fox2/Kanone/Luft-Boden"; tracked: air-to-air missiles (Pitbull, Trashed)
+  local ammo, tracked, fmax, lastHit, ejected = {}, {}, {}, {}, {}   -- lastHit: target -> last X;hit (R382); ejected: unit -> pilot out (R361); fmax: unit -> internal tank kg (LK15); ammo: unit -> "fox3/fox1/fox2/Kanone/Luft-Boden"; tracked: air-to-air missiles (Pitbull, Trashed)
   local function ammoOf(u)
     local n = { 0, 0, 0, 0, 0 }
     for _, a in ipairs(u:getAmmo() or {}) do
@@ -389,6 +443,9 @@ local function start()
       if not (isAi(u) or isAi(t)) then return end
       local life = 1
       pcall(function() life = t:getLife() / math.max(1, t:getLife0()) end)
+      local lh, now = lastHit[uname(t)], timer.getTime()   -- R382: gun bursts give dozens of hits per second -> one event per target and second unless the damage jumps
+      if lh and now - lh.at < 1 and math.abs(lh.life - life) <= 0.05 then return end
+      lastHit[uname(t)] = { at = now, life = life }
       evt(string.format("X;hit;%s;%s;%s;%s;%s;%.2f", uname(u), gname(u), uname(t), gname(t), clean(e.weapon and e.weapon:getTypeName() or ""), life))
     elseif e.id == E.S_EVENT_KILL then
       if not (isAi(u) or isAi(t)) then return end
@@ -398,7 +455,12 @@ local function start()
     elseif e.id == E.S_EVENT_EJECTION then
       if not air(u) then return end   -- also players (N45): the app finds the player via the unit
       local p = u:getPoint()
-      evt(string.format("X;eject;%s;%s;%.0f;%.0f", uname(u), gname(u), p.x, p.z))
+      ejected[uname(u)] = true
+      local ok, st = pcall(land.getSurfaceType, { x = p.x, y = p.z })
+      evt(string.format("X;eject;%s;%s;%.0f;%.0f;%d", uname(u), gname(u), p.x, p.z, ok and (st == 2 or st == 3) and 1 or 0))   -- R361: 1 = over water (SurfaceType 2/3)
+    elseif e.id == E.S_EVENT_PILOT_DEAD and ejected[uname(u)] then
+      ejected[uname(u)] = nil
+      evt("X;pilotdead;" .. uname(u))   -- R361: no SAR call for a dead pilot
     end
   end) end })
   -- every 0.5 s: active missile closer than 10 NM to the target -> Pitbull; missile gone without a hit, target alive -> Trashed
@@ -408,7 +470,7 @@ local function start()
         local a, b = m.w:getPoint(), m.t:getPoint()
         if (a.x - b.x) ^ 2 + (a.y - b.y) ^ 2 + (a.z - b.z) ^ 2 < (10 * NM) ^ 2 then
           m.pit = true
-          if now - m.at > 3 then evt("X;pitbull;" .. m.unit) end   -- shot down within 10 NM: no own Pitbull call
+          if now - m.at > 3 then evt("X;pitbull;" .. m.unit .. ";" .. uname(m.t)) end   -- shot down within 10 NM: no own Pitbull call; target: its "defending" (R379)
         end
       end
       return now - m.at > 120
@@ -492,7 +554,7 @@ local function start()
   end
 
   -- Range (A17, from KutaisiATC.lua): first trigger zone "Range…" of the mission (circle or quad: farthest corner point) -> Z line; without a zone no range controller.
-  -- Impacts of players' bombs/missiles/air-to-ground guided weapons in it: distance and clock position (12 = approach direction) to the nearest ground target of the opposing side in the zone,
+  -- Impacts of players' bombs/missiles/air-to-ground guided weapons in it: distance and clock position (12 = approach direction) to the nearest ground, ship or static target of the opposing side in the zone,
   -- flight time (the app checks the clearance for the drop, R58); gun hits and kills in the zone -> R/H/K events. Only measure, spawn nothing.
   local RZ
   for _, z in ipairs(env.mission.triggers and env.mission.triggers.zones or {}) do
@@ -502,17 +564,22 @@ local function start()
       RZ = { x = z.x, z = z.y, r = r }
     end
   end
+  HAS.range = RZ ~= nil   -- R390: F10 shows Range only then
   if RZ then
     local function inRange(p) return (p.x - RZ.x) ^ 2 + (p.z - RZ.z) ^ 2 < (RZ.r + 1500) ^ 2 end
-    local function nearestTarget(p, side)
+    local function nearestTarget(p, side)   -- R369: ground groups, ships and static objects of the opposing side
       local best, bd = nil, 1e9
-      for _, g in ipairs(coalition.getGroups(3 - side, Group.Category.GROUND) or {}) do
-        for _, u in ipairs(g:getUnits() or {}) do
+      local function scan(units)
+        for _, u in ipairs(units) do
           local q = u:getPoint()
           local d = math.sqrt((p.x - q.x) ^ 2 + (p.z - q.z) ^ 2)
           if d < bd and inRange(q) then best, bd = u, d end
         end
       end
+      for _, cat in ipairs({ Group.Category.GROUND, Group.Category.SHIP }) do
+        for _, g in ipairs(coalition.getGroups(3 - side, cat) or {}) do scan(g:getUnits() or {}) end
+      end
+      scan(coalition.getStaticObjects and coalition.getStaticObjects(3 - side) or {})
       return best, bd
     end
     local function track(w, unit, hdg, side)
@@ -544,7 +611,9 @@ local function start()
       elseif e.id == E.S_EVENT_HIT and e.target and e.target.getPoint and inRange(e.target:getPoint()) and e.weapon and (e.weapon:getDesc() or {}).category == Weapon.Category.SHELL then
         evt(string.format("H;%s;%s", clean(u:getName()), clean(e.target:getTypeName())))
       elseif e.id == E.S_EVENT_KILL and e.target and e.target.getPoint and inRange(e.target:getPoint()) then
-        evt(string.format("K;%s;%s", clean(u:getName()), clean(e.target:getTypeName())))
+        local tc = 0   -- R369: coalition of the destroyed object (the app scores only the opposing side)
+        pcall(function() tc = e.target:getCoalition() end)
+        evt(string.format("K;%s;%s;%d", clean(u:getName()), clean(e.target:getTypeName()), tc))
       end
     end) end })
   end
@@ -555,7 +624,7 @@ local function start()
     pcall(function()
       if world.weather.getFogThickness() > 0 then v = math.min(v, world.weather.getFogVisibilityDistance()) end
     end)
-    G = string.format("G;%d;%.0f;%.0f", cover, cl.base or 0, v)
+    G = string.format("G;%d;%.0f;%.0f;%d", cover, cl.base or 0, v, ceil)
     W = {}
     for _, f in ipairs(fields) do
       local w = atmosphere.getWind({ x = f.p.x, y = f.p.y + 10, z = f.p.z })
@@ -1215,10 +1284,11 @@ local function start()
                 local un = clean(u:getName())
                 if not ammo[un] then local ok, a = pcall(ammoOf, u) ammo[un] = ok and a or "" end
                 if not fmax[un] then local ok, d = pcall(u.getDesc, u) fmax[un] = ok and d and d.fuelMassMax or 0 end   -- LK15: internal tank kg (ops check in 1000 lb)
-                l[#l + 1] = string.format("T;%s;%s;%s;%.1f;%.1f;%.1f;%.4f;%.1f;%d;%s;%d;%s;%.2f;%d;%.3f;%s;%s;%.0f",
+                l[#l + 1] = string.format("T;%s;%s;%s;%.1f;%.1f;%.1f;%.4f;%.1f;%d;%s;%d;%s;%.2f;%d;%.3f;%s;%s;%.0f;%s",
                   un, clean(g:getName()), clean(u:getTypeName()), p.x, p.z, p.y, hdg, spd, air,
                   clean(A.ai[g:getName()] or (cvBound[g:getName()] and "cv") or ""), u:getCoalition(), clean(u:getCallsign()), u.getFuel and u:getFuel() or 1, g:getID(),   -- Tank 0–1: fuel shortage -> priority; group ID: AI flight member of the player
-                  gfreq[g:getName()] or gfreq[(g:getName():gsub("%s*#%d+$", ""))] or 0, ammo[un], kind, fmax[un])   -- Flight frequency (editor), ammunition fox3/fox1/fox2/gun/air-to-ground (AI radio), h/a, internal tank kg
+                  gfreq[g:getName()] or gfreq[(g:getName():gsub("%s*#%d+$", ""))] or 0, ammo[un], kind, fmax[un],   -- Flight frequency (editor), ammunition fox3/fox1/fox2/gun/air-to-ground (AI radio), h/a, internal tank kg
+                  clean(gtask[g:getName()] or gtask[(g:getName():gsub("%s*#%d+$", ""))] or ""))   -- editor task (CAP, SEAD, ...)
               end
             end
           end
@@ -1417,7 +1487,10 @@ local function start()
           gid = tonumber(gid) or 0
           text = text or s
           local dur = tonumber(sec) or math.max(20, #text / 8)   -- Display duration from the app (AI radio short), otherwise reading time: at least 20 s, long texts longer
-          if gid == 0 then trigger.action.outText(text, dur) else trigger.action.outTextForGroup(gid, text, dur) end
+          local side = tonumber(f:match("%-c(%d)%.out$"))   -- "{ticks}-0-c{side}.out": to all of that coalition only (R356)
+          if gid ~= 0 then trigger.action.outTextForGroup(gid, text, dur)
+          elseif side then trigger.action.outTextForCoalition(side, text, dur)
+          else trigger.action.outText(text, dur) end
         end
       end
       os.remove(dir .. "\\" .. f)

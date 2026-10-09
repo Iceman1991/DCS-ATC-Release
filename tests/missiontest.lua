@@ -34,15 +34,18 @@ env = { info = function(s) if os.getenv("DBG") then print(s) end end, error = fu
 country = { id = { USA = 2, RUSSIA = 0 } }
 timer = { getTime = function() return T end, scheduleFunction = function(f, a, t) queue[#queue + 1] = { f = f, a = a, t = t } end }
 world = { event = { S_EVENT_BIRTH = 15, S_EVENT_LAND = 4, S_EVENT_CRASH = 5, S_EVENT_DEAD = 8, S_EVENT_UNIT_LOST = 30, S_EVENT_ENGINE_SHUTDOWN = 19,
-                    S_EVENT_SHOT = 1, S_EVENT_HIT = 2, S_EVENT_EJECTION = 6, S_EVENT_SHOOTING_START = 23, S_EVENT_SHOOTING_END = 24, S_EVENT_KILL = 28, S_EVENT_REFUELING = 7, S_EVENT_REFUELING_STOP = 14, S_EVENT_TAKEOFF = 3, S_EVENT_LANDING_QUALITY_MARK = 36 },
+                    S_EVENT_SHOT = 1, S_EVENT_HIT = 2, S_EVENT_EJECTION = 6, S_EVENT_PILOT_DEAD = 9, S_EVENT_SHOOTING_START = 23, S_EVENT_SHOOTING_END = 24, S_EVENT_KILL = 28, S_EVENT_REFUELING = 7, S_EVENT_REFUELING_STOP = 14, S_EVENT_TAKEOFF = 3, S_EVENT_LANDING_QUALITY_MARK = 36 },
           addEventHandler = function(h) handlers[#handlers + 1] = h end, VolumeType = { SPHERE = 1 },
           weather = { getFogThickness = function() return 0 end }, removeJunk = function() end }
 MENU = {}
-missionCommands = { addSubMenuForGroup = function() return {} end, addCommandForGroup = function(_, name, _, fn, arg) MENU[#MENU + 1] = { name = name, fn = fn, arg = arg } end }
+GROUPS = {}   -- R390: submenus { name, n = entries } – at most 9 per level (DCS F10)
+missionCommands = { addSubMenuForGroup = function(_, name, parent) local g = { name = name, n = 0 }; if parent then parent.n = parent.n + 1 end; GROUPS[#GROUPS + 1] = g; return g end,
+                    addCommandForGroup = function(_, name, parent, fn, arg) if parent then parent.n = parent.n + 1 end; MENU[#MENU + 1] = { name = name, fn = fn, arg = arg } end }
 function menu(name, v) for _, m in ipairs(MENU) do if m.name == name and (v == nil or m.arg.v == v) then m.fn(m.arg) return end end error("Menü fehlt: " .. name) end
 OUT = {}   -- Texts in game: { gid, text, display duration }
 trigger = { action = { outText = function(t, d) OUT[#OUT + 1] = { 0, t, d } end, outTextForGroup = function(g, t, d) OUT[#OUT + 1] = { g, t, d } end,
-                       outTextForUnit = function(u, t, d, c) OUT[#OUT + 1] = { "u" .. u, t, d, c } end } }
+                       outTextForUnit = function(u, t, d, c) OUT[#OUT + 1] = { "u" .. u, t, d, c } end,
+                       outTextForCoalition = function(s, t, d) OUT[#OUT + 1] = { "c" .. s, t, d } end } }
 atmosphere = { getWind = function() return vec(1, 1) end, getTemperatureAndPressure = function() return 288, 101325 end }
 landX = nil   -- Land from this x coordinate (CVTURN test), otherwise water (3)
 land = { getHeight = function() return 0 end, getSurfaceType = function(v) return landX and v.x >= landX and 1 or 3 end }
@@ -103,9 +106,11 @@ coalition = {
     local l = {}
     if cat == 0 and side == 2 then for _, p in ipairs(planes) do l[#l + 1] = p.g end end
     if cat == 2 and side == 1 then for _, g in ipairs(REDGROUND or {}) do l[#l + 1] = g end end
+    if cat == 3 and side == 1 then for _, g in ipairs(REDSHIPS or {}) do l[#l + 1] = g end end
     for _, g in pairs(groups) do if g.cat == cat and side == 2 then l[#l + 1] = g end end
     return l
   end,
+  getStaticObjects = function(side) return side == 1 and REDSTATIC or {} end,
   addGroup = function(ctry, cat, d)
     local g = { d = d, cat = cat }
     local u = unit(d.units[1].name, d.units[1].x, d.units[1].y, nil)
@@ -132,7 +137,7 @@ env.mission.coalition.blue.country[1].ship = { group = { { name = "CVN", units =
   { id = "WrappedAction", params = { action = { id = "ActivateICLS", params = { channel = 11 } } } } } } } }, { x = 5000, y = 2000, speed = 12 }, { x = 9000, y = 2000, speed = 12 } } } } } }
 env.mission.coalition.blue.country[1].plane.group[2] = { name = "Hornet CV", units = { {} }, route = { points = { { type = "Land", linkUnit = 501 } } } }
 plane("Hornet CV", 3000, 2000).air = true
-env.mission.coalition.blue.country[1].plane.group[3] = { name = "Viper", frequency = 141, units = { {} } }   -- AI radio: flight frequency
+env.mission.coalition.blue.country[1].plane.group[3] = { name = "Viper", frequency = 141, task = "CAP", units = { {} } }   -- AI radio: flight frequency, editor task (R376)
 local cv = unit("CVN-73", 1000, 2000); cv.v = vec(10, 0); cv.air = false
 function cv:getTypeName() return "CVN_73" end
 groups["CVN"] = { cat = 3, getUnits = function() return { cv } end, getUnit = function() return cv end, getName = function() return "CVN" end, getController = function() return { getDetectedTargets = function() return {} end, setTask = function(_, k) cvTask = k end } end }
@@ -158,6 +163,10 @@ env.mission.triggers = { zones = { { name = "Range Alpha", x = 20000, y = 0, rad
 tank = unit("Tank1", 20000, 0, nil, 1)
 function tank:getTypeName() return "T-72B" end
 REDGROUND = { { getUnits = function() return { tank } end, getUnit = function() return tank end } }
+static1 = unit("Depot1", 20000, 2000, nil, 1); function static1:getTypeName() return "Warehouse" end; REDSTATIC = { static1 }   -- R369: static object and ship of the red side in the range
+ship1 = unit("Boat1", 20000, -2000, nil, 1); function ship1:getTypeName() return "Speedboat" end
+REDSHIPS = { { getUnits = function() return { ship1 } end, getUnit = function() return ship1 end, getName = function() return "RedBoat" end,
+  getController = function() return { getDetectedTargets = function() return {} end } end } }
 DCSATC_SPAWNTEST = true   -- since 0.9.4 the mod spawns nothing; the spawn code is still tested here
 DCSATC_OPTIONS = { arrivals = { Senaki = 2 }, crew = true }   -- Ground crew is off by default, test it here too   -- Arrivals at mission start
 dofile(arg[1])
@@ -196,7 +205,7 @@ RADAR[1].type = true
 run(T + 3); assert(stateFile():find("D;2;Bandit1;1", 1, true), "Typ erkannt fehlt")
 assert(("\n" .. stateFile()):find("\nP;[^\n]*;1%.00;0%.50;a\n"), "Fahrwerk/Kategorie fehlt in der P-Zeile: " .. stateFile())
 local huey = coalition.addGroup(2, Group.Category.HELICOPTER, { name = "Huey", units = { { name = "Huey", x = 900000, y = 0, alt = 300 } } })   -- N50: category h/a in P and T line
-run(T + 3); assert(("\n" .. stateFile()):find("\nT;Huey;Huey;[^\n]*;h;%d+\n") and stateFile():find("T;Hornet CV;[^\n]*;a;%d+\n"), "Kategorie fehlt in der T-Zeile: " .. stateFile())
+run(T + 3); assert(("\n" .. stateFile()):find("\nT;Huey;Huey;[^\n]*;h;%d+;[^;\n]*\n") and stateFile():find("T;Hornet CV;[^\n]*;a;%d+;[^;\n]*\n"), "Kategorie fehlt in der T-Zeile: " .. stateFile())
 huey:destroy()
 assert(stateFile():find("C;CVN-73;CVN;CVN_73;1000.0;2000.0;0.0000;10.0;2;127.500;73X;11;1.0;1.0;101325;0", 1, true), "Träger-Zeile fehlt: " .. stateFile())
 assert(stateFile():find("T;Hornet CV;Hornet CV;FA%-18C_hornet;[^\n]*;cv;"), "KI mit Landung auf dem Träger ohne Flag cv")
@@ -350,12 +359,20 @@ do local n = {} for _, m in ipairs(MENU) do if type(m.arg) == "table" and m.arg.
     and n["minimum fuel"] and n["Approach: hung ordnance"] and n["Ground: hot brakes"] and n["Tower: flameout, high key"], "F10 Notfall wie Funkrad (R297) fehlt") end
 do local tr = false for _, m in ipairs(MENU) do if m.name == "Request zone transit" and m.arg.text == "Approach: request zone transit" then tr = true end end
   assert(tr, "F10 Allgemein: Request zone transit (N3) fehlt") end
+do local g, tx = {}, {}   -- R390: F10 like the radio wheel – groups, wheel name for "Base, touch and go", answer entries, at most 9 per level
+  for _, x in ipairs(GROUPS) do g[x.name] = true; assert(x.n <= 9, "F10 Ebene mit mehr als 9 Einträgen: " .. x.name .. " " .. x.n) end
+  for _, m in ipairs(MENU) do if type(m.arg) == "table" and m.arg.text then tx[m.arg.text] = m.name end end
+  assert(g["Closed / SFO"] and g["AWACS / Tanker"] and g["AWACS"] and g["Tanker"] and g["Verkehr"] and g["Gefecht"] and g["Mehr"] and g["Range"] and g["Carrier"],
+    "F10 Untergruppen (R390)")
+  assert(tx["Tower: base, gear down, touch and go"] == "Base, touch and go" and not tx["Tower: final, gear down, touch and go"]
+    and tx["Approach: traffic in sight"] and tx["Approach: report airspeed"] and tx["Tanker: visual"] and tx["Tanker: refuel complete"]
+    and tx["Range: in hot"] == "In hot" and tx["Carrier: ball"] and tx["AWACS: checking in"] and tx["AWACS: bingo, RTB"] and tx["Tower: request S F O"] and tx["Approach: cancel approach"], "F10 Antwort-Einträge (R390)") end
 do local fh = realOpen(tmp .. "\\DcsAtc-Terrain-Caucasus-map.txt.tmp", "r"); assert(fh and fh:read("*l"):find("^Map;"), "Kartenraster (V15) fehlt"); fh:close() end
 for _, id in ipairs({ "23", "26" }) do local fh = realOpen(tmp .. "\\DcsAtc-Terrain-Caucasus-" .. id .. ".txt.tmp", "r"); assert(fh, "Platzraster " .. id .. " fehlt"); fh:close() end   -- one after another (queue)
 -- AI radio: AI Viper (flight frequency 141) fires AIM-120 at Bandit1 -> X;shot, Pitbull under 10 NM, Trashed without a hit; kill, ejection
 local vip = plane("Viper", 60000, 0); vip.air = true; vip.group = "Viper"
 vip.ammo = { { count = 4, desc = { category = 1, missileCategory = 1, guidance = 3 } }, { count = 2, desc = { category = 1, missileCategory = 1, guidance = 2 } }, { count = 500, desc = { category = 0 } } }
-run(T + 1); assert(stateFile():find("T;Viper;Viper;FA%-18C_hornet;[^\n]*;141%.000;4/0/2/500/0;a;4899\n"), "T-Zeile ohne Flight-Frequenz/Munition/Innentank (LK15): " .. stateFile())
+run(T + 1); assert(stateFile():find("T;Viper;Viper;FA%-18C_hornet;[^\n]*;141%.000;4/0/2/500/0;a;4899;CAP\n"), "T-Zeile ohne Flight-Frequenz/Munition/Innentank (LK15)/Auftrag (R376): " .. stateFile())
 local wpn = { id_ = 77, p = vec(90000, 0), alive = true }
 function wpn:getDesc() return { category = 1, missileCategory = 1, guidance = 3 } end
 function wpn:getTypeName() return "AIM_120C" end
@@ -366,12 +383,20 @@ local function fire(e) for _, h in ipairs(handlers) do h:onEvent(e) end end
 fire({ id = world.event.S_EVENT_SHOT, initiator = vip, weapon = wpn })
 assert(has("X;shot;Viper;Viper;2;AIM_120C;missile;aam;radar_active;Bandit1;;60000;0"), "X;shot fehlt: " .. table.concat(events, " "))
 run(T + 4); assert(not table.concat(events, " "):find("pitbull"), "Pitbull zu früh")
-wpn.p = vec(60000, 0); run(T + 1); assert(has("X;pitbull;Viper"), "Pitbull fehlt")
+wpn.p = vec(60000, 0); run(T + 1); assert(has("X;pitbull;Viper;Bandit1"), "Pitbull mit Ziel (R379) fehlt")
 wpn.alive = false; run(T + 3); assert(has("X;trashed;Viper;Bandit1"), "Trashed fehlt")
+-- R382: gun burst, 40 hits in 2 s without damage change -> at most 3 X;hit
+for _ = 1, 40 do T = T + 0.05; fire({ id = world.event.S_EVENT_HIT, initiator = vip, target = low, weapon = wpn }) end
+local nHit = 0; for _, x in ipairs(events) do if x:find("^X;hit;Viper;") then nHit = nHit + 1 end end
+assert(nHit >= 1 and nHit <= 3, "Treffer-Drossel (R382): " .. nHit .. " X;hit in 2 s")
 fire({ id = world.event.S_EVENT_KILL, initiator = vip, target = low }); assert(has("X;kill;Viper;Viper;Bandit1;;FA-18C_hornet;1"), "X;kill fehlt")
-fire({ id = world.event.S_EVENT_EJECTION, initiator = vip }); assert(has("X;eject;Viper;Viper;60000;0"), "X;eject fehlt")
+landX = 30000   -- R361: Viper (x 60000) over land, P1 (x 0) over water
+fire({ id = world.event.S_EVENT_EJECTION, initiator = vip }); assert(has("X;eject;Viper;Viper;60000;0;0"), "X;eject fehlt")
+fire({ id = world.event.S_EVENT_PILOT_DEAD, initiator = low }); fire({ id = world.event.S_EVENT_PILOT_DEAD, initiator = vip })
+assert(has("X;pilotdead;Viper") and not has("X;pilotdead;Bandit1"), "X;pilotdead nur nach Ausstieg (R361) fehlt")
 p1.group = "P1grp"; p1.air = true
-fire({ id = world.event.S_EVENT_EJECTION, initiator = p1 }); assert(has("X;eject;P1;P1grp;0;0"), "X;eject für Spieler (N45) fehlt: " .. table.concat(events, " "))
+fire({ id = world.event.S_EVENT_EJECTION, initiator = p1 }); assert(has("X;eject;P1;P1grp;0;0;1"), "X;eject für Spieler (N45) über Wasser (R361) fehlt: " .. table.concat(events, " "))
+landX = nil
 -- KF6/LK14: red SAM radar tracks the AI Viper -> X;spike (once, with type and location), ends -> X;naked; radar on the player -> nothing
 local sr = unit("SR1", 70000, 1000, nil, 1)
 function sr:getTypeName() return "Kub 1S91 str" end
@@ -395,8 +420,10 @@ OUT = {}
 files["9-30.out"] = "7|6|Viper (141.0): Fox three"
 files["9-31.out"] = "0|Tower (265.0): alter Text"
 files["9-32.out"] = "0|9|ATC: 5|3 Flugzeuge"
+files["9-34-0-c1.out"] = "0|8|Guard (243.0): Mayday, mayday, mayday"   -- R356: to all of the red coalition only
 run(T + 1)
-assert(#OUT == 3, "nicht alle .out gelesen: " .. #OUT)
+assert(#OUT == 4, "nicht alle .out gelesen: " .. #OUT)
+assert(OUT[4][1] == "c1" and OUT[4][2] == "Guard (243.0): Mayday, mayday, mayday" and OUT[4][3] == 8, ".out Koalition: " .. tostring(OUT[4][1]))
 assert(OUT[1][1] == 7 and OUT[1][2] == "Viper (141.0): Fox three" and OUT[1][3] == 6, ".out neu: " .. tostring(OUT[1][2]) .. " / " .. tostring(OUT[1][3]))
 assert(OUT[2][1] == 0 and OUT[2][2] == "Tower (265.0): alter Text" and OUT[2][3] == 20, ".out alt: " .. tostring(OUT[2][2]) .. " / " .. tostring(OUT[2][3]))
 assert(OUT[3][1] == 0 and OUT[3][2] == "ATC: 5|3 Flugzeuge" and OUT[3][3] == 9, ".out neu mit |: " .. tostring(OUT[3][2]))
@@ -423,9 +450,25 @@ function bomb:getVelocity() return vec(0, 0) end
 fire({ id = world.event.S_EVENT_SHOT, initiator = p1, weapon = bomb })
 run(T + 1); bomb.alive = false; run(T + 1)
 assert(table.concat(events, " "):find("R;P1;weapons.bombs.Mk_82;12;6;T%-72B;1%.%d"), "R-Ereignis (Einschlag) fehlt: " .. table.concat(events, " "))
+-- R369: static objects and ships count as range targets, not only ground groups
+for _, c in ipairs({ { 20000, 1980, "Warehouse" }, { 20000, -2020, "Speedboat" } }) do
+  local b2 = { p = vec(c[1], c[2]), alive = true }
+  function b2:getDesc() return { category = 3 } end
+  function b2:getTypeName() return "weapons.bombs.Mk_82" end
+  function b2:isExist() return self.alive end
+  function b2:getPoint() return self.p end
+  function b2:getVelocity() return vec(0, 0) end
+  fire({ id = world.event.S_EVENT_SHOT, initiator = p1, weapon = b2 })
+  run(T + 1); b2.alive = false; run(T + 1)
+  assert(table.concat(events, " "):find("R;P1;weapons.bombs.Mk_82;20;%d+;" .. c[3] .. ";1%.%d"), "R-Ereignis auf " .. c[3] .. " fehlt: " .. table.concat(events, " "))
+end
 local shell = { getDesc = function() return { category = 0 } end, getTypeName = function() return "shell" end }
 fire({ id = world.event.S_EVENT_HIT, initiator = p1, target = tank, weapon = shell }); assert(has("H;P1;T-72B"), "H-Ereignis (Kanonentreffer) fehlt")
-fire({ id = world.event.S_EVENT_KILL, initiator = p1, target = tank }); assert(has("K;P1;T-72B"), "K-Ereignis (Abschuss) fehlt")
+fire({ id = world.event.S_EVENT_KILL, initiator = p1, target = tank }); assert(has("K;P1;T-72B;1"), "K-Ereignis (Abschuss) fehlt")
+-- R369: K carries the coalition of the target (the app drops own-side kills)
+fire({ id = world.event.S_EVENT_KILL, initiator = p1, target = static1 }); assert(has("K;P1;Warehouse;1"), "K-Ereignis auf Static fehlt")
+local own = unit("Own1", 20000, 500, nil, 2); function own:getTypeName() return "Truck" end
+fire({ id = world.event.S_EVENT_KILL, initiator = p1, target = own }); assert(has("K;P1;Truck;2"), "K-Ereignis auf eigene Seite ohne Koalition")
 -- R27: DCS LSO grade on trap -> W;Unit;Wire;grade (player only, only with wire); player under 2 NM at the carrier in the air -> state every 0.25 s instead of 0.5 s
 fire({ id = world.event.S_EVENT_LANDING_QUALITY_MARK, initiator = p1, comment = "LSO: GRADE:OK  : WIRE# 3" })
 fire({ id = world.event.S_EVENT_LANDING_QUALITY_MARK, initiator = vip, comment = "LSO: GRADE:OK  : WIRE# 2" })
@@ -439,6 +482,35 @@ local near, far = rate(1000, 3000), rate(1000, 2000 + 5 * 1852)
 p1.air = false; local deck = rate(1000, 2100)
 io.open = ro
 assert(near >= 7 and far <= 4 and deck <= 4, "Zustand am Träger (R27): nah " .. near .. ", weit " .. far .. ", Deck " .. deck)
+do   -- R390: trigger zone "Range…" in the mission -> F10 group Range (like the radio wheel), without carrier no group Carrier
+  local blue, zones = env.mission.coalition.blue.country[1], env.mission.triggers
+  env.mission.triggers, blue.ship = nil, nil
+  for i = #queue, 1, -1 do queue[i] = nil end
+  for i = #handlers, 1, -1 do handlers[i] = nil end
+  DCSATC, DCSATC_SPAWNTEST, DCSATC_OPTIONS, MENU, GROUPS = nil, nil, { crew = true }, {}, {}
+  dofile(arg[1])
+  run(T + 3)
+  local g = {}
+  for _, x in ipairs(GROUPS) do g[x.name] = true end
+  assert(g["Tower"] and not g["Range"] and not g["Carrier"], "F10 ohne Range-Zone und Träger (R390)")
+  env.mission.triggers = zones
+end
+-- Modules (installer/settings): DcsAtcModules.txt "atc" -> F10 without AWACS/Tanker entries and without the ground crew switch, crew off despite the option
+do
+  local io0 = io.open
+  io.open = function(p, m) if p:find("DcsAtcModules%.txt$") then return { read = function() return "core,atc" end, close = function() end } end return io0(p, m) end
+  lfs.writedir = function() return tmp .. "\\" end
+  for i = #queue, 1, -1 do queue[i] = nil end
+  for i = #handlers, 1, -1 do handlers[i] = nil end
+  DCSATC, DCSATC_SPAWNTEST, DCSATC_OPTIONS, MENU = nil, nil, { crew = true }, {}
+  dofile(arg[1])
+  run(T + 3)
+  io.open, lfs.writedir = io0, nil
+  local n = {} for _, m in ipairs(MENU) do n[#n + 1] = m.name end
+  local s = "|" .. table.concat(n, "|") .. "|"
+  assert(s:find("|Request taxi|", 1, true) and s:find("|Radio check|", 1, true) and s:find("|Spritmangel|", 1, true) and not s:find("AWACS", 1, true)
+         and not s:find("Tanker", 1, true) and not s:find("|Picture|", 1, true) and not s:find("|Visual|", 1, true) and not s:find("Bodenpersonal", 1, true) and DCSATC.opt.crew == false, "Module F10: " .. s)
+end
 -- Hook: file paths with a real backslash (Lua 5.1: '\D' becomes 'D' -> %TMP%DcsAtc-..., autostart/session/DCS folder never arrived)
 local opened = {}
 io.open = function(p) opened[#opened + 1] = p end

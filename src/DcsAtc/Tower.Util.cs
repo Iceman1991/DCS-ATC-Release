@@ -54,9 +54,10 @@ public partial class Tower
     internal static double Bearing(double fx, double fz, double tx, double tz) => (Math.Atan2(tz - fz, tx - fx) * 180 / Math.PI + 360) % 360;
     internal static double HdgDiff(double a, double b) => Math.Abs(((a - b) % 360 + 540) % 360 - 180);
     internal static int Miles(double m) => Math.Max(1, (int)Math.Round(m / NM));
+    internal static string MilesTxt(double m) { int n = Miles(m); return n == 1 ? "1 mile" : $"{n} miles"; }   // R373: singular for 1
     internal static string Dir8(double brg) =>
         new[] { "north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest" }[(int)Math.Round(brg / 45) % 8];
-    string Where(Telemetry t, string of = "the field") { int m = Miles(Dist(t.X, t.Z, CX, CZ)); return $"{m} mile{(m == 1 ? "" : "s")} {Dir8(Bearing(CX, CZ, t.X, t.Z))} of {of}"; }
+    string Where(Telemetry t, string of = "the field") => $"{MilesTxt(Dist(t.X, t.Z, CX, CZ))} {Dir8(Bearing(CX, CZ, t.X, t.Z))} of {of}";
 
     /// Remember "fly heading one two zero" (magnetic, 5° steps) and target for further headings.
     string Steer(Telemetry t, (double X, double Z) goal, string name)
@@ -146,7 +147,7 @@ public partial class Tower
         double brg = (Math.Atan2(t.Z - CZ, t.X - CX) * 180 / Math.PI + 360) % 360;
         string[] dirs = { "north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest" };
         int d = (int)Math.Round(Dist(t.X, t.Z, CX, CZ) / NM);
-        return $"identified, {d} miles {dirs[(int)Math.Round(brg / 45) % 8]} of {F.Name.Replace('-', ' ')}";   // R322: reference point (FAA JO 7110.65 5-3-7)
+        return $"identified, {MilesTxt(d * NM)} {dirs[(int)Math.Round(brg / 45) % 8]} of {F.Name.Replace('-', ' ')}";   // R322: reference point (FAA JO 7110.65 5-3-7)
     }
 
     static double WindFromTrue(Telemetry t) => (Math.Atan2(-t.WindZ, -t.WindX) * 180 / Math.PI + 360) % 360;
@@ -199,9 +200,10 @@ public partial class Tower
     static readonly Regex InHgTypes = new(@"^(F-14|FA-18|F-16|F-15|F-4E|F-5|F-86|F-117|A-10|AV8B|A-4|A-6|T-45|S-3|E-2|E-3|C-130|C-17|KC-1|B-1|B-52|AH-64|UH-1|UH-60|OH-?58|CH-47|P-51|TF-51|P-47|F4U|Christen)");
     internal static bool InHg(string type) => AltimeterUnit == "inhg" || AltimeterUnit != "hpa" && InHgTypes.IsMatch(type);
     /// "QNH one zero one three" or "altimeter two niner niner two" (1 hPa = 0.02953 inHg); inHg null = both.
+    /// R345: truncated, not rounded (QNH to whole hPa down, inHg to 0.01 down; ICAO Annex 3 App. 3 4.7).
     internal static string QnhSay(double hpa, bool? inHg)
     {
-        string q = $"QNH {Digits(((int)Math.Round(hpa)).ToString())}", a = $"altimeter {Digits((hpa * 0.02953).ToString("0.00", CultureInfo.InvariantCulture))}";
+        string q = $"QNH {Digits(((int)Math.Floor(hpa + 1e-6)).ToString())}", a = $"altimeter {Digits((Math.Floor(hpa * 0.02953 * 100 + 1e-6) / 100).ToString("0.00", CultureInfo.InvariantCulture))}";
         return inHg is { } i ? (i ? a : q) : $"{q}, {a}";
     }
 
@@ -255,6 +257,7 @@ public partial class Tower
         s = Regex.Replace(s, @"(?<=\d),(?=\d{3}\b)", "");      // 6,000 -> 6000
         s = Regex.Replace(s, @"(?<=\d)\.(?=\d)", " point ");    // 6.2 -> 6 point 2
         s = Regex.Replace(s, @"[^a-z0-9 ]", " ");
+        s = Regex.Replace(s, @"\bmay +day\b", "mayday");     // R360: transcription splits the word
         return string.Join(" ", s.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                                  .Select(w => Words.TryGetValue(w, out var d) ? d : w));
     }

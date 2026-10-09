@@ -36,6 +36,11 @@ class SimPilot
     }
 
     public Telemetry Tel() => new(Alt, Alt - F.Elev, Ias, Hdg * Math.PI / 180, X, Z, wind.X, wind.Z, 1013.25 * Math.Pow(1 - 2.25577e-5 * Alt, 5.25588), Vs);   // Air pressure (hPa) of the standard atmosphere
+    /// R352 (test rule): runways named in a runway announcement ("in use", "expect …", "approved"), otherwise null.
+    internal static string[]? RwAnnounced(string text) => Regex.IsMatch(text, "in use|expect|approved") && RwRe.Matches(text.ToLower()) is { Count: > 0 } ms ? ms.Select(m => m.Groups[1].Value).ToArray() : null;
+    /// R352 (test rule): landing clearance for a runway other than the last announced one -> error text.
+    internal static string? RwCheck(string[]? ann, string text) =>
+        text.Contains("cleared to land") && RwRe.Match(text.ToLower()) is { Success: true } m && ann != null && !ann.Contains(m.Groups[1].Value) ? $"Landung Bahn {m.Groups[1].Value}, angesagt {string.Join("/", ann)}" : null;
     static int Num(string w) => int.Parse(string.Concat(w.Split(' ').Select(d => (char)('0' + Array.IndexOf(Tower.DigitWords, d)))));
     static string RwOf(string w) { var p = w.Split(' '); return $"{Num(p[0] + " " + p[1]):00}" + (p.Length > 2 ? char.ToUpper(p[2][0]).ToString() : ""); }
     /// Announced magnetic heading as true heading.
@@ -49,7 +54,7 @@ class SimPilot
     void Apply(string s, double now)
     {
         bool fixedTrack = Mode is "brk" or "dw" or "fin" || Mode == "loc" && Glide;   // Pattern/final: headings (PAR, steering) are advisory only
-        if (HdgOf(s) is { } h && !fixedTrack && !(Mode == "loc" && Tower.HdgDiff(h, F.End(Rw).Hdg) < 15)) { tHdg = h; Mode = "hdg"; }   // ≈ runway heading: stays on the centerline
+        if (HdgOf(s) is { } h && !fixedTrack && !(Mode == "loc" && Tower.HdgDiff(h, F.End(Rw).Hdg) < 15)) { tHdg = h; Mode = "hdg"; Glide = false; }   // ≈ runway heading: stays on the centerline
         if (!strict && IcptRe.Match(s) is { Success: true } ic) icpt = RwOf(ic.Groups[1].Value);
         var alt = Regex.Replace(s, @"[Tt]raffic[^.]*?(?=advise you|\.|$)\.?", "");   // Traffic advisories ("..., 100 feet", "climbing through 1500 feet") are not an altitude instruction, the avoidance altitude in the safety alert ("advise you … climb to …", R214) is
         var fm = FtRe.Match(alt);
@@ -58,7 +63,9 @@ class SimPilot
         else if (fm.Success) tAlt = int.Parse(fm.Groups[1].Value) * Ft;
         if (KtRe.Match(s) is { Success: true } k) tIas = int.Parse(k.Groups[1].Value) * Kt;
         if (s.Contains("final approach speed")) tIas = 140 * Kt;
-        if (!fixedTrack && (s.Contains("on course") || Regex.IsMatch(s, @"cleared (ILS|P A R|straight in) approach|proceed straight in")))
+        if (!fixedTrack && Mode == "hdg" && Regex.Match(s, $@"until established[^,]*, cleared (?:ILS|P A R) approach {RwRe}") is { Success: true } ce && Tower.HdgDiff(tHdg, F.End(RwOf(ce.Groups[1].Value)).Hdg) >= 10)
+        { icpt = RwOf(ce.Groups[1].Value); Glide = !s.Contains("circle to"); }   // R353: intercept heading with the clearance: fly it, capture, then the glide path
+        else if (!fixedTrack && (s.Contains("on course") || Regex.IsMatch(s, @"cleared (ILS|P A R|straight in) approach|proceed straight in")))
         {
             Mode = "loc"; Rw = Aligned(); Glide = (s.Contains("approach runway") || s.Contains("proceed straight in runway")) && !s.Contains("circle to");   // R212: circling: stay at altitude
         }
@@ -191,18 +198,18 @@ public partial class Tower
             Console.WriteLine($"{(ok ? "OK  " : "FAIL")} {f.Name} {rw} {(ifr ? "IFR" : "VFR")} {dir:000}°: {info}");
             if (runs.Count == 1 || Environment.GetEnvironmentVariable("ANFLUGLOG") is var al && (al == "1" && !ok || al == "all")) log.ForEach(l => Console.WriteLine("    " + l));
         }
-        Ifr = false;
+        ForceIfr = false;
         Console.WriteLine($"{runs.Count - bad}/{runs.Count} OK");
         return bad == 0 ? 0 : 1;
     }
 
-    static readonly string[] Bad = { "check runway", "check altitude", "low altitude alert", "expedite", "wrong side", "negative", "not following", "go around", "too low", "unable", "say again", "pattern is south", "no transmissions" };   // R271: PAR lost-comm ("… five seconds on final approach") only with talk-down
+    static readonly string[] Bad = { "check runway", "check altitude", "low altitude alert", "expedite", "wrong side", "negative", "not following", "go around", "too low", "unable", "say again", "pattern is south", "no transmissions", "verify heading" };   // R271: PAR lost-comm ("… five seconds on final approach") only with talk-down
 
     static (bool Ok, string Info, List<string> Log) SimRun(Airfield f, string rw, bool ifr, double dir, bool strict)
     {
         var e = f.End(rw);
         var wind = (X: -e.Dx * 5, Z: -e.Dz * 5);   // 10 kt headwind: DCS (and the AI) land on rw
-        Ifr = ifr;
+        ForceIfr = ifr;
         double x = f.X + 38 * NM * Math.Cos(dir * Math.PI / 180), z = f.Z + 38 * NM * Math.Sin(dir * Math.PI / 180);
         double ft = Math.Max(10000, Math.Ceiling(f.MvaLeg(x, z, f.X, f.Z) / 1000) * 1000);   // like a pilot: above the minimum altitude of the direct route
         var p = new SimPilot(f, x, z, ft * Ft, Bearing(x, z, f.X, f.Z), 300 * Kt, wind, strict);
@@ -212,6 +219,10 @@ public partial class Tower
         var errs = new List<string>();
         int calls = 0;
         double maxTurn = 0, clrVec = 1e9, clrTwr = 1e9, clrFin = 1e9, hoLat = double.NaN, hoFt = double.NaN, hoA = double.NaN, brkFt = double.NaN, clearedAt = double.NaN, sec = 0;
+        double lastApp = -1e9, pilotAt = -1e9;   // R351: last Approach call, last pilot call
+        int sinceIcpt = -1;   // R353: Approach calls since the intercept vector, -1 = none pending
+        string[]? annRw = null;   // R352: runways of the last runway announcement
+        var alts = new List<(double S, string A)>();   // R355: altitudes assigned by Approach
         void Hear(List<Msg> ms, bool first = false)
         {
             foreach (var m in ms.Where(m => m.Role != "Info"))
@@ -219,6 +230,24 @@ public partial class Tower
                 var (pa, pl) = p.AL(f.End(tw.Runway));
                 log.Add($"{sec,4}s {(p.Alt / Ft - f.Elev / Ft),5:0} ft a={pa / NM,5:0.0} l={pl / NM,5:0.0} h={p.Hdg,3:0} {p.Mode,-3} {m.Role}: {m.Text}");
                 if (Bad.FirstOrDefault(b => m.Text.Contains(b, StringComparison.OrdinalIgnoreCase)) is { } b) errs.Add($"\"{b}\" @{sec}s");
+                if (SimPilot.RwCheck(annRw, m.Text) is { } rwErr) errs.Add($"{rwErr} @{sec}s");
+                annRw = SimPilot.RwAnnounced(m.Text) ?? annRw;
+                if (m.Role == "Approach")
+                {
+                    // R351: next vector only after the previous one was flown: two calls within 10 s without a pilot call in between (except the handoff)
+                    if (!first && sec > lastApp && sec - lastApp <= 10 && lastApp > pilotAt && !m.Text.Contains("contact ")) errs.Add($"zwei Ansagen binnen {sec - lastApp:0} s @{sec}s");
+                    lastApp = sec;
+                    // R353: approach clearance with the intercept vector, at most one call in between
+                    if (Regex.IsMatch(m.Text, @"cleared (ILS|P A R) approach")) { if (sinceIcpt > 1) errs.Add($"Freigabe {sinceIcpt} Ansagen nach dem Eindrehvektor @{sec}s"); sinceIcpt = -1; }
+                    else if (m.Text.Contains("intercept")) sinceIcpt = 0;
+                    else if (sinceIcpt >= 0 && !Regex.IsMatch(m.Text, @"^[^,]+, (descend|climb) and maintain [^,]+\.$")) sinceIcpt++;   // profile descent alone (R305, long final) does not count
+                    // R355: no other altitude shortly before the handoff
+                    if (Regex.Match(m.Text, @"maintain (flight level [a-z ]+?|\d+ feet)\b") is { Success: true } am)
+                    {
+                        if (m.Text.Contains("contact") && m.Text.Contains("Tower") && alts.LastOrDefault(x => sec - x.S <= 10 && x.A != am.Groups[1].Value) is { A: { } oa }) errs.Add($"{oa} und {am.Groups[1].Value} vor der Übergabe @{sec}s");
+                        alts.Add((sec, am.Groups[1].Value));
+                    }
+                }
                 if (m.Role == "Approach" && tw.Phase == Phase.Inbound)
                 {
                     calls++;
@@ -241,6 +270,7 @@ public partial class Tower
             if (p.Call(sec) is { } call)
             {
                 log.Add($"{sec,4}s Pilot: {call}");
+                pilotAt = sec;
                 ms.AddRange(tw.OnTranscript(call, t, none, sec));
             }
             Hear(ms);

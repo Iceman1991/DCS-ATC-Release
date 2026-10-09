@@ -29,6 +29,9 @@ Installation
      MissionScripting.lua (siehe "Was das Setup an DCS ändert").
   2. Am Ende "Tasten festlegen": Taste fürs Funkrad und Push-to-Talk (Tastatur oder HOTAS).
   3. Fertig. DCS-ATC startet ab jetzt mit jeder Mission von selbst (kleines Fenster in der Taskleiste).
+  Module: Bei "Benutzerdefiniert" nimmst du Teile raus, die du nicht brauchst (Flugsicherung, Schießplatz,
+  AWACS, Tanker, Flugzeugträger, KI-Funk, Bodenpersonal), z. B. wenn ein echter Spieler AWACS macht.
+  Später änderbar im Einstellungsfenster.
   Sprache: Das Setup fragt am Anfang nach der Sprache (Deutsch oder Englisch). Später wechseln: Setup erneut
   starten und die andere Sprache wählen.
 

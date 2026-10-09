@@ -61,10 +61,28 @@ Setup installiert nach `%LOCALAPPDATA%\Programs\DCS-ATC` und legt diese Startmen
 | Liesmich | Öffnet die kurze Liesmich-Datei. |
 | DCS-ATC deinstallieren | Entfernt DCS-ATC, auch die Zeilen, die es in `MissionScripting.lua` und `Export.lua` eingefügt hat. |
 
+#### Module wählen
+
+Setup fragt, welche Teile von DCS-ATC du willst. **Vollständig** hakt alles an, bei **Benutzerdefiniert** nimmst du raus, was du nicht brauchst:
+
+| Modul | Umfang |
+|---|---|
+| Flugsicherung | Ground, Tower, Approach/Departure, ATIS, Luftraumüberwachung, Notfallmenü |
+| Schießplatz | Range-Controller |
+| AWACS | Lagebild, Bogey Dope, Luftkampf, Führung der KI-Jäger |
+| Tanker | Rejoin, Pre-Contact, Hilfe beim Tanken |
+| Flugzeugträger | Marshal, Tower und LSO |
+| KI-Funk | KI-Verkehr spricht mit den Lotsen, Sprüche der KI-Flüge (Fox, Splash, Bingo) |
+| Bodenpersonal | Crew Chief, Tank- und Munitionswagen, Feuerwehr |
+
+Ein abgewähltes Modul schweigt, DCS-ATC hört seine Frequenz nicht ab, und es fehlt im Funkrad und im F10-Menü. Das passt, wenn im Mehrspieler ein echter Spieler AWACS oder Tower macht, oder wenn du nur Tanker und AWACS willst. Installiert werden immer alle Dateien. Radio Check, Say again und das Debriefing bleiben immer da.
+
+Ändern kannst du die Module später im [Einstellungsfenster](#das-einstellungsfenster). Die App übernimmt das sofort, das F10-Menü ab der nächsten Mission. Ein Update behält deine Auswahl. Für eine stille Installation z. B. `DCS-ATC-Setup.exe /SILENT /COMPONENTS="atc,awacs"`.
+
 #### Was Setup an DCS ändert
 
 - `Saved Games\DCS\Scripts\Hooks\DcsAtcHook.lua` startet DCS-ATC mit jeder Mission und reicht Funkrad-Anfragen anderer Spieler an den Host weiter.
-- `Saved Games\DCS\Scripts\DcsAtc\` enthält das Missionsskript, die Standardoptionen (`DcsAtcOptions.lua`) und die Sprachdatei.
+- `Saved Games\DCS\Scripts\DcsAtc\` enthält das Missionsskript, die Standardoptionen (`DcsAtcOptions.lua`), die Sprachdatei und die Modulliste (`DcsAtcModules.txt`).
 - `Saved Games\DCS\Scripts\DcsAtcExport.lua` plus eine Zeile am Ende von `Export.lua` schickt die Daten deines eigenen Flugzeugs an DCS-ATC. Andere Export-Skripte wie SRS oder Tacview bleiben unberührt.
 - Eine Zeile in `<DCS-Ordner>\Scripts\MissionScripting.lua` (siehe Schritt 3).
 
@@ -109,7 +127,7 @@ DCS-ATC läuft auch auf einem PC mit DCS Dedicated Server (`DCS_server.exe`), an
 | HOTAS (falls belegt) | Rad-Knopf öffnet und schließt das Rad. Hat hoch/runter bewegt die Markierung, rechts wählt, links geht zurück. |
 | Push-to-Talk, Standard rechte `Strg` | Nur, wenn SRS nicht verbunden ist. Mit SRS sprichst du mit deiner normalen SRS-Sprechtaste. |
 
-Alle Funkrad-Einträge stehen unter [Funkrad](#funkrad). Das F10-Funkmenü **ATC** bietet die meisten davon im Spiel. In VR siehst du das Desktop-Rad nicht, deshalb erscheint es zusätzlich als Text im Spiel (siehe [Funkrad als Text im Spiel](#funkrad-als-text-im-spiel-vr)).
+Alle Funkrad-Einträge stehen unter [Funkrad](#funkrad). Das F10-Funkmenü **ATC** bietet dieselben Einträge im Spiel. In VR siehst du das Desktop-Rad nicht, deshalb erscheint es zusätzlich als Text im Spiel (siehe [Funkrad als Text im Spiel](#funkrad-als-text-im-spiel-vr)).
 
 ### Dein erster Flug: Kaltstart in Kutaisi
 
@@ -309,7 +327,7 @@ Diese Sprüche gehen bei jedem Platzlotsen:
 | Du sagst | Lotse |
 |---|---|
 | „… radio check“ / „how do you read“ | *„Enfield one one, Kutaisi Tower, read you five.“* |
-| „say again“, „come again“, „repeat“, „say last“, „didn't copy“, „missed“, „pardon“ | Wiederholt die letzte Anweisung: *„Enfield one one, I say again, …“*. Unter Radarführung, im Holding oder auf dem Weg zum Initial gibt er neuen Kurs, Höhe und Fahrt ab deiner aktuellen Position. Gibt es nichts zu wiederholen: *„…, go ahead.“* |
+| „say again“, „come again“, „repeat“, „say last“, „didn't copy“, „missed“, „pardon“ | Wiederholt die letzte Anweisung: *„Enfield one one, I say again, …“*. Unter Radarführung, im Holding oder auf dem Weg zum Initial gibt er neuen Kurs, Höhe und Fahrt ab deiner aktuellen Position. Gibt es nichts zu wiederholen: *„…, go ahead.“* Ein „say again“ ohne Stationsnamen geht an Range, AWACS oder Tanker, der zuletzt gesprochen hat (binnen 5 Minuten), sonst an den Platz. |
 | „confirm …“ / „verify …“ (etwa „confirm heading 045“, „verify runway 25“) | Prüft den Wert gegen die letzte Anweisung: *„affirm, heading zero four five“* oder *„negative, heading zero five five“*. Eine Frage zu einer Freigabe („confirm cleared to land“) wiederholt den ganzen Spruch. |
 | Nur Station und Rufzeichen („Kutaisi Tower, Enfield 1-1“) | *„Enfield one one, Kutaisi Tower.“* Dann sagst du dein Anliegen. Direkt nach einer Übergabe kommen gleich die Anweisungen. |
 | „request weather“, „QNH“, „wind“, „altimeter“, „runway in use“, „which runway“ | *„Enfield one one, Kutaisi Tower, wind two five zero degrees, eight knots, altimeter two niner niner two, runway two five in use.“* |
@@ -578,14 +596,16 @@ In jeder Mission mit DCS-ATC bekommt jede Spielergruppe **F10 Andere → ATC**. 
 | Untermenü | Einträge |
 |---|---|
 | Ground | Request startup · Request taxi · Runway vacated, taxi to parking · Progressive taxi · Hot brakes · IFR clearance → *Nächster in Abflugrichtung* / bis zu 8 eigene oder neutrale Plätze, nächster zuerst |
-| Tower | Ready for departure · Ready, closed pattern · Initial · Overhead · Base, gear down · Final, gear down, full stop · Base, touch and go · Going around · Request closed |
-| Approach | Airborne (nach Start) · Inbound for landing · Inbound, pattern work · Request straight in · C R P |
-| AWACS / Tanker | AWACS: picture · AWACS: bogey dope · AWACS: nearest tanker · Tanker: request rejoin · Tanker: pre-contact |
+| Tower | Ready for departure · Ready, closed pattern · Initial · Overhead · Base, gear down · Final, gear down, full stop · Base, touch and go · Going around · Closed / SFO → Request closed · Request SFO · High key · Low key, gear down · Ready, practice approach |
+| Approach | Airborne (nach Start) · Inbound for landing · Inbound, pattern work · Request ILS / straight in · Flight following · Abmelden (cancel approach) · Verkehr → Traffic in sight / Negative contact · C R P · Mehr → Fahrt melden / Say again / Request higher |
+| Range (nur wenn die Mission eine Range hat) | Check in · IP inbound · In hot · Off safe · Check out · Check out, hung ordnance |
+| AWACS / Tanker | AWACS → Check in · Picture · Bogey dope · Sort · Nächster Tanker · Vektor nächster Platz · Check out · Gefecht → Committing / Fox three / Splash / Defending / Request support / Unable / Winchester / Bingo, RTB / Say again. Tanker → Request rejoin · Visual · Observation · Pre-contact · Refuel complete |
+| Carrier (nur wenn die Mission einen Träger hat) | Marshal check in · See you at · Initial · Commencing · Platform · Ball · Clara · Pigeons |
 | Notfall | MAYDAY → Art · PAN PAN → Art · Spritmangel · Hung ordnance · Flameout, high key · Notfall beenden (Arten: Triebwerksausfall, Treibstoff (nur MAYDAY), Hydraulik, Gefechtsschaden, Medizinisch, Vogelschlag) |
 | Allgemein | Radio check · Say again · QNH / weather · ATIS hören · Request zone transit · Debriefing |
 | Einstellungen | Bodenpersonal an/aus · Anzeigen |
 
-F10-Sprüche werden wie Rad-Sprüche behandelt, mit Pilotenstimme und Platzwahl. Das F10-Menü hat weniger Einträge als das Rad: keine Range, kein Carrier, kein AWACS-Check-in/-out oder Sort und kein Flight Following. Dafür Rad oder Stimme nehmen.
+F10-Sprüche werden wie Rad-Sprüche behandelt, mit Pilotenstimme und Platzwahl. Das F10-Menü hat dieselben Gruppen, Namen und Texte wie das Rad, höchstens 9 Einträge je Ebene; nur *Platz wählen* fehlt (dafür das Rad nehmen oder den Platznamen sagen). Das Rad blendet Einträge aus, die zu deinem Flugzustand nicht passen, F10 zeigt immer alle; ein unpassender Ruf wird wie gewohnt beantwortet (z. B. *unable*).
 
 Läuft DCS-ATC nicht, kommt *„DCS-ATC läuft nicht – Startmenü -> DCS-ATC starten, dann erneut senden.“*
 
@@ -1187,6 +1207,7 @@ Im IFR- oder Geradeaus-Anflug wird ein Durchstarten in zwei Schritten zum Fehlan
 - **Spieler in der Platzrunde** hören: „traffic, Viper crossing overhead eastbound, 3500 feet.“
 - **Voller Platz:** „remain outside the control zone, expect transit in 4 minutes.“
 - **Keine Meldung:** 1 NM hinter dem Zonenrand: „I show you clear of the zone, frequency change approved.“
+- **Im Anflug oder in der Platzrunde:** „unable zone transit, say intentions.“ Der Rad-Eintrag erscheint nur im Flug außerhalb des Landeablaufs.
 
 #### Flight Following
 
@@ -1969,13 +1990,13 @@ Einen Range-Lotsen gibt es nur, wenn die Mission eine Triggerzone hat, deren Nam
 
 | Du sagst (erkannte Wörter) | Range antwortet |
 |---|---|
-| **checking in** (*check in*, *inbound*, *request entry*, *entering*, *with you*, *request range*) | *„Enfield one one, Range Alpha, altimeter two niner niner two, wind on target two seven zero at one zero, range is cold. Range bears one eight zero, 12 miles. Enter from the north, run-in headings one six zero to two zero zero, minimum altitude 1500 feet. Report IP.“* Ist ein anderes Flugzeug hot: *„…, one aircraft in.“* statt *„range is cold“*. |
+| **checking in** (*check in*, *inbound*, *request entry*, *entering*, *with you*, *request range*) | *„Enfield one one, Range Alpha, altimeter two niner niner two, wind on target two seven zero at one zero, range is cold. Range bears one eight zero, 12 miles. Enter from the north, run-in headings one six zero to two zero zero, minimum altitude 1500 feet AGL. Report IP.“* Ist ein anderes Flugzeug hot: *„…, one aircraft in.“* statt *„range is cold“*. |
 | **IP inbound** (nach dem Check-in) | *„Enfield one one, continue.“* Vor dem Check-in: *„negative, you are not checked in. Report check in.“* |
 | **in hot** (*rolling in*, *inbound hot*, *in from the north*, *in heading 360*, *in now*, *ready in* oder ein Spruch, der auf „in“ endet) | *„cleared hot.“* (Bedingungen unten) |
 | **in dry** | *„cleared dry.“* Gleiche Bedingungen wie für „cleared hot“ (unten). Ein trockener Anflug belegt die Range bis *off* (oder bis sie wie bei einem heißen Anflug von selbst frei wird), wird aber nicht gewertet. |
-| **off** (*off safe*, *off west* …) | *„Enfield one one, pass 2, 3 impacts, best 12 meters at 6 o'clock, 2 gun hits. Report in hot or checking out.“* Warst du nicht hot (oder trocken): *„roger, range is cold.“* Mit *hung ordnance* oder *hot gun* in diesem oder einem früheren Spruch: *„pass 2, copy hung ordnance, check switches safe, no further hot passes, report checking out.“* |
+| **off** (*off safe*, *off west* …) | *„Enfield one one, pass 2, 3 impacts, best 40 feet at 6 o'clock, 2 gun hits. Report in hot or checking out.“* Warst du nicht hot (oder trocken): *„roger, range is cold.“* Mit *hung ordnance* oder *hot gun* in diesem oder einem früheren Spruch: *„pass 2, copy hung ordnance, check switches safe, no further hot passes, report checking out.“* |
 | **winchester** | *„pass 2, …, check switches safe, report checking out.“* |
-| **checking out** (*check out*, *leaving*, *departing*, *good day*) | *„check switches safe. 2 passes, best impact 12 meters at 6 o'clock. Cleared off the range to the north, contact Overlord 251.5, good day.“* Mit *hung ordnance* oder *hot gun* im Spruch (oder früher in diesem Besuch gemeldet): *„copy hung ordnance, check switches safe. … Cleared off the range to the north via the hung ordnance route, advise Approach, good day.“* |
+| **checking out** (*check out*, *leaving*, *departing*, *good day*) | *„check switches safe. 2 passes, best impact 40 feet at 6 o'clock. Cleared off the range to the north, contact Overlord 251.5, good day.“* Mit *hung ordnance* oder *hot gun* im Spruch (oder früher in diesem Besuch gemeldet): *„copy hung ordnance, check switches safe. … Cleared off the range to the north via the hung ordnance route, advise Approach, good day.“* |
 | alles andere | *„say again. Report check in, in hot, off, or checking out.“* |
 
 Zur Check-in-Antwort:
@@ -1997,8 +2018,8 @@ Zur Check-in-Antwort:
 #### Wertung und Durchsetzung
 
 - **Treffermeldung:** etwa 3 s nach dem letzten Einschlag einer Auslösung kommt ein Spruch:
-  - *„Enfield one one, 12 meters at 6 o'clock.“*
-  - *„rockets, best 30 meters at 7 o'clock.“*
+  - *„Enfield one one, 40 feet at 6 o'clock.“*
+  - *„rockets, best 100 feet at 7 o'clock.“*
   - *„direct hit.“*
   - *„no score.“* (kein Ziel innerhalb 500 m)
 - **Zerstört:** ein zerstörtes Ziel bekommt einmal je Anflug *„good hits, target destroyed.“*
@@ -2015,16 +2036,16 @@ Zur Check-in-Antwort:
 Du:     Range Alpha, Enfield 1-1, checking in from the north, angels 10.
 Range:  Enfield one one, Range Alpha, altimeter two niner niner two, wind on target two seven zero
         at one zero, range is cold. Range bears one eight zero, 9 miles. Enter from the north,
-        run-in headings one six zero to two zero zero, minimum altitude 1500 feet. Report IP.
+        run-in headings one six zero to two zero zero, minimum altitude 1500 feet AGL. Report IP.
 Du:     Range Alpha, Enfield 1-1, IP inbound.
 Range:  Enfield one one, continue.
 Du:     Range Alpha, Enfield 1-1, in hot.
 Range:  Enfield one one, cleared hot.
-Range:  Enfield one one, 12 meters at 6 o'clock.
+Range:  Enfield one one, 40 feet at 6 o'clock.
 Du:     Enfield 1-1, off safe.
-Range:  Enfield one one, pass 1, impact 12 meters at 6 o'clock. Report in hot or checking out.
+Range:  Enfield one one, pass 1, impact 40 feet at 6 o'clock. Report in hot or checking out.
 Du:     Range Alpha, Enfield 1-1, checking out.
-Range:  Enfield one one, Range Alpha, check switches safe. 1 pass, best impact 12 meters at 6 o'clock.
+Range:  Enfield one one, Range Alpha, check switches safe. 1 pass, best impact 40 feet at 6 o'clock.
         Cleared off the range to the north, contact Overlord 251.5, good day.
 ```
 
@@ -2152,7 +2173,7 @@ Spieler müssen DCS-ATC gar nicht installieren. Läuft es beim Host (oder auf de
 
 - **Sprechen über SRS.** Mit dem SRS-Server des Hosts verbinden, Lotsenfrequenz rasten und auf Englisch sprechen. Beispiel:
   > "Kutaisi Ground, Enfield 1-2, request startup"
-- **F10-Menü.** `F10 -> ATC` hat die meisten Anfragen des Funkrads (Ground, Tower, Approach, Allgemein, Notfall …). Jeder Spieler bekommt sein eigenes `ATC`-Menü. Teilen sich mehrere Spieler eine Gruppe, hat das `ATC`-Menü je Spieler ein Untermenü mit seinem Rufzeichen.
+- **F10-Menü.** `F10 -> ATC` hat dieselben Anfragen wie das Funkrad (Ground, Tower, Approach, AWACS / Tanker, Allgemein, Notfall …). Jeder Spieler bekommt sein eigenes `ATC`-Menü. Teilen sich mehrere Spieler eine Gruppe, hat das `ATC`-Menü je Spieler ein Untermenü mit seinem Rufzeichen.
 - **Lotsentext** erscheint im Spiel für deine Gruppe, die Stimme kommt über SRS.
 
 Funkrad und ENTER-Vorschlag bekommen sie nicht. Ihre F10-Anfragen spricht trotzdem die Pilotenstimme, wie bei allen anderen.
@@ -2343,6 +2364,7 @@ Die erzeugten Zeilen in `frequencies.jsonc` enthalten die Platznamen schon. Sons
 | **Mikrofon (nur ohne SRS)** `*` | Windows-Standard oder ein bestimmtes Gerät | `MicName` |
 | **SRS-Ordner** `*` | Der Pfad, mit „…“ zum Durchsuchen. Geprüft wird auf `ExternalAudio\DCS-SR-ExternalAudio.exe`. | `SrsPath` |
 | **Tasten festlegen …** | Öffnet die Tastenabfrage (Funkrad, HOTAS, Sprechtaste). | `WheelKey`, `PttKey`, … |
+| **Module** | Ein Kästchen pro Modul, wie im [Setup](#module-wählen). Das F10-Menü ändert sich ab der nächsten Mission. | (`modules.txt`, `DcsAtcModules.txt`) |
 
 **Alle Optionen (config.jsonc) …** öffnet die Datei im Editor.
 

@@ -107,7 +107,7 @@ static partial class Program
         return bad == 0 ? 0 : 1;
     }
 
-    static readonly string[] MpBad = { "check runway", "check altitude", "low altitude alert", "expedite", "wrong side", "negative", "not following", "go around", "too low", "unable", "say again", "traffic alert", "no transmissions" };   // R271: PAR lost-comm only with talk-down
+    static readonly string[] MpBad = { "check runway", "check altitude", "low altitude alert", "expedite", "wrong side", "negative", "not following", "go around", "too low", "unable", "say again", "traffic alert", "no transmissions", "verify heading" };   // R271: PAR lost-comm only with talk-down
 
     static (bool Ok, string Info, List<string> Log) MpRun(Airfield f, bool ifr, int np, int na, int nd)
     {
@@ -160,6 +160,8 @@ static partial class Program
         }
         var landedAt = new Dictionary<string, double>();
         var conflict = new HashSet<string>();
+        var vacTold = new HashSet<string>();   // R354: pilots who got the vacate instruction
+        var annRw = new Dictionary<string, string[]>();   // R352: runways of the last runway announcement per pilot
         int goArounds = 0;
         void Route(double now)
         {
@@ -179,6 +181,10 @@ static partial class Program
                         .Select(o => $"{o.N} {Dist(o.X, o.Z, s.S.X, s.S.Z) / NM:0.0} NM {(o.Alt - s.S.Alt) / SimFt:+0;-0} ft")));
                 if (MpBad.FirstOrDefault(b => tx.Text.Contains(b, StringComparison.OrdinalIgnoreCase)) is { } bw) errs.Add($"{s.P.Callsign} \"{bw}\" @{now - t0:0}s");
                 if (tx.Text.Contains("leave the hold") && tx.Text.Contains("climb and maintain")) errs.Add($"{s.P.Callsign} \"leave the hold … climb\" @{now - t0:0}s");   // R272: holding altitude above the terrain of the approach path
+                if (tx.Text.Contains("vacate")) vacTold.Add(s.P.Callsign);
+                if (tx.Text.Contains("not cleared to taxi") && !vacTold.Contains(s.P.Callsign)) errs.Add($"{s.P.Callsign} \"not cleared to taxi\" vor \"vacate\" @{now - t0:0}s");   // R354
+                if (SimPilot.RwCheck(annRw.GetValueOrDefault(s.P.Callsign), tx.Text) is { } rwErr) errs.Add($"{s.P.Callsign} {rwErr} @{now - t0:0}s");   // R352
+                if (SimPilot.RwAnnounced(tx.Text) is { } ann) annRw[s.P.Callsign] = ann;
                 if (tx.Text.Contains("go around")) goArounds++;
                 s.S.Hear(tx.Text, now);
             }

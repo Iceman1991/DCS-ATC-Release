@@ -103,7 +103,7 @@ sealed class Wheel : Form
         get
         {
             var (aw, tk) = Up();
-            var t = Vis(All.Where(i => i.Label switch { "Range" => Ops.Range != null, "Carrier" => Carrier.Boats.Count > 0, "AWACS" => aw, "Tanker" => tk, _ => true }).ToArray(), Fits());
+            var t = Vis(Mod(All.Where(i => i.Label switch { "Range" => Ops.Range != null, "Carrier" => Carrier.Boats.Count > 0, "AWACS" => aw, "Tanker" => tk, _ => true })), Fits());
             if (top == null || !t.SequenceEqual(top)) top = t;
             return top;
         }
@@ -112,6 +112,9 @@ sealed class Wheel : Form
     /// R307: does this radio call fit right now (Program.WheelFits: phase, open question, traffic advisory, Range/Tanker/Carrier)? Fellow players/preview: no state, everything.
     public static Func<Func<string, bool>> Fits = () => _ => true;
     /// R307: visible with text if it fits; submenu if one in it fits; with neither (Platz wählen) always. At most 9 (keys 1–9); if nothing fits, everything.
+    /// Module selection (setup/settings): entries of deselected modules removed before Vis, so its fallback never shows them. Platz wählen with ATC.
+    internal static Item[] Mod(IEnumerable<Item> xs) => xs.Where(ModOk).ToArray();
+    static bool ModOk(Item i) => i.Text != null ? Program.TextOn(i.Text) : i.Sub is { Length: > 0 } ? i.Sub.Any(ModOk) : Program.On("atc");
     internal static Item[] Vis(Item[] xs, Func<string, bool> f)
     {
         bool Ok(Item i) => i.Text != null ? f(i.Text) : i.Sub is not { Length: > 0 } || i.Sub.Any(Ok);
@@ -347,7 +350,7 @@ sealed class Wheel : Form
         var it = items[i];
         if (it.Sub != null)
         {
-            items = it.Sub.Length > 0 ? Vis(it.Sub, Fits()) : it.Text == null ? Near().Select(f => new Item(f, "switch " + f)).ToArray() : Dests(it.Text); title = it.Label;
+            items = it.Sub.Length > 0 ? Vis(Mod(it.Sub), Fits()) : it.Text == null ? Near().Select(f => new Item(f, "switch " + f)).ToArray() : Dests(it.Text); title = it.Label;
             mark = Math.Max(0, Array.FindIndex(items, x => sug != null && x.Text?.EndsWith(sug.Value.Text) == true));
             Render();
             return;
@@ -368,7 +371,7 @@ sealed class Wheel : Form
     {
         if (items == top) { Close2(); return; }
         var up = All.FirstOrDefault(p => p.Sub?.Any(s => s.Sub != null && s.Label == title) == true);   // Platz wählen -> Allgemein, otherwise top level
-        var ps = up != null ? Vis(up.Sub!, Fits()) : null;   // R307: as when entering
+        var ps = up != null ? Vis(Mod(up.Sub!), Fits()) : null;   // R307: as when entering
         (items, title, mark) = ps != null ? (ps, up!.Label, Math.Max(0, Array.FindIndex(ps, s => s.Label == title))) : (Top, Field, 0);
         Render();
     }

@@ -210,6 +210,7 @@ public partial class Tower
                 // to final (descent at own discretion), landing clearance from Tower at about 5 NM (tick). PAN: others do not hold
                 if (t == null || Dist(t.X, t.Z, CX, CZ) < 5 * NM || F.Ends.Any(e => OnFinal(t.X, t.Z, t.Hdg, t.Agl, e.Name, 6 * NM)))
                 {
+                    if (TrafficOnRunway(traffic)) return EmgBusy($"{c}, {F.StationOf("Tower")}, {kind}, runway {RwSay(er)}, {Wind(t)}, {Qnh(t)}", traffic);   // R357
                     Phase = Phase.ClearedLand;
                     return Say($"{c}, {F.StationOf("Tower")}, {kind}, runway {RwSay(er)}, {Wind(t)}, {Qnh(t)}, cleared to land, emergency services standing by.", "Tower");
                 }
@@ -323,6 +324,7 @@ public partial class Tower
 
             case "taxi":
             {
+                if (VfrBlocked) return Neg(VfrUnable(hdr));
                 bool first = Phase == Phase.Parked;   // First call: check ATIS identifier, "request startup and taxi" answers both; A33: QNH only here and only without reported ATIS, not again after "start up approved"
                 Phase = Phase.TaxiOut;
                 home = NearestRamp(t);
@@ -331,7 +333,8 @@ public partial class Tower
                 var hp = t != null && progressive ? ParkDir(t, HoldPt(rw, t)) : null;   // N26: "request progressive taxi" right in the taxi request
                 (crossOk, crossWait) = (null, null);
                 var hx = t != null && CrossNext(t) is { } x0 ? $", hold short runway {RwSay(x0)}" : "";   // Forum 0.9.7 (FAA JO 7110.65 3-7-2): parallel runway on the way, crossing only on report at the holding point
-                return Say($"{hdr}, {rwAck}{(first && StartReq(n) ? "start up approved, " : "")}taxi to holding point runway {RwSay(rw)}{Route(rw)}{hx}{(hp != null ? ", " + hp : "")}" +
+                var go = IsHeli ? $"air taxi{Route(rw)} to holding point runway {RwSay(rw)}" : $"taxi to holding point runway {RwSay(rw)}{Route(rw)}";   // R347: helicopter air taxi (FAA JO 7110.65 3-11-1)
+                return Say($"{hdr}, {rwAck}{(first && StartReq(n) ? "start up approved, " : "")}{go}{hx}{(hp != null ? ", " + hp : "")}" +
                            $"{(first && !AtisHeard(n) ? $", {Wind(t)}, {Qnh(t)}.{AtisNote(n)}" : ".")}{(depClr ? "" : $" Squawk {Digits(TakeSquawk())}.")}" +
                            (SameFreq("Tower") ? $" Hold short runway {RwSay(rw)}, report ready for departure." : $" Hold short runway {RwSay(rw)}, contact {Contact("Tower")} when ready for departure."));   // R104: no change to the same frequency
             }
@@ -354,6 +357,7 @@ public partial class Tower
                                $"{Route(rw)}, report ready for departure.");
                 if (Ifr && stayPattern && Has(n, "closed pattern", "pattern work", "circuits") && !Has(n, "approach"))   // R253: no visual pattern in IMC (FAA JO 7110.65 3-10-11), practice approach yes
                 { option = null; stayPattern = false; return Neg($"{c}, closed traffic not approved, I F R conditions."); }
+                if (VfrBlocked) return Neg(VfrUnable(c));
                 return Say(DepartureClearance(t, traffic, now));
             }
 
@@ -467,6 +471,9 @@ public partial class Tower
                            $"runway {RwSay(rw)} in use, report clear of the zone.");
             }
 
+            case "transitno":   // R389: wheel/F10 "request zone transit" while inbound or in the pattern
+                return Say($"{hdr}, unable zone transit, say intentions.");
+
             case "transitoff":   // N3: "clear of the zone"
                 transitFt = null;
                 Released |= Phase == Phase.Away;   // R47: pin released
@@ -553,7 +560,7 @@ public partial class Tower
                     {
                         needWx |= WxDue(n);
                         Phase = Phase.Entering; lastAltFt = PatternFt;   // R256
-                        return Neg($"{c}, negative, you are {Miles(Dist(t.X, t.Z, ip.X, ip.Z))} miles from initial. " +
+                        return Neg($"{c}, negative, you are {MilesTxt(Dist(t.X, t.Z, ip.X, ip.Z))} from initial. " +
                                    $"{Cap(Steer(t, ip, "initial"))}, {Alt(PatternFt)}, report initial runway {RwSay(rw)}.");
                     }
                 }
@@ -621,7 +628,7 @@ public partial class Tower
                 {
                     entry = at;
                     Phase = Phase.Inbound;
-                    return Neg($"{c}, negative, you are {Miles(Dist(t.X, t.Z, Crp[at].X, Crp[at].Z))} miles from C R P {at}. " +
+                    return Neg($"{c}, negative, you are {MilesTxt(Dist(t.X, t.Z, Crp[at].X, Crp[at].Z))} from C R P {at}. " +
                                $"{Cap(Steer(t, Crp[at], $"C R P {at}"))}, report C R P {at}.");
                 }
                 entry = at;
@@ -683,7 +690,7 @@ public partial class Tower
                         return Say(info + $"{(HoldAt(fix) is { } hr ? $"Hold {hr}" : "Hold at present position")}, orbit left hand, {AltTo(t, holdFt)}{HoldSpd(t)}, {hold}");
                     }
                     holdFt = RouteFt(t, traffic, fix, holdFt);
-                    return Say(info + $"{Cap(Steer(t, fix, "the hold"))}, {AltTo(t, holdFt)}{HoldSpd(t)}, {(HoldAt(fix) is { } hr2 ? $"hold {hr2}, {Miles(hd)} miles to go" : $"{Miles(hd)} miles to the holding point")}, " +
+                    return Say(info + $"{Cap(Steer(t, fix, "the hold"))}, {AltTo(t, holdFt)}{HoldSpd(t)}, {(HoldAt(fix) is { } hr2 ? $"hold {hr2}, {MilesTxt(hd)} to go" : $"{MilesTxt(hd)} to the holding point")}, " +
                                $"I will call you there. {Cap(hold)}");
                 }
                 if (!F.Charted)
@@ -770,7 +777,7 @@ public partial class Tower
                 // R41: the named airfield ("request direct Batumi"), otherwise the route clearance destination, otherwise his own
                 var to = All.FirstOrDefault(f => f.Name != F.Name && f.Name.ToLowerInvariant().Split('-', ' ').Any(w => w.Length >= 4 && n.Contains(w))) ?? dest ?? F;
                 if (nav != null) { nav = depClr ? (to.X, to.Z) : null; navName = to.Name.Replace('-', ' '); }   // R41: departure vector now leads there (VFR: CRP departure dropped)
-                return Say($"{c}, cleared direct {to.Name.Replace('-', ' ')}, {TurnTo(t, Bearing(t.X, t.Z, to.X, to.Z))}, {Miles(Dist(t.X, t.Z, to.X, to.Z))} miles.");
+                return Say($"{c}, cleared direct {to.Name.Replace('-', ' ')}, {TurnTo(t, Bearing(t.X, t.Z, to.X, to.Z))}, {MilesTxt(Dist(t.X, t.Z, to.X, to.Z))}.");
             }
 
             case "callup":   // A27: only station + callsign (+ altitude, "information X"): expected after handover -> instructions right away, otherwise report (last stays)
@@ -857,6 +864,7 @@ public partial class Tower
             if (Has(n, "flight following", "radar service", "radar advisor", "traffic advisor")) return Has(n, "cancel", "terminat") && !Has(n, "cancel ifr", "cancelling ifr") ? "ffoff" : "ff";
             if (transitFt != null && Has(n, "clear of the", "outside the", @"leaving the (?:control )?zone") && !Has(n, "report")) return "transitoff";   // before transit ("transit complete, clear of the zone"), readback "report clear of the zone" not
             if (Phase is Phase.Away or Phase.Departing && Has(n, "transit", "crossing", "cross the", "overfl", "pass through") && !Has(n, "inbound", "landing")) return "transit";   // N3 ("transition" too; "crossing the coast, inbound for landing" is a first call)
+            if (Phase is Phase.Inbound or Phase.Entering or Phase.Initial or Phase.Pattern or Phase.ClearedLand && Has(n, "zone transit", "request transit") && !Has(n, "inbound", "landing")) return "transitno";   // R389: in the landing flow no transit, not a new check-in
             if (Has(n, "visual approach") && !Ifr && !Has(n, "cancel ifr", "cancelling ifr", "vfr")) return "straightin";   // P3-AP7: straight-in approach without procedure; IFR weather: "visual" rejects
             if (Has(n, "cancel ifr", "cancelling ifr", "vfr", "visual approach", "visual recovery")) return "visual";
             if (Has(n, FieldSight) && !Has(n, "report", "request", "inbound", "landing", "final", "initial", "overhead")) return "fieldinsight";   // R115: reply to "report field in sight" (airfield/runway in sight); after cancel/flight following/visual ("field in sight, cancel IFR" stays a sign-off)
@@ -976,7 +984,7 @@ public partial class Tower
     {
         var head = $"{Cs()}, {F.StationOf("Approach")}, {F.Name.Replace('-', ' ')} is closed, ";
         var s = to == null ? head + "resume own navigation."
-            : head + $"divert {to.Name.Replace('-', ' ')}, {Steer(t, (to.X, to.Z), to.Name.Replace('-', ' '))}, {Miles(Dist(t.X, t.Z, to.X, to.Z))} miles, " +
+            : head + $"divert {to.Name.Replace('-', ' ')}, {Steer(t, (to.X, to.Z), to.Name.Replace('-', ' '))}, {MilesTxt(Dist(t.X, t.Z, to.X, to.Z))}, " +
               $"{AltTo(t, Math.Ceiling(Math.Max(F.MvaLeg(t.X, t.Z, to.X, to.Z), to.PatternFt + 1000) / 100) * 100)}, contact {to.StationOf("Approach")} {FreqSay(FreqOf(to, "Approach"))}.";
         CancelApproach(t);
         Released = true;
@@ -1026,9 +1034,14 @@ public partial class Tower
         _ => t != null && !OnGround(t) ? ("Approach", Following ? "cancel flight following" : "inbound for landing") : ("Ground", "request startup"),   // end FF: no longer in the wheel (R17)
     };
 
-    /// At the runway holding point of the active runway (700 m around the threshold) or already on a runway: "ready for departure" fits.
+    /// At the runway holding point of the active runway (R349: 250 m around the holding point or the threshold) or already on a runway: "ready for departure" fits.
     /// Forum 0.9.7: not while a parallel runway still lies in between (holding point 03L with assigned 03R, close together like Nellis).
-    bool AtHold(Telemetry? t) => t == null || CrossNext(t) == null && (OnRunwayPos(t.X, t.Z) || Dist(t.X, t.Z, Thr(Runway).X, Thr(Runway).Z) <= 700);
+    bool AtHold(Telemetry? t) => t == null || CrossNext(t) == null && (OnRunwayPos(t.X, t.Z) || Dist(t.X, t.Z, Thr(Runway).X, Thr(Runway).Z) <= 250 ||
+                                                                       HoldPt(Runway, t) is var h && Dist(t.X, t.Z, h.X, h.Z) <= 250);
+
+    /// R339: instrument conditions without IFR clearance: no VFR taxi/departure (14 CFR 91.155, SERA.5005(b)); practice approaches fly the radar pattern (R253)
+    bool VfrBlocked => Ifr && !depClr && !stayPattern;
+    static string VfrUnable(string hdr) => $"{hdr}, field is I F R, unable VFR departure, advise ready to copy IFR clearance.";
 
     /// Forum 0.9.7: parallel runway between aircraft and assigned runway, not yet fully crossed (the nearest first), name in takeoff direction ("03L" before 03R), otherwise null.
     /// DCS-ATC does not know taxiways: only if the holding point is next to it (otherwise it goes around its end).

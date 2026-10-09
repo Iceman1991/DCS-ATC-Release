@@ -14,7 +14,8 @@ static class Flights
 
     /// AI aircraft from the T line. Ammo: Fox 3, Fox 1, Fox 2, gun, air-to-ground. Freq: flight frequency from the editor (0 = none).
     public record Unit(string Name, string Group, string Type, string Callsign, int Side, double X, double Z, double Alt, bool InAir,
-                       double Fuel, double Freq, int[] Ammo, string Flag = "", int Gid = 0, double Hdg = double.NaN, double FuelKg = 0);   // Hdg: heading (rad), NaN = unknown; FuelKg: internal tank (0 = unknown)
+                       double Fuel, double Freq, int[] Ammo, string Flag = "", int Gid = 0, double Hdg = double.NaN, double FuelKg = 0,
+                       string Task = "", bool Heli = false);   // Hdg: heading (rad), NaN = unknown; FuelKg: internal tank (0 = unknown); Task: editor task (R376); Heli: helicopter
     /// Radio call. Who: speaking unit (voice), "" = AWACS. Freq2: second frequency (Guard VHF).
     public record Call(string Kind, string Who, string Station, string Text, double Freq, int Prio, double MaxAge, bool Stress = false, double Freq2 = 0, int Side = 0);   // Side: SRS coalition (A133)
     /// Players (side, location, DCS group, unit, callsign); AWACS per side and location (name, frequency; null = none); tactical frequency without AWACS.
@@ -33,9 +34,10 @@ static class Flights
     static readonly Dictionary<string, double> told = new();               // key -> time: block repeats
     static readonly Dictionary<string, (int N, double At)> kills = new();  // unit -> kills in quick succession (splash two)
     static readonly Dictionary<string, double> shotAt = new();             // group/unit -> last shot (engaged, winchester, shack)
-    static readonly Dictionary<double, List<double>> sent = new();         // frequency -> transmit times of the last minute (budget)
+    static readonly Dictionary<(double, int), List<double>> sent = new();  // frequency, coalition -> transmit times of the last minute (budget)
+    static readonly Dictionary<string, bool> ordered = new();              // R384: "side:flight" -> last AWACS tasking sent (true) or dropped (false)
     static readonly Dictionary<string, (Unit U, double At)> downAt = new(); // shot down, ejection still pending
-    static readonly List<(Unit U, double At, int Step, string Bulls)> down = new();   // Ejections: beacon, pilot on the ground
+    static readonly List<(Unit U, double At, int Step, string Bulls, bool Water)> down = new();   // Ejections: beacon, pilot on the ground (R361: or in the water)
     static readonly Dictionary<string, (double Alt, double At)> level = new();   // group -> altitude and since when held (on station)
     static readonly Dictionary<string, (double X, double Z)> station = new();      // group -> where "on station" was reported (RTB)
     static readonly Dictionary<string, double> rtbSince = new();                    // group -> since when it has been heading home
@@ -43,6 +45,7 @@ static class Flights
     static readonly Dictionary<string, (string Unit, string Grp, double At)> fight = new();   // own group -> last air-to-air shot (target, target group, time): out, status
     static readonly Dictionary<string, double> opsAt = new();                       // group -> last ops check (LK15)
     static readonly HashSet<string> spiked = new();                                  // own units with reported spike (LK14: naked)
+    static readonly HashSet<string> dead = new();                                    // R381: air kills still in the T lines (falling), not counted as contacts
     static readonly Dictionary<(string S, string T), double> flying = new();        // shooter/target -> expected end of time of flight (timeout); infinity = timeout called
     /// LK3: group name at the side's AWACS (side, Traffic.Id of the enemy unit) -> "north group"/"single group"/null; the selftest replaces it
     public static Func<int, int, string?> LabelOf = Ops.GroupLabel;
@@ -85,6 +88,8 @@ static class Flights
     // ------------------------------------------------------------ Who talks, on which frequency
     static bool Armed(Unit u) => u.Ammo.Sum() > 0;
     static int Aam(Unit u) => u.Ammo.Length >= 3 ? u.Ammo[0] + u.Ammo[1] + u.Ammo[2] : 0;
+    /// R376: only counter-air flights check in, commit and defend themselves (SEAD/CAS/strike keep their task); unknown task = as before.
+    static bool CounterAir(Unit u) => u.Task is "" or "Nothing" or "CAP" or "Fighter Sweep" or "Escort" or "Intercept";
     /// AI flight allowed to transmit: no airfield traffic, no AI wingman of a player (except option), player of the same side nearby.
     static bool Ours(Unit u, World w, double radiusNm = 0) => Mode != "aus" && !Regex.IsMatch(u.Flag, "^(dep|arr)") &&
         (OwnWingmen || !w.Players.Any(p => p.Gid > 0 && p.Gid == u.Gid)) &&
@@ -124,10 +129,10 @@ static class Flights
     static string Tail((string Key, Unit Lead, int N, bool Known) g) =>
         $"{(g.Known ? "hostile" : "bogey")}, {(g.N == 1 ? "single" : g.N == 2 ? "two contacts" : $"heavy, {g.N} contacts")}{(g.Known ? Opt(Nato(g.Lead.Type)) : "")}";
     /// like Ops: "clean" only without contacts in the side's radar picture (A113), same radius Ops.RadarNm (R53); side missing = everything visible
-    static bool Clean(Unit u, World w, Unit? except = null)
+    static bool Clean(Unit u, World w)
     {
         var det = Ops.Detected.GetValueOrDefault(u.Side);
-        return !Hostiles(u, w).Any(h => Dist(h.X, h.Z, u.X, u.Z) < Ops.RadarNm * NM && (except == null || (h.X, h.Z) != (except.X, except.Z)) && (det == null || h.Id == 0 || det.ContainsKey(h.Id)));
+        return !Hostiles(u, w).Any(h => Dist(h.X, h.Z, u.X, u.Z) < Ops.RadarNm * NM && !dead.Any(d => d.GetHashCode() == h.Id) && (det == null || h.Id == 0 || det.ContainsKey(h.Id)));
     }
 
     static bool Once(string key, double now, double sec)
@@ -177,7 +182,7 @@ static class Flights
                              : cat == "missile" && guid == "radar_passive" ? "magnum"
                              : cat == "missile" && mcat == "anti_ship" ? "bruiser"
                              : cat == "missile" ? "rifle"
-                             : cat == "bomb" ? "bombs away" : null;
+                             : cat == "bomb" ? "pickle" : null;   // R385: PICKLE (ATP 1-02.1) instead of "bombs away"
                     bool aa = call?.StartsWith("fox") == true;
                     if (call != null && Once("shot:" + s.Name, now, 4))   // salvo: one call
                     {
@@ -204,11 +209,12 @@ static class Flights
                     if (cat == "bomb") shotAt["bomb:" + s.Name] = now;
                 }
                 // LD1 self-defense comes first: air-to-air missile at an own AI fighter -> its flight attacks the shooter's group (mode awacs)
-                if (Follow && t != null && s != null && mcat == "aam" && s.Side != t.Side && Ours(t, w) && Armed(t) && Once($"selfdef:{t.Group}>{s.Group}", now, 120)) Cmd?.Invoke($"ENGAGE;{t.Group};{s.Group}");
-                // Missile at an own AI aircraft: RWR/MAWS -> Defending toward the threat (gun, bomb: no)
+                if (Follow && t != null && s != null && mcat == "aam" && s.Side != t.Side && Ours(t, w) && Armed(t) && CounterAir(t) && Once($"selfdef:{t.Group}>{s.Group}", now, 120)) Cmd?.Invoke($"ENGAGE;{t.Group};{s.Group}");
+                // Missile at an own AI aircraft: RWR/MAWS -> Defending toward the threat (gun, bomb: no). R379: only once it is a threat – launch within 15 NM at once,
+                // further out when the missile has closed to about 15 NM (3 s per NM as LK13) or earlier at its pitbull; tactical frequency (LUFTKAMPF-DREHBUCH)
                 if (t != null && cat == "missile" && Ours(t, w) && (s == null || s.Side != t.Side) && Once("def:" + t.Name, now, 10))
-                    Say(now, 1.2 + Rnd(), "defending", t, $"{Cs(t)}, {(mcat == "sam" ? "SAM" : "launch")} {Ops.Card(Bearing(t.X, t.Z, D(11), D(12)))}, defending.",
-                        Intra(t, w), 0, 4, stress: true);
+                    Say(now, 1.2 + Rnd() + Math.Max(0, 3 * (Dist(t.X, t.Z, D(11), D(12)) / NM - 15)), "defending", t,
+                        $"{Cs(t)}, {(mcat == "sam" ? "SAM" : "launch")} {Ops.Card(Bearing(t.X, t.Z, D(11), D(12)))}, defending.", Tac(t, w), 0, 4, stress: true);
                 break;
             }
             case "maddog":   // active missile without target: instead of "fox three"
@@ -217,14 +223,25 @@ static class Flights
                 if (i >= 0) pending[i] = (pending[i].Due, pending[i].C with { Text = Regex.Replace(pending[i].C.Text, "fox three.*", "maddog.") });
                 break;
             }
-            case "pitbull" when U(2) is { } u && Ours(u, w):
-                Say(now, Reaction(), "pitbull", u, $"{Cs(u)}, pitbull.", Tac(u, w), 2, 15);   // R310: often waits behind a long AWACS call; valid until impact (~15 s)
+            case "pitbull":
+            {
+                // R379: the missile goes active -> its target defends now (pending "defending" pulled forward)
+                int j = e.Length > 3 ? pending.FindIndex(p => p.C.Kind == "defending" && p.C.Who == e[3]) : -1;
+                if (j >= 0 && pending[j].Due > now + 1) pending[j] = (now + Reaction(), pending[j].C);
+                // R380: salvo = one call
+                if (U(2) is { } u && Ours(u, w) && Once("pitbull:" + u.Name, now, 6))
+                    Say(now, Reaction(), "pitbull", u, $"{Cs(u)}, pitbull.", Tac(u, w), 2, 15);   // R310: often waits behind a long AWACS call; valid until impact (~15 s)
                 break;
-            case "trashed" when U(2) is { } u && Ours(u, w):
-                // LK13: after "timeout" (time of flight over) no "trashed" for the same missile
-                if (!(flying.Remove((u.Name, e.Length > 3 ? e[3] : ""), out var fd) && double.IsInfinity(fd)))
+            }
+            case "trashed":
+            {
+                string tg = e.Length > 3 ? e[3] : "";
+                pending.RemoveAll(p => p.C.Kind == "defending" && p.C.Who == tg);   // R379: missile gone before its target had to defend
+                // LK13: after "timeout" (time of flight over) no "trashed" for the same missile; R380: salvo = one call
+                if (U(2) is { } u && Ours(u, w) && !(flying.Remove((u.Name, tg), out var fd) && double.IsInfinity(fd)) && Once($"trashed:{u.Name}>{tg}", now, 6))
                     Say(now, Reaction(), "trashed", u, $"{Cs(u)}, trashed.", Tac(u, w), 1, 15);
                 break;
+            }
             // LK14 (KF6, KF31/32): an enemy's radar tracks the AI aircraft (RWR) -> ATP 1-02.1 SPIKE [direction, type] or MUD (ground threat), end -> NAKED; flight frequency
             case "spike" when e.Length >= 7 && U(2) is { } u && Ours(u, w) && Once($"spike:{u.Name}>{e[3]}", now, 10):
             {
@@ -244,6 +261,7 @@ static class Flights
             case "hit" when e.Length >= 8:
             {
                 flying.Remove((e[2], e[4]));   // LK13: missile arrived, no timeout
+                pending.RemoveAll(p => p.C.Kind == "defending" && p.C.Who == e[4]);   // R379: hit before the deferred "defending"
                 if (U(4) is { } t && Ours(t, w, RadiusNm * 2))
                 {
                     double life = D(7);
@@ -269,6 +287,7 @@ static class Flights
                 bool air = e[7] == "1";
                 var v = U(4);
                 foreach (var key in flying.Keys.Where(f => f.T == e[4]).ToList()) flying.Remove(key);   // LK13: target dead, no timeout
+                if (air) dead.Add(e[4]);
                 if (U(2) is { } k && air && Ours(k, w) && v?.Side != k.Side)
                 {
                     var (n, at) = kills.GetValueOrDefault(k.Name);
@@ -278,10 +297,20 @@ static class Flights
                     int i = pending.FindIndex(p => p.C.Who == k.Name && p.C.Kind == "splash");   // not yet sent: count up instead of a second call
                     if (i >= 0) pending[i] = (pending[i].Due, pending[i].C with { Text = text });
                     else Say(now, 1.5 + Rnd(), "splash", k, text, Tac(k, w), 1, 10);
-                    if (w.Awacs(k.Side, k.X, k.Z) is { } aw && Once("awsplash:" + k.Group, now, 10))
+                    if (w.Awacs(k.Side, k.X, k.Z) is { } aw)
                     {
-                        bool clean = Clean(k, w, v);
-                        SayAwacs(now, 5 + Rnd(), "splash", k.Side, aw.Name, $"{aw.Name} copies, splash{(clean ? ", picture clean" : "")}.", Tac(k, w), 2);
+                        // R381 (ATP 3-52.4, LUFTKAMPF-DREHBUCH): count of the flight, remaining contacts of the group with its picture name, otherwise picture clean
+                        var (ng, gat) = kills.GetValueOrDefault("grp:" + k.Group);
+                        kills["grp:" + k.Group] = (ng = now - gat < 15 ? ng + 1 : 1, now);
+                        var det = Ops.Detected.GetValueOrDefault(k.Side);   // only what the radar picture shows
+                        int rest = v == null ? 0 : Units.Values.Count(x => x.Group == v.Group && x.InAir && !dead.Contains(x.Name) && (det == null || det.ContainsKey(x.Name.GetHashCode())));
+                        var ack = $"{aw.Name} copies splash {Count(ng)}" + (rest > 0 ? $"{Opt(Named(k.Side, v!.Group))}, {Count(rest)} contact{(rest > 1 ? "s" : "")}."
+                                  : Clean(k, w) ? ", picture clean." : ".");
+                        // not yet sent: count up. ponytail: two flights splashing within the same 5 s share one acknowledgment
+                        int j = pending.FindLastIndex(p => p.C.Kind == "splash" && p.C.Who == "" && p.C.Side == k.Side && p.C.Text.StartsWith(aw.Name + " copies splash"));
+                        if (j >= 0) pending[j] = (pending[j].Due, pending[j].C with { Text = ack });
+                        else SayAwacs(now, 5 + Rnd(), "splash", k.Side, aw.Name, ack, Tac(k, w), 2);
+                        told["awsplash:" + k.Group] = now;   // LD13: reset after the splash
                     }
                 }
                 if (v != null) Down(v);
@@ -295,7 +324,7 @@ static class Flights
                 var bulls = Bulls(u);
                 if (Wingman(u) is { } wing) Say(now, 2 + Rnd(), "down", wing, $"{Cs(wing)}, {Elem(u)} is down, good chute{Opt(bulls)}.", Tac(wing, w), 1, 15);
                 else Say(now, 0.2, "down", u, $"{Cs(u)}, ejecting, ejecting.", Tac(u, w), 0, 5, stress: true);
-                down.Add((u, now, 0, bulls));
+                down.Add((u, now, 0, bulls, e.Length > 6 && e[6] == "1"));
                 break;
             }
             case "eject" when w.Players.FirstOrDefault(p => p.Unit == e[2]) is { Unit: { Length: > 0 } } pl:   // Player (N45): no T entry, pseudo-unit for the down procedure
@@ -303,26 +332,32 @@ static class Flights
                 var pu = new Unit(pl.Unit, pl.Gid > 0 ? Units.Values.FirstOrDefault(x => x.Gid == pl.Gid)?.Group ?? "" : "", "", pl.Callsign, pl.Side, pl.X, pl.Z, 0, false, 0, 0, Array.Empty<int>(), "", pl.Gid);
                 var bulls = Bulls(pu);   // "ejecting" is said by the player himself; only an AI wingman can report him (principle 8: with OwnWingmen)
                 if (Wingman(pu) is { } wing && Ours(wing, w, RadiusNm * 2)) Say(now, 2 + Rnd(), "down", wing, $"{Cs(wing)}, {Elem(pu)} is down, good chute{Opt(bulls)}.", Tac(wing, w), 1, 15);
-                down.Add((pu, now, 0, bulls));
+                down.Add((pu, now, 0, bulls, e.Length > 6 && e[6] == "1"));
                 break;
             }
+            case "pilotdead":   // R361: ejected pilot dead -> no SAR call
+                down.RemoveAll(d => d.U.Name == e[2]);
+                break;
         }
     }
 
     static string Opt(string? s) => string.IsNullOrEmpty(s) ? "" : ", " + s;
-    /// R299: shot down or ejected: unsent Mayday "hit, RTB" and the AWACS acknowledgment with heading to the airfield are dropped.
-    static void Down(Unit u) => pending.RemoveAll(p => p.C.Kind == "guard" &&
-        (p.C.Who == u.Name ? p.C.Text.Contains(", hit, RTB") : p.C.Who == "" && p.C.Text.StartsWith(Cs(u) + ", ") && p.C.Text.Contains("copy mayday")));
+    /// R299/R378: shot down or ejected: nothing more from him except "ejecting" and the Guard calls from the ground (unsent Mayday "hit, RTB" dropped too);
+    /// AWACS calls to him are dropped, to his flight only when nobody of it is left.
+    static void Down(Unit u) => pending.RemoveAll(p => p.C.Who == u.Name ? p.C.Kind is not ("guard" or "down") || p.C.Text.Contains(", hit, RTB")
+        : p.C.Who == "" && (p.C.Text.StartsWith(Cs(u) + ", ") || p.C.Text.StartsWith(Fl(u) + ", ") && !Units.Values.Any(x => x.Group == u.Group && x.Name != u.Name)));
 
     // ------------------------------------------------------------ Tick (Program, every 250 ms)
     public static List<Call> Tick(double now, World w)
     {
+        dead.IntersectWith(Units.Keys);   // R381: gone from the T lines
         for (int i = down.Count - 1; i >= 0; i--)   // Ejection: after 90 s the pilot on the ground on Guard, AWACS answers
         {
             var d = down[i];
-            if (now - d.At >= 90)
+            if (w.Players.Any(p => p.Unit == d.U.Name && Dist(p.X, p.Z, d.U.X, d.U.Z) > NM)) down.RemoveAt(i);   // R361: player flying again (respawn) -> no SAR
+            else if (now - d.At >= 90)
             {
-                Say(now, 0, "guard", d.U, $"Mayday, mayday, mayday, {Cs(d.U)}, on the ground{Opt(d.Bulls)}, uninjured.", Guard, 1, 30, freq2: GuardVhf);
+                Say(now, 0, "guard", d.U, $"Mayday, mayday, mayday, {Cs(d.U)}, {(d.Water ? "in the water" : "on the ground")}{Opt(d.Bulls)}.", Guard, 1, 30, freq2: GuardVhf);   // R361: only known facts
                 if (w.Awacs(d.U.Side, d.U.X, d.U.Z) is { } aw)
                     SayAwacs(now, 7, "guard", d.U.Side, aw.Name, $"{Cs(d.U)}, {aw.Name}, copy, SAR notified, monitor guard.", Guard, 1, GuardVhf);
                 down.RemoveAt(i);
@@ -339,9 +374,15 @@ static class Flights
         foreach (var (due, c) in pending.Where(p => p.Due <= now).OrderBy(p => p.Due).ToList())
         {
             pending.Remove((due, c));
-            if (!sent.TryGetValue(c.Freq, out var times)) sent[c.Freq] = times = new();
+            if (c.Who != "" && c.Kind is not ("guard" or "down") && !Units.ContainsKey(c.Who) && !w.Players.Any(p => p.Unit == c.Who)) continue;   // R378: speaker gone (dead, despawned)
+            if (!sent.TryGetValue((c.Freq, c.Side), out var times)) sent[(c.Freq, c.Side)] = times = new();   // R384: the coalitions do not hear each other
             times.RemoveAll(x => now - x > 60);
-            if (c.Prio == 2 && times.Count >= 10 || c.Prio == 1 && times.Count >= 16) continue;   // Radio discipline: frequency full -> unimportant calls are dropped
+            bool full = c.Prio == 2 && times.Count >= 10 || c.Prio == 1 && times.Count >= 16;   // Radio discipline: frequency full -> unimportant calls are dropped
+            // R384: AWACS tasking (commit, skip it, reset ...) and the flight's acknowledgment go together: sent -> acknowledged in any case, dropped -> no acknowledgment
+            string to = c.Kind is "commit" or "abm" ? $"{c.Side}:{Regex.Match(c.Text, "^[^,.]+").Value}" : "";
+            if (to != "" && c.Who != "" && ordered.Remove(to, out bool told0)) full = !told0;
+            else if (to != "" && c.Who == "") ordered[to] = !full;
+            if (full) continue;
             times.Add(now);
             outl.Add(c);
         }
@@ -362,6 +403,7 @@ static class Flights
         {
             var low = g.MinBy(u => u.Fuel)!;
             var lead = g.OrderBy(u => u.Callsign, StringComparer.Ordinal).First();
+            if (low.Fuel > 0.4) { told.Remove("joker:" + g.Key); told.Remove("bingo:" + g.Key); }   // R385: refuelled (tanker, landing) -> joker/bingo armed again, ABM takes it again
             if (low.Fuel < 0.22 && Once("bingo:" + g.Key, now, 1e9))
             {
                 Abm.Release(lead.Side, Fl(lead));   // LK9: bingo -> assignment free
@@ -374,7 +416,9 @@ static class Flights
             else if (low.Fuel is < 0.35 and >= 0.22 && Once("joker:" + g.Key, now, 1e9)) Say(now, 0, "joker", low, $"{Cs(low)}, joker.", Intra(low, w), 2, 20);
             foreach (var u in g.Where(u => Aam(u) == 0 && now - shotAt.GetValueOrDefault(u.Name, -1e9) < 60))
                 if (Once("winchester:" + u.Name, now, 1e9)) Say(now, 1, "winchester", u, $"{Cs(u)}, winchester.", Tac(u, w), 1, 15);
-            if (Hostiles(lead, w).Any(h => Dist(h.X, h.Z, lead.X, lead.Z) < 3 * NM && !(Math.Abs(h.Alt - lead.Alt) >= 5000 * 0.3048)) && Once("merged:" + g.Key, now, 120))
+            // R383 MERGED (ATP 1-02.1): enemy fighter/combat aircraft (no helicopter, AWACS/tanker/transport) within 2 NM and 5000 ft; players without altitude are not merged
+            if (Units.Values.Any(h => h.InAir && h.Side != lead.Side && h.Side != 0 && !h.Heli && !Ops.Support.IsMatch(h.Type) && Dist(h.X, h.Z, lead.X, lead.Z) < 2 * NM &&
+                                      Math.Abs(h.Alt - lead.Alt) < 5000 * 0.3048) && Once("merged:" + g.Key, now, 120))
                 Say(now, 0.3, "merged", lead, $"{Cs(lead)}, merged.", Tac(lead, w), 0, 4, stress: true);
             // LK13 OUT (ATP 1-02.1: turn to cold aspect from the threat, with direction): up to 2 min after the shot the lead turns more than 120° away from the target; once per shot
             if (fight.TryGetValue(g.Key, out var fg) && now - fg.At < 120 && !double.IsNaN(lead.Hdg) && Pos(fg.Unit, w) is { } fp &&
@@ -383,8 +427,9 @@ static class Flights
             // LK11: second element = number 3 in a four-ship (11/12 and 13/14), otherwise the wingman
             var rest = g.Where(u => u != lead).OrderBy(u => u.Callsign, StringComparer.Ordinal).ToList();
             var wing = rest.FirstOrDefault(u => u.Callsign.EndsWith("3")) ?? rest.FirstOrDefault();
-            if (g.Any(u => Aam(u) > 0)) { Fighter(now, w, g.Key, lead, wing); fighters.Add((lead, wing)); }
-            else Abm.Release(lead.Side, Fl(lead));   // LK9: winchester -> assignment free
+            if (w.Players.Any(p => p.Gid > 0 && p.Gid == lead.Gid)) continue;   // AI wingmen of a player (OwnWingmen): the player checks in and gets the tasking
+            if (g.Any(u => Aam(u) > 0) && CounterAir(lead)) { Fighter(now, w, g.Key, lead, wing); fighters.Add((lead, wing)); }
+            else Abm.Release(lead.Side, Fl(lead));   // LK9: winchester (or no counter-air task) -> assignment free
         }
         // LK9: the side's Air Battle Manager distributes the groups (after the signs of life from Fighter), then each flight picks up its tasking
         foreach (var side in fighters.Select(f => f.Lead.Side).Distinct()) Abm.Tick(side, AbmGroups(side), now);
@@ -491,10 +536,11 @@ static class Flights
         bool fired = shotAt.Any(kv => now - kv.Value < 300 && Units.TryGetValue(kv.Key, out var x) && x.Group == grp);
         // LK15 OPS CHECK (KF55): every 15 min airborne, not within 5 min after a shot (then afterwards)
         if (!opsAt.TryAdd(grp, now) && now - opsAt[grp] >= 900 && !fired) { opsAt[grp] = now; OpsCheck(now, w, grp, lead); }
-        // ON STATION: first time 60 s within ±500 ft above 10000 ft; without AWACS nobody is there to report to
+        // ON STATION: after the check-in, first time 60 s within ±500 ft (station altitude reached, any altitude); without AWACS nobody is there to report to
         (double Alt, double At) lv = level.GetValueOrDefault(grp, (lead.Alt, now));
-        // LD7 CHECK-IN in the climb through 10000 ft (ATP 1-02.1 AS FRAGGED, PLAYTIME): count, altitude, time to bingo -> AWACS "radar contact"
-        if (aw is { } ac && !station.ContainsKey(grp) && lv.Alt < 10000 * 0.3048 && lead.Alt >= 10000 * 0.3048 && Once("checkin:" + grp, now, 1e9))
+        // LD7/R377 CHECK-IN on first contact in AWACS coverage once the flight is ours (no longer with ATC) (ATP 1-02.1 AS FRAGGED, PLAYTIME; ATP 3-52.4):
+        // count, altitude, time to bingo -> AWACS "radar contact"
+        if (aw is { } ac && !station.ContainsKey(grp) && Once("checkin:" + grp, now, 1e9))
         {
             var fl1 = Units.Values.Where(u => u.Group == grp && u.InAir).ToList();
             int play = (int)Math.Max(0, (fl1.Min(u => u.Fuel) - 0.22) * 100) / 5 * 5;   // ponytail: 1 % fuel per minute (cruise), real burn rate if needed
@@ -503,7 +549,7 @@ static class Flights
         }
         if (Math.Abs(lead.Alt - lv.Alt) > 500 * 0.3048) lv = (lead.Alt, now);
         level[grp] = lv;
-        if (aw is { } a0 && !station.ContainsKey(grp) && lead.Alt > 10000 * 0.3048 && now - lv.At >= 60)
+        if (aw is { } a0 && !station.ContainsKey(grp) && told.ContainsKey("checkin:" + grp) && now - lv.At >= 60)
         {
             station[grp] = (lead.X, lead.Z);
             Say(now, 0.5, "fence", lead, $"{Fence(lead)}, fence in.", Intra(lead, w), 2, 20);   // LD12 FENCE IN (ATP 1-02.1): switch for combat, on the element frequency
@@ -602,7 +648,7 @@ static class Flights
     }
 
     /// New mission: forget everything.
-    public static void Reset() { pending.Clear(); told.Clear(); kills.Clear(); shotAt.Clear(); sent.Clear(); downAt.Clear(); down.Clear(); level.Clear(); station.Clear(); rtbSince.Clear(); tgt.Clear(); fight.Clear(); flying.Clear(); spiked.Clear(); opsAt.Clear(); Abm.Reset(); lastScan = 0; }
+    public static void Reset() { pending.Clear(); told.Clear(); kills.Clear(); shotAt.Clear(); sent.Clear(); ordered.Clear(); downAt.Clear(); down.Clear(); level.Clear(); station.Clear(); rtbSince.Clear(); tgt.Clear(); fight.Clear(); flying.Clear(); spiked.Clear(); dead.Clear(); opsAt.Clear(); Abm.Reset(); lastScan = 0; }
 
     // ------------------------------------------------------------ Self-test
     public static void SelfTest(Action<bool, string> check)
@@ -633,13 +679,14 @@ static class Flights
         OnEvent(X("X;kill;V11;Viper;B1;Su-27;Red;1"), 120, w);
         OnEvent(X("X;kill;V11;Viper;B2;Su-27;Red;1"), 121, w);
         a = Run(130);
-        check(All(a) == "251.0:Viper one one, splash two, Flanker. | 251.0:Overlord copies, splash, picture clean.", "KI-Funk Splash zwei, AWACS: " + All(a));
+        check(All(a) == "251.0:Viper one one, splash two, Flanker. | 251.0:Overlord copies splash two, picture clean.", "KI-Funk Splash zwei, AWACS zählt mit (R381): " + All(a));
         OnEvent(X("X;shot;B1;Red;1;SA-11;missile;sam;radar_semi_active;V12;Viper;0;-10000"), 140, w);
         a = Run(143);
-        check(a.Count == 1 && a[0].Text == "Viper one two, SAM west, defending." && a[0].Freq == 141 && a[0].Prio == 0 && a[0].Stress, "KI-Funk Defending: " + All(a));
+        check(a.Count == 1 && a[0].Text == "Viper one two, SAM west, defending." && a[0].Freq == 251 && a[0].Prio == 0 && a[0].Stress, "KI-Funk Defending auf der taktischen Frequenz (R379): " + All(a));
         // Flight frequency missing (0) or is the AWACS frequency: internal calls ("I'm hit", Defending) do not go on the AWACS net (A137)
         Units["C1"] = new Unit("C1", "Cobra", "F-16C_50", "Cobra11", 2, 0, 500, 6000, true, 0.8, 251, full);
         Units["C2"] = new Unit("C2", "Cobra", "F-16C_50", "Cobra12", 2, 0, 600, 6000, true, 0.8, 0, full);
+        station["Cobra"] = (0, 0);   // on station: no check-in (R377) in the middle of the test
         foreach (var c in new[] { "C1", "C2" })
         {
             OnEvent(X($"X;shot;B1;Red;1;SA-11;missile;sam;radar_semi_active;{c};Cobra;0;-10000"), 144, w);
@@ -662,7 +709,7 @@ static class Flights
         a = Run(156);
         check(a.Count == 0, "KI-Funk kein Notsender-Ton: " + All(a));
         a = Run(241);
-        check(All(a) == "243.0:Mayday, mayday, mayday, Viper one two, on the ground, bullseye zero eight four, 1, uninjured.", "KI-Funk Pilot am Boden: " + All(a));
+        check(All(a) == "243.0:Mayday, mayday, mayday, Viper one two, on the ground, bullseye zero eight four, 1.", "KI-Funk Pilot am Boden: " + All(a));
         a = Run(249);
         check(All(a) == "243.0:Viper one two, Overlord, copy, SAR notified, monitor guard.", "KI-Funk AWACS auf Guard: " + All(a));
         OnEvent(X("X;shot;V11;Viper;2;AIM_9X;missile;aam;ir;B1;Red;0;0"), 258, w);   // last missile
@@ -675,6 +722,15 @@ static class Flights
         a = Run(270); a.AddRange(Run(276));
         check(All(a).Contains("141.0:Colt one two, bingo.") && All(a).Contains("251.0:Colt one, bingo, RTB.") && !All(a).Contains("Colt one two, bingo, RTB"), "LD6 Bingo des Wingman: Rottenfrequenz, Lead für den Flug taktisch: " + All(a));
         Units.Remove("C11"); Units.Remove("C12");
+        // R385: refuelled above 40 % -> joker armed again
+        station["Hawk"] = (0, 0);
+        int Jokers(double t0, double fuel)
+        {
+            Units["H11"] = new Unit("H11", "Hawk", "F-16C_50", "Hawk11", 2, 0, 3 * NM, 6000, true, fuel, 141, full);
+            return Run(t0).Concat(Run(t0 + 2)).Count(c => c.Text == "Hawk one one, joker.");
+        }
+        check(Jokers(280, 0.3) == 1 && Jokers(284, 0.8) == 0 && Jokers(288, 0.3) == 1, "R385 Joker nach dem Tanken wieder scharf");
+        Units.Remove("H11");
         // far away (100 NM from the player): silent; tactical: no joker; budget: at most 10 Prio 2 calls per minute
         Units["V11"] = V("V11", "Viper11", 100 * NM, 0);
         OnEvent(X("X;shot;V11;Viper;2;AIM_120C;missile;aam;radar_active;B1;Red;0;0"), 300, w);
@@ -683,8 +739,34 @@ static class Flights
         Mode = "taktisch";
         check(Run(310).Count == 0, "KI-Funk taktisch: kein Joker");
         Mode = "voll";
-        for (int i = 0; i < 14; i++) OnEvent(X($"X;pitbull;V11"), 400 + i, w);
-        check(Run(420).Count(c => c.Text.EndsWith("pitbull.")) == 10, "KI-Funk Budget 10 je Minute");   // plus the timeout of the shot from 258 (LK13, Prio 1)
+        for (int i = 0; i < 14; i++) OnEvent(X($"X;pitbull;V11"), 400 + 6 * i, w);
+        check(Run(490).Count(c => c.Text.EndsWith("pitbull.")) == 10, "KI-Funk Budget 10 je Minute");   // plus the timeout of the shot from 258 (LK13, Prio 1)
+        OnEvent(X("X;pitbull;V11"), 600, w); OnEvent(X("X;pitbull;V11"), 601.5, w);
+        a = Run(610);
+        check(a.Count(c => c.Text.EndsWith("pitbull.")) == 1, "R380 zwei Pitbull binnen 2 s: ein Spruch: " + All(a));
+        // R379: missile from 50 NM: no "defending" while it flies out, then once when it goes active (two pitbull events)
+        OnEvent(X(FormattableString.Invariant($"X;shot;B1;Red;1;R-77;missile;aam;radar_active;V11;Viper;0;{50 * NM:0}")), 620, w);
+        a = Run(630); a.AddRange(Run(640));
+        bool early = a.Any(c => c.Text.Contains("defending"));
+        OnEvent(X("X;pitbull;B1;V11"), 641, w); OnEvent(X("X;pitbull;B1;V11"), 642, w);
+        a = Run(645); a.AddRange(Run(650));
+        check(!early && a.Count(c => c.Text.Contains("defending")) == 1, $"R379 Schuss aus 50 NM: defending erst bei Pitbull, einmal (früh {early}): " + All(a));
+        // R384: AWACS tasking and its acknowledgment are one exchange: after 9 calls in the minute the tasking (10th) goes and the ack still comes;
+        // the other side has its own budget; a dropped tasking drops its ack
+        Call P(string kind, string who, string text, int side = 2) => new(kind, who, "", text, 251, 2, 15, Side: side);
+        for (int i = 0; i < 9; i++) pending.Add((800, P("pitbull", "V11", $"Viper one one, pitbull {i}.")));
+        pending.Add((800.1, P("commit", "", "Viper one, Overlord, commit group.")));
+        pending.Add((800.2, P("commit", "V11", "Viper one, committing.")));
+        pending.Add((800.3, P("pitbull", "V11", "Viper one one, pitbull extra.")));
+        pending.Add((800.4, P("pitbull", "B1", "Red one, pitbull.", 1)));
+        a = Run(801);
+        check(a.Any(c => c.Text.Contains("commit group")) && a.Any(c => c.Text == "Viper one, committing.") && !a.Any(c => c.Text.Contains("extra")) && a.Any(c => c.Side == 1),
+              "R384 Zuweisung und Quittung trotz Budget, andere Seite eigenes Budget: " + All(a));
+        pending.Add((820, P("commit", "", "Viper one, Overlord, commit group.")));
+        a = Run(821);
+        pending.Add((865, P("commit", "V11", "Viper one, committing.")));
+        a.AddRange(Run(866));
+        check(!a.Any(c => c.Kind == "commit"), "R384 verworfene Zuweisung: keine Quittung: " + All(a));
         // Player ejects (N45): no T entry, still beacon, Mayday and AWACS reply on Guard; an AI wingman reports him only with OwnWingmen
         Units["W1"] = new Unit("W1", "Enfield", "F-16C_50", "Enfield12", 2, 0, 4 * NM, 6000, true, 0.8, 141, full, Gid: 9);
         OnEvent(X("X;eject;Niemand;Enfield;0;0"), 1000, w);
@@ -694,7 +776,7 @@ static class Flights
         a = Run(1206);
         check(a.Count == 0, "KI-Funk kein Spieler-Notsender-Ton: " + All(a));
         a = Run(1291);
-        check(All(a) == "243.0:Mayday, mayday, mayday, Enfield one one, on the ground, bullseye zero eight four, 5, uninjured.", "KI-Funk Spieler am Boden: " + All(a));
+        check(All(a) == "243.0:Mayday, mayday, mayday, Enfield one one, on the ground, bullseye zero eight four, 5.", "KI-Funk Spieler am Boden: " + All(a));
         a = Run(1299);
         check(All(a) == "243.0:Enfield one one, Overlord, copy, SAR notified, monitor guard.", "KI-Funk AWACS-SAR für Spieler: " + All(a));
         OwnWingmen = true;
@@ -704,6 +786,16 @@ static class Flights
         Run(1406); Run(1491); Run(1499);
         OwnWingmen = own;
         Units.Remove("W1");
+        // R361: over water "in the water"; player flying again after a respawn or pilot dead -> no SAR call
+        OnEvent(X("X;eject;P1;Enfield;0;0;1"), 1500, w);
+        a = Run(1591); Run(1599);
+        check(All(a) == "243.0:Mayday, mayday, mayday, Enfield one one, in the water, bullseye zero eight four, 5.", "R361 Ausstieg über Wasser: " + All(a));
+        OnEvent(X("X;eject;P1;Enfield;0;0;0"), 1600, w);
+        Tick(1630, w with { Players = new List<(int, double, double, int, string, string)> { (2, 0, 20 * NM, 9, "P1", "Enfield 1-1") } });   // airborne again, 15 NM away
+        OnEvent(X("X;eject;P1;Enfield;0;0;0"), 1700, w);
+        OnEvent(X("X;pilotdead;P1"), 1730, w);
+        a = Run(1800);
+        check(!a.Any(c => c.Kind == "guard"), "R361 Spieler fliegt wieder / Pilot tot: keine SAR-Meldung: " + All(a));
         // merged only with altitude difference under 5000 ft (A113); picture clean only without detected contacts in the radar picture
         Units["V11"] = V("V11", "Viper11", 0, 0);
         Units["B1"] = bandit with { X = NM, Z = 0, Alt = 6000 + 3000 };   // 1 NM away, 3000 m (9800 ft) higher
@@ -711,20 +803,35 @@ static class Flights
         Units["B1"] = bandit with { X = NM, Z = 0, Alt = 6000 + 1000 };   // 3300 ft higher
         a = Run(2004); a.AddRange(Run(2006));
         check(a.Any(c => c.Text == "Viper one one, merged."), "KI-Funk: 1 NM, 3300 ft höher: merged: " + All(a));
-        Units["B1"] = bandit; Units["B3"] = bandit with { Name = "B3", X = 10 * NM };
+        // R383: a helicopter 1 NM away is no merge, a fighter at 1.5 NM is
+        told.Remove("merged:Viper");
+        Units["B1"] = bandit with { Type = "Mi-24P", X = NM, Heli = true };
+        a = Run(2010); a.AddRange(Run(2012));
+        check(!a.Any(c => c.Text.EndsWith("merged.")), "R383 Hubschrauber in 1 NM: kein merged: " + All(a));
+        Units["B1"] = bandit with { X = 1.5 * NM };
+        a = Run(2014); a.AddRange(Run(2016));
+        check(a.Any(c => c.Text == "Viper one one, merged."), "R383 Jäger in 1,5 NM: merged: " + All(a));
+        Units["B1"] = bandit; Units["B3"] = bandit with { Name = "B3", Group = "Red2", X = 10 * NM };   // other group: no remaining contact of the splashed group (R381)
         Ops.Detected[2] = new() { [999] = true };   // B3 is not in the side's radar picture
         OnEvent(X("X;kill;V11;Viper;B1;Su-27;Red;1"), 2100, w);
         a = Run(2108);
-        check(All(a).Contains("splash, picture clean"), "KI-Funk Splash: nicht erfasster Kontakt zählt nicht (picture clean): " + All(a));
+        check(All(a).Contains("copies splash one, picture clean."), "KI-Funk Splash: nicht erfasster Kontakt zählt nicht (picture clean): " + All(a));
         Ops.Detected[2] = new() { ["B3".GetHashCode()] = true };
         OnEvent(X("X;kill;V11;Viper;B1;Su-27;Red;1"), 2200, w);
         a = Run(2208);
-        check(All(a).Contains("copies, splash.") && !All(a).Contains("clean"), "KI-Funk Splash: erfasster Kontakt in 10 NM: kein picture clean: " + All(a));
+        check(All(a).Contains("copies splash one.") && !All(a).Contains("clean"), "KI-Funk Splash: erfasster Kontakt in 10 NM: kein picture clean: " + All(a));
         Units["B3"] = Units["B3"] with { X = 220 * NM };   // R53: same radius as Ops (whole radar picture, RadarNm): 220 NM beyond NewGroupNm still counts
         OnEvent(X("X;kill;V11;Viper;B1;Su-27;Red;1"), 2300, w);
         a = Run(2308);
-        check(All(a).Contains("copies, splash.") && !All(a).Contains("clean"), "KI-Funk Splash R53: erfasster Kontakt in 220 NM: kein picture clean: " + All(a));
-        Ops.Detected.Clear(); Units.Remove("B3"); Units["B1"] = bandit;
+        check(All(a).Contains("copies splash one.") && !All(a).Contains("clean"), "KI-Funk Splash R53: erfasster Kontakt in 220 NM: kein picture clean: " + All(a));
+        // R381: remaining detected contact of the same group with its picture name
+        Units["B3"] = bandit with { Name = "B3", X = 10 * NM };
+        LabelOf = (_, id) => id == "B3".GetHashCode() ? "north group" : null;
+        OnEvent(X("X;kill;V11;Viper;B1;Su-27;Red;1"), 2400, w);
+        a = Run(2408);
+        LabelOf = (_, _) => null;
+        check(All(a).Contains("Overlord copies splash one, north group, one contact."), "R381 Splash mit Restkontakt der Gruppe: " + All(a));
+        Ops.Detected.Clear(); Units.Remove("B3"); Units["B1"] = bandit; dead.Clear();
         var fp = new Unit("P2", "", "", "Iceman", 2, 0, 0, 0, false, 0, 0, Array.Empty<int>());   // Player with free-text callsign
         check(Cs(fp) == "Iceman" && Elem(fp) == "Iceman", "KI-Funk Spieler-Rufzeichen ohne Muster: " + Cs(fp));
         var g = OnGuard("Enfield one one, Overlord, threat, group BRAA 354, 20, hot.", "Overlord", 251);
@@ -741,6 +848,16 @@ static class Flights
         check(a.Count(c => c.Text.Contains("RTB")) == 1 && a.Single(c => c.Text.Contains("RTB")).Text.Contains("Viper one four") && !a.Any(c => c.Text.Contains("copy mayday")),
               "R299 kein Mayday/AWACS-Kurs nach Abschuss/Ausstieg: " + All(a));
         Units.Remove("V13"); Units.Remove("V14");
+        // R378: fox, shooter shot down 1 s later -> no "fox"/"engaged" from him any more, his "ejecting" still goes
+        station["Snake"] = (0, 0);
+        Units["S13"] = V("S13", "Snake13", 0, 2000) with { Group = "Snake" };
+        OnEvent(X("X;shot;S13;Snake;2;AIM_120C;missile;aam;radar_active;B1;Red;0;0"), 3100, w);
+        OnEvent(X("X;kill;B1;Red;S13;Snake;F-16C_50;1"), 3101, w);
+        OnEvent(X("X;eject;S13;Snake;0;2000;0"), 3102, w);
+        Units.Remove("S13");
+        a = Run(3110);
+        check(!a.Any(c => c.Text.Contains("fox") || c.Text.Contains("engaged")) && a.Any(c => c.Text.Contains("ejecting")), "R378 abgeschossener Schütze schweigt: " + All(a));
+        down.Clear();
         // R311: on station, commit/committing, targeted, RTB replace the DCS radio of the AI fighters (R308 mutes it)
         Reset(); Ops.Detected.Clear();
         const double ft = 0.3048;
@@ -749,8 +866,8 @@ static class Flights
         Units = new() { ["F11"] = F("F11", "Ford11", 35 * NM, 0, 8000 * ft), ["F12"] = F("F12", "Ford12", 35 * NM, 1000, 8000 * ft) };
         Run(4990);
         Units = new() { ["F11"] = F("F11", "Ford11", 35 * NM, 0, 20000 * ft), ["F12"] = F("F12", "Ford12", 35 * NM, 1000, 20000 * ft) };
-        a = Run(5000); a.AddRange(Run(5010));   // LD7: in the climb through 10000 ft
-        check(All(a) == "251.0:Overlord, Ford one, checking in as fragged, flight of two, angels 20, playtime 55. | 251.0:Ford one, Overlord, radar contact.", "LD7 check-in: " + All(a));
+        a = Run(5000); a.AddRange(Run(5010));   // LD7/R377: check-in on first contact once ours, no altitude gate (8000 ft)
+        check(All(a) == "251.0:Overlord, Ford one, checking in as fragged, flight of two, angels 8, playtime 55. | 251.0:Ford one, Overlord, radar contact.", "LD7/R377 check-in beim ersten Kontakt, auch unter 10000 ft: " + All(a));
         Units["F11"] = F("F11", "Ford11", 35 * NM, 0, 25000 * ft); Units["F12"] = F("F12", "Ford12", 35 * NM, 1000, 25000 * ft);   // still climbing
         a = Run(5030); a.AddRange(Run(5062));
         check(a.Count == 0, "KI-Funk on station: erst nach 60 s auf derselben Höhe: " + All(a));
@@ -777,6 +894,16 @@ static class Flights
         Units.Remove("R1"); Units.Remove("R2");   // Ford's group gone (splash): reset
         a = Run(5160); a.AddRange(Run(5165));
         check(All(a) == "251.0:Ford one, Overlord, reset. | 251.0:Ford one, resetting.", "LK9 Gruppe weg -> reset, resetting: " + All(a));
+        // R376/R377: CAP flight at 6000 ft checks in, goes on station and commits; a SEAD flight next to it stays silent and gets no ENGAGE
+        Reset(); Ops.Detected.Clear();
+        var cmds376 = new List<string>(); Cmd = cmds376.Add;
+        Units = new() { ["F11"] = F("F11", "Ford11", 35 * NM, 0, 6000 * ft) with { Task = "CAP" }, ["R1"] = R("R1", "Red", 65 * NM, 0),
+                        ["S11"] = new Unit("S11", "Weasel", "F-16C_50", "Weasel11", 2, 35 * NM, 2 * NM, 6000 * ft, true, 0.8, 141, full, Hdg: 0, Task: "SEAD") };
+        a = new();
+        foreach (var t in new[] { 5200.0, 5202, 5210, 5262, 5264, 5270, 5272, 5280, 5290 }) a.AddRange(Run(t));
+        Cmd = cmd0;
+        check(All(a).Contains("Ford one, checking in") && All(a).Contains("Ford one, on station") && All(a).Contains("Ford one, Overlord, commit") && !All(a).Contains("Weasel") &&
+              string.Join(" ", cmds376) == "ENGAGE;Ford;Red", "R376/R377 CAP meldet sich und committet, SEAD still: " + All(a) + " / " + string.Join(" ", cmds376));
         // LK10: group names from the AWACS (Ops.GroupLabel): commit and targeted with names, location only in the commit; LK9: the second flight holds the CAP (maintain), skip it
         Reset(); (station["Ford"], station["Dodge"]) = ((0, 0), (0, 0));
         LabelOf = (s, id) => s != 2 ? null : id == "R1".GetHashCode() ? "west group" : id == "R3".GetHashCode() ? "east group" : null;
@@ -896,7 +1023,8 @@ static class Flights
             if (t >= 9080 && t < 9230) Units["R2"] = Su("R2", sx);
             if (t >= 9080) sx -= 0.27 * NM;
             if (t == 9160) OnEvent(X("X;shot;F11;Ford;2;AIM_120C;missile;aam;radar_active;R1;Red;0;0"), t, w);
-            if (t == 9166) OnEvent(X(FormattableString.Invariant($"X;shot;R1;Red;1;R-27ER;missile;aam;radar_semi_active;F12;Ford;{sx:0};{-10 * NM:0}")), t, w);
+            if (t == 9166) OnEvent(X(FormattableString.Invariant($"X;shot;R1;Red;1;R-77;missile;aam;radar_active;F12;Ford;{sx:0};{-10 * NM:0}")), t, w);
+            if (t == 9174) OnEvent(X("X;pitbull;R1;F12"), t, w);   // R379: F12 defends when the R-77 goes active
             if (t == 9176) OnEvent(X("X;pitbull;F11"), t, w);
             if (t == 9190) { Units.Remove("R1"); OnEvent(X("X;kill;F11;Ford;R1;Su-27;Red;1"), t, w); }
             if (t == 9210) OnEvent(X("X;shot;F11;Ford;2;AIM_120C;missile;aam;radar_active;R2;Red;0;0"), t, w);
@@ -907,7 +1035,7 @@ static class Flights
         var miss = new List<string>();
         int at = 0;
         foreach (var k in new[] { "checking in as fragged", "radar contact", "on station", "fence in", "Overlord, commit", "Ford one, committing", "Ford one, targeted", "sorted",
-                                  "Ford one one, fox three", "defending", "pitbull", "splash one", "copies, splash.", "fox three", "splash one", "copies, splash, picture clean", "Ford one, Overlord, reset.", "Ford one, resetting", "bingo", "copy bingo" })
+                                  "Ford one one, fox three", "defending", "pitbull", "splash one", "copies splash one.", "fox three", "splash one", "copies splash one, picture clean", "Ford one, Overlord, reset.", "Ford one, resetting", "bingo", "copy bingo" })
             if (seq.FindIndex(at, s => s.Contains(k)) is var i && i >= 0) at = i; else miss.Add(k);
         var busy = dz.GroupBy(x => x.C.Freq).Select(g => (F: g.Key, N: g.Max(x => g.Count(y => y.T >= x.T && y.T < x.T + 60)))).Where(x => x.N > 12).ToList();
         var longs = seq.Where(s => s.Split(' ').Length > (s.Contains("picture") ? 30 : 18)).ToList();

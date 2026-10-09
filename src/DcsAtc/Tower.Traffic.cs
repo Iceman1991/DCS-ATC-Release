@@ -142,7 +142,7 @@ public partial class Tower
         if (OnFinalTr(a, rw))
             return $"{type} on {Miles(Approach(a.X, a.Z, rw).along)} mile final";
         if (OnRunwayPos(a.X, a.Z) && a.AltMsl - FieldElev < 15) return $"{type} on the runway";
-        return $"{type}, {Miles(Dist(a.X, a.Z, CX, CZ))} miles {Dir8(Bearing(CX, CZ, a.X, a.Z))} of the field, " +
+        return $"{type}, {MilesTxt(Dist(a.X, a.Z, CX, CZ))} {Dir8(Bearing(CX, CZ, a.X, a.Z))} of the field, " +
                $"{Math.Round(a.AltMsl / Ft / 100) * 100:0} feet";
     }
 

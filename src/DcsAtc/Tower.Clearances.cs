@@ -49,7 +49,7 @@ public partial class Tower
         lineUp = rejecting = false; popM = 0;
         var c = (Cs() + ", " + Wake(t, traffic, Runway)).TrimEnd(',', ' ');   // R205: wake turbulence ahead
         // A95: departure part before the clearance ("after departure exit via …, runway …, wind …, cleared for takeoff")
-        var clr = $"runway {RwSay(Runway)}, {Wind(t)}, cleared for {(fin != null ? "immediate " : "")}takeoff{(fin != null ? $", traffic {Describe(fin, Runway)}" : "")}";
+        var clr = $"{(IsHeli ? "" : $"runway {RwSay(Runway)}, ")}{Wind(t)}, cleared for {(fin != null ? "immediate " : "")}takeoff{(IsHeli ? " from present position" : "")}{(fin != null ? $", traffic {Describe(fin, Runway)}" : "")}";   // R347: helicopter without runway (FAA JO 7110.65 3-11-2)
         goFt = 0;
         if (stayPattern && Ifr)   // R253: practice approaches in IMC as radar pattern (FAA JO 7110.65 4-8-11): runway heading and altitude, after liftoff "contact Approach" (tick), vectors after check-in
         {
@@ -94,16 +94,18 @@ public partial class Tower
         bool near = fin != null && Approach(fin.X, fin.Z, rw).along < 4 * NM;
         var head = FinalTraffic(traffic, opp, 4 * NM).FirstOrDefault();   // Landing aircraft on the opposite direction (runway request A41, AI lands per DCS wind)
         var on = RwyTraffic(traffic);
-        if (EmgWithin(15) || near || head != null || on != null || RunwayClaimed > 0)
+        int ahead = RunwayClaimed + HoldAhead;   // R341: takeoff clearances plus players holding short who reported earlier
+        if (EmgWithin(15) || near || head != null || on != null || ahead > 0)
         {
+            if (!(Phase == Phase.HoldShort && holdSince >= 0)) holdSince = now;   // R341: a repeated "ready" keeps the place in the departure order
             Phase = Phase.HoldShort;
-            holdSince = now;
-            lineUp = !EmgWithin(15) && fin == null && head == null && RunwayClaimed == 0 && on is { Speed: > 3 };
+            // R343: line up and wait only behind a takeoff roll in departure direction (FAA JO 7110.65 3-9-4), not behind opposite direction, backtrack or rollout
+            lineUp = !EmgWithin(15) && fin == null && head == null && ahead == 0 && on is { Speed: > 10 } && HdgDiff(on.Hdg * 180 / Math.PI, LandHdg(rw)) < 30 && !on.Flag.StartsWith("arr");
             return EmgWithin(15) ? $"{c}, hold short runway {RwSay(rw)}, emergency traffic inbound."
-                 : lineUp ? $"{c}, runway {RwSay(rw)}, line up and wait, traffic on the runway."
+                 : lineUp ? $"{c}, runway {RwSay(rw)}, line up and wait, traffic {Ops.TypeSay(on!.Type)} departing runway {RwSay(rw)}."
                  : fin != null ? $"{c}, hold short runway {RwSay(rw)}, traffic {Describe(fin, rw)}."
                  : head != null ? $"{c}, hold short runway {RwSay(rw)}, opposite direction traffic, {Describe(head, opp)} runway {RwSay(opp)}."
-                 : RunwayClaimed > 0 ? $"{c}, hold short runway {RwSay(rw)}, number {RunwayClaimed + 1} for departure."
+                 : ahead > 0 ? $"{c}, hold short runway {RwSay(rw)}, number {ahead + 1} for departure."
                  : $"{c}, hold short runway {RwSay(rw)}, traffic {Describe(on!, rw)}.";
         }
         if (now - heavyDepAt < 120)   // R205: 2 min behind a departing Heavy (FAA JO 7110.65 3-9-6), clearance afterwards by itself (tick)
@@ -138,6 +140,14 @@ public partial class Tower
     };
     string Closed() => stayPattern && !Ifr && !wantStraight ? $", {Hand(Runway).Split(' ')[0]} closed traffic approved, report base" : "";   // FAA 7110.65 3-10: traffic pattern together with the clearance, then quiet
 
+    /// R357: emergency with the runway occupied: priority, but no clearance yet; Tick clears once the runway is clear (FAA JO 7110.65 3-10-5)
+    List<Msg> EmgBusy(string c, IReadOnlyList<Traffic> traffic)
+    {
+        Phase = Phase.Pattern;
+        rwyBusyTold = true;
+        return Say($"{c}, continue approach, {BusyWhy(traffic)}, will advise. Emergency services standing by.", "Tower");
+    }
+
     /// baseCall: "base" report (A44), the base position then counts like the final.
     List<Msg> Landing(Telemetry? t, IReadOnlyList<Traffic> traffic, string c, bool baseCall = false)
     {
@@ -145,6 +155,7 @@ public partial class Tower
         rwSwitched = false;   // R334: every answer here names the runway
         if (Emergency)
         {
+            if (TrafficOnRunway(traffic)) return EmgBusy(c, traffic);
             Phase = Phase.ClearedLand;
             return Say($"{c}, runway {RwSay(EmergencyRunway(t))}, {Wind(t)}, cleared to land, emergency services standing by.", "Tower");
         }
@@ -197,7 +208,7 @@ public partial class Tower
         holdFt = RouteFt(t, traffic, fix, HoldFtAt(fix));
         double d = Dist(t.X, t.Z, fix.X, fix.Z);
         return Say($"{Cs()}, emergency in progress, {(pattern ? "leave the pattern, " : "")}{Steer(t, fix, "the hold")}, {AltTo(t, holdFt)}{HoldSpd(t)}, " +
-                   $"{(HoldAt(fix) is { } hr ? $"hold {hr}, {Miles(d)} miles to go" : $"{Miles(d)} miles to the holding point")}, I will call you.", by);
+                   $"{(HoldAt(fix) is { } hr ? $"hold {hr}, {MilesTxt(d)} to go" : $"{MilesTxt(d)} to the holding point")}, I will call you.", by);
     }
 
     /// Emergency: the runway the pilot is already aligned with, otherwise the active one.

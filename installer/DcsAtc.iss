@@ -1,5 +1,5 @@
 ﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe
-#define AppVer "0.10.0-alpha"
+#define AppVer "0.11.0-alpha"
 #define Src ".."
 
 [Setup]
@@ -56,6 +56,41 @@ de.ServerSaved=Saved-Games-Ordner des Dedicated Servers (z. B. DCS.server, DCS.d
 en.ServerSaved=Saved Games folder of the dedicated server (e.g. DCS.server, DCS.dcs_serverrelease or the name after -w):
 de.ServerDcs=Installationsordner des Dedicated Servers (enthält bin\DCS_server.exe):
 en.ServerDcs=Installation folder of the dedicated server (contains bin\DCS_server.exe):
+de.TypeFull=Vollständig (alle Module)
+en.TypeFull=Full (all modules)
+de.TypeCustom=Benutzerdefiniert
+en.TypeCustom=Custom
+de.CompCore=Grundprogramm (Spracherkennung, Stimmen, SRS, Funkrad, Debriefing)
+en.CompCore=Core (speech recognition, voices, SRS, radio wheel, debriefing)
+de.CompAtc=Flugsicherung (Ground, Tower, Approach, ATIS, Luftraum)
+en.CompAtc=Air traffic control (Ground, Tower, Approach, ATIS, airspace)
+de.CompRange=Schießplatz (Range)
+en.CompRange=Range
+de.CompAwacs=AWACS (Picture, Bogey Dope, Luftkampf, KI-Jäger-Führung)
+en.CompAwacs=AWACS (picture, bogey dope, air combat, AI fighter control)
+de.CompTanker=Tanker
+en.CompTanker=Tanker
+de.CompCarrier=Flugzeugträger (Marshal, Tower, LSO)
+en.CompCarrier=Carrier (Marshal, Tower, LSO)
+de.CompAi=KI-Funk (KI-Verkehr spricht mit den Lotsen, Fox, Splash, Bingo)
+en.CompAi=AI radio (AI traffic talks to the controllers, fox, splash, bingo)
+de.CompCrew=Bodenpersonal (Crew Chief, Tankwagen, Munition, Feuerwehr)
+en.CompCrew=Ground crew (crew chief, fuel and ammo trucks, fire service)
+
+[Types]
+Name: "full"; Description: "{cm:TypeFull}"
+Name: "custom"; Description: "{cm:TypeCustom}"; Flags: iscustom
+
+; Modules: all files are always installed (same voices and models), the choice goes to modules.txt (app) and DcsAtcModules.txt (F10 menu); the settings window changes it later
+[Components]
+Name: "core"; Description: "{cm:CompCore}"; Types: full custom; Flags: fixed
+Name: "atc"; Description: "{cm:CompAtc}"; Types: full custom
+Name: "range"; Description: "{cm:CompRange}"; Types: full custom
+Name: "awacs"; Description: "{cm:CompAwacs}"; Types: full custom
+Name: "tanker"; Description: "{cm:CompTanker}"; Types: full custom
+Name: "carrier"; Description: "{cm:CompCarrier}"; Types: full custom
+Name: "ai"; Description: "{cm:CompAi}"; Types: full custom
+Name: "crew"; Description: "{cm:CompCrew}"; Types: full custom
 
 [Files]
 Source: "{#Src}\tmp\sc\DcsAtc.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -124,11 +159,14 @@ Type: files; Name: "{code:SavedGames}\Scripts\DcsAtc\DcsAtcLang.txt"
 Type: files; Name: "{code:ServerSaved}\Scripts\DcsAtc\DcsAtcPath.txt"
 Type: files; Name: "{code:ServerSaved}\Scripts\DcsAtc\DcsAtcLang.txt"
 Type: files; Name: "{app}\lang.txt"
+Type: files; Name: "{app}\modules.txt"
+Type: files; Name: "{code:SavedGames}\Scripts\DcsAtc\DcsAtcModules.txt"
+Type: files; Name: "{code:ServerSaved}\Scripts\DcsAtc\DcsAtcModules.txt"
 
 [Code]
 const ExportLine = 'pcall(function() local l=require(''lfs''); dofile(l.writedir()..[[Scripts\DcsAtcExport.lua]]) end)   -- DCS-ATC';
 var Saved, ServerSave, ServerDir: String;
-    ServerOnly, TaskSet: Boolean;   { ServerOnly: no Saved Games\DCS but a dedicated server -> install there only }
+    ServerOnly, TaskSet, CompSet: Boolean;   { ServerOnly: no Saved Games\DCS but a dedicated server -> install there only }
 
 { Saved Games\DCS (bzw. DCS.openbeta, falls nur das existiert): früher gewählter Ordner (HKCU\Software\DCS-ATC, liest auch die App),
   sonst der echte Ort von Saved Games (Konstante usersavedgames = Known Folder, in Windows verschiebbar) }
@@ -179,9 +217,26 @@ begin
   Result := not ServerOnly;
 end;
 
+{ Update: untick modules missing in modules.txt (the settings window may have changed them since the last setup; Inno only remembers its own choice) }
+procedure Untick(S, Id: String);
+begin
+  if Pos(',' + Id + ',', S) = 0 then begin
+    WizardSelectComponents('!' + Id);
+    WizardForm.TypesCombo.ItemIndex := 1;   { custom }
+  end;
+end;
+
 { Tasks page: preselect only on a server-only PC (player PC with a server folder: default path as before, user ticks the box) }
 procedure CurPageChanged(CurPageID: Integer);
+var S: AnsiString;
 begin
+  if (CurPageID = wpSelectComponents) and not CompSet and not WizardSilent then begin
+    CompSet := True;
+    if LoadStringFromFile(ExpandConstant('{app}\modules.txt'), S) then begin
+      S := ',' + Lowercase(Trim(S)) + ',';
+      Untick(S, 'atc'); Untick(S, 'range'); Untick(S, 'awacs'); Untick(S, 'tanker'); Untick(S, 'carrier'); Untick(S, 'ai'); Untick(S, 'crew');
+    end;
+  end;
   if (CurPageID = wpSelectTasks) and not TaskSet then begin
     TaskSet := True;
     if ServerOnly then WizardSelectTasks('server');
@@ -241,22 +296,27 @@ begin
   end;
 end;
 
-{ App path for the DCS hook (starts DcsAtc.exe with every mission); language for the app (lang.txt) and F10 menu (DcsAtcLang.txt) }
+{ App path for the DCS hook (starts DcsAtc.exe with every mission); language and modules for the app (lang.txt, modules.txt) and F10 menu (DcsAtcLang.txt, DcsAtcModules.txt) }
 procedure CurStepChanged(CurStep: TSetupStep);
+var Mods: String;
 begin
   if CurStep = ssPostInstall then begin
+    Mods := WizardSelectedComponents(False);
     if HasClient() then begin
       ForceDirectories(SavedGames('') + '\Scripts\DcsAtc');
       SaveStringToFile(SavedGames('') + '\Scripts\DcsAtc\DcsAtcPath.txt', ExpandConstant('{app}\DcsAtc.exe'), False);
       SaveStringToFile(SavedGames('') + '\Scripts\DcsAtc\DcsAtcLang.txt', ActiveLanguage, False);
+      SaveStringToFile(SavedGames('') + '\Scripts\DcsAtc\DcsAtcModules.txt', Mods, False);
       ExportLua(True);
     end;
     if WantServer() then begin   { Dedicated server: the hook starts the app with every server mission }
       ForceDirectories(ServerSaved('') + '\Scripts\DcsAtc');
       SaveStringToFile(ServerSaved('') + '\Scripts\DcsAtc\DcsAtcPath.txt', ExpandConstant('{app}\DcsAtc.exe'), False);
       SaveStringToFile(ServerSaved('') + '\Scripts\DcsAtc\DcsAtcLang.txt', ActiveLanguage, False);
+      SaveStringToFile(ServerSaved('') + '\Scripts\DcsAtc\DcsAtcModules.txt', Mods, False);
     end;
     SaveStringToFile(ExpandConstant('{app}\lang.txt'), ActiveLanguage, False);
+    SaveStringToFile(ExpandConstant('{app}\modules.txt'), Mods, False);
   end;
 end;
 

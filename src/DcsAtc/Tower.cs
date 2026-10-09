@@ -83,15 +83,19 @@ public partial class Tower
     bool missDep;                            // R253: the open "missed approach" is the departure to the radar pattern (check-in "airborne, climbing")
     double popM;                            // R113: handoff distance after pop-up IFR (smallest distance since then + 5 NM, at least 15 NM), 0 = 15 NM
     Telemetry? lastTel;
-    double lastSeen = -999, lastTaxiWarn = -999, lastAltWarn = -999, landedAt = -999, stoppedSince = -1, holdSince, touchAt = -999, rollBack = -1;   // rollBack: since when away from the holding point (A12)
+    double lastSeen = -999, lastTaxiWarn = -999, lastAltWarn = -999, landedAt = -999, stoppedSince = -1, holdSince, touchAt = -999, rollBack = -1, clrStill = -1;   // rollBack: since when away from the holding point (A12); clrStill: cleared for takeoff and standing since (R348)
     // Navigation / coordination
     (double X, double Z)? nav;          // target for headings (CRP, initial, airfield, final, departure CRP)
     string navName = "";
     double handoffAt = -999, lastVector = -999, lastGuide = -999, lastLow = -999, lastIncursion = -999, lastAbort = -999, lastPatternWarn = -999, lastGa = -999;   // lastGa: go-around from the tower (A11)
-    bool baseCalled, extended, wrongRwyTold, lineUp, gearTold, finalLowTold, rejecting;   // rejecting: rejected takeoff (R100) above 40 kt, the deceleration is not a takeoff roll
+    bool baseCalled, extended, wrongRwyTold, lineUp, gearTold, finalLowTold, rejecting, clrAsked;   // rejecting: rejected takeoff (R100) above 40 kt, the deceleration is not a takeoff roll
     bool needWx;                        // R126: initial rejection was the first contact, wind and QNH only come with the break clearance
     public bool LineUp => lineUp;       // "line up and wait" (Program: AI waits, A9/A10)
     public int RunwayClaimed;           // A9: others with takeoff clearance or LUAW before the takeoff roll (player) or AI with takeoff clearance on the ground (Program)
+    public double HoldSince => holdSince;
+    public int HoldAhead;               // R341: other players holding short who reported ready earlier (Program; departure order by report time)
+    public bool Heli;                   // R347: helicopter (mission category, Program); also by type without mission data
+    bool IsHeli => Heli || Regex.IsMatch(AcType, @"^(UH-|Mi-|Ka-|AH-|CH-|OH|SA342|AS532|MH-60)");
     // Traffic patterns, emergency, holding, landing assessment
     string? option;                     // "touch and go" / "low approach" / "full stop"
     bool stayPattern, holding, wasAir, graded;   // graded: landing graded, free again only above 30 m (bounce = one landing)
@@ -102,7 +106,7 @@ public partial class Tower
     bool mayday;                        // own emergency is MAYDAY (PAN: only priority in the sequence, others do not hold)
     public bool Mayday => Emergency && mayday && airborne;   // others hold, runway clear (Program: OtherEmergency, AI waits)
     bool EmgWithin(double nm) => OtherEmergency && EmergencyNm < nm;
-    string EmgNote() => OtherEmergency ? $", expedite vacating, emergency traffic {Miles(EmergencyNm * NM)} miles" : "";
+    string EmgNote() => OtherEmergency ? $", expedite vacating, emergency traffic {MilesTxt(EmergencyNm * NM)}" : "";
     public int QueueAhead = -1;         // aircraft ahead of me in the airfield's landing sequence (Program), -1 = unknown
     public bool Spaced = true;          // preceding aircraft is out of the holding and near the airfield or separated (Program) -> may approach
     public double AheadR = -1;          // R46: remaining distance (m) of the preceding aircraft to the threshold (Program, FinalPath), -1 = none/unknown
@@ -185,7 +189,11 @@ public partial class Tower
                                          : $"{(first ? "" : "revised, ")}expect approach in {min} minute{(min == 1 ? "" : "s")}");
     }
     public string AtisLetter = "";      // current ATIS identifier of the airfield (Program), "" = no ATIS
-    public static bool Ifr;             // visibility < 5 km or low clouds (Program, from the mission) -> ILS with radar vectoring
+    public static bool ForceIfr;        // instrument conditions regardless of the weather (tests)
+    public static (bool Ceil, double BaseM, double VisM)? Sky;   // mission weather (Program): ceiling BKN/OVC, base MSL, visibility; null = no mission data
+    /// R340: per airfield: visibility < 5 km or ceiling (BKN/OVC, R367) below 1500 ft above the field (SERA.5005(b)) -> ILS with radar vectoring
+    public static bool IfrAt(Airfield f) => ForceIfr || Sky is { } s && (s.VisM < 5000 || s.Ceil && s.BaseM - f.Elev < 1500 * Ft);
+    public bool Ifr => IfrAt(F);
     public static bool Watch = true;    // Config.AirspaceWatch (Program): announce violations and put them in the debriefing (N4)
     public int Rejected { get; private set; }   // rejected radio calls (debriefing)
     int? holdFor;                       // taxi traffic: stopped because of this traffic (Id), waits for "continue taxi" (R106)
@@ -249,10 +257,10 @@ public partial class Tower
     public record State(Phase Phase, string Runway, string? Option, bool StayPattern, bool Holding, double HoldFt, double[]? Nav, string NavName,
                         bool Emergency, bool Following, bool Separate, bool DepClr, string? Dest, double DepFt, int ParkNum, double[]? Spot,
                         bool Airborne, bool HandedOff, string? ExitDir, string? Entry, int Laps, bool WasAir, bool Vectoring = false, bool Straight = false, bool VecFinal = false,
-                        string? Squawk = null, bool Visual = false);
+                        string? Squawk = null, bool Visual = false, bool? Mayday = null);
     public State Save() => new(Phase, Runway, option, stayPattern, holding, holdFt, nav is { } n ? new[] { n.X, n.Z } : null, navName,
                                Emergency, Following, Separate, depClr, dest?.Name, depFt, parkNum, spot is { } s ? new[] { s.X, s.Z } : null,
-                               airborne, handedOff, exitDir, entry, Laps, wasAir, Vectoring, wantStraight, vecFinal, Squawk, wantVisual);
+                               airborne, handedOff, exitDir, entry, Laps, wasAir, Vectoring, wantStraight, vecFinal, Squawk, wantVisual, mayday);
     public bool Vectoring => vec != null;   // radar vectoring running
     public void Load(State s, Telemetry t, double now)
     {
@@ -260,7 +268,7 @@ public partial class Tower
         nav = s.Nav is [var x, var z] ? (x, z) : null;
         spot = s.Spot is [var sx, var sz] ? (sx, sz) : null;
         (Emergency, Following, Separate, depClr, depFt, parkNum) = (s.Emergency, s.Following, s.Separate, s.DepClr, s.DepFt, s.ParkNum);
-        mayday = Emergency;   // type not saved: treated like MAYDAY after the restart
+        mayday = s.Mayday ?? Emergency;   // R362: type saved; older session files: treated like MAYDAY
         dest = All.FirstOrDefault(f => f.Name == s.Dest);
         Squawk = s.Squawk;
         (airborne, handedOff, exitDir, entry, Laps, wasAir) = (s.Airborne, s.HandedOff, s.ExitDir, s.Entry, s.Laps, s.WasAir);

@@ -13,6 +13,7 @@ public partial class Tower
     static readonly string[] FieldSight = { "field in sight", "airfield in sight", "airport in sight", "runway in sight", "have the field", "have the airport", "have the runway", "field not in sight", "airport not in sight", "runway not in sight" };
     bool visAsk, visSeen;   // R115: visual approach waits for "field in sight" / airfield is reported
     bool vecFinal, wantStraight, wantVisual, optedOut;   // wantStraight: instrument approach wanted (also after holding), wantVisual: of which visual approach (P3-AP7)
+    bool apprClr;   // R353: approach clearance already given with the turn-in vector (handover only)
     double vecFt, lastVecSaid = -999, vecHdg, prevHdg, prevIas, lastSeqSaid = -999, lastHoldInfo = -999;
     int lastAhead = -1;
     bool holdArrived;
@@ -57,6 +58,15 @@ public partial class Tower
     string ProcSay(string rw) => F.Ils.TryGetValue(rw, out var i) ? $"ILS approach runway {RwSay(rw)}, localizer {FreqSay(i.Mhz)}"
         : $"{(Proc(rw) is var p && p != "" ? p : "straight in")} approach runway {RwSay(rw)}";
 
+    /// R352: replanning under radar; other runway or route than before: "due to terrain, expect …" before the vector (FAA JO 7110.65 4-8-1, 5-9-2)
+    string Replan(Telemetry t, double now, string? why = null)
+    {
+        var (was, wasV) = (Runway, vrw);
+        var sv = StartVectors(t, Ifr || wantStraight, now, why: why);
+        if (Runway == was && vrw == wasV) return sv;
+        var pt = PlanText(was);
+        return char.ToLower(pt[0]) + pt[1..] + Cap(sv);
+    }
     /// Plan waypoints and give first heading.
     string StartVectors(Telemetry t, bool final, double now, double minFt = 0, string? why = null)   // minFt: missed approach altitude (R44), not below it; why: reason for replanning (R222)
     {
@@ -66,6 +76,7 @@ public partial class Tower
         if (vec == null) { pdDescent = false; keepHighR = 0; }   // R303: new approach: the previous one's request no longer applies
         (vrw, gate, vecOver, vec) = Plan(t, final);
         vecFinal = final && !vecOver;   // Circling as overhead
+        while (vec.Count > 0 && Dist(t.X, t.Z, vec[0].X, vec[0].Z) < Lead(t).Lim) vec.RemoveAt(0);   // R351: first waypoint already within the turn lead: heading for the next leg now, not "fly heading …" and 1 s later "turn right …"
         if (!vecOver) Runway = vrw;     // on the reciprocal runway (terrain, plan): applies to this approach (Program holds the AI)
         // Traffic close by (e.g. holding of a neighbouring airfield): immediately the next altitude with 1000 ft separation and name the traffic, not "traffic alert" 2 s later
         bool Clear(double ft) => !near.Any(a => a.InAir && Dist(t.X, t.Z, a.X, a.Z) < 3 * NM && Math.Abs(a.AltMsl / Ft - ft) < 1000);
@@ -77,7 +88,7 @@ public partial class Tower
         (advised[a.Id], followAt) = (new Advice { At = now }, now);
         int clock = (int)Math.Round(((Bearing(t.X, t.Z, a.X, a.Z) - t.Hdg * 180 / Math.PI) % 360 + 360) % 360 / 30) % 12;
         double dAlt = (a.AltMsl - t.AltMsl) / Ft;
-        return VecCall(t, now) + $" Traffic {(clock == 0 ? 12 : clock)} o'clock, {Miles(Dist(t.X, t.Z, a.X, a.Z))} miles, " +
+        return VecCall(t, now) + $" Traffic {(clock == 0 ? 12 : clock)} o'clock, {MilesTxt(Dist(t.X, t.Z, a.X, a.Z))}, " +
                $"{(Math.Abs(dAlt) < 300 ? "same altitude" : $"{Math.Round(Math.Abs(dAlt) / 100) * 100:0} feet {(dAlt > 0 ? "above" : "below")}")}, {Ops.TypeSay(a.Type)}.";
     }
 
@@ -262,7 +273,12 @@ public partial class Tower
         var rw = vrw;
         lastVecSaid = now;
         double brg = leg ?? VecBrg(t);   // leg: heading of the new leg (turn anticipated), otherwise to the waypoint
-        if (!ReferenceEquals(vec, vecMemList)) { vecMemList = vec; intentsAsked = false; vecMemLeg = ""; vecMemKt = 0; vecMemFt = -1; full = true; lastAltFt = -1; spdTold = 0; spdFree = false; }   // Start of guidance (StartVectors, direct): first contact
+        if (!ReferenceEquals(vec, vecMemList)) { vecMemList = vec; intentsAsked = false; vecMemLeg = ""; vecMemKt = 0; vecMemFt = -1; full = true; lastAltFt = -1; spdTold = 0; spdFree = false; apprClr = false; }   // Start of guidance (StartVectors, direct): first contact
+        double? sd = null;
+        KeepLow(t);
+        double mva = PathMva(t);
+        if (mva > vecFt) vecFt = mva;   // Terrain on the way: high
+        else sd = stepFt ?? StepDown(t);
         string tail;
         if (vec!.Count > 0)
             tail = vec.Count == 1 || HdgDiff(brg, LandHdg(Runway) + 180) > 45 ? $", vectors for {(vecFinal ? "final approach" : Circling ? (CircleIfr ? "circling approach" : $"{Hand(Runway)} downwind") : vecOver ? "overhead join" : "initial")} runway {RwSay(Runway)}"
@@ -270,6 +286,13 @@ public partial class Tower
         else   // Review R212: circling without procedure (VMC): centreline of the reciprocal runway, then downwind of the active runway
             tail = $", intercept {(!vecFinal && !(Circling && CircleIfr) ? "the extended centerline" : Proc(rw) == "ILS" && !wantVisual ? "the localizer" : "final approach course")} runway {RwSay(rw)}" +
                    $"{(!vecOver ? "" : Circling ? (CircleIfr ? $", circle to runway {RwSay(Runway)}" : $" for {Hand(Runway)} downwind runway {RwSay(Runway)}") : $" for overhead join runway {RwSay(Runway)}")}";   // Reciprocal direction only as a way to the overhead: say so, otherwise he thinks of a landing there
+        // R353: last turn-in vector at most 30°, meets the centreline 2 NM or more before the gate and within 18 NM (localizer service volume), not above the glide path there (at most gate + 1000 ft):
+        // "maintain … until established" and the approach clearance in the same call (FAA JO 7110.65 5-9-1, 5-9-2)
+        var ip = Icpt(t.X, t.Z);
+        double ca = AL(ip.X, ip.Z, rw).A;
+        var p = Proc(rw);
+        bool clr = vec.Count == 0 && vecFinal && p != "" && !wantVisual && HdgDiff(brg, LandHdg(rw)) <= 30.5 && ca >= gate + 2 * NM && ca <= Math.Max(18 * NM, gate + 2 * NM) && vecFt <= Math.Min(GateFt + 1000, FieldElev / Ft + ca / NM * 318);
+        if (clr) { tail = $", maintain {Alt(vecFt)} until established{(p == "ILS" ? " on the localizer" : "")}, cleared {p} approach runway {RwSay(rw)}" + OnTheGo(rw); apprClr = true; }
         var tailSaid = vecWhy != null && vec.Count > 0 ? ", " + vecWhy : tail;   // R222: led through the approach line / replanned: reason instead of first-contact wording (vecMemLeg remains the plan leg)
         vecWhy = null;
         bool newLeg = tail != vecMemLeg;
@@ -278,13 +301,8 @@ public partial class Tower
         double turn = ((brg - t.Hdg * 180 / Math.PI) % 360 + 540) % 360 - 180;
         int mag = (int)Math.Round(((brg - MagVar) % 360 + 360) % 360 / 5) * 5;
         var hdg = $"heading {Digits((mag == 0 ? 360 : mag).ToString("000"))}";
-        double? sd = null;
-        KeepLow(t);
-        double mva = PathMva(t);
-        if (mva > vecFt) vecFt = mva;   // Terrain on the way: high
-        else sd = stepFt ?? StepDown(t);
         var to = vecFinal ? Thr(rw) : vecOver ? Ovh : OnCenterline(rw, InitialDist);
-        var range = $"{Miles(Dist(t.X, t.Z, to.X, to.Z))} miles from {(vecFinal ? "touchdown" : vecOver ? "the field" : "initial")}";
+        var range = $"{MilesTxt(Dist(t.X, t.Z, to.X, to.Z))} from {(vecFinal ? "touchdown" : vecOver ? "the field" : "initial")}";
         // Heading always; distance at first contact and with the last vector; altitude/speed only on change (or far off); leg only on change
         var head = Math.Abs(turn) < 10 ? $"fly {hdg}" : $"turn {(turn > 0 ? "right" : "left")} {hdg}";
         bool sayRange = full || newLeg && vec.Count == 0;
@@ -292,7 +310,8 @@ public partial class Tower
         if (sayRange && vec.Count > 0) sb.Append($", {range}");
         double dz = IndFt(t) - vecFt;
         bool altDev = again || dz < -300 && t.Vs < 2.5 || !Emergency && !Pd(t) && dz > 300 && t.Vs > -2.5;   // R292: emergency on top: descent at own discretion   // off and not correcting: name direction, not only "maintain" (R130 same-altitude rule applies only while he is flying toward it)
-        if (full || vecFt != vecMemFt || Math.Abs(IndFt(t) - vecFt) > 1000) sb.Append(", " + (sd is { } ft && ft < IndFt(t) ? Descend(lastAltFt = ft, t) : AltTo(t, vecFt, altDev)));   // R130: AltTo only if the altitude is actually stated (remembers it)
+        if (clr) lastAltFt = vecFt;   // R353: the altitude is in the clearance
+        else if (full || vecFt != vecMemFt || Math.Abs(IndFt(t) - vecFt) > 1000) sb.Append(", " + (sd is { } ft && ft < IndFt(t) ? Descend(lastAltFt = ft, t) : AltTo(t, vecFt, altDev)));   // R130: AltTo only if the altitude is actually stated (remembers it)
         vecMemFt = vecFt;
         if (VecKt(t) is > 0 and var kts && (full || kts != vecMemKt || Math.Abs(t.Ias / Kt - kts) > 60)) { if ((again ? Spd(t, kts) : SpdSay(t, kts, now, kts != vecMemKt)) is { } ss) sb.Append(", " + ss); vecMemKt = kts; }   // say again: repeat verbatim, does not count
         if (full || newLeg) sb.Append(tailSaid);
@@ -466,6 +485,14 @@ public partial class Tower
         return target;
     }
 
+    /// Anticipate turn (radius at 300 kt ~2 NM): give the next heading early enough that he rolls out on the new leg. Lim: lead before vec[0], Nb: heading of the next leg.
+    (double Lim, double Nb) Lead(Telemetry t)
+    {
+        var nx = vec!.Count >= 2 ? vec[1] : Icpt(vec[0].X, vec[0].Z);   // Next leg: next waypoint or turn-in point
+        double nb = Bearing(vec[0].X, vec[0].Z, nx.X, nx.Z);   // Corner at waypoint: heading there -> next leg (not the current heading, otherwise much too early)
+        return (Math.Clamp(TurnR(t) * Math.Tan(Math.Min(HdgDiff(Bearing(t.X, t.Z, vec[0].X, vec[0].Z), nb), 150) * Math.PI / 360), 1.5 * NM, 5 * NM), nb);
+    }
+
     /// Every second during radar vectoring.
     List<Msg>? VecTick(Telemetry t, IReadOnlyList<Traffic> traffic, double now)
     {
@@ -474,16 +501,16 @@ public partial class Tower
         var rw = vrw;
         double hdg = t.Hdg * 180 / Math.PI;
         KeepLow(t);
+        bool soon = false;   // R355: VFR on the centreline, handover zone (gate + 2 NM) within ~15 s: no profile step any more, the handover states the altitude
         if (vec.Count > 0)
         {
-            // Anticipate turn (radius at 300 kt ~2 NM): give the next heading early enough that he rolls out on the new leg
-            var nx = vec.Count >= 2 ? vec[1] : Icpt(vec[0].X, vec[0].Z);   // Next leg: next waypoint or turn-in point
-            double nb = Bearing(vec[0].X, vec[0].Z, nx.X, nx.Z);   // Corner at waypoint: heading there -> next leg (not the current heading, otherwise much too early)
-            double wb = Bearing(t.X, t.Z, vec[0].X, vec[0].Z), wd = Dist(t.X, t.Z, vec[0].X, vec[0].Z), lim = Math.Clamp(TurnR(t) * Math.Tan(Math.Min(HdgDiff(wb, nb), 150) * Math.PI / 360), 1.5 * NM, 5 * NM);
+            var (lim, nb) = Lead(t);
+            double wb = Bearing(t.X, t.Z, vec[0].X, vec[0].Z), wd = Dist(t.X, t.Z, vec[0].X, vec[0].Z);
             vecLim = lim;   // R315: correction/StepDown not shortly before this turn
             // Senaki 0.9.5: wide turn radius (fast/flat) -> passes the waypoint to the side; counts as reached (up to 5 NM off), otherwise U-turn back to the point behind him
             bool abeam = HdgDiff(hdg, vecHdg) < 30 && wd < 5 * NM && wd * Math.Cos(HdgDiff(hdg, wb) * Math.PI / 180) < lim;
-            if ((HdgDiff(hdg, vecHdg) < 30 || HdgDiff(hdg, wb) > 90) && wd < lim || abeam) { vec.RemoveAt(0);
+            // R351: the next vector only once the previous one is being flown (15 s); the waypoint stays until the call goes out
+            if (((HdgDiff(hdg, vecHdg) < 30 || HdgDiff(hdg, wb) > 90) && wd < lim || abeam) && now - lastVecSaid >= 15) { vec.RemoveAt(0);
                 // last turn already close to the centreline and low enough: hand over right away (not intercept heading and 1 s later "cleared approach")
                 if (vec.Count == 0 && AL(t.X, t.Z, rw) is var (ea, el) && ea > 0 && Math.Abs(el) < 2 * NM && HandoffOk(t, ea)) return Established(t);
                 return Say($"{c}, {VecCall(t, now, leg: nb)}", "Approach"); }   // equal to the leg heading: rolls out on it, no follow-up correction
@@ -495,13 +522,14 @@ public partial class Tower
             double dh = HdgDiff(hdg, LandHdg(rw));
             double lead = TurnR(t) * (1 - Math.Cos(Math.Min(dh, 90) * Math.PI / 180)) + 0.1 * NM;
             bool closing = dh < 5 || Math.Abs(AL(t.X + 300 * Math.Cos(t.Hdg), t.Z + 300 * Math.Sin(t.Hdg), rw).L) < Math.Abs(l);
+            soon = !vecFinal && a > 0 && dh < 60 && closing && Math.Abs(l) - Math.Max(lead, 0.3 * NM) < 15 * t.Ias * Math.Sin(dh * Math.PI / 180) && a - 15 * t.Ias * Math.Cos(dh * Math.PI / 180) < gate + 2 * NM;
             if (a > 0 && Math.Abs(l) < Math.Max(lead, 0.3 * NM) && dh < 60 && closing)   // also far out: otherwise he flies through the centreline
             {
                 if (HandoffOk(t, a)) return Established(t);
                 // too high or too far out for handover: first on heading, keep descending (StepDown), hand over at the gate at the latest. R306: only if he otherwise flies through –
                 // after "intercept …" he turns in himself (already turning to runway heading or not yet at his own turn-in point): no "join" seconds after the intercept heading
                 bool capturing = dh < HdgDiff(prevHdg, LandHdg(rw)) - 0.01 || Math.Abs(l) > (lead - 0.1 * NM) * 0.6;   // turns in or is not yet clearly beyond his turn-in point
-                if (dh > 10 && HdgDiff(vecHdg, LandHdg(rw)) > 1 && !capturing)
+                if (dh > 10 && HdgDiff(vecHdg, LandHdg(rw)) > 1 && !capturing && !apprClr)
                 {                    vecHdg = LandHdg(rw); lastVecSaid = now;
                     return Say($"{c}, {TurnTo(t, vecHdg)}, join the extended centerline runway {RwSay(rw)}, {AltTo(t, vecFt)}.", "Approach");
                 }
@@ -514,13 +542,13 @@ public partial class Tower
                 {
                     intentsAsked = true; lastVecSaid = now;
                     double side = ((Bearing(Thr(rw).X, Thr(rw).Z, t.X, t.Z) - LandHdg(rw) - 180) % 360 + 540) % 360 - 180;
-                    return Say($"{c}, {Miles(a)} miles from the airport, {(Math.Abs(l) < 0.75 * NM ? "one half mile" : $"{Miles(Math.Abs(l))} miles")} {(side > 0 ? "left" : "right")} of course, say intentions.", "Approach");
+                    return Say($"{c}, {MilesTxt(a)} from the airport, {(Math.Abs(l) < 0.75 * NM ? "one half mile" : MilesTxt(Math.Abs(l)))} {(side > 0 ? "left" : "right")} of course, say intentions.", "Approach");
                 }
             }
             if ((late || Math.Abs(l) > 10 * NM) && now - lastVecSaid > 30)   // or too far away: replan
                 // Visual to initial as number 1, not far across: rather direct (up to 60° bend at initial) than a full circle
                 return late && !vecFinal && !vecOver && QueueAhead <= 0 && a - InitialDist > NM && Math.Abs(l) < Math.Min((a - InitialDist) * 1.73, 10 * NM) ? Established(t, true)
-                     : Say($"{c}, {StartVectors(t, Ifr || wantStraight, now, why: late && vecFinal ? "vectors across final for re-sequencing" : null)}", "Approach");
+                     : Say($"{c}, {Replan(t, now, late && vecFinal ? "vectors across final for re-sequencing" : null)}", "Approach");
         }
         bool joining = vec.Count == 0 && Math.Abs(AL(t.X, t.Z, rw).L) < NM && HdgDiff(hdg, LandHdg(rw)) < 35;   // is just turning in
         double ft = IndFt(t);
@@ -528,6 +556,11 @@ public partial class Tower
         prevHdg = hdg;
         slewing = VecKt(t) > 0 && Math.Abs(t.Ias - VecKt(t) * Kt) < Math.Abs(prevIas - VecKt(t) * Kt) - 0.2;   // is just braking/accelerating toward target: leave alone
         prevIas = t.Ias;
+        if (apprClr)   // R353: cleared: he intercepts himself, no corrections or descents any more; flown through the centreline: vectors again
+        {
+            if (Intercepts(t, hdg) || Math.Abs(AL(t.X, t.Z, rw).L) < NM) return null;
+            apprClr = false;
+        }
         if (HdgDiff(hdg, vecHdg) <= 7 && Math.Abs(ft - vecFt) <= 500) { devAt.Clear(); ignored = 0; }   // complied with
         if (Math.Abs(ft - vecFt) <= 300) { reachedFt = vecFt; highTold = 0; }   // R302: arrived at the assigned altitude (above it afterwards = climbed unasked)
         if (VecKt(t) > 0 && Math.Abs(t.Ias / Kt - VecKt(t)) <= 30) spdTold = 0;   // Speed complied: counter back
@@ -568,7 +601,7 @@ public partial class Tower
             lastVecSaid = now; vecMemKt = sk;
             return Say($"{c}, reduce speed {sk} knots for spacing.", "Approach");
         }
-        if (now - lastVecSaid >= 30 && !(vec.Count > 0 && Dist(t.X, t.Z, vec[0].X, vec[0].Z) < vecLim + NM) && StepDown(t) is { } sd)   // Profile descent: gradually to handover altitude
+        if (now - lastVecSaid >= 30 && !soon && !(vec.Count > 0 && Dist(t.X, t.Z, vec[0].X, vec[0].Z) < vecLim + NM) && StepDown(t) is { } sd)   // Profile descent: gradually to handover altitude
         {
             lastVecSaid = now;
             var say = sd > IndFt(t) ? $"climb and maintain {Alt(sd)}" : Descend(sd, t);   // Holding on the path: above it (StepDown)
@@ -677,9 +710,9 @@ public partial class Tower
                 if (holding && nav is { } hf)
                 {
                     holdArrived = false;
-                    return Say($"{c}, {Steer(t, hf, navName)}, {Miles(Dist(t.X, t.Z, hf.X, hf.Z))} miles to the hold, {AltTo(t, holdFt)}.", "Approach");
+                    return Say($"{c}, {Steer(t, hf, navName)}, {MilesTxt(Dist(t.X, t.Z, hf.X, hf.Z))} to the hold, {AltTo(t, holdFt)}.", "Approach");
                 }
-                return Say($"{c}, {StartVectors(t, Ifr || wantStraight, now)}", "Approach");
+                return Say($"{c}, {Replan(t, now)}", "Approach");
             case 3: return Say($"{c}, say intentions.", "Approach");
             default: return Dev($"{c}, you are not following instructions, you are removed from the sequence. {Cap(CancelApproach(t))}",
                                 $"aus der Reihenfolge entfernt (Anweisungen nicht befolgt) {F.Name}", $"removed from the sequence (instructions not followed) {F.Name}", "Approach");
@@ -699,6 +732,7 @@ public partial class Tower
         var c = Cs();
         var rw = Runway;
         vec = null;
+        bool clr = apprClr; apprClr = false;
         Phase = Phase.Entering;
         handoffAt = lastVector = lastSeen; towerDue = true; towerNag = false;   // Tower only controls once he has turned in (otherwise "fly heading … to initial" mid-turn)
         if (vecFinal)
@@ -708,10 +742,11 @@ public partial class Tower
             if (wantVisual && !visSeen)   // R115: visual approach only with airfield in sight, stay with Approach (Tick: from 4 NM fallback to straight-in/instrument)
             {
                 Phase = Phase.Inbound; visAsk = true;
-                return Say($"{c}, {(HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(rw)) > 5 ? TurnTo(t, LandHdg(rw)) + ", " : "")}{Miles(Dist(t.X, t.Z, thr.X, thr.Z))} miles from touchdown, expect visual approach runway {RwSay(rw)}, report field in sight.", "Approach");
+                return Say($"{c}, {(HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(rw)) > 5 ? TurnTo(t, LandHdg(rw)) + ", " : "")}{MilesTxt(Dist(t.X, t.Z, thr.X, thr.Z))} from touchdown, expect visual approach runway {RwSay(rw)}, report field in sight.", "Approach");
             }
+            if (clr) return Say($"{c}, {(Dist(t.X, t.Z, thr.X, thr.Z) < 9 * NM || AheadR >= 0 ? "reduce to final approach speed, " : "")}{Qnh(t)}, contact {Contact("Tower")}.", "Approach");   // R353: cleared with the turn-in vector: handover only
             // R220: position before heading, "until established on the localizer" (FAA JO 7110.65 5-9-4); R271: PAR without lost-comm instruction (R221) – it promises calls every 5 s on final that do not exist without talk-down (N13); R217: practice approach with climb-out
-            return Say($"{c}, {Miles(Dist(t.X, t.Z, thr.X, thr.Z))} miles from touchdown, {(HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(rw)) > 5 ? TurnTo(t, LandHdg(rw)) + ", " : "")}" +
+            return Say($"{c}, {MilesTxt(Dist(t.X, t.Z, thr.X, thr.Z))} from touchdown, {(HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(rw)) > 5 ? TurnTo(t, LandHdg(rw)) + ", " : "")}" +
                        (Proc(rw) is var p && p != "" && !wantVisual ? $"{(HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(rw)) > 5 || Math.Abs(AL(t.X, t.Z, rw).L) > 0.3 * NM ? $"maintain {Alt(vecFt)} until established{(p == "ILS" ? " on the localizer" : "")}, " : "")}cleared {p} approach runway {RwSay(rw)}" : $"on course, {(wantVisual ? "cleared visual approach" : "proceed straight in")} runway {RwSay(rw)}") + OnTheGo(rw) + (Dist(t.X, t.Z, thr.X, thr.Z) < 9 * NM || AheadR >= 0 ? ", reduce to final approach speed, " : ", ") +   // R46: with preceding traffic also at the 10 NM gate (otherwise he catches up with the speed from radar vectoring)
                        $"{Qnh(t)}, contact {Contact("Tower")}.", "Approach");   // R314: "report four mile final" is given by the tower (first call), not Approach
         }
@@ -724,13 +759,13 @@ public partial class Tower
         if (Circling)   // R212: instrument approach to the reciprocal runway, circling at pattern altitude (FAA JO 7110.65 4-8-1, 4-8-6); no overhead in IMC
         {
             nav = null; navName = "circle";
-            return Say($"{c}, {Miles(d)} miles from the field, {(HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(vrw)) > 5 ? TurnTo(t, LandHdg(vrw)) + ", " : "")}" +
+            return Say($"{c}, {MilesTxt(d)} from the field, {(HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(vrw)) > 5 ? TurnTo(t, LandHdg(vrw)) + ", " : "")}" +
                        (CircleIfr ? $"maintain {Alt(ft)} until established{(Proc(vrw) == "ILS" ? " on the localizer" : "")}, cleared {Proc(vrw)} approach runway {RwSay(vrw)}, circle to runway {RwSay(rw)}"
                                   : $"on course, maintain {Alt(ft)}, expect {Hand(rw)} downwind runway {RwSay(rw)}") +   // Review R212: without procedure no approach clearance to the reciprocal runway, the tower gives the pattern
                        $", {Qnh(t)}, contact {Contact("Tower")}.", "Approach");
         }
-        return Say($"{c}, " + (direct ? $"proceed direct initial runway {RwSay(rw)}, {Miles(d)} miles, "
-                   : $"{(HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(vrw)) > 5 ? TurnTo(t, LandHdg(vrw)) + ", " : "")}on course, {Miles(d)} miles from {(vecOver ? "the field" : "initial")}, ") +
+        return Say($"{c}, " + (direct ? $"proceed direct initial runway {RwSay(rw)}, {MilesTxt(d)}, "
+                   : $"{(HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(vrw)) > 5 ? TurnTo(t, LandHdg(vrw)) + ", " : "")}on course, {MilesTxt(d)} from {(vecOver ? "the field" : "initial")}, ") +
                    $"{AltTo(t, ft)}, " +   // R323: same altitude not "descend and" again (R130)
                    (vecOver ? $"proceed overhead, {Hand(rw)} pattern runway {RwSay(rw)}, " : "") +
                    $"contact {Contact("Tower")}, report {navName}{(vecOver ? "" : " for overhead break")}.", "Approach");

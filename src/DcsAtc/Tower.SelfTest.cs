@@ -34,6 +34,15 @@ public partial class Tower
         Check(r.Count == 0, "Rücklesen -> keine Antwort");
         r = tw.OnTranscript("Springfield one two ready for departure", parked, none, 3.5);
         Check(r[0].Contains("negative, you are not at the holding point"), r[0]);
+        {   // R349: "ready for departure" only at the holding point (250 m), 500 m before it -> continue taxi
+            var tw349 = new Tower("Enfield 1-1");
+            tw349.Tick(parked, none, 0);
+            tw349.OnTranscript("Kutaisi Ground, Enfield 11, request taxi", parked, none, 1);
+            var e25 = K.End("25"); var hp25 = tw349.HoldPt("25", At(Thr25X, Thr25Z + 120));
+            var early349 = At(hp25.X - 500 * e25.Dx, hp25.Z - 500 * e25.Dz);
+            var r349 = tw349.OnTranscript("Kutaisi Tower, Enfield 11, ready for departure", early349, none, 2)[0].Text;
+            Check(r349.Contains("Continue taxi to holding point runway two five") && tw349.Phase == Phase.TaxiOut && Dist(early349.X, early349.Z, Thr25X, Thr25Z) < 700, "R349 ready 500 m vor dem Rollhalt: " + r349);
+        }
         {   // Forum log 0.9.4: readback of the taxi clearance (Whisper "CY" instead of "taxi") with "contact tower when ready for departure" is not takeoff readiness
             var trb = new Tower("Enfield 1-1") { HeardOn = 263 };   // F-14 on Kutaisi UHF: one frequency for Ground/Tower, the controller follows the intent
             trb.Tick(parked, none, 0);
@@ -1408,7 +1417,7 @@ public partial class Tower
         // R39 · R48: Enter suggestion only if it fits (null = none): IMC first IFR clearance, "ready" only at the holding point, nothing after takeoff/landing/taxi-in clearance, no CRP in holding
         var twSg = new Tower("Enfield 1-1");
         twSg.Tick(parked, none, 0);
-        Ifr = true; var sg = new List<string?> { twSg.Suggest(parked)?.Text }; Ifr = false;
+        ForceIfr = true; var sg = new List<string?> { twSg.Suggest(parked)?.Text }; ForceIfr = false;
         twSg.OnTranscript("Enfield 11 request taxi", parked, none, 1);
         sg.Add(twSg.Suggest(parked)?.Text); sg.Add(twSg.Suggest(hold)?.Text);
         twSg.OnTranscript("Enfield 11 ready for departure", hold, none, 2);
@@ -1838,6 +1847,13 @@ public partial class Tower
             tq.Tick(N(12, 180, 2500), pat, 0);
             r = tq.OnTranscript("Kutaisi Approach, Enfield 1-1, request zone transit", N(12, 180, 2500), pat, 1);
             Check(r.Count == 1 && r[0].Text == "Enfield one one, Kutaisi Approach, remain outside the control zone, expect transit in 6 minutes." && tq.TransitInfo == null, "N3 volle Runde: " + string.Join(" | ", r));
+            // R389: "request zone transit" (radio wheel/F10) inbound is no transit and no new check-in
+            var tn = new Tower("Enfield 1-1");
+            tn.Tick(N(12, 180, 2500), none, 0);
+            tn.OnTranscript("Kutaisi Approach, Enfield 1-1, inbound for landing", N(12, 180, 2500), none, 1);
+            var tnPh = tn.Phase;
+            r = tn.OnTranscript("Approach: request zone transit", N(12, 180, 2500), none, 2);
+            Check(r.Count == 1 && r[0].Text == "Enfield one one, Kutaisi Approach, unable zone transit, say intentions." && tn.Phase == tnPh && tnPh != Phase.Away && tn.TransitInfo == null, "R389 Durchflug im Anflug: " + string.Join(" | ", r));
             var tv = new Tower("Enfield 1-1");
             tv.Tick(N(30, 180, 6000), none, 0);
             r = tv.OnTranscript("Kutaisi Approach, Enfield 1-1, request VFR flight following", N(30, 180, 6000), none, 1);
@@ -1920,6 +1936,24 @@ public partial class Tower
         var tw8e = Cleared();   // already on the runway: landing aircraft under 1.5 NM does not withdraw the clearance (AI does not go around), he continues the takeoff
         r = tw8e.Tick(At(CX, CZ, 0, 254, 5), new[] { lander }, 4);
         Check(tw8e.Phase == Phase.ClearedTakeoff && r.Count == 0, "auf der Bahn, Landender 1 NM: Freigabe bleibt: " + string.Join(" | ", r.Select(m => m.Text)));
+        // R348: cleared but standing: query after 60 s, cancel after 120 s (RunwayClaimed: neither ClearedTakeoff nor line up), no silent new clearance; on the runway he may stand
+        foreach (var onRwy348 in new[] { false, true })
+        {
+            var tw348 = Cleared();
+            var at348 = onRwy348 ? At(CX, CZ, 0, 254, 0) : hold;
+            var r348 = new[] { 4.0, 50, 64, 100, 124, 130 }.Select(s => string.Join(" ", tw348.Tick(at348, none, s).Select(m => m.Text))).ToList();
+            Check(r348[0] == "" && r348[1] == "" && r348[2].Contains("verify rolling, runway two five, cleared for takeoff") && r348[3] == "" && r348[5] == "" && tw348.Phase == Phase.HoldShort && tw348.LineUp == onRwy348 &&
+                  r348[4].Contains("cancel takeoff clearance, " + (onRwy348 ? "exit the runway" : "hold short runway two five") + ", report ready for departure"),
+                  $"R348 Freigabe ohne Rollen (Bahn {onRwy348}): " + string.Join(" | ", r348));
+        }
+        // R347: helicopter: air taxi, takeoff clearance without runway number
+        var tw347 = new Tower("Enfield 1-1") { AcType = "UH-1H" };
+        tw347.Tick(parked, none, 0);
+        tw347.OnTranscript("Enfield 11 request startup", parked, none, 1);
+        var taxi347 = tw347.OnTranscript("Enfield 11 request taxi", parked, none, 2);
+        var clr347 = tw347.OnTranscript("Enfield 11 ready for departure", hold, none, 3);
+        Check(taxi347.Count == 1 && taxi347[0].Contains("air taxi") && taxi347[0].Contains("to holding point runway two five") && clr347.Count == 1 &&
+              clr347[0].Contains("cleared for takeoff from present position") && !clr347[0].Contains("runway"), "R347 Hubschrauber: " + string.Join(" | ", taxi347.Concat(clr347).Select(m => m.Text)));
         // R100: rejected takeoff clears the takeoff clearance; vacate the runway without "hold position", new clearance only on "ready for departure"
         foreach (var call in new[] { "Kutaisi Tower, Enfield 1-1, aborting takeoff", "Enfield 1-1, stopping", "Enfield 1-1, rejecting takeoff", "Kutaisi Tower, Enfield 1-1, cancel my takeoff", "Kutaisi Tower, Enfield 1-1, aborting, bird strike" })
         {
@@ -1952,7 +1986,7 @@ public partial class Tower
         Check(rg.Count(m => m.Role != "Info") == 1 && rg[0].Contains("stop immediately"), "R100 danach Startlauf ohne Freigabe: " + (rg.FirstOrDefault()?.Text ?? "-"));
 
         // --- Final (PAR): silent on the glide path, call only when clearly off; too low. Without initial call (Away) with gear down (R11)
-        Ifr = true;   // K9: without ILS in IFR PAR (visual: straight in without calls)
+        ForceIfr = true;   // K9: without ILS in IFR PAR (visual: straight in without calls)
         var tw9 = new Tower("Enfield 1-1");
         tw9.navName = "six mile final";   // Straight-in approach (PAR); visual pattern gets no mile calls
         double along4 = 3.9 * NM;
@@ -1985,7 +2019,7 @@ public partial class Tower
         tw9.Phase = Phase.Entering;   // new approach: radar vectoring shortened to final
         r = tw9.Tick(At(g2x, g2z, 50, LandHdg("25"), 70) with { Gear = 1 }, none, 90).Concat(tw9.Tick(At(g2x, g2z, 50, LandHdg("25"), 70) with { Gear = 1 }, none, 91)).ToList();
         Check(r.Any(m => m.Text.Contains("Low altitude alert")), "Tiefenwarnung nach Durchstarten vom Tower: " + string.Join(" | ", r.Select(m => m.Text)));
-        Ifr = false;
+        ForceIfr = false;
         // Gear up shortly before landing (descending: landing cue, R11): "check wheels down" (once)
         var twWh = new Tower("Enfield 1-1");
         var (g1x, g1z) = P("25", 1.5 * NM);
@@ -2017,13 +2051,13 @@ public partial class Tower
         r = twSb.OnTranscript("Kutaisi Approach, Enfield 11, request straight in", s6 with { AltMsl = 1500 * Ft }, none, 1);
         Check(r[0].Contains("Maintain 1500 feet") && !r[0].Contains("limb"), "R42 Straight-in unter dem Gleitweg: " + r[0]);
         // K9: IFR without ILS (Kutaisi 25, TACAN at the airfield): PAR as on the map, no TACAN procedure; in visual conditions continue straight in (above)
-        Ifr = true;
+        ForceIfr = true;
         var kp = Airfield.Kutaisi(); kp.Tacan = 44;
         var atisP = new Tower(kp, "x").AtisText("K", new Telemetry(kp.Elev + 2, 0, 0, 0, kp.X, kp.Z, 0, 0, 760), 15, true, 200, 3000);
         var twPar = new Tower(kp, "Enfield 1-1");
         r = twPar.OnTranscript("Kutaisi Approach, Enfield 11, request P A R approach", s6, none, 1);
         var rP = twPar.Tick(At(g4x, g4z, along4 * Math.Tan(3 * Math.PI / 180) + 15 + 400 * Ft, LandHdg("25"), 70) with { Gear = 1 }, none, 30);   // cleared on final: PAR calls anyway
-        Ifr = false;
+        ForceIfr = false;
         Check(atisP.Contains("expect vectors for P A R approach runway two five") && !atisP.Contains("TACAN approach") && r[0].Contains("until established, cleared P A R approach runway two five")
               && !r[0].Contains("no transmissions")   // R271: without talk-down no lost-comm instruction (R221 promised calls every 5 s on final)
               && rP.Any(m => m.Text.Contains("well above glidepath")), $"K9 PAR Kutaisi 25: {atisP} | {r[0]} | {string.Join(" | ", rP.Select(m => m.Text))}");
@@ -2280,8 +2314,25 @@ public partial class Tower
         Check(r[0].Contains("taxi to holding point runway two five") && !r[0].Contains("QNH") && !r[0].Contains("Information"), "A33 Rollfreigabe nach dem Anlassen ohne QNH: " + r[0]);   // ... the taxi clearance does not repeat it
         var atis = tw11.AtisText("C", At(CX, CZ, 2) with { WindX = 5, Pressure = 101325 }, -5, false, 0, 50000);
         Check(atis.StartsWith("Kutaisi information Charlie. Runway two five in use") && atis.Contains("Temperature minus five") &&
-              atis.Contains("QNH one zero one niner"), atis);
+              atis.Contains("QNH one zero one eight"), atis);   // R345: 1018.9 hPa truncated
+        Check(QnhSay(1012.9, false) == "QNH one zero one two" && QnhSay(29.879 / 0.02953, true) == "altimeter two niner eight seven" && QnhSay(1013.25, null) == "QNH one zero one three, altimeter two niner niner two",
+              "R345 QNH/Altimeter abgeschnitten: " + QnhSay(1012.9, null) + " | " + QnhSay(29.879 / 0.02953, true));
         Check(tw11.AtisText("C", At(CX, CZ, 2), 5, true, 1045, 9000).Contains("clouds 3300 feet"), "A34 ATIS-Wolken über Platz (Basis 1045 m NN, Platz 45 m)");
+        {   // R340: IFR per airfield from the ceiling above the field; FEW/SCT (R367) is no ceiling
+            var skyR340 = Sky;
+            var fHi = Airfield.Kutaisi(); fHi.Elev = 524;   // Beslan elevation
+            var fLo = Airfield.Kutaisi(); fLo.Elev = 10;    // Batumi elevation
+            var (twIfrHi, twIfrLo) = (new Tower(fHi, "Enfield 1-1"), new Tower(fLo, "Enfield 1-1"));
+            Sky = (true, 700, 20000);
+            bool hiIfr = twIfrHi.Ifr, loVfr = !twIfrLo.Ifr;
+            string aHi = twIfrHi.AtisText("C", At(CX, CZ, 2), 5, true, 700, 20000), aLo = twIfrLo.AtisText("C", At(CX, CZ, 2), 5, true, 700, 20000);
+            Sky = (true, 550, 20000); bool lo550 = !twIfrLo.Ifr;
+            Sky = (false, 700, 20000); bool fewSct = !twIfrHi.Ifr;
+            Sky = (false, 700, 3000); bool vis = twIfrLo.Ifr;
+            Sky = skyR340;
+            Check(hiIfr && loVfr && lo550 && fewSct && vis && aHi.Contains("Instrument conditions") && !aLo.Contains("Instrument conditions"),
+                  $"R340 IFR je Platz (Basis 700 m: Beslan {hiIfr}, Batumi VFR {loVfr}; 550 m Batumi VFR {lo550}; FEW/SCT VFR {fewSct}; Sicht 3 km {vis}): {aHi} | {aLo}");
+        }
         var atFog = tw11.AtisText("C", At(CX, CZ, 2), 5, false, 0, 820);
         var atMist = tw11.AtisText("C", At(CX, CZ, 2), 5, false, 0, 3000);
         Check(atFog.Contains("Visibility 800 meters, fog, sky clear") && atMist.Contains("Visibility three kilometers, mist, sky clear") &&
@@ -2403,7 +2454,7 @@ public partial class Tower
         r = tw12b.OnTranscript("Enfield 11 ready for departure, closed pattern", hold, none, 2);
         Check(r[0].Text == "Enfield one one, runway two five, wind calm, cleared for takeoff, left closed traffic approved, report base.", "R200 Start zur Platzrunde: " + r[0]);   // FAA JO 7110.65 3-10-11
         // R253: IMC: "closed pattern" rejected, "practice approach" = radar pattern (runway heading/altitude, after liftoff contact Approach, check-in -> vectors)
-        Ifr = true;
+        ForceIfr = true;
         var tw253 = new Tower("Enfield 1-1");
         tw253.Tick(parked, none, 0);
         tw253.OnTranscript("Enfield 11 request taxi, pattern work", parked, none, 1);
@@ -2413,11 +2464,29 @@ public partial class Tower
         r253.Add(string.Join(" ", tw253.Tick(up253, none, 5).Select(m => m.Text)));
         r253.Add(tw253.Suggest(up253)?.Text ?? "-");
         r253.Add(tw253.OnTranscript("Kutaisi Approach, Enfield 11, airborne, climbing", up253, none, 8)[0].Text);
-        Ifr = false;
+        ForceIfr = false;
         Check(r253[0] == "ready for departure, practice approach" && r253[1] == "Enfield one one, closed traffic not approved, I F R conditions." &&
               r253[2].StartsWith("Enfield one one, after departure fly runway heading, climb and maintain ") && r253[2].EndsWith("cleared for takeoff.") && !r253[2].Contains("downwind") &&
               r253[3].Contains("contact Kutaisi Approach") && r253[4] == "airborne, climbing" && r253[5].Contains("identified") && r253[5].Contains("heading") && !r253[5].Contains("say intentions") &&
               tw253.Phase == Phase.Inbound && tw253.stayPattern, "R253 Radarplatzrunde IMC: " + string.Join(" | ", r253));
+        {   // R339: IMC without IFR clearance: no VFR taxi and no VFR takeoff; after the clearance the normal flow
+            ForceIfr = true;
+            var tw339 = new Tower("Enfield 1-1");
+            tw339.Tick(parked, none, 0);
+            var tx339 = tw339.OnTranscript("Kutaisi Ground, Enfield 11, request taxi", parked, none, 1)[0].Text;
+            bool parked339 = tw339.Phase == Phase.Parked;
+            ForceIfr = false;
+            tw339.OnTranscript("Kutaisi Ground, Enfield 11, request taxi", parked, none, 2);
+            ForceIfr = true;   // weather drops while taxiing
+            var rd339 = tw339.OnTranscript("Kutaisi Tower, Enfield 11, ready for departure", hold, none, 3)[0].Text;
+            var tk339 = tw339.Tick(hold, none, 200);
+            tw339.OnTranscript("Kutaisi Ground, Enfield 11, request IFR clearance", hold, none, 210);
+            var ok339 = tw339.OnTranscript("Kutaisi Tower, Enfield 11, ready for departure", hold, none, 220)[0].Text;
+            ForceIfr = false;
+            Check(tx339 == "Enfield one one, Kutaisi Ground, field is I F R, unable VFR departure, advise ready to copy IFR clearance." && parked339 &&
+                  rd339 == "Enfield one one, field is I F R, unable VFR departure, advise ready to copy IFR clearance." && tk339.Count == 0 && ok339.Contains("cleared for takeoff"),
+                  $"R339 IMC ohne IFR-Freigabe: {tx339} | {rd339} | {string.Join(" ", tk339.Select(m => m.Text))} | {ok339}");
+        }
 
         // R32: "check altitude" only 60 s after handoff to the Tower (no spam before), then on real deviation
         var twA32 = new Tower("Enfield 1-1");
@@ -2465,11 +2534,36 @@ public partial class Tower
         Check(tw295.Phase == Phase.ClearedLand && !tw295.Emergency && c295[0].Text == "Enfield one one, roger, emergency cancelled, runway two five, cleared to land." &&
               n295[0].Text == "Enfield one one, roger." && a295[0].Text == "Enfield one one, roger." && tw295b.Phase == Phase.Away && !tw295b.Emergency,
               "R295 cancel emergency: " + string.Join(" | ", c295.Concat(n295).Concat(a295).Select(m => m.Text)));
+        // R357: MAYDAY close in with the runway occupied: "continue approach", no clearance; runway clear -> clearance (tick); occupied again on short final -> go around
+        var tw357 = new Tower("Enfield 1-1");
+        tw357.Tick(OnFin(3), none, 0); tw357.RunwayClaimed = 1;
+        var m357 = tw357.OnTranscript("Mayday mayday mayday, Enfield 11, engine failure", OnFin(3), none, 1);
+        tw357.RunwayClaimed = 0;
+        var c357 = tw357.Tick(OnFin(2.5), none, 3);
+        tw357.RunwayClaimed = 1;
+        var g357 = tw357.Tick(OnFin(0.5), none, 5);
+        Check(m357[0].Contains("roger mayday") && m357[0].Contains("continue approach, traffic departing runway two five, will advise") && !m357[0].Contains("cleared to land") &&
+              c357.Any(m => m.Contains("cleared to land, emergency services standing by")) && g357.Any(m => m.Contains("go around")),
+              "R357 Notfall bei belegter Bahn: " + string.Join(" | ", m357.Concat(c357).Concat(g357).Select(m => m.Text)));
+        // R357: still on the runway after landing, MAYDAY of another at 4 NM -> once "vacate runway immediately"
+        var tw357v = new Tower("Enfield 1-1");
+        tw357v.Tick(At(CX, CZ, 300, 254, 140 * Kt), none, 0);
+        tw357v.Tick(At(CX, CZ, 0, 254, 130 * Kt), none, 1);
+        tw357v.Tick(At(CX, CZ, 0, 254, 90 * Kt), none, 3);
+        (tw357v.OtherEmergency, tw357v.EmergencyNm) = (true, 4);
+        var v357 = tw357v.Tick(At(CX, CZ, 0, 254, 0), none, 5);
+        var v357b = tw357v.Tick(At(CX, CZ, 0, 254, 0), none, 6);
+        Check(v357.Count == 1 && v357[0].Contains("vacate runway immediately, emergency traffic 4 miles") && !v357b.Any(m => m.Contains("immediately")),
+              "R357 Bahn räumen bei Mayday: " + string.Join(" | ", v357.Concat(v357b).Select(m => m.Text)));
         // PAN: priority only, others do not hold
         var twPan = new Tower("Enfield 1-1");
         twPan.Tick(farWest, none, 0);
         r = twPan.OnTranscript("Pan pan, pan pan, pan pan, Enfield 11, hydraulic failure, request priority landing", farWest, none, 1);
         Check(twPan.Emergency && !twPan.Mayday && twPan.Vectoring && r[0].Contains("roger pan pan.") && !r[0].Contains("all traffic is holding"), "Pan: " + r[0]);
+        // R362: PAN survives the session restore; older session files without the type: MAYDAY
+        var twPanR = new Tower("Enfield 1-1"); twPanR.Load(twPan.Save(), farWest, 2);
+        var twPanO = new Tower("Enfield 1-1"); twPanO.Load(twPan.Save() with { Mayday = null }, farWest, 2);
+        Check(twPanR.Emergency && !twPanR.Mayday && twPanO.Mayday, $"R362 PAN nach Neustart: Mayday {twPanR.Mayday}, alte Datei {twPanO.Mayday}");
         // R244: radio-wheel emergency call states fuel and persons (PilotCall) -> no query
         var tw244 = new Tower("Enfield 1-1");
         tw244.Tick(farWest, none, 0);
@@ -2604,6 +2698,36 @@ public partial class Tower
         r = tw15.Tick(At(hx + 500, hz, ha, 90, 120), none, 128);
         for (double tt = 129; tt < 250 && !r.Any(m => m.Text.Contains("leave the hold")); tt++) r = tw15.Tick(At(hx + 500, hz, ha, 90, 120), none, tt);   // Heading does not fit: at most 2 min
         Check(r.Count == 1 && r[0].Contains("leave the hold") && r[0].Contains("heading"), r.FirstOrDefault()?.Text ?? "Hold frei: -");
+        // R350: flying to the hold with shrinking distance -> no kick for 600 s; fixed course away -> stages 1-4, at least 30 s apart
+        var tw350 = new Tower("Enfield 1-1");
+        tw350.Tick(west, busyPattern, 0);
+        tw350.OnTranscript("Kutaisi Approach, Enfield 11, inbound for landing", west, busyPattern, 1);
+        var (h350x, h350z, _) = tw350.HoldInfo!.Value;
+        double h350d = Dist(west.X, west.Z, h350x, h350z), h350v = (h350d - 2 * NM) / 600;
+        var k350 = new List<string>();
+        for (int s = 2; s <= 600; s++)
+        {
+            double f = 1 - h350v * s / h350d;
+            double qx = h350x + (west.X - h350x) * f, qz = h350z + (west.Z - h350z) * f;
+            k350.AddRange(tw350.Tick(At(qx, qz, tw350.HoldInfo!.Value.Ft * Ft - FieldElev, Bearing(qx, qz, h350x, h350z), 120), busyPattern, s).Select(m => m.Text));
+        }
+        Check(!k350.Any(m => m.Contains("verify") || m.Contains("say intentions") || m.Contains("removed from the sequence")), "R350 Anflug zur Warteschleife ohne Kick: " + string.Join(" | ", k350));
+        var tw350b = new Tower("Enfield 1-1");
+        tw350b.Tick(west, busyPattern, 0);
+        tw350b.OnTranscript("Kutaisi Approach, Enfield 11, inbound for landing", west, busyPattern, 1);
+        var (h350bx, h350bz, h350bFt) = tw350b.HoldInfo!.Value;
+        double away = Bearing(h350bx, h350bz, west.X, west.Z);
+        var st350 = new List<(int S, string T)>();
+        for (int s = 2; s <= 500 && !st350.Any(m => m.T.Contains("removed from the sequence")); s++)
+        {
+            double qx = west.X + Math.Cos(away * Math.PI / 180) * 120 * s, qz = west.Z + Math.Sin(away * Math.PI / 180) * 120 * s;
+            st350.AddRange(tw350b.Tick(At(qx, qz, h350bFt * Ft - FieldElev, away, 120), busyPattern, s).Select(m => (s, m.Text)));
+        }
+        int I350(string w) => st350.FindIndex(m => m.T.Contains(w));
+        int v350 = I350("verify heading"), i350 = I350("say intentions"), x350 = I350("removed from the sequence");
+        int r350 = v350 >= 0 ? st350.FindIndex(v350 + 1, m => m.T.Contains("miles to the hold")) : -1;
+        Check(v350 >= 0 && r350 == v350 + 1 && i350 == r350 + 1 && x350 == i350 + 1 && st350[r350].S - st350[v350].S >= 30 && st350[i350].S - st350[r350].S >= 30 && st350[x350].S - st350[i350].S >= 30,
+              "R350 Kurs weg von der Warteschleife: Stufen 1-4 im 30-s-Takt: " + string.Join(" | ", st350.Select(m => $"{m.S}s {m.T}")));
         // Helicopter in holding: no speed instruction, no speed reminder at 100 kt (R45)
         var twHh = new Tower("Enfield 1-1") { AcType = "UH-1H" };
         twHh.Tick(west, busyPattern, 0);
@@ -2833,6 +2957,24 @@ public partial class Tower
         tw19b.Tick(taxiing, new[] { Mate(30, 0, 0, 3) }, 4);
         r = tw19b.Tick(taxiing, new[] { Mate(30, 0, 0, 3), cross }, 5);   // while following, one crosses from the right: stop anyway
         Check(r.Count == 1 && r[0].Contains("hold position, give way to the Hornet on your right"), r.FirstOrDefault()?.Text ?? "A31 follow + kreuzend: -");
+        // R342: stationary traffic in the taxi path: holding short ahead -> follow; standing in the taxiway -> hold position, continue taxi once it has left
+        var tw342 = new Tower("Enfield 1-1");
+        tw342.Tick(taxiing, none, 0);
+        tw342.OnTranscript("Kutaisi Ground, Enfield 1-1, request taxi", taxiing, none, 1);
+        var hp342 = tw342.HoldPt(tw342.Runway, taxiing);
+        double b342 = Bearing(taxiing.X, taxiing.Z, hp342.X, hp342.Z) * Math.PI / 180;
+        var me342 = At(hp342.X - 80 * Math.Cos(b342), hp342.Z - 80 * Math.Sin(b342), 0, b342 * 180 / Math.PI, 6);
+        var held342 = new Traffic(342, "F-16C_50", hp342.X, hp342.Z, FieldElev, b342, 0, "AI", "dep", false);
+        r = tw342.Tick(me342, new[] { held342 }, 2).Concat(tw342.Tick(me342, new[] { held342 }, 3)).ToList();
+        Check(r.Count == 1 && r[0].Contains($"follow the Viper holding short runway {RwSay(tw342.Runway)}"), "R342 follow am Rollhalt: " + string.Join(" | ", r));
+        var tw342b = new Tower("Enfield 1-1");
+        tw342b.F.Spots.Add((taxiing.X - 900, taxiing.Z, 4, 72));
+        tw342b.Tick(taxiing, none, 0);
+        tw342b.OnTranscript("Kutaisi Ground, Enfield 1-1, request taxi", taxiing, none, 1);
+        var r342 = tw342b.Tick(taxiing, new[] { Mate(80, 0, 0, 0) }, 2).Select(m => m.Text).ToList();
+        r342.Add("|" + string.Join(" ", tw342b.Tick(taxiing with { Ias = 0 }, new[] { Mate(80, 0, 0, 0) }, 11)));
+        r342.Add("|" + string.Join(" ", tw342b.Tick(taxiing with { Ias = 0 }, new[] { Mate(200, 0, 0, 8) }, 12)));
+        Check(r342.Count == 3 && r342[0].Contains("hold position, traffic ahead, Viper") && r342[1] == "|" && r342[2].Contains("continue taxi"), "R342 hold position: " + string.Join(" ", r342));
         // Merging under 44° (from front left or front right, collision course): exactly one waits, not both
         foreach (var (relDeg, hdgDeg) in new[] { (300.0, 44.0), (60.0, 316.0) })
         {
@@ -2971,7 +3113,7 @@ public partial class Tower
         Check(own108.Contains("parking spot niner one") && r[0].Contains("parking spot niner two"), $"R108 Reservierung: {own108} | {r[0]}");
 
         // --- IFR: approach -> radar vectoring to final instead of CRP, ATIS announces it
-        Ifr = true;
+        ForceIfr = true;
         var tw20 = new Tower("Enfield 1-1");
         var far = At(CX + 20 * NM, CZ, 1500, 180, 130);
         tw20.Tick(far, none, 0);
@@ -3038,7 +3180,7 @@ public partial class Tower
         }
         r = tw22.OnTranscript("Kutaisi Approach, Enfield 1-1, cancel IFR", north, none, 4);   // without gap > 10 s: otherwise new flight (position jump)
         Check(r[0].Contains("negative, field is I F R"), "IFR: cancel IFR abgelehnt: " + r[0]);
-        Ifr = false;
+        ForceIfr = false;
         r = tw22.OnTranscript("Kutaisi Approach, Enfield 1-1, cancel IFR", north, none, 5);
         Check(r[0].Contains("I F R cancelled") && !tw22.wantStraight, "VFR: cancel IFR: " + r[0]);
         // P3-AP7: Visual approach = straight-in approach without procedure (no "cleared ILS")
@@ -3107,12 +3249,12 @@ public partial class Tower
         twR102p.Phase = Phase.Pattern;
         r = twR102p.OnTranscript("Kutaisi Approach, Enfield 1-1, 15 miles north, inbound for landing", north, none, 1);
         Check(r[0].Role == "Approach" && !r[0].Contains("ontact") && !r[0].Contains("report final") && twR102p.Phase == Phase.Inbound && twR102p.Rejected == 0, "R102 inbound weit weg aus der Platzrunde: " + r[0]);
-        Ifr = true;   // Visual approach needs visibility: IFR weather -> rejection like "cancel IFR"
+        ForceIfr = true;   // Visual approach needs visibility: IFR weather -> rejection like "cancel IFR"
         var twVi = new Tower("Enfield 1-1");
         twVi.Tick(fin, none, 0);
         r = twVi.OnTranscript("Kutaisi Approach, Enfield 1-1, request visual approach", fin, none, 1);
         Check(r[0].Contains("negative, field is I F R") && !r[0].Contains("cleared visual"), "IFR: visual approach abgelehnt: " + r[0]);
-        Ifr = false;
+        ForceIfr = false;
         // A29: minimum fuel is acknowledged (position, no priority in the text), on the ground no "say again"
         var twMf = new Tower("Enfield 1-1") { QueueAhead = 1, Spaced = true };
         twMf.Tick(north, none, 0);
@@ -3262,7 +3404,7 @@ public partial class Tower
             Check(first.Contains("Due to terrain, expect vectors for overhead join runway three one") && tv.Phase == Phase.Entering && tv.navName == "overhead" &&
                   clr >= 900 && ft <= bat.PatternFt + 1100, $"Batumi Sicht von {name}: Übergabe {ft:0} ft, Geländeabstand min {clr:0} ft, {first}");
         }
-        Ifr = true;
+        ForceIfr = true;
         bat.Ils["13"] = (110.3, "ILU");   // as from Beacons.lua (Program.RadioTest checks the parsing)
         foreach (var (sx, sz, sft, sh, name) in new[] { (bat.X + 20 * NM, bat.Z + 5 * NM, 8000.0, 180.0, "Nord"), (bat.X, bat.Z + 25 * NM, 15000.0, 270.0, "Ost") })
         {
@@ -3279,7 +3421,7 @@ public partial class Tower
               $"R212 Batumi Circling: {fcFt:0} ft, {cc:0} ft, {fc} | {lastMsg} | {string.Join(" | ", ci31)}");
         Check(new Tower(bat, "x").AtisText("B", new Telemetry(bat.Elev + 2, 0, 0, 0, bat.X, bat.Z, 0, 0, 760), 15, true, 200, 3000).Contains("expect vectors for ILS approach runway one three, localizer one one zero decimal three"),
               "Batumi ATIS IFR -> 13");
-        Ifr = false;
+        ForceIfr = false;
         // Review R212: visual, straight-in request, without procedure on the 13: no contradictory "cleared straight in approach runway 13, circle to runway 31", but downwind 31;
         // after taking over the pattern "circle" remains (report point base), go-around (PatternReset) clears it
         bat.Ils.Remove("13");
@@ -3351,7 +3493,7 @@ public partial class Tower
         // User report (game): radar vectoring to final, pilot flies only the headings (2.1°/s), reacts late: at 6-9 NM no alternating left/right headings
         foreach (var (za, zl, zh, zlate) in new[] { (14.0, 5.0, 8.0, 3), (12.0, 3.0, 6.0, 15), (11.0, -2.5, 5.0, 15), (10.0, 2.0, 6.0, 25), (9.0, 4.0, 6.0, 3), (9.5, 1.5, 4.0, 20), (9.0, -3.0, 6.0, 10), (10.0, 4.0, 7.0, 20) })
         {
-            Ifr = true;
+            ForceIfr = true;
             var kz = Airfield.Kutaisi();
             var tz = new Tower(kz, "Enfield 1-1");
             var (zx, zz) = tz.Pt("25", za * NM, zl * NM);
@@ -3378,14 +3520,14 @@ public partial class Tower
                 icpt |= m[0].Text.Contains("intercept");
                 zPend = tz.vecHdg; zPendAt = zSec + zlate;
             }
-            Ifr = false;
+            ForceIfr = false;
             if (Environment.GetEnvironmentVariable("VECDBG") == "Zick") zLog.ForEach(l => Console.WriteLine("  " + l));
             Check(tz.Phase == Phase.Entering && bad == 0, $"Zickzack Kutaisi 25 ab {za} NM/{zl} NM, {zlate} s spät: {bad} falsche Ansagen, {tz.Phase} | {string.Join(" | ", zLog.Skip(1))}");
         }
 
         // R42: IFR gate 10/8 NM (last vector a good 2 NM before the Approach gate), 6/4 NM only with terrain or already close; Kutaisi both directions from 8 directions, 30 NM
         {
-            Ifr = true;
+            ForceIfr = true;
             var kg = Airfield.Kutaisi();
             var gs = new List<string>();
             foreach (var grw in new[] { "07", "25" })
@@ -3399,14 +3541,14 @@ public partial class Tower
                     tr42.OnTranscript("Kutaisi Approach, Enfield 1-1, inbound for landing", gt, none, 1);
                     if (tr42.gate < 8 * NM) gs.Add($"{grw}/{d}°: {tr42.gate / NM:0} NM");
                 }
-            Ifr = false;
+            ForceIfr = false;
             Check(gs.Count == 0, "R42 Gate 10/8 NM aus 30 NM: " + (gs.Count == 0 ? "alle" : string.Join(", ", gs)));
         }
 
         // R46: Separation on final: 3 NM at the threshold (150 kt), behind heavy 5 NM; too close -> "reduce speed ... for spacing" (15 % slower)
         {
             Check(Behind(16 * NM, 10 * NM, false) && !Behind(14 * NM, 10 * NM, false) && !Behind(16 * NM, 10 * NM, true) && Behind(19 * NM, 10 * NM, true), "R46 Behind 3/5 NM");
-            Ifr = true;
+            ForceIfr = true;
             var ks = Airfield.Kutaisi();
             var ts = new Tower(ks, "Enfield 1-2") { AcType = "FA-18C_hornet" };
             var (sx, sz) = ts.Pt("25", 16 * NM, 3 * NM);
@@ -3417,7 +3559,7 @@ public partial class Tower
             int free = ts.VecKt(Sp(ts.vecHdg, ts.vecFt, 250));
             ts.AheadR = sp - 3 * NM;   // Preceding traffic only 3 NM of track ahead (too close at 250 kt)
             var sm = ts.Tick(Sp(ts.vecHdg, ts.vecFt, free), none, 40);
-            Ifr = false;
+            ForceIfr = false;
             Check(free > 0 && ts.VecKt(Sp(ts.vecHdg, ts.vecFt, free)) == (int)Math.Round(free * 0.85 / 10) * 10 && sm.Any(m => m.Text.Contains($"reduce speed {(int)Math.Round(free * 0.85 / 10) * 10} knots for spacing")),
                   $"R46 zu dicht hinter dem Vordermann: {free} kt -> " + string.Join(" | ", sm.Select(m => m.Text)));
             // Preceding traffic just handed over (Established, gate 10 NM): 11 NM out turning in, 3000 ft -> remaining distance known (otherwise no separation up to 10 NM on the course)
@@ -3426,7 +3568,7 @@ public partial class Tower
             double efp = te.FinalPath(new(3000 * Ft, 3000 * Ft - ks.Elev, 180 * Kt, (te.LandHdg(te.Runway) + 25) * Math.PI / 180, ep.X, ep.Z, 0, 0, 760));
             Check(efp > 11 * NM && efp < 12 * NM, $"R46 Restweg Vordermann nach der Übergabe: {efp / NM:0.0} NM");
             // mptest Golf (Ras Al Khaimah IFR, Bandar-e-Jask VFR): another's holding 4 NM ahead on the path at my altitude (just stepped down there) -> 1000 ft above beforehand
-            Ifr = true;
+            ForceIfr = true;
             var th = new Tower(ks, "Enfield 1-3") { AcType = "FA-18C_hornet" };
             th.Tick(Sp(250, 2000, 250), none, 0);
             th.OnTranscript("Kutaisi Approach, Enfield 1-3, inbound for landing", Sp(250, 2000, 250), none, 1);
@@ -3436,12 +3578,12 @@ public partial class Tower
             double hb = Bearing(hm.X, hm.Z, hp.X, hp.Z) * Math.PI / 180;
             var hTr = new[] { new Traffic(81, "FA-18C_hornet", hm.X + 4 * NM * Math.Cos(hb), hm.Z + 4 * NM * Math.Sin(hb), 2000 * Ft, 0, 115, "U9", "hold:Kutaisi", true, 2) };
             var hs = th.Tick(hm, hTr, 40);
-            Ifr = false;
+            ForceIfr = false;
             Check(th.vecFt == 3000 && hs.Any(m => m.Text.Contains("climb and maintain 3000 feet")), $"Warteschleife am Weg auf gleicher Höhe: {th.vecFt} ft | " + string.Join(" | ", hs.Select(m => m.Text)));
             // R270 (mptest Kobuleti VFR "maintain 3100" -> "climb and maintain 5000" through the holding at 4000): holding 900 ft above, terrain (MVA 2000) allows
             // no passing below -> hold altitude, do not climb through its altitude; Sukhumi IFR: holder is descending right through my altitude to its new level (assigned 1000 ft
             // lower) -> reference is the assigned altitude, no "climb"
-            Ifr = true;
+            ForceIfr = true;
             var terr300 = new float[61, 61];
             for (int i = 0; i < 61; i++) for (int j = 0; j < 61; j++) terr300[i, j] = 335;   // 1099 ft -> MVA 2100 (like Kobuleti 3100)
             ks.SetTerrain(terr300, ks.X - 30 * NM, ks.Z - 30 * NM, NM);
@@ -3454,13 +3596,13 @@ public partial class Tower
                 Check(th.vecFt <= myFt && !hs2.Any(m => m.Text.Contains("climb")), $"R270 Warteschleife am Weg {what}: kein Steigen ({th.vecFt} ft) | " + string.Join(" | ", hs2.Select(m => m.Text)));
             }
             ks.SetTerrain(null!, 0, 0, 0);
-            Ifr = false;
+            ForceIfr = false;
         }
 
         // R302 (log 22:44, Kutaisi 55 NM, assigned 4000, climbs unasked to 4800+): not "expedite descent", but "verify altitude, maintain …",
         // on the second time "climb not authorized, descend and maintain …"; "expedite" only with traffic at his altitude
         {
-            Ifr = true;
+            ForceIfr = true;
             var k302 = Airfield.Kutaisi();
             var e302 = k302.End("07");
             var fw302 = (X: -e302.Dx * 5, Z: -e302.Dz * 5);
@@ -3483,14 +3625,14 @@ public partial class Tower
             var tr302 = new[] { new Traffic(91, "FA-18C_hornet", p302.X + 2.5 * NM, p302.Z, 0, 0, 0, "U9", "", true, 2) };   // is 2.5 NM beside at his new altitude
             var hx302 = Run302(tr302);
             Check(hx302.Any(m => m.Contains("expedite descent, maintain")), "R302 Verkehr auf seiner Höhe: expedite descent | " + string.Join(" | ", hx302));
-            Ifr = false;
+            ForceIfr = false;
         }
 
         // R303 (game Senaki): under radar vectoring at ~14000, assigned 11500, radio wheel "request higher" -> "descend and maintain 12500", again -> "13500",
         // 1 s later "descend and maintain 9500" by itself. Now: far out his altitude approved (never "descend", no 1000-ft ladder), it stays;
         // close to the gate "unable higher, expect lower shortly"; "request descent at pilot's discretion" -> "descend at pilot's discretion, maintain …", no nagging
         {
-            Ifr = true;
+            ForceIfr = true;
             var k3 = Airfield.Kutaisi();
             var e3 = k3.End("07");
             var fw303 = (X: -e3.Dx * 5, Z: -e3.Dz * 5);
@@ -3524,13 +3666,13 @@ public partial class Tower
             var pdTick3 = Enumerable.Range(11, 150).SelectMany(s => tp3.Tick(tlp3(20000), none, s)).Select(m => m.Text).ToList();   // not descending yet
             Check(pd31.Contains($"descend at pilot's discretion, maintain {tp3.GateFt + 1000:0} feet") && !pdTick3.Any(m => m.Contains("descend and maintain") || m.Contains("expedite") || m.Contains("verify")),
                   $"R303 descent at pilot's discretion: {pd31} | " + string.Join(" / ", pdTick3));
-            Ifr = false;
+            ForceIfr = false;
         }
 
         // R305 (game 08.10., Kutaisi): from far out on the centerline – "descend and maintain" gate altitude came at ~25 NM (profile 12 NM ahead), immediately afterwards
         // "cleared … approach, contact Tower". Now: gate altitude only after the profile at the point, handoff only up to 2 NM before the gate
         {
-            Ifr = true;
+            ForceIfr = true;
             var k5 = Airfield.Kutaisi();
             var e5 = k5.End("07");
             var fw305 = (X: -e5.Dx * 5, Z: -e5.Dz * 5);
@@ -3544,7 +3686,7 @@ public partial class Tower
                 double f0 = ft5; a5 -= 250 * Kt; ft5 = Math.Max(t5.vecFt, ft5 - 25);   // flies the centerline, descends 1500 ft/min to the assigned altitude
                 m5.AddRange(t5.Tick(T5((ft5 - f0) * Ft), none, s).Select(m => (A: a5 / NM, m.Text)));
             }
-            Ifr = false;
+            ForceIfr = false;
             double g5 = t5.gate / NM, hoA5 = m5.FirstOrDefault(m => m.Text.Contains("contact Kutaisi Tower")).A, stepA5 = m5.FirstOrDefault(m => m.Text.Contains($"descend and maintain {t5.GateFt:0} feet")).A;
             Check(t5.Phase == Phase.Entering && hoA5 > g5 - 0.5 && hoA5 <= g5 + 2.1 && stepA5 <= g5 + 6,
                   $"R305 auf der Mittellinie: Gate-Höhe bei {stepA5:0.0} NM, Übergabe bei {hoA5:0.0} NM (Gate {g5:0}) | " + string.Join(" | ", m5.Select(m => $"{m.A:0.0} {m.Text}")));
@@ -3553,7 +3695,7 @@ public partial class Tower
         // R314 (game Senaki 27): handoff "…, contact Kolkhi Tower, report four mile final", then "final, gear down, full stop" at 9 NM on the centerline ->
         // "negative, I don't have you on final". Now: Approach without reporting point, initial call "9 mile final, full stop" (ENTER suggestion) -> landing clearance with station name; 3 NM beside still negative
         {
-            Ifr = true;
+            ForceIfr = true;
             var k14 = Airfield.Kutaisi();
             var e14 = k14.End("07");
             var fw314 = (X: -e14.Dx * 5, Z: -e14.Dz * 5);
@@ -3569,7 +3711,7 @@ public partial class Tower
             var fin14 = t14.OnTranscript("Kutaisi Tower, Dagger 1-1, " + (sug14?.Text ?? "-"), T14(9 * NM, 0, 2700), none, s14 + 2);
             var off14 = new Tower(k14, "Dagger 1-2") { FieldWind = fw314, Phase = Phase.Entering, navName = "six mile final" };
             var neg14 = off14.OnTranscript("Kutaisi Tower, Dagger 1-2, 9 mile final, full stop", T14(9 * NM, 3 * NM, 2700), none, 300);
-            Ifr = false;
+            ForceIfr = false;
             var hoMsg = ho14.LastOrDefault(m => m.Contains("contact Kutaisi Tower")) ?? "-";
             Check(!hoMsg.Contains("report four mile final") && sug14?.Text == "9 mile final, gear down, full stop" && fin14.Count > 0 && fin14[0].Text.StartsWith("Dagger one one, Kutaisi Tower") && fin14[0].Text.Contains("cleared to land")
                   && neg14.Count > 0 && neg14[0].Text.Contains("negative, I don't have you on final"),
@@ -3598,10 +3740,31 @@ public partial class Tower
             }
         }
 
+        // R351 (Anflugtest Kutaisi 25 IFR 045°): replanning at 17 NM, then within 10 s no next vector ("fly heading two five zero …" -> 1 s later "turn right heading three four zero"):
+        // first waypoint already within the turn lead is skipped, the next one only once the vector is flown (FAA JO 7110.65 5-6-1)
+        {
+            ForceIfr = true;
+            var k51 = Airfield.Kutaisi();
+            var t51 = new Tower(k51, "Enfield 1-1");
+            var p51 = t51.Pt("25", 15.7 * NM, 5.3 * NM);
+            double x51 = p51.X, z51 = p51.Z, h51 = t51.LandHdg("25") + 2;
+            Telemetry T51() => new(4700 * Ft, 4700 * Ft - k51.Elev, 250 * Kt, h51 * Math.PI / 180, x51, z51, 0, 0, 1013);
+            t51.Tick(T51(), none, 0);
+            t51.OnTranscript("Kutaisi Approach, Enfield 1-1, inbound for landing", T51(), none, 1);
+            var said51 = new List<string> { t51.StartVectors(T51(), true, 2) };
+            t51.lastVecSaid = 2;
+            for (int s = 3; s <= 12; s++)
+            {
+                x51 += 250 * Kt * Math.Cos(h51 * Math.PI / 180); z51 += 250 * Kt * Math.Sin(h51 * Math.PI / 180);
+                said51.AddRange(t51.Tick(T51(), none, s).Select(m => $"{s}s {m.Text}"));
+            }
+            ForceIfr = false;
+            Check(said51.Count == 1, "R351 Neuplanung bei 17 NM: ein Ruf in 10 s | " + string.Join(" | ", said51));
+        }
         // R306 (game 08.10.): oscillation when turning in 300 -> 270 "join" -> 285 -> 270. Intercept heading 30°, pilot captures the centerline himself (as after "intercept"):
         // afterwards no new heading (the intercept point slipped along close and became shallower), no "join" seconds later, handoff shortly before the gate
         {
-            Ifr = true;
+            ForceIfr = true;
             var k6 = Airfield.Kutaisi();
             var e6 = k6.End("07");
             var fw306 = (X: -e6.Dx * 5, Z: -e6.Dz * 5);
@@ -3628,16 +3791,20 @@ public partial class Tower
                 x6 += v6 * Math.Cos(h6 * Math.PI / 180) + fw306.X; z6 += v6 * Math.Sin(h6 * Math.PI / 180) + fw306.Z;
                 foreach (var m6 in t6.Tick(T6(), none, s)) { said6.Add($"{s}s a={t6.AL(x6, z6, "07").A / NM:0.0} {m6.Text}"); if (!cap6 && t6.Phase == Phase.Inbound) tgt6 = t6.vecHdg; }
             }
-            Ifr = false;
+            ForceIfr = false;
             var hdgCalls6 = said6.Skip(1).Where(m => m.Contains("heading") && !m.Contains("contact")).ToList();
-            Check(t6.Phase == Phase.Entering && hdgCalls6.Count == 0 && said6[0].Contains("intercept"),
+            Check(t6.Phase == Phase.Entering && hdgCalls6.Count == 0 && Regex.IsMatch(said6[0], "intercept|until established, cleared"),   // R353: turn-in vector with the clearance
                   $"R306 Eindrehen: ein Eindrehkurs, kein Nachsteuern/\"join\" ({hdgCalls6.Count}) | " + string.Join(" | ", said6));
+            // R353: 30° turn-in vector, meets the centreline 2 NM or more before the gate, altitude fits: vector, "maintain … until established" and clearance in one call;
+            // afterwards no descent or second clearance, the handover only says "contact Tower" (FAA JO 7110.65 5-9-1, 5-9-2)
+            Check(Regex.IsMatch(said6[0], @"heading [a-z ]+, .*maintain \d+ feet until established, cleared P A R approach runway zero seven\.$") && !said6.Skip(1).Any(m => m.Contains("cleared") || m.Contains("descend"))
+                  && said6.Skip(1).Any(m => m.Contains("contact Kutaisi Tower")), "R353 Eindrehvektor und Freigabe in einem Ruf | " + string.Join(" | ", said6));
         }
 
         // User report (game): "climb and maintain 2700 feet" at 8 NM. Intercept heading at 7.5 NM, already lower than instructed (2300 instead of 3000 ft),
         // hill 2.5 NM beside the final (MVA 2700): take over the altitude, no climb; below the minimum altitude on final still "climb"
         {
-            Ifr = true;
+            ForceIfr = true;
             var kh = Airfield.Kutaisi();
             var tk = new Tower(kh, "Enfield 1-1") { Phase = Phase.Inbound };
             var hg = new float[61, 61];
@@ -3663,7 +3830,7 @@ public partial class Tower
             (tu.vrw, tu.vecFinal, tu.vec, tu.gate, tu.vecFt) = ("25", true, new(), 6 * NM, 3000);
             hs = tu.VecCall(new(2100 * Ft, 2100 * Ft - ku.Elev, 128, (tu.LandHdg("25") + 30) * Math.PI / 180, ux, uz, 0, 0, 760), 10);
             Check(hs.Contains("climb and maintain") && tu.vecFt >= 2300, "Eindrehen über einem Hügel neben dem Endanflug: climb: " + hs);
-            Ifr = false;
+            ForceIfr = false;
         }
 
         // --- Senaki 27 (without map): holding 8 NM southeast, as number 2 out only with spacing, radar vectoring without reversal turns
@@ -3786,6 +3953,15 @@ public partial class Tower
             var r10 = rw10.Tick(At(s0x, s0z, 0, LandHdg("25")), new[] { rwC130 }, 7);
             Check(rw10.lineUp == false && r[0].Contains("line up and wait") && r10.Count == 1 && r10[0].Contains("cleared for immediate takeoff, traffic C 130 on 5 mile final"),
                   "A10 LUAW, dann immediate: " + T(r) + " / " + T(r10));
+            {   // R343: LUAW only behind a takeoff roll in departure direction, with traffic description; opposite direction -> hold short
+                var rw343 = Cleared(); rw343.Phase = Phase.TaxiOut;
+                var opp343 = rw343.OnTranscript("Enfield 11 ready for departure", hold, new[] { depAc with { Hdg = h25 + Math.PI } }, 5)[0].Text;
+                bool hs343 = rw343.Phase == Phase.HoldShort && !rw343.lineUp;
+                rw343.Phase = Phase.TaxiOut;
+                var dep343 = rw343.OnTranscript("Enfield 11 ready for departure", hold, new[] { depAc }, 6)[0].Text;
+                Check(hs343 && opp343.Contains("hold short runway two five, traffic Viper") && dep343 == "Enfield one one, runway two five, line up and wait, traffic Viper departing runway two five." && rw343.lineUp,
+                      $"R343 LUAW nur hinter Startlauf: {opp343} | {dep343}");
+            }
             var (f2bx, f2bz) = P("25", 2 * NM);
             var near2 = rwC130 with { X = f2bx, Z = f2bz, AltMsl = FieldElev + 180 };
             var rw10b = Cleared();
@@ -3850,9 +4026,9 @@ public partial class Tower
                   "R205 2-min-Intervall hinter Heavy: " + T(d205) + " / " + T(d205b) + " / " + T(d205c));
             // R202: "request closed" in the pattern -> closed traffic approved, report base; not for IFR
             var w202 = Pat(rwF2).OnTranscript("Kutaisi Tower, Enfield 11, request closed traffic", rwF2, none, 1);
-            Ifr = true;
+            ForceIfr = true;
             var w202i = Pat(rwF2).OnTranscript("Kutaisi Tower, Enfield 11, request closed traffic", rwF2, none, 1);
-            Ifr = false;
+            ForceIfr = false;
             Check(T(w202) == "Enfield one one, left closed traffic approved, report base." && T(w202i) == "Enfield one one, closed traffic not approved, I F R conditions.", "R202 request closed: " + T(w202) + " / " + T(w202i));
             // R204: SFO high key -> low key -> low approach clearance with pattern; for IFR unable
             var sfoAt = At(CX + 3 * NM, CZ, 2500 * Ft, LandHdg("25"), 120);
@@ -3861,9 +4037,9 @@ public partial class Tower
             var sf1 = ws.OnTranscript("Kutaisi Tower, Enfield 11, request S F O", sfoAt, none, 1);
             var sf2 = ws.OnTranscript("Kutaisi Tower, Enfield 11, high key", sfoAt, none, 2);
             var sf3 = ws.OnTranscript("Kutaisi Tower, Enfield 11, low key, gear down", sfoAt, none, 3);
-            Ifr = true;
+            ForceIfr = true;
             var sf4 = new Tower("Enfield 1-1").OnTranscript("Kutaisi Tower, Enfield 11, request S F O", sfoAt, none, 1);
-            Ifr = false;
+            ForceIfr = false;
             Check(T(sf1).StartsWith("Enfield one one, runway two five, wind calm, QNH") && T(sf1).EndsWith("report high key.") && T(sf2) == "Enfield one one, report low key." && ws.Phase == Phase.ClearedLand &&
                   T(sf3).StartsWith("Enfield one one, runway two five, ") && T(sf3).EndsWith("cleared low approach, left closed traffic approved, report base.") && T(sf4).Contains("unable S F O, I F R conditions"),
                   "R204 SFO: " + T(sf1) + " / " + T(sf2) + " / " + T(sf3) + " / " + T(sf4));
@@ -3873,11 +4049,11 @@ public partial class Tower
             wfo.OnTranscript("Mayday mayday mayday, Enfield 11, engine failure", sfoAt, none, 1);
             var fo1 = wfo.OnTranscript("Kutaisi Tower, Enfield 11, high key", sfoAt, none, 2);
             var fo2 = wfo.OnTranscript("Kutaisi Tower, Enfield 11, low key, gear down", sfoAt, none, 3);
-            Ifr = true;
+            ForceIfr = true;
             var wfi = new Tower("Enfield 1-1");
             wfi.Tick(sfoAt, none, 0);
             var fo3 = wfi.OnTranscript("Kutaisi Tower, Enfield 11, flameout, high key", sfoAt, none, 1);
-            Ifr = false;
+            ForceIfr = false;
             var fo4 = new Tower("Enfield 1-1") { OtherEmergency = true }.OnTranscript("Kutaisi Tower, Enfield 11, request S F O", sfoAt, none, 1);
             Check(T(fo1) == "Enfield one one, report low key." && wfo.Phase == Phase.ClearedLand &&
                   T(fo2).StartsWith("Enfield one one, runway two five, ") && T(fo2).EndsWith(", cleared to land.") && wfi.Emergency && T(fo3).EndsWith("report low key.") && T(fo4).Contains("unable S F O, emergency in progress"),

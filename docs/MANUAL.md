@@ -59,10 +59,28 @@ Setup installs to `%LOCALAPPDATA%\Programs\DCS-ATC` and creates these Start-menu
 | Readme | Opens the short readme. |
 | Uninstall DCS-ATC | Removes DCS-ATC, including the lines it added to `MissionScripting.lua` and `Export.lua`. |
 
+#### Choosing modules
+
+Setup asks which parts of DCS-ATC you want. **Full** ticks everything. With **Custom** you untick what you don't need:
+
+| Module | What it covers |
+|---|---|
+| Air traffic control | Ground, Tower, Approach/Departure, ATIS, airspace watch, the emergency menu |
+| Range | The range controller |
+| AWACS | Picture, bogey dope, air combat, AI fighter control |
+| Tanker | Rejoin, pre-contact, refueling help |
+| Carrier | Marshal, Tower and LSO |
+| AI radio | AI traffic talking to the controllers, AI flight calls (fox, splash, bingo) |
+| Ground crew | Crew chief, fuel and ammo trucks, fire service |
+
+An unticked module stays silent, DCS-ATC doesn't listen on its frequency, and it is gone from the radio wheel and the F10 menu. Use this when a real player runs the AWACS or the tower, or if you only want tankers and AWACS. All files are installed either way. Radio check, say again and the debriefing are always there.
+
+You can change the modules later in the [settings window](#the-settings-window). The app picks up the change at once, the F10 menu with the next mission. An update keeps your choice. For a silent install use for example `DCS-ATC-Setup.exe /SILENT /COMPONENTS="atc,awacs"`.
+
 #### What setup changes in DCS
 
 - `Saved Games\DCS\Scripts\Hooks\DcsAtcHook.lua` starts DCS-ATC with each mission and passes radio-wheel requests from other players to the host.
-- `Saved Games\DCS\Scripts\DcsAtc\` holds the mission script, the default options (`DcsAtcOptions.lua`) and the language file.
+- `Saved Games\DCS\Scripts\DcsAtc\` holds the mission script, the default options (`DcsAtcOptions.lua`), the language file and the module list (`DcsAtcModules.txt`).
 - `Saved Games\DCS\Scripts\DcsAtcExport.lua`, plus one line at the end of `Export.lua`, sends your own aircraft's data to DCS-ATC. Other export scripts such as SRS or Tacview are not touched.
 - One line is added to `<DCS folder>\Scripts\MissionScripting.lua` (see step 3 above).
 
@@ -107,7 +125,7 @@ DCS-ATC can also run on a PC that hosts a DCS dedicated server (`DCS_server.exe`
 | HOTAS (if set) | The wheel button opens and closes the wheel. Hat up/down moves the highlight, right selects, left goes back. |
 | Push-to-talk, default right `Ctrl` | Used only when SRS is not connected. With SRS you talk with your normal SRS PTT. |
 
-All wheel entries are listed under [Radio wheel](#radio-wheel). The F10 radio menu **ATC** offers most of them in the game. In VR you can't see the desktop wheel, so it is also shown as text in the game (see [Radio wheel as text in the game](#radio-wheel-as-text-in-the-game-vr)).
+All wheel entries are listed under [Radio wheel](#radio-wheel). The F10 radio menu **ATC** offers the same entries in the game. In VR you can't see the desktop wheel, so it is also shown as text in the game (see [Radio wheel as text in the game](#radio-wheel-as-text-in-the-game-vr)).
 
 ### Your first flight: ramp start at Kutaisi
 
@@ -307,7 +325,7 @@ These phrases work with every airfield controller:
 | You say | Controller |
 |---|---|
 | "… radio check" / "how do you read" | *"Enfield one one, Kutaisi Tower, read you five."* |
-| "say again", "come again", "repeat", "say last", "didn't copy", "missed", "pardon" | Repeats the last instruction: *"Enfield one one, I say again, …"*. Under radar vectors, in the hold or on the way to initial, he gives a fresh heading, altitude and speed from your current position. If there is nothing to repeat: *"…, go ahead."* |
+| "say again", "come again", "repeat", "say last", "didn't copy", "missed", "pardon" | Repeats the last instruction: *"Enfield one one, I say again, …"*. Under radar vectors, in the hold or on the way to initial, he gives a fresh heading, altitude and speed from your current position. If there is nothing to repeat: *"…, go ahead."* A bare "say again" without a station name goes to the Range, AWACS or tanker that spoke last (within 5 minutes), otherwise to the airfield. |
 | "confirm …" / "verify …" (e.g. "confirm heading 045", "verify runway 25") | Checks the value against the last instruction: *"affirm, heading zero four five"* or *"negative, heading zero five five"*. A question about a clearance ("confirm cleared to land") repeats the whole call. |
 | Station and callsign only ("Kutaisi Tower, Enfield 1-1") | *"Enfield one one, Kutaisi Tower."* You then state your request. Right after a handoff, he goes straight to the instructions. |
 | "request weather", "QNH", "wind", "altimeter", "runway in use", "which runway" | *"Enfield one one, Kutaisi Tower, wind two five zero degrees, eight knots, altimeter two niner niner two, runway two five in use."* |
@@ -576,14 +594,16 @@ In every mission with DCS-ATC, each player group gets **F10 Other → ATC**. If 
 | Submenu | Entries |
 |---|---|
 | Ground | Request startup · Request taxi · Runway vacated, taxi to parking · Progressive taxi · Hot brakes · IFR clearance → *Next in departure direction* / up to 8 friendly or neutral airfields, nearest first |
-| Tower | Ready for departure · Ready, closed pattern · Initial · Overhead · Base, gear down · Final, gear down, full stop · Base, touch and go · Going around · Request closed |
-| Approach | Airborne (after takeoff) · Inbound for landing · Inbound, pattern work · Request straight in · C R P |
-| AWACS / Tanker | AWACS: picture · AWACS: bogey dope · AWACS: nearest tanker · Tanker: request rejoin · Tanker: pre-contact |
+| Tower | Ready for departure · Ready, closed pattern · Initial · Overhead · Base, gear down · Final, gear down, full stop · Base, touch and go · Going around · Closed / SFO → Request closed · Request SFO · High key · Low key, gear down · Ready, practice approach |
+| Approach | Airborne (after takeoff) · Inbound for landing · Inbound, pattern work · Request ILS / straight in · Flight following · Cancel approach · Traffic → Traffic in sight / Negative contact · C R P · More → Report airspeed / Say again / Request higher |
+| Range (only if the mission has a range) | Check in · IP inbound · In hot · Off safe · Check out · Check out, hung ordnance |
+| AWACS / Tanker | AWACS → Check in · Picture · Bogey dope · Sort · Nearest tanker · Vector nearest airfield · Check out · Combat → Committing / Fox three / Splash / Defending / Request support / Unable / Winchester / Bingo, RTB / Say again. Tanker → Request rejoin · Visual · Observation · Pre-contact · Refuel complete |
+| Carrier (only if the mission has a carrier) | Marshal check in · See you at · Initial · Commencing · Platform · Ball · Clara · Pigeons |
 | Emergency | MAYDAY → kind · PAN PAN → kind · Minimum fuel · Hung ordnance · Flameout, high key · Cancel emergency (kinds: engine failure, fuel (MAYDAY only), hydraulic failure, battle damage, medical, bird strike) |
 | General | Radio check · Say again · QNH / weather · Listen to ATIS · Request zone transit · Debriefing |
 | Settings | Ground crew on/off · Show |
 
-F10 calls are handled like wheel calls, including the pilot voice and the choice of airfield. The F10 menu has fewer entries than the wheel: there is no Range, no Carrier, no AWACS check-in/out or sort, and no flight following. Use the wheel or your voice for those.
+F10 calls are handled like wheel calls, including the pilot voice and the choice of airfield. The F10 menu has the same groups, names and texts as the wheel, with at most 9 entries per level; only *Select airfield* is missing (use the wheel, or say the airfield's name). The wheel hides entries that don't fit your flight state, F10 always shows all of them; a call that doesn't fit is answered as usual (for example *unable*).
 
 If DCS-ATC isn't running, you get the message *"DCS-ATC is not running – Start menu -> Start DCS-ATC, then send again."*
 
@@ -1185,6 +1205,7 @@ On an IFR or straight-in approach, a go-around becomes a missed approach in two 
 - **Players in the pattern** are told: "traffic, Viper crossing overhead eastbound, 3500 feet."
 - **Busy airfield:** "remain outside the control zone, expect transit in 4 minutes."
 - **No report:** 1 NM past the zone edge: "I show you clear of the zone, frequency change approved."
+- **Inbound or in the pattern:** "unable zone transit, say intentions." The wheel entry shows only in flight outside the landing flow.
 
 #### Flight following
 
@@ -1967,13 +1988,13 @@ A range controller exists only when the mission has a trigger zone whose name st
 
 | You say (recognised words) | Range answers |
 |---|---|
-| **checking in** (*check in*, *inbound*, *request entry*, *entering*, *with you*, *request range*) | *"Enfield one one, Range Alpha, altimeter two niner niner two, wind on target two seven zero at one zero, range is cold. Range bears one eight zero, 12 miles. Enter from the north, run-in headings one six zero to two zero zero, minimum altitude 1500 feet. Report IP."* If another aircraft is hot: *"…, one aircraft in."* instead of *"range is cold"*. |
+| **checking in** (*check in*, *inbound*, *request entry*, *entering*, *with you*, *request range*) | *"Enfield one one, Range Alpha, altimeter two niner niner two, wind on target two seven zero at one zero, range is cold. Range bears one eight zero, 12 miles. Enter from the north, run-in headings one six zero to two zero zero, minimum altitude 1500 feet AGL. Report IP."* If another aircraft is hot: *"…, one aircraft in."* instead of *"range is cold"*. |
 | **IP inbound** (after the check-in) | *"Enfield one one, continue."* Before the check-in: *"negative, you are not checked in. Report check in."* |
 | **in hot** (*rolling in*, *inbound hot*, *in from the north*, *in heading 360*, *in now*, *ready in*, or a call ending in "in") | *"cleared hot."* (see conditions below) |
 | **in dry** | *"cleared dry."* Same conditions as "cleared hot" (below). A dry pass holds the range until you call *off* (or until it is released automatically like a hot pass), but it isn't scored. |
-| **off** (*off safe*, *off west* …) | *"Enfield one one, pass 2, 3 impacts, best 12 meters at 6 o'clock, 2 gun hits. Report in hot or checking out."* If you weren't hot (or were dry): *"roger, range is cold."* With *hung ordnance* or *hot gun* in this or an earlier call: *"pass 2, copy hung ordnance, check switches safe, no further hot passes, report checking out."* |
+| **off** (*off safe*, *off west* …) | *"Enfield one one, pass 2, 3 impacts, best 40 feet at 6 o'clock, 2 gun hits. Report in hot or checking out."* If you weren't hot (or were dry): *"roger, range is cold."* With *hung ordnance* or *hot gun* in this or an earlier call: *"pass 2, copy hung ordnance, check switches safe, no further hot passes, report checking out."* |
 | **winchester** | *"pass 2, …, check switches safe, report checking out."* |
-| **checking out** (*check out*, *leaving*, *departing*, *good day*) | *"check switches safe. 2 passes, best impact 12 meters at 6 o'clock. Cleared off the range to the north, contact Overlord 251.5, good day."* With *hung ordnance* or *hot gun* in the call (or reported earlier on this visit): *"copy hung ordnance, check switches safe. … Cleared off the range to the north via the hung ordnance route, advise Approach, good day."* |
+| **checking out** (*check out*, *leaving*, *departing*, *good day*) | *"check switches safe. 2 passes, best impact 40 feet at 6 o'clock. Cleared off the range to the north, contact Overlord 251.5, good day."* With *hung ordnance* or *hot gun* in the call (or reported earlier on this visit): *"copy hung ordnance, check switches safe. … Cleared off the range to the north via the hung ordnance route, advise Approach, good day."* |
 | anything else | *"say again. Report check in, in hot, off, or checking out."* |
 
 Notes on the check-in answer:
@@ -1995,8 +2016,8 @@ Notes on the check-in answer:
 #### Scoring and enforcement
 
 - **Score call:** about 3 s after the last impact of a release you get one call:
-  - *"Enfield one one, 12 meters at 6 o'clock."*
-  - *"rockets, best 30 meters at 7 o'clock."*
+  - *"Enfield one one, 40 feet at 6 o'clock."*
+  - *"rockets, best 100 feet at 7 o'clock."*
   - *"direct hit."*
   - *"no score."* (no target within 500 m)
 - **Kill:** a destroyed target gets *"good hits, target destroyed."* once per pass.
@@ -2013,16 +2034,16 @@ Notes on the check-in answer:
 You:    Range Alpha, Enfield 1-1, checking in from the north, angels 10.
 Range:  Enfield one one, Range Alpha, altimeter two niner niner two, wind on target two seven zero
         at one zero, range is cold. Range bears one eight zero, 9 miles. Enter from the north,
-        run-in headings one six zero to two zero zero, minimum altitude 1500 feet. Report IP.
+        run-in headings one six zero to two zero zero, minimum altitude 1500 feet AGL. Report IP.
 You:    Range Alpha, Enfield 1-1, IP inbound.
 Range:  Enfield one one, continue.
 You:    Range Alpha, Enfield 1-1, in hot.
 Range:  Enfield one one, cleared hot.
-Range:  Enfield one one, 12 meters at 6 o'clock.
+Range:  Enfield one one, 40 feet at 6 o'clock.
 You:    Enfield 1-1, off safe.
-Range:  Enfield one one, pass 1, impact 12 meters at 6 o'clock. Report in hot or checking out.
+Range:  Enfield one one, pass 1, impact 40 feet at 6 o'clock. Report in hot or checking out.
 You:    Range Alpha, Enfield 1-1, checking out.
-Range:  Enfield one one, Range Alpha, check switches safe. 1 pass, best impact 12 meters at 6 o'clock.
+Range:  Enfield one one, Range Alpha, check switches safe. 1 pass, best impact 40 feet at 6 o'clock.
         Cleared off the range to the north, contact Overlord 251.5, good day.
 ```
 
@@ -2150,7 +2171,7 @@ Players don't need to install DCS-ATC at all. If the host (or the dedicated serv
 
 - **Voice over SRS.** Connect to the host's SRS server, tune the controller frequency and talk, in English. Example:
   > "Kutaisi Ground, Enfield 1-2, request startup"
-- **F10 menu.** `F10 -> ATC` has most of the requests of the radio wheel (Ground, Tower, Approach, General, emergency…). Every player gets their own `ATC` menu. If several players share one group, the `ATC` menu has a submenu for each player, named by callsign.
+- **F10 menu.** `F10 -> ATC` has the same requests as the radio wheel (Ground, Tower, Approach, AWACS / Tanker, General, emergency…). Every player gets their own `ATC` menu. If several players share one group, the `ATC` menu has a submenu for each player, named by callsign.
 - **Controller text** appears in the game for your group, and the voice comes over SRS.
 
 They don't get the radio wheel or the ENTER suggestion. Their F10 requests are still spoken by the pilot voice, like everyone else's.
@@ -2341,6 +2362,7 @@ Open it from **Start menu → DCS-ATC → Settings** or from **Radio wheel → G
 | **Microphone (only without SRS)** `*` | Windows default or a specific device | `MicName` |
 | **SRS folder** `*` | The path, with "…" to browse. It is checked for `ExternalAudio\DCS-SR-ExternalAudio.exe`. | `SrsPath` |
 | **Set keys …** | Opens the key prompt (radio wheel, HOTAS, push-to-talk). | `WheelKey`, `PttKey`, … |
+| **Modules** | One box per module, as in [setup](#choosing-modules). The F10 menu changes with the next mission. | (`modules.txt`, `DcsAtcModules.txt`) |
 
 **All options (config.jsonc) …** opens the file in Notepad.
 

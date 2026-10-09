@@ -143,8 +143,10 @@ static class Kneeboard
         FormattableString.Invariant($"  AWACS   {cfg.Frequencies.GetValueOrDefault("AWACS", 251.5):0.0}   Rufname aus Mission, sonst Overlord"),
         "                  (GCI: Magic blau, Moscow rot)",
         FormattableString.Invariant($"  Tanker  {cfg.Frequencies.GetValueOrDefault("Tanker", 255.5):0.0}   Rufname aus der Mission (z. B. Texaco)"),
-        "  Hat der AWACS/Tanker in der Mission eine eigene",
+        "  Hat der AWACS in der Mission eine eigene",
         "  Frequenz, gilt diese (Funkrad zeigt sie an).",
+        "  Beim Tanker stellt DCS die Frequenz nach dem",   // R391: tanker frequency from the mission is not read from the config
+        "  Kontakt selbst ein.",
         "",
         "CHECK-IN (nur mit eigenem AWACS/GCI in der Luft)",
         "  \"Overlord, Enfield 1-1, checking in\"",
@@ -213,6 +215,7 @@ static class Kneeboard
         var cfg = new Config(); cfg.Frequencies["AWACS"] = 252.5; cfg.Frequencies["Tanker"] = 256.5;
         var aw = string.Join("\n", AwacsLines(cfg));
         if (!aw.Contains("AWACS   252.5") || !aw.Contains("Tanker  256.5")) throw new Exception("Kneeboard: AWACS-Seite ohne Config-Frequenz: " + aw);
+        if (aw.Contains("AWACS/Tanker in der Mission") || !aw.Contains("Beim Tanker stellt DCS die Frequenz")) throw new Exception("Kneeboard: Tanker-Frequenz aus der Mission behauptet (R391): " + aw);
         var nt = NotesLines();
         if (!nt.Any(l => l.Contains("UR-R152")) || !nt.Any(l => l.Contains("Lochini")) || !nt.Any(l => l.StartsWith("BATUMI")) || !nt.Any(l => l.StartsWith("SOCHI")) ||
             nt.Any(l => l.Length > 54))   // wider than the page (Consolas 22 px, 708 px)

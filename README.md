@@ -42,7 +42,7 @@ Manual: [English](docs/MANUAL.md) · [Deutsch](docs/ANLEITUNG.md) (installation,
 1. Close DCS, unzip, run `DCS-ATC-Setup.exe` and pick English or German. No admin rights needed, only one Windows prompt for `MissionScripting.lua`.
 2. SmartScreen may complain because the setup is new and not signed: More info, then Run anyway. You can check the file against the SHA256 in the release (`Get-FileHash`).
 3. At the end you set the keys for the radio wheel and push-to-talk, then the settings window opens (voices, speech speed, altimeter hPa/inHg, runway lights, AWACS range).
-4. That's it, DCS-ATC starts with every mission. For a dedicated server tick "Dedicated server" in the setup (see manual).
+4. That's it, DCS-ATC starts with every mission. For a dedicated server tick "Dedicated server" in the setup (see manual). With "Custom" you can leave out modules you don't need (air traffic control, Range, AWACS, Tanker, Carrier, AI radio, ground crew), for example when a real player runs AWACS or Tower.
 
 ## Requirements
 

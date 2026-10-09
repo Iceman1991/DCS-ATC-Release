@@ -29,6 +29,8 @@ Installation
      MissionScripting.lua (see "What setup changes in DCS").
   2. At the end, "Set keys": key for the radio wheel and push-to-talk (keyboard or HOTAS).
   3. Done. From now on DCS-ATC starts with every mission by itself (small window in the taskbar).
+  Modules: "Custom" lets you untick parts you don't need (ATC, Range, AWACS, Tanker, Carrier, AI radio,
+  ground crew), e.g. when a real player runs the AWACS. You can change this later in the settings window.
   Language: the setup asks for the language at the start (German or English). To change the language
   of the program and menus later, simply run the setup again and choose the other language.
 

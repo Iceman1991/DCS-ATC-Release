@@ -60,7 +60,7 @@ public partial class Tower
         // R205: heavy in takeoff roll/departure on the active runway (up to 500 ft): 2-min interval counts from the last time
         if (traffic.Any(a => Heavy(a.Type) && a.Speed > 30 && a.AltMsl - FieldElev < 500 * Ft && HdgDiff(a.Hdg * 180 / Math.PI, LandHdg(rw)) < 30 &&
                              Approach(a.X, a.Z, rw).lateral < 0.5 * NM && HeavyDep(a, rw))) heavyDepAt = now;
-        if (Phase == Phase.HoldShort && holdSince >= 0 && now - heavyDepAt >= 120 && !EmgWithin(15) && !TrafficOnRunway(traffic) && !TrafficOnFinal(traffic, Airfield.Opposite(rw), 4 * NM))
+        if (Phase == Phase.HoldShort && holdSince >= 0 && now - heavyDepAt >= 120 && !EmgWithin(15) && !VfrBlocked && HoldAhead == 0 && !TrafficOnRunway(traffic) && !TrafficOnFinal(traffic, Airfield.Opposite(rw), 4 * NM))   // R339: no VFR takeoff in IMC; R341: earliest report first
         {
             var fin = FinalTraffic(traffic, rw, 6 * NM).FirstOrDefault();
             double fa = fin == null ? double.MaxValue : Approach(fin.X, fin.Z, rw).along;
@@ -82,6 +82,24 @@ public partial class Tower
                 return Say($"{c}, hold position, cancel takeoff clearance, traffic " + (busy ? "on the runway." : Describe(low!, rw) + "."), "Tower");
             }
         }
+
+        // R348: cleared for takeoff but not rolling: query after 60 s, cancel after 120 s (FAA JO 7110.65 3-9-1); on the runway he may stand like after a spawn there (holdSince -1: only on "ready")
+        if (Phase == Phase.ClearedTakeoff && ground && Gs(t) / Kt < 2)
+        {
+            if (clrStill < 0) clrStill = now;
+            else if (now - clrStill >= 120)
+            {
+                bool onRwy = OnRunwayPos(t.X, t.Z);
+                (Phase, holdSince, lineUp, clrStill, clrAsked) = (Phase.HoldShort, -1, onRwy, -1, false);
+                return Say($"{c}, cancel takeoff clearance, " + (onRwy ? "exit the runway" : $"hold short runway {RwSay(rw)}") + ", report ready for departure.", "Tower");
+            }
+            else if (now - clrStill >= 60 && !clrAsked)
+            {
+                clrAsked = true;
+                return Say($"{c}, verify rolling, runway {RwSay(rw)}, cleared for takeoff.", "Tower");
+            }
+        }
+        else (clrStill, clrAsked) = (-1, false);
 
         // A12: taxied back from the holding point (30 s over 700 m from the threshold, not on the runway): clearance lapses, back to Ground
         if (ground && Phase is Phase.HoldShort or Phase.ClearedTakeoff && !OnRunwayPos(t.X, t.Z) && Dist(t.X, t.Z, Thr(rw).X, Thr(rw).Z) > 700)
@@ -228,9 +246,10 @@ public partial class Tower
         {
             Phase = Phase.Inbound;
             fromHold = true;
+            var was = Runway;
             var sv = StartVectors(t, Ifr || wantStraight, now);   // R270: still holding: altitude is the assigned level (may be descending there right now), not the current one
             holding = false;
-            return Say($"{c}, leave the hold, {sv}", "Approach");
+            return Say($"{c}, leave the hold{(vecOver || Runway != was ? ". " + PlanText(was) + Cap(sv) : ", " + sv)}", "Approach");   // R352: other runway than announced: say so before the vector
         }
 
         // Holding: lead there, let circle at the point, every minute situation (sequence, waiting time) or heading back
@@ -260,14 +279,14 @@ public partial class Tower
             bool off = holdArrived ? HoldKtFor() > 0 && Math.Abs(t.Ias / Kt - HoldKtFor()) > 30 : HdgDiff(t.Hdg * 180 / Math.PI, Bearing(t.X, t.Z, hf.X, hf.Z)) > 15;   // in the circle: speed off
             if (now - lastHoldInfo > (!holdArrived ? (off ? 30 : 120) : 60))
             {
-                if (d > room && Ignored("hold", d, 0.3 * NM)) return Kick(t);   // does not fly to the holding point
                 bool drift = holdArrived && d > room;
+                if ((drift || off) && d > room && Ignored("hold", d, 0.3 * NM)) return Kick(t);   // does not fly to the holding point. R350: only with a due call on a real deviation (not every second while flying there), counts only if the distance did not shrink
                 var eat = EatNote(busy, now, fixS: holdArrived ? 0 : d / (HoldKt * Kt));   // "" = unchanged; sets lastEat, hence only here, where speech also happens below
                 if (drift || off || eat != "")   // R321: unchanged en route not the same instruction every 120 s
                 {
                     lastHoldInfo = now;
                     if (drift) holdArrived = false;   // drifted: lead back, there again "hold here"
-                    var head = !holdArrived ? $", {Steer(t, hf, navName)}, {Miles(d)} miles to the hold{(Math.Abs(IndFt(t) - holdFt) > 300 ? ", " + AltTo(t, holdFt) : "")}"
+                    var head = !holdArrived ? $", {Steer(t, hf, navName)}, {MilesTxt(d)} to the hold{(Math.Abs(IndFt(t) - holdFt) > 300 ? ", " + AltTo(t, holdFt) : "")}"
                              : off ? HoldSpd(t) : "";   // in the circle on speed deviation only the speed
                     return Say($"{c}{head}{(eat == "" ? "" : $", {seq}, {eat}")}.{(!holdArrived && QueueAhead < 0 ? SeqNote(t, traffic, now) : "")}", "Approach");
                 }
@@ -386,7 +405,7 @@ public partial class Tower
             if (navName == "six mile final" && (d < 1.5 * NM || OnFinal(t.X, t.Z, t.Hdg, t.Agl, rw, 7 * NM))) nav = null;
             else if (!holding && Phase != Phase.ClearedLand && leaveAt < 0 && now - lastVector > 45 && d > 1.5 * NM && HdgDiff(t.Hdg * 180 / Math.PI, Bearing(t.X, t.Z, goal.X, goal.Z)) > 30 &&
                      !(Phase is Phase.ClearedTakeoff or Phase.Departing && (Dist(t.X, t.Z, CX, CZ) < 2 * NM || handedOff)))   // Reporting obligation #8: handed over, no check-in yet: Departure does not vector; landing clearance (e.g. emergency on the way to the initial), A13 after "say intentions": no heading any more
-                return Say($"{c}, {Steer(t, goal, navName)}, {Miles(d)} miles to {navName}.");
+                return Say($"{c}, {Steer(t, goal, navName)}, {MilesTxt(d)} to {navName}.");
         }
         // Review l1: after "no clearance to join, remain outside the pattern" or "say position, remain outside the control zone" nevertheless (45 s later still or again) in the pattern
         // (3 NM, under pattern + 1000 ft) or further in the zone than the C R P: once redirect with violation (debriefing, "possible pilot deviation", FAA JO 7110.65 2-1-26) like the zone watch
@@ -510,7 +529,7 @@ public partial class Tower
             // A11: go-around with occupied runway also without landing clearance (Entering, Initial deep in final, Pattern), not Away (R11)
             // afterwards 60 s quiet on final: otherwise per tick again "go around" or in the climb right away "continue approach"/"cleared to land"
             bool gaQuiet = now - lastGa < 60;
-            if (!gaQuiet && !unannounced && !Emergency && (onRwy || EmgWithin(4)) && along < 0.8 * NM && (Phase != Phase.Initial || t.Agl < 150) && OnFinal(t.X, t.Z, t.Hdg, t.Agl, rw, 3 * NM))
+            if (!gaQuiet && !unannounced && (onRwy || !Emergency && EmgWithin(4)) && along < 0.8 * NM && (Phase != Phase.Initial || t.Agl < 150) && OnFinal(t.X, t.Z, t.Hdg, t.Agl, rw, 3 * NM))
             {
                 lastGa = now;
                 wentAround |= Phase == Phase.ClearedLand;   // N4: landing clearance withdrawn; new approach: too-low warning possible again (A97)
@@ -608,6 +627,7 @@ public partial class Tower
             if (follow == null && !unclr && Gs(t) >= 40 * Kt) { vacDue = true; return new(); }   // R333: vacate instruction not right after touchdown (FAA JO 7110.65 3-10-9 Note), only when slow
             var vac = Vacate(landed);   // R210: no "welcome to ...", straight to the vacate instruction
             var end = SameFreq("Ground") ? "report vacated." : $"contact {Contact("Ground")} when vacated.";   // R104
+            vacAt = now;   // R354
             var wel = follow == null ? $"{c}, {char.ToLower(vac[0])}{vac[1..]} {Cap(end)}"
                     : $"{c}, expedite vacating, traffic {Describe(follow, landed)}, {(vac.EndsWith("when able.") ? end : $"{char.ToLower(vac[0])}{vac[1..]} {Cap(end)}")}";   // R266: without a taxiway no "vacate runway when able" after "expedite vacating"
             return !unclr ? Say(wel, "Tower") : ga ? Dev(wel, $"Landung nach Go-around {F.Name} {landed}", $"landing after go-around {F.Name} {landed}", "Tower")
@@ -617,12 +637,18 @@ public partial class Tower
         // A48/A83: still on the runway (rolled out slowly, standing) and the following traffic only now comes within 3 NM: vacate promptly, once per landing
         if (Phase == Phase.TaxiIn && ground && expFor != landedAt && OnRunwayPos(t.X, t.Z) && Follower(traffic, landRw, Gs(t), now) is { } fo)
         {
-            expFor = landedAt;
+            expFor = landedAt; vacAt = now;
             return Say($"{c}, expedite vacating, traffic {Describe(fo, landRw)}.", "Tower");
+        }
+        // R357: MAYDAY of another inside 5 NM while still on the runway: vacate (FAA JO 7110.65 3-10-5), once per landing
+        if (Phase == Phase.TaxiIn && ground && expFor != landedAt && OnRunwayPos(t.X, t.Z) && EmgWithin(5))
+        {
+            expFor = landedAt;
+            return Say($"{c}, vacate runway immediately, emergency traffic {MilesTxt(EmergencyNm * NM)}.", "Tower");
         }
         if (vacDue && Phase == Phase.TaxiIn && ground && Gs(t) < 40 * Kt)
         {
-            vacDue = false;
+            vacDue = false; vacAt = now;
             var vac = Vacate(landRw);
             return Say($"{c}, {char.ToLower(vac[0])}{vac[1..]} {Cap(SameFreq("Ground") ? "report vacated." : $"contact {Contact("Ground")} when vacated.")}", "Tower");
         }
@@ -641,8 +667,11 @@ public partial class Tower
         if (ground && !OnRunwayPos(t.X, t.Z) && (Phase == Phase.TaxiOut || Phase == Phase.TaxiIn && taxiInTold))
         {
             var taxiTraffic = traffic.Where(a => !OnRunwayPos(a.X, a.Z)).ToList();
-            if (taxiFollow is { } fid && TaxiConflict(t, taxiTraffic.Where(a => a.Id == fid).ToList()) == null) taxiFollow = null;   // passed: silent, he was not stopped
-            var conflict = TaxiConflict(t, taxiTraffic.Where(a => a.Id != taxiFollow).ToList());
+            if (taxiFollow is { } fid && taxiTraffic.Where(a => a.Id == fid).ToList() is var ft && TaxiConflict(t, ft) == null && StandConflict(t, ft) == null) taxiFollow = null;   // passed: silent, he was not stopped
+            var others = taxiTraffic.Where(a => a.Id != taxiFollow).ToList();
+            var conflict = TaxiConflict(t, others);
+            var stand = conflict == null ? StandConflict(t, others) : null;   // R342: stationary traffic in the taxi path
+            conflict ??= stand;
             if (holdFor is { } hid)
             {
                 // R106: only after 8 s halt and when the traffic is gone or (over 60 m or no longer in his own path, computed with taxi movement) and not approaching (regardless of speed);
@@ -661,6 +690,16 @@ public partial class Tower
             {
                 double rel = ((Bearing(t.X, t.Z, conflict.X, conflict.Z) - t.Hdg * 180 / Math.PI) % 360 + 360) % 360;
                 var side = rel < 30 || rel > 330 ? "ahead" : rel < 180 ? "on your right" : "on your left";
+                if (stand != null)   // R342: holding short ahead -> follow (queue at the holding point), otherwise stop behind it
+                {
+                    if (AtHoldPt(stand, t))
+                    {
+                        taxiFollow = stand.Id;
+                        return Say($"{c}, follow the {Ops.TypeSay(stand.Type)} holding short runway {RwSay(Runway)}.", "Ground");
+                    }
+                    (holdFor, holdAt, holdDist) = (stand.Id, now, Dist(t.X, t.Z, stand.X, stand.Z));
+                    return Say($"{c}, hold position, traffic ahead, {Ops.TypeSay(stand.Type)}.", "Ground");
+                }
                 if (side == "ahead" && HdgDiff(t.Hdg * 180 / Math.PI, conflict.Hdg * 180 / Math.PI) < 45)   // same direction: follow, no halt
                 {
                     taxiFollow = conflict.Id;
@@ -674,8 +713,8 @@ public partial class Tower
 
         // A91: left the runway but no Ground call: remind once 30 s after vacating (ICAO Doc 4444 12.3.4)
         if (Phase == Phase.TaxiIn && ground && !OnRunwayPos(t.X, t.Z) && vacatedAt <= landedAt) vacatedAt = now;   // 30 s from vacating, not from landing (long rollout)
-        // Reporting duty #13: parking without taxi clearance over 5 kt and 150 m off the runway: have him stop, violation (once per landing)
-        if (Phase == Phase.TaxiIn && !taxiInTold && ground && gkt > 5 && !OnRunwayPos(t.X, t.Z, 180, 150) && taxiDevFor != landedAt)
+        // Reporting duty #13: parking without taxi clearance over 5 kt and 150 m off the runway: have him stop, violation (once per landing); R354: only 10 s after the vacate instruction (FAA JO 7110.65 3-10-9)
+        if (Phase == Phase.TaxiIn && !taxiInTold && ground && gkt > 5 && !OnRunwayPos(t.X, t.Z, 180, 150) && taxiDevFor != landedAt && !vacDue && now - vacAt >= 10)
         {
             taxiDevFor = vacRemFor = landedAt;   // no A91 reminder afterwards
             return Dev($"{c}, hold position, you are not cleared to taxi. {(SameFreq("Ground") ? "Request taxi." : $"Contact {Contact("Ground")} for taxi.")}",
@@ -832,6 +871,15 @@ public partial class Tower
         return null;
     }
 
+    /// R342: stationary ground traffic in the own taxi path (ahead within 30°, under 150 m, track passes within 40 m); parked ones at a stand do not count
+    /// (without DCS parking positions only at the holding point, otherwise every parked aircraft along the taxiway would hold him).
+    Traffic? StandConflict(Telemetry t, IReadOnlyList<Traffic> traffic) => traffic.FirstOrDefault(a =>
+        !a.InAir && a.Speed < 2 && Dist(t.X, t.Z, a.X, a.Z) is var d && d < 150 &&
+        ((Bearing(t.X, t.Z, a.X, a.Z) - t.Hdg * 180 / Math.PI) % 360 + 360) % 360 is var rel && (rel < 30 || rel > 330) && Math.Abs(d * Math.Sin(rel * Math.PI / 180)) < 40 &&
+        (F.Spots.Count == 0 ? AtHoldPt(a, t) : !F.Spots.Any(s => s.Type != 16 && Dist(a.X, a.Z, s.X, s.Z) < 30)));
+
+    bool AtHoldPt(Traffic a, Telemetry t) => Phase == Phase.TaxiOut && HoldPt(Runway, t) is var h && Dist(a.X, a.Z, h.X, h.Z) < 150;
+
     /// Smallest distance to a in the next 25 s (straight-line projection, own speed my) and when (0: now or diverging)
     static (double Miss, double Tc) TaxiMiss(Telemetry t, Traffic a, double my)
     {
@@ -946,10 +994,10 @@ public partial class Tower
         var alt = Math.Abs(dAlt) < 300 ? "same altitude" : $"{Math.Round(Math.Abs(dAlt) / 100) * 100:0} feet {(dAlt > 0 ? "above" : "below")}";
         var hdg = $"turn {(turn > 0 ? "right" : "left")} heading {Digits((mag == 0 ? 360 : mag).ToString("000"))}";
         if (early) return Say($"{Cs()}, {hdg}, traffic {(clock == 0 ? 12 : clock)} o'clock, " +
-                              $"{Miles(Dist(t.X, t.Z, a.X, a.Z))} miles, departing aircraft, climbing through {Alt(Math.Round(itFt / 100) * 100)}.", "Approach");
+                              $"{MilesTxt(Dist(t.X, t.Z, a.X, a.Z))}, departing aircraft, climbing through {Alt(Math.Round(itFt / 100) * 100)}.", "Approach");
         // R214: attention word before the callsign, "advise you turn … and climb/descend … immediately" (FAA JO 7110.65 2-1-6 b)
         var vert = ft is { } g ? $" and {(g > myFt ? "climb" : "descend")}{(ctl ? $" to {Alt(g)}" : "")}" : "";
-        return Say($"Traffic alert, {Cs()}, {(clock == 0 ? 12 : clock)} o'clock, {Miles(Dist(t.X, t.Z, a.X, a.Z))} miles, {Dir8(a.Hdg * 180 / Math.PI)}bound, {alt}, " +
+        return Say($"Traffic alert, {Cs()}, {(clock == 0 ? 12 : clock)} o'clock, {MilesTxt(Dist(t.X, t.Z, a.X, a.Z))}, {Dir8(a.Hdg * 180 / Math.PI)}bound, {alt}, " +
                    $"advise you {hdg}{vert} immediately.", "Approach");
     }
 
@@ -1015,7 +1063,7 @@ public partial class Tower
     {
         int clock = (int)Math.Round(((Bearing(t.X, t.Z, a.X, a.Z) - t.Hdg * 180 / Math.PI) % 360 + 360) % 360 / 30) % 12;
         double dAlt = (a.AltMsl - t.AltMsl) / Ft;
-        return $"{(clock == 0 ? 12 : clock)} o'clock, {Miles(Dist(t.X, t.Z, a.X, a.Z))} miles, {Dir8(a.Hdg * 180 / Math.PI)}bound, " +
+        return $"{(clock == 0 ? 12 : clock)} o'clock, {MilesTxt(Dist(t.X, t.Z, a.X, a.Z))}, {Dir8(a.Hdg * 180 / Math.PI)}bound, " +
                $"{(Math.Abs(dAlt) < 300 ? "same altitude" : $"{Math.Round(Math.Abs(dAlt) / 100) * 100:0} feet {(dAlt > 0 ? "above" : "below")}")}, {Ops.TypeSay(a.Type)}";
     }
     /// "at your 2 o'clock, 350 meters" to own parking position; null = unknown or other airfield.
@@ -1191,6 +1239,7 @@ public partial class Tower
     }
     bool rwSwitched;      // R334: Aligned changed the runway with landing clearance
     bool vacDue;          // R333: vacate instruction pending (without following traffic only below 40 kt)
+    double vacAt = -999;  // R354: time of the last vacate instruction
     double slowAt = -1;   // R255: lander first below 8 m/s after landedAt
     string RwyOf(Telemetry t)   // Runway by heading (takeoff/landing), parallel runways by position; crossing runways only by heading (near the intersection the other centreline would be closer)
     {

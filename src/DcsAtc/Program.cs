@@ -89,6 +89,7 @@ class Pilot
     public double[]? PinFreqs;                        // Pinned by a call on the airfield frequency: SRS frequencies included, valid until turning away from the airfield (null = selected in the radio wheel)
     public double[]? LastFq; public Airfield? Fresh;   // last reported SRS frequencies; airfield most recently tuned in (wins when several are tuned)
     public double TankMenuAt = -1e9, TankFq;         // R304: last press in the DCS tanker menu; frequency DCS (Easy Comms) tuned itself afterwards (mission frequency of the tanker, 0 = none)
+    public (string Role, double At)? LastOps;         // R393: Range/AWACS/tanker spoke last (an airfield call clears it): "say again" without a station goes there
     public string? OnBoat;                            // carrier selected in the radio wheel: radio calls without a target go to Marshal/Paddles
     public bool Crew;                                // ground crew stands at the aircraft (mission: C;unit;crew|back)
     public double Fuel = 1;                          // tank 0–1 (mission), low fuel -> priority in the landing order
@@ -103,7 +104,7 @@ class Pilot
 record Tx(string Text, string Role, string Station, int Gid, bool Pilot = false, string? Voice = null, uint Unit = 0, double[]? Freqs = null,   // Unit: intercom target (Role "Crew")
           int Prio = 1, Tx? Standby = null, double MaxAge = 0, bool Stress = false, int Side = 0, Func<string?>? Live = null);   // MaxAge: afterwards text only (0 = per prio); Stress: combat voice; Side: SRS coalition of the sender (A133), 0 = Cfg.Coalition
 
-class AtisInfo { public char Letter = 'A'; public string Key = "", Text = "", Mp3 = "", Call = ""; public double Sec; }   // Call: announcement on new identifier
+class AtisInfo { public char Letter = 'A'; public string Key = "", Text = "", Mp3 = "", Call = ""; public double Sec, Clk, TempC; public (double X, double Z) W; }   // Call: announcement on new identifier; Clk/TempC/W: time, temperature and wind of the identifier (R344)
 
 static partial class Program
 {
@@ -407,18 +408,12 @@ static partial class Program
     /// Radio call via SRS: sender via DCS unit ID (otherwise player name), called controller via the frequency.
     static void OnSrs(SrsListener.Transmission tx)
     {
-        var role = Cfg.Frequencies.FirstOrDefault(f => f.Key != "ATIS" && Math.Abs(f.Value - tx.FreqMHz) < 0.01).Key
-                   ?? (Ops.AwacsFreq.Values.Any(f => Math.Abs(f - tx.FreqMHz) < 0.01) ? "AWACS" : null)   // mission AWACS
-                   ?? (Carrier.Boats.Any(b => b.Freq > 0 && Math.Abs(b.Freq - tx.FreqMHz) < 0.01) ? "Carrier" : null);   // mission carrier
+        Pilot? p;   // A26/A141: sender first (R387: its tanker frequency decides the role; the Whisper prompt uses its call sign and airfield)
+        lock (TowerLock) p = PilotFor(tx);
+        var role = SrsRole(p, tx.FreqMHz);
         Airfield? via = null;   // airfield frequency: this airfield, controller by content (Ground/Tower/Approach) or the one with its own frequency
         if (role is not ("AWACS" or "Tanker" or "Range" or "Carrier")) lock (TowerLock) (via, role) = FreqRoute(tx.FreqMHz, role);
         role ??= via == null ? "Tower" : null;
-        Pilot? p;   // A141: sender first, so the Whisper prompt uses its call sign and airfield
-        lock (TowerLock)
-            p = !MissionData ? Host()
-              : Pilots.Values.FirstOrDefault(x => tx.UnitId != 0 && x.Id == tx.UnitId)
-                ?? Pilots.Values.FirstOrDefault(x => x.Name == tx.Name)
-                ?? (Pilots.Count == 1 ? Pilots.Values.First() : null);
         var (text, conf) = Transcribe(SaveWav(tx.Pcm), p);
         var who = p == null ? "Rufzeichen im Spruch" : !MissionData ? "Host" : tx.UnitId != 0 && p.Id == tx.UnitId ? "Unit-ID" : p.Name == tx.Name ? "SRS-Name" : "einziger Spieler";   // Debug log
         if (Environment.GetEnvironmentVariable("DCSATC_SRSDEBUG") == "1") Console.WriteLine($"OnSrs {role} unit {tx.UnitId} '{tx.Name}': {text} ({conf:0.00})");
@@ -432,6 +427,20 @@ static partial class Program
         Trace("SRS", $"{tx.FreqMHz:0.000} MHz unit {tx.UnitId} '{tx.Name}' {tx.Pcm.Length / 16000.0:0.0} s -> {p?.Callsign ?? "unbekannt"} ({(p == null ? "-" : who)}), Lotse {role ?? "nach Inhalt"}, Platzfrequenz {via?.Name ?? "-"}, conf {conf:0.00}: {text}");
         Request(p, role == null ? text : $"{role}: {text}", "SRS", false, via, conf);
     }
+
+    /// Role of a called frequency: the tanker frequency DCS tuned for the sender (R387, also if it equals an airfield frequency), config, mission AWACS/carrier; null = airfield frequency or unknown.
+    internal static string? SrsRole(Pilot? p, double mhz) =>
+        (p is { TankFq: > 0 } && Math.Abs(p.TankFq - mhz) < 0.01 ? "Tanker" : null)
+        ?? Cfg.Frequencies.FirstOrDefault(f => f.Key != "ATIS" && Math.Abs(f.Value - mhz) < 0.01).Key
+        ?? (Ops.AwacsFreq.Values.Any(f => Math.Abs(f - mhz) < 0.01) ? "AWACS" : null)   // mission AWACS
+        ?? (Carrier.Boats.Any(b => b.Freq > 0 && Math.Abs(b.Freq - mhz) < 0.01) ? "Carrier" : null);   // mission carrier
+
+    /// Sender of an SRS call (under TowerLock). R358: the only player only for an SRS client without unit (otherwise slot change, spectator, second client: call sign, A26)
+    static Pilot? PilotFor(SrsListener.Transmission tx) =>
+        !MissionData ? Host()
+        : Pilots.Values.FirstOrDefault(x => tx.UnitId != 0 && x.Id == tx.UnitId)
+          ?? Pilots.Values.FirstOrDefault(x => x.Name == tx.Name)
+          ?? (Pilots.Count == 1 && tx.UnitId == 0 ? Pilots.Values.First() : null);
 
     /// Airfield and controller for the called frequency (under TowerLock): airfield with own frequency first; if exactly one controller owns it (AirfieldFrequencies), that one, otherwise by content (null).
     /// No airfield frequency: (null, role) unchanged.
@@ -549,7 +558,7 @@ static partial class Program
         return 0;
     }
 
-    /// Range events of the mission: R;unit;waffe;abstand;uhr;ziel;flugzeit  H;unit;ziel (gun hit)  K;unit;ziel (destroyed)
+    /// Range events of the mission: R;unit;waffe;abstand;uhr;ziel;flugzeit  H;unit;ziel (gun hit)  K;unit;ziel;koalition (destroyed)
     static void OnEvent(string line)
     {
         var e = line.Split(';');
@@ -565,7 +574,7 @@ static partial class Program
                 e.Length > 6 && double.TryParse(e[6], NumberStyles.Float, CultureInfo.InvariantCulture, out var fl) ? fl : -1);   // flight time (older mission: no seventh field)
             else if (e[0] == "H") p.Ops.OnGunHit();
             else if (e[0] == "W" && e.Length >= 3 && int.TryParse(e[2], out var wire)) { p.Boat.OnWire(wire); Log($"[LSO] {p.Callsign}: DCS-Wertung {(e.Length > 3 ? e[3] : "")} (Wire {wire})"); }   // R27: LANDING_QUALITY_MARK
-            else if (e[0] == "K") calls = p.Ops.OnKill(MeOf(p), Now());
+            else if (e[0] == "K") calls = p.Ops.OnKill(MeOf(p), Now(), e.Length > 3 && int.TryParse(e[3], out var kc) ? kc : -1);   // R369: fourth field = coalition of the destroyed object (older mission: none)
             else if (e[0] == "F" && e.Length >= 4)   // Aerial refueling
             {
                 var kg = e.Length > 4 && double.TryParse(e[4], NumberStyles.Float, CultureInfo.InvariantCulture, out var k) ? k : 0;   // internal tank in kg (older mission: no fifth field)
@@ -645,7 +654,8 @@ static partial class Program
             if (!fromMenu && MissionData && Flights.Ask(Tower.Normalize(spoken), p.Coalition, Now(), FlightWorld())) return;   // LK15: "Ford one, say status" to an AI flight (reply comes via FlightComms)
             p.AtcAt = Now();   // N2: call to a controller (airfield, carrier, AWACS, tanker, range)
             p.Expect = (p.Lead ?? p).Expect = null;   // answered (radio wheel Enter)
-            bool distress = Regex.IsMatch(spoken, @"\b(?:mayday|pan pan|declaring emergency|emergency fuel)\b", RegexOptions.IgnoreCase) && !Regex.IsMatch(spoken, @"\bcancel\b", RegexOptions.IgnoreCase);
+            var sn = Tower.Normalize(spoken);   // R360: "Pan-pan", "May day" as transcribed
+            bool distress = Regex.IsMatch(sn, @"\b(?:mayday|pan pan|declaring emergency|emergency fuel)\b") && !Regex.IsMatch(sn, @"\bcancel\b");
             // R293: emergency of a wingman: own sequence (reply to his call sign, emergency stays with him, FAA JO 7110.65 2-1-13); FormFlights does not reattach him until the emergency ends
             if (distress && p.Lead is { } dl)
             {
@@ -662,9 +672,8 @@ static partial class Program
                 return;
             }
             // ground/tower/approach request on a station frequency (mission preset): no station action (no DCS tanker menu), no "say again", hint to the airfield frequency
-            var sn = Tower.Normalize(spoken);
-            if (!fromMenu && to is "Tanker" or "AWACS" or "Carrier" or "Range" && Fields.Count > 0 && FieldRole(sn) is { } fr && !(to == "Carrier" && fr == "Approach") && !p.Boat.OnDeck   // R24: no airfield on the deck, the carrier gives the deck hint
-                && Ops.RoleOf(sn) == null && !p.Boat.Wants(sn) && !Tower.Has(sn, "vector", "home plate", "bingo", "nearest airfield", "recovery", "divert"))   // AWACS: "bingo, vectors … full stop" stays with the AWACS
+            if (!fromMenu && to is "Tanker" or "AWACS" or "Carrier" or "Range" && On("atc") && Fields.Count > 0 && FieldRole(sn) is { } fr && !(to == "Carrier" && fr == "Approach") && !p.Boat.OnDeck   // R24: no airfield on the deck, the carrier gives the deck hint
+                && Ops.RoleOf(sn, p.Callsign) == null && !p.Boat.Wants(sn) && !Tower.Has(sn, "vector", "home plate", "bingo", "nearest airfield", "recovery", "divert"))   // AWACS: "bingo, vectors … full stop" stays with the AWACS
             {
                 var wf = (p.Lead ?? p).Active?.F ?? Pick(p.Lead ?? p, spoken).F;
                 string Mhz(double x) => x.ToString("0.0##", CultureInfo.InvariantCulture);
@@ -673,9 +682,9 @@ static partial class Program
                 SayQueue.Add(new Tx(L($"Du funkst auf {to} {on}. {ok}", $"You are transmitting on {to} {on}. {ok}"), "Info", "", p.Gid));
                 return;
             }
-            if (to == "Carrier" || p.Boat.OnDeck && via == null && to is null or "Ground" or "Tower" or "Approach" && Ops.RoleOf(Tower.Normalize(text)) == null
+            if (On("carrier") && (to == "Carrier" || p.Boat.OnDeck && via == null && to is null or "Ground" or "Tower" or "Approach" && Ops.RoleOf(Tower.Normalize(text), p.Callsign) == null
                 || p.Boat.Launching && via == null && to == "Approach" && p.Boat.Wants(Tower.Normalize(text))   // R24: radio wheel "Approach: airborne" after the catapult -> carrier Departure
-                || to == null && via == null && (p.Boat.Wants(Tower.Normalize(text)) || (p.Lead ?? p).OnBoat != null && Ops.RoleOf(Tower.Normalize(text)) == null))
+                || to == null && via == null && (p.Boat.Wants(Tower.Normalize(text)) || (p.Lead ?? p).OnBoat != null && Ops.RoleOf(Tower.Normalize(text), p.Callsign) == null)))
             {
                 if (fromMenu && Regex.IsMatch(spoken, @"^marshal, checking in$", RegexOptions.IgnoreCase) && CheckIn(p) is { } ci) (spoken, text) = (ci, "Carrier: Marshal, " + ci);
                 if (fromMenu && Regex.Match(spoken, @"^(ball|clara)$", RegexOptions.IgnoreCase) is { Success: true } bm) (spoken, text) = (BallCall(p, bm.Value), "Carrier: " + BallCall(p, bm.Value));   // R28
@@ -687,7 +696,9 @@ static partial class Program
                 return;
             }
             // Range / AWACS / tanker: frequency or menu ("Range: ...") or name in the radio call
-            var opsRole = to is "Range" or "AWACS" or "Tanker" ? to : to == null ? Ops.RoleOf(Tower.Normalize(text)) : null;
+            var opsRole = to is "Range" or "AWACS" or "Tanker" ? to : to == null ? Ops.RoleOf(Tower.Normalize(text), p.Callsign) : null;
+            if (opsRole == null && to == null && p.LastOps is { } lo && Now() - lo.At < 300 && Ops.BareSayAgain(sn, p.Callsign)) opsRole = lo.Role;   // R393: the controller who spoke last repeats
+            if (opsRole != null && Off(opsRole.ToLowerInvariant(), text)) return;
             if (opsRole != null)
             {
                 var calls = p.Ops.OnTranscript(opsRole, text, MeOf(p), TrafficFor(p), Fields, Now(), conf < MinConf, Cfg.Frequencies.GetValueOrDefault("AWACS", 251.5), FieldWxOf);
@@ -701,6 +712,8 @@ static partial class Program
                     outq.Add(new Tx($"{calls[0].Station}, {p.Callsign.Replace('-', ' ')}, {spoken}.", opsRole, p.Callsign, p.Gid, true, PilotVoiceFor(p.Unit), Freqs: OpsTx(p, calls[0]).Freqs, Prio: 0, Side: p.Coalition));
                 foreach (var c in calls) AwacsNote(p, c);
                 outq.AddRange(calls.Select(c => OpsTx(p, c)));
+                if (calls.Count > 0) p.LastOps = (opsRole, Now());
+                if (opsRole == "Tanker" && Tower.Has(Tower.Normalize(spoken), "complete", "departing", "thank", "good day", "leaving")) p.TankFq = 0;   // R387: departed (the reply above still goes out on the tanker frequency)
                 if (p.Ops.Divert is { } dv)   // A15: MAYDAY/PAN to the AWACS -> its airfield like "Platz wählen", Approach takes over the emergency
                 {
                     p.Ops.Divert = null;
@@ -715,6 +728,7 @@ static partial class Program
                 Send(p, outq);
                 return;
             }
+            if (Off("atc", text)) return;
             var q = p.Lead ?? p;   // flight: request applies to the flight
             if (Regex.Match(spoken, @"^switch (.+)$") is { Success: true } sw && Fields.FirstOrDefault(f => f.Name == sw.Groups[1].Value) is { } pf)
             {
@@ -746,6 +760,7 @@ static partial class Program
             Prep(q, q.Active!, ActivePilots().Where(x => x.Lead == null).ToList());   // newly called airfield: weather/sequence already for the reply
             var tw = q.Active!;
             List<Msg> msgs;
+            p.LastOps = null;   // R393: the airfield spoke last
             var intent = tw.IntentOf(text, q.Tel);   // Debug log
             if (Regex.IsMatch(text, @"^\s*atis\s*$", RegexOptions.IgnoreCase))
             {
@@ -763,7 +778,8 @@ static partial class Program
                 if (!Cfg.Frequencies.ContainsKey(role) && role != "Departure") role = "Tower";   // Departure: own frequency (AirfieldFrequencies)
                 outq.Add(new Tx(PilotCall(tw.F, role, p, spoken), role, p.Callsign, p.Gid, true, PilotVoiceFor(p.Unit), Freqs: FieldFreqs(tw.F, role), Prio: 0, Side: p.Coalition));
             }
-            outq.AddRange(msgs.Select(m => ToTx(q, m)));
+            bool emg = intent == "emergency" && conf >= MinConf && other == null && tw.Emergency;   // R359: reply to an emergency call (also without signal word) goes first, no "stand by"
+            outq.AddRange(msgs.Select(m => emg ? ToTx(q, m) with { Prio = 0 } : ToTx(q, m)));
         }
         Send(p, outq);
     }
@@ -816,7 +832,7 @@ static partial class Program
         {
             var ft = Math.Round(tl.AltMsl / 0.3048 / 100) * 100;
             spoken = spoken == "airborne, climbing" ? $"airborne, passing {ft:0} feet, climbing"
-                : $"{Tower.Miles(Dist(tl.X, tl.Z, f.X, f.Z))} miles {Tower.Dir8(Tower.Bearing(f.X, f.Z, tl.X, tl.Z))}, {ft:0} feet, inbound for landing";
+                : $"{Tower.MilesTxt(Dist(tl.X, tl.Z, f.X, f.Z))} {Tower.Dir8(Tower.Bearing(f.X, f.Z, tl.X, tl.Z))}, {ft:0} feet, inbound for landing";
         }
         if (Regex.Match(spoken, @"^(mayday mayday mayday(?: fuel)?|pan pan, pan pan, pan pan), (.+?)(, request \w+ landing)?$", RegexOptions.IgnoreCase) is not { Success: true } m) return $"{station}, {cs}, {spoken}.";
         if (p.Tel is { } gt && Tower.OnGround(gt)) return $"{m.Groups[1].Value.ToUpperInvariant()}, {station}, {cs}, {m.Groups[2].Value}, shutting down.";   // R300: on the ground without landing, position, altitude
@@ -824,7 +840,7 @@ static partial class Program
         if (p.Tel is { } t)
         {
             int h = (int)Math.Round(((t.Hdg * 180 / Math.PI - f.MagVar) % 360 + 360) % 360) % 360;
-            pos = FormattableString.Invariant($", {Tower.Miles(Dist(t.X, t.Z, f.X, f.Z))} miles {Tower.Dir8(Tower.Bearing(f.X, f.Z, t.X, t.Z))} of {f.Name.Replace('-', ' ')}, {Math.Round(t.AltMsl / 0.3048 / 100) * 100:0} feet, heading {(h == 0 ? 360 : h):000}")
+            pos = FormattableString.Invariant($", {Tower.MilesTxt(Dist(t.X, t.Z, f.X, f.Z))} {Tower.Dir8(Tower.Bearing(f.X, f.Z, t.X, t.Z))} of {f.Name.Replace('-', ' ')}, {Math.Round(t.AltMsl / 0.3048 / 100) * 100:0} feet, heading {(h == 0 ? 360 : h):000}")
                 + ", " + FuelSouls(p);
         }
         return $"{m.Groups[1].Value.ToUpperInvariant()}, {station}, {cs}, {(p.Type != "" ? Ops.TypeSay(p.Type) + ", " : "")}{m.Groups[2].Value}{pos}{m.Groups[3].Value}.";
@@ -866,15 +882,17 @@ static partial class Program
     static IEnumerable<double> ListenFreqs(List<Pilot> pilots)
     {
         bool known = Fields.Any(f => f.HasFreq);
-        var roles = Cfg.Frequencies.Where(f => f.Key is "AWACS" or "Tanker" || (f.Key == "Range" && Ops.Range != null)
+        var roles = Cfg.Frequencies.Where(f => RoleOn(f.Key)).Where(f => f.Key is "AWACS" or "Tanker" || (f.Key == "Range" && Ops.Range != null)
                                                || (f.Key == "Carrier" && Carrier.Boats.Count > 0)
                                                || (!known && f.Key is "Ground" or "Tower" or "Approach")).Select(f => f.Value)
-                        .Concat(Carrier.Boats.Where(b => b.Freq > 0).Select(b => b.Freq));
+                        .Concat(Carrier.Boats.Where(b => b.Freq > 0 && On("carrier")).Select(b => b.Freq))
+                        .Concat(pilots.Where(p => p.TankFq > 0 && RoleOn("Tanker")).Select(p => p.TankFq));   // R387: tanker frequency tuned by DCS
         // A22: order active airfields of all players, then taxiing, then neighboring airfields (SrsListener takes at most Max, duplicates count once)
         static IEnumerable<double> Fq(IEnumerable<Airfield> fs) => fs.SelectMany(f => f.FreqsOf("*") ?? Array.Empty<double>());   // UHF, VHF or own per controller
         var act = pilots.Where(p => p.Active != null && Served(p.Coalition, p.Active.F)).Select(p => p.Active!.F);   // N1: own and neutral airfields only
         var near = pilots.Where(p => p.Tel != null).SelectMany(p => Fields.Where(f => Served(p.Coalition, f)).OrderBy(f => Dist(p.Tel!.X, p.Tel.Z, f.X, f.Z)).Take(2));
-        return Fq(act).Concat(roles).Concat(Ops.AwacsFreq.Values).Concat(Fq(near));
+        bool atc = On("atc");   // modules switched off: not monitored (a real AWACS/tower player answers there)
+        return Fq(act).Where(_ => atc).Concat(roles).Concat(Ops.AwacsFreq.Values.Where(_ => On("awacs"))).Concat(Fq(near).Where(_ => atc));
     }
 
     static Tx ToTx(Pilot p, Msg m) => new(m.Text, m.Role, p.Active!.F.StationOf(m.Role), p.Gid, Freqs: FieldFreqs(p.Active.F, m.Role), Side: SideOf(p.Active.F, p));
@@ -907,6 +925,15 @@ static partial class Program
     }
 
     static double FieldQnhOf(Airfield f) => Wx.TryGetValue(f.Name, out var w) && w.Pa > 0 ? w.Pa / 100 / Math.Pow(1 - 2.25577e-5 * (f.Elev + 2), 5.25588) : 0;   // QNH = pressure at the airfield reduced to sea level, 0 = unknown
+    /// R386: ", wind 240 degrees, 8 knots" from the mission weather at the airfield (magnetic like Tower.Wind), "" without weather data
+    static string WindSay(Airfield f)
+    {
+        if (!Wx.TryGetValue(f.Name, out var w)) return "";
+        double kt = Math.Sqrt(w.Wx * w.Wx + w.Wz * w.Wz) / 0.514444;
+        if (kt < 3) return ", wind calm";
+        int dir = (int)Math.Round(((Math.Atan2(-w.Wz, -w.Wx) * 180 / Math.PI - f.MagVar) % 360 + 720) % 360 / 10) * 10;
+        return $", wind {Tower.Digits((dir == 0 ? 360 : dir).ToString("000"))} degrees, {Tower.Digits(((int)Math.Round(kt)).ToString())} knots";
+    }
     static (double Qnh, double Wx, double Wz) FieldWxOf(Airfield f) => (FieldQnhOf(f), Wx.GetValueOrDefault(f.Name).Wx, Wx.GetValueOrDefault(f.Name).Wz);   // R132: QNH and surface wind at the airfield for the range check-in
 
     /// Situation at the airfield for the player's tower: others' emergencies, weather, landing order, ATIS identifier (every second and before the reply to a radio call).
@@ -918,6 +945,7 @@ static partial class Program
         tw.FlightSize = p.FlightSize;
         tw.Reserved = pilots.Where(o => o != p && o.Active?.F == tw.F && o.Active.Phase == Phase.TaxiIn && o.Active.TaxiInTold && o.Active.Spot is { }).Select(o => o.Active!.Spot!.Value).ToList();   // R108: assigned parking spots of other players
         tw.AcType = p.Type;
+        tw.Heli = p.Heli;   // R347
         tw.Side = p.Coalition;   // N1: clearance only to own/neutral targets
         tw.HeardOn = SpokenFreq(tw.F, p, any: true);
         tw.Key = "p:" + p.Unit;
@@ -929,6 +957,10 @@ static partial class Program
         // A9: one runway, one clearance: other players at the airfield with takeoff clearance or "line up and wait" before the takeoff roll (below 30 kt), AI with takeoff clearance still on the ground
         tw.RunwayClaimed = pilots.Count(o => o != p && o.Active?.F == tw.F && o.Tel is { Agl: < 15, Ias: < 15 } && (o.Active.Phase == Phase.ClearedTakeoff || o.Active.Phase == Phase.HoldShort && o.Active.LineUp))
             + Ai.Where(a => !a.InAir && a.Speed < 15 && a.Flag.StartsWith("dep-go") && (a.Flag.Split(':', 2) is [_, var n] ? n : "Kutaisi") == tw.F.Name && aiStage.GetValueOrDefault(a.Group) == "ready").Select(a => a.Group).Distinct().Count();
+        // R341: departure order by the report at the holding point (FAA JO 7110.65 3-9-1): others holding short who reported earlier; not yet holding short myself -> all of them
+        bool queued = tw.Phase == Phase.HoldShort && tw.HoldSince >= 0;
+        tw.HoldAhead = pilots.Count(o => o != p && o.Active?.F == tw.F && o.Active.Phase == Phase.HoldShort && !o.Active.LineUp && o.Active.HoldSince >= 0
+                                         && (!queued || o.Active.HoldSince < tw.HoldSince || o.Active.HoldSince == tw.HoldSince && string.CompareOrdinal(o.Unit, p.Unit) < 0));
         if (p.FlightSize > 1) tw.SetCallsign(p.Callsign);
         tw.CallsignFixed = MissionData || Cfg.MyCallsign != "";   // call sign from the slot or the settings: not from numbers in the radio call
         tw.AtisLetter = Atis.TryGetValue(tw.F.Name, out var a) && a.Text != "" ? a.Letter.ToString() : "";
@@ -975,14 +1007,15 @@ static partial class Program
             {
                 var tw = p.Active!;
                 Prep(p, tw, pilots);
-                var msgs = tw.Tick(p.Tel, TrafficFor(p), Now());
+                var msgs = tw.Tick(p.Tel, TrafficFor(p), Now());   // also without the atc module: phases for debrief and crew
+                if (!On("atc")) msgs.Clear();
                 if (tw.HoldInfo is { } hi) Holds["p:" + p.Unit] = hi; else Holds.Remove("p:" + p.Unit);   // current for the AI squadron
-                if (MissionData && p == host && Cfg.RunwayLights != "off" && p.Tel is { } lt && LightKind(tw.Phase, lt, tw.F) is { } lk && Now() - p.LitAt.GetValueOrDefault((tw.F.Id, lk), -1e9) > 900)
+                if (MissionData && p == host && Cfg.RunwayLights != "off" && On("atc") && p.Tel is { } lt && LightKind(tw.Phase, lt, tw.F) is { } lk && Now() - p.LitAt.GetValueOrDefault((tw.F.Id, lk), -1e9) > 900)
                 {
                     p.LitAt[(tw.F.Id, lk)] = Now();   // lighting: only after DCS-ATC contact. Mission checks sun/weather (w) and open DCS dialog, switches the airfield on audibly for a short time
                     bool untuned = Srs?.TunedFreqs(p.Id) is { } fq && new[] { tw.F.Uhf, tw.F.Vhf }.Where(x => x > 0).ToArray() is { Length: > 0 } fs && !fs.Any(x => fq.Any(m => Math.Abs(m - x) < 0.005));   // u: counts only without Easy Communication; DCS knows only the map frequency, not AirfieldFrequencies
                     if (Cfg.CommsKey == 0) Log($"[DCS] Befeuerung {tw.F.Name}: keine Funkmenü-Taste (CommsKey 0)");
-                    else AiCmd($"MENU;{p.Unit};{lk};{tw.F.Id};{(Tower.Ifr ? "w" : "")}{(untuned ? "u" : "")}{(Cfg.RunwayLights == "dcs" ? "" : "s")}");
+                    else AiCmd($"MENU;{p.Unit};{lk};{tw.F.Id};{(tw.Ifr ? "w" : "")}{(untuned ? "u" : "")}{(Cfg.RunwayLights == "dcs" ? "" : "s")}");
                 }
                 foreach (var m in msgs.Where(m => m.Role == "Info" && (m.Text.StartsWith(L("Landebewertung", "Landing grade")) || m.Text.StartsWith(L("Platzrunde", "Pattern")) || m.Text.StartsWith(L("Anflug ohne", "Approach without")) || m.Text.StartsWith(L("Verstoß:", "Deviation:")))))   // R11, N4
                     foreach (var o in ActivePilots().Where(o => o == p || o.Lead == p)) o.Ops.Debrief.Add(m.Text.Split(L(". Beenden", ". To end"))[0]);
@@ -997,10 +1030,10 @@ static partial class Program
                 outq.AddRange(TransitNotes(p, tw, pilots));
             }
             Carrier.WireEvents = MissionData;   // R27: wire comes from the DCS event
-            Tower.Ifr = MissionData && (Sky.VisM < 5000 || (Sky.Clouds && Sky.BaseM < 600));
+            Tower.Sky = MissionData ? (Sky.Clouds && Carrier.Ceiling, Sky.BaseM, Sky.VisM) : null;   // R340: IFR per airfield (Tower.IfrAt), FEW/SCT is no ceiling (R367)
             foreach (var p in ActivePilots())   // range, AWACS, tanker; debrief after shutdown
             {
-                var oc = p.Ops.Tick(MeOf(p), TrafficFor(p), Now(), awacs: p.Lead == null, lead: p.Lead?.Ops).ToList();
+                var oc = p.Ops.Tick(MeOf(p), TrafficFor(p), Now(), awacs: p.Lead == null && On("awacs"), lead: p.Lead?.Ops).ToList();
                 foreach (var c in oc) AwacsNote(p, c);
                 outq.AddRange(oc.Select(c => OpsTx(p, c)));
                 foreach (var c in oc.Where(c => c.Role == "AWACS" && Urgent.IsMatch(c.Text)))   // KF84: not tuned to AWACS -> repeat on Guard
@@ -1011,7 +1044,7 @@ static partial class Program
                     outq.Add(new Tx(Flights.OnGuard(c.Text, c.Station, f), "AWACS", c.Station, p.Gid, Freqs: new[] { Flights.Guard, Flights.GuardVhf }, Prio: 0, Side: p.Coalition));
                 }
                 p.Boat.Lead = p.Lead?.Boat;   // R26: lead's check-in/Charlie applies to the flight in formation
-                var bt = p.Boat.Tick(MeOf(p), Now());
+                var bt = On("carrier") ? p.Boat.Tick(MeOf(p), Now()) : new();
                 if (p.Boat.Gone) { p.Boat.Gone = false; (p.Lead ?? p).OnBoat = null; }   // A21: out of the recovery (divert, landed): radio without target goes to the tower again
                 if (p.Boat.LatLog is { } ll) { Log(ll); p.Boat.LatLog = null; }   // R4: calibrate SternLat
                 foreach (var c in bt.Where(c => c.Role == "Info" && (c.Text.StartsWith("LSO") || c.Text.StartsWith(L("Verstoß:", "Deviation:")))))   // #17: violation at the carrier
@@ -1020,7 +1053,7 @@ static partial class Program
                     if (c.Text.StartsWith("LSO") && p.Boat.AoaLog(p.Callsign) is { } al) Log(al);   // calibrate (Export may deliver a different AoA than the HUD)
                 }
                 outq.AddRange(bt.Select(c => OpsTx(p, c)));
-                outq.AddRange(BoatWatch(p));
+                if (On("carrier")) outq.AddRange(BoatWatch(p));
                 if (p.Tel is { Agl: > 30 } && p.Airborne == null) { p.Airborne = Clock; p.HostileTold.Clear(); }   // N1: "enemy" hint reset for each flight
                 var ph = (p.Lead ?? p).Active?.Phase;
                 if (p.LastPhase == Phase.TaxiIn && ph == Phase.Parked && p.Airborne != null) outq.Add(DebriefTx(p, true));   // A7: only after a flight
@@ -1032,7 +1065,7 @@ static partial class Program
                 if (ph != null) p.LastPhase = ph.Value;
             }
             ControlAi(pilots, outq);
-            if (MissionData) { SteerBoats(); outq.AddRange(CarrierChat()); }
+            if (MissionData && On("carrier")) { SteerBoats(); outq.AddRange(CarrierChat()); }
             TraceState("Tick");
         }
         outq.ForEach(SayQueue.Add);
@@ -1107,7 +1140,7 @@ static partial class Program
     /// Ball call and LSO reply of the mission AI at the carrier (N30): prio 2, without a tuned player no Piper (Say); silent while a player is in the groove (Carrier.AiCalls).
     static IEnumerable<Tx> CarrierChat()
     {
-        if (!Cfg.AiChatter || Carrier.Boats.Count == 0) return Array.Empty<Tx>();
+        if (!Chatter || Carrier.Boats.Count == 0) return Array.Empty<Tx>();
         var calls = Carrier.AiCalls(b => Pilots.Values.Any(p => p.Boat.BoatGroup == b.Group && p.Tel != null && p.Boat.InGroove(p.Tel)));
         return calls.Where(c => Pilots.Values.Any(p => p.Tel != null && Dist(p.Tel.X, p.Tel.Z, c.B.X, c.B.Z) < 50 * NM))   // like the airfield radio: players ≤ 50 NM
                     .SelectMany(c => new[] { c.Pilot, c.Lso }.Where(s => s != "").Select(s => new Tx(s, "Carrier", s == c.Lso ? "Paddles" : c.Cs != "" ? c.Cs : c.Group, 0, s != c.Lso,
@@ -1596,7 +1629,7 @@ static partial class Program
             {
                 switch (p[0])
                 {
-                    case "G" when p.Length >= 4: Sky = (D(1) > 0, D(2), D(3)); break;
+                    case "G" when p.Length >= 4: Sky = (D(1) > 0, D(2), D(3)); Carrier.Ceiling = p.Length < 5 || D(4) > 0; break;
                     case "S" when p.Length >= 2: MissionGap(D(1)); break;   // R120: mission runtime
                     case "Z" when p.Length >= 4: rz = (D(1), D(2), D(3)); break;     // Range Alpha
                     case "B" when p.Length >= 3: Ops.Bulls[p.Length >= 4 && int.TryParse(p[3], out var bs) ? bs : 0] = (D(1), D(2)); break;   // Bullseye per side
@@ -1608,7 +1641,7 @@ static partial class Program
                     case "C" when p.Length >= 12:   // C;unit;group;type;x;z;hdg;speed;side;freq;tacan;icls;wx;wz;pa;noTurn (carrier)
                         boats.Add(new(p[1], p[2], p[3], D(4), D(5), D(6), D(7), int.Parse(p[8]), D(9), p[10], p[11], p.Length > 13 ? D(12) : 0, p.Length > 13 ? D(13) : 0, p.Length > 14 ? D(14) : 0, p.Length > 15 && p[15] == "1"));
                         break;
-                    case "Y" when p.Length >= 2: Carrier.Clock = D(1); Carrier.Sun = p.Length >= 3 && p[2] != "" ? D(2) : double.NaN; break;   // Mission clock[;sun elevation at the carrier]
+                    case "Y" when p.Length >= 2: Carrier.Clock = D(1); Carrier.Skew = Carrier.Clock - Now(); Carrier.Sun = p.Length >= 3 && p[2] != "" ? D(2) : double.NaN; break;   // Mission clock[;sun elevation at the carrier]
                     case "R" when p.Length >= 2: gci.Add((int)D(1)); break;                    // Side with ground radar (GCI, V19)
                     case "D" when p.Length >= 2:                                                 // D;side[;unit;type known]
                         if (!det.TryGetValue((int)D(1), out var ds)) det[(int)D(1)] = ds = new();
@@ -1626,7 +1659,8 @@ static partial class Program
                         if (p.Length > 14) AiGid[p[2]] = (int)D(14);
                         if (p.Length > 16)   // AI radio: flight frequency, ammunition fox3/fox1/fox2/gun/air-to-ground
                             fu[p[1]] = new Flights.Unit(p[1], p[2], p[3], p[12], int.Parse(p[11]), D(4), D(5), D(6), p[9] == "1", D(13), D(15),
-                                p[16].Split('/', StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).ToArray(), p[10], (int)D(14), D(7), p.Length > 18 ? D(18) : 0);   // D(7): heading (rad) for commit/RTB; D(18): internal tank kg (LK15 ops check)
+                                p[16].Split('/', StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).ToArray(), p[10], (int)D(14), D(7), p.Length > 18 ? D(18) : 0,
+                                p.Length > 19 ? p[19] : "", p.Length > 17 && p[17] == "h");   // D(7): heading (rad) for commit/RTB; D(18): internal tank kg (LK15 ops check); p[19]: editor task (R376)
                         break;
                     case "P" when p.Length >= 17:   // P;unit;gid;callsign;player;type;x;z;alt;agl;speed;hdg;windx;windz;pressure;vy;inAir;id;coalition;fuel;gear;kind (h/a)
                     {
@@ -1895,9 +1929,10 @@ static partial class Program
         k.StartsWith("ai:") ? Ai.FirstOrDefault(x => x.Group == k[3..]) is { } t0 ? (t0.X, t0.Z) : null
                             : pilots.FirstOrDefault(p => "p:" + p.Unit == k)?.Tel is { } pt ? (pt.X, pt.Z) : null;
 
+    static bool Chatter => Cfg.AiChatter && On("ai");
     static void ControlAi(List<Pilot> pilots, List<Tx> outq)
     {
-        if (!MissionData) return;
+        if (!MissionData || !On("atc")) return;   // without atc: the AI flies the DCS ATC
         bool Once(string key)
         {
             if (aiSent.TryGetValue(key, out var t0) && (Clock - t0).TotalSeconds < 120) return false;   // Mission sets the flag; otherwise do not repeat constantly
@@ -1958,9 +1993,9 @@ static partial class Program
             {
                 if (!Heard(role) || emergency) return;
                 var voice = PilotVoiceFor(g.Key);
-                if (Cfg.AiChatter && pilot != "") outq.Add(new Tx(pilot, role, cs, 0, true, voice, Freqs: FieldFreqs(fld, role), Prio: 2, Side: a.Coalition));
+                if (Chatter && pilot != "") outq.Add(new Tx(pilot, role, cs, 0, true, voice, Freqs: FieldFreqs(fld, role), Prio: 2, Side: a.Coalition));
                 outq.Add(new Tx(atc, role, fld.StationOf(role), 0, Freqs: FieldFreqs(fld, role), Prio: 2, Side: fld.Side > 0 ? fld.Side : a.Coalition));   // A133: AI pilot with his side, controller with that of the airfield
-                if (Cfg.AiChatter && readback != null) outq.Add(new Tx(readback, role, cs, 0, true, voice, Freqs: FieldFreqs(fld, role), Prio: 2, Side: a.Coalition));
+                if (Chatter && readback != null) outq.Add(new Tx(readback, role, cs, 0, true, voice, Freqs: FieldFreqs(fld, role), Prio: 2, Side: a.Coalition));
             }
             double stack = Math.Max(Tower.StackFt(fld, pos), Math.Ceiling(fld.MvaFt(a.X, a.Z) / 1000) * 1000 + Math.Max(0, pos - 2) * 1000);   // above the terrain
             var hp = Holds.TryGetValue("ai:" + g.Key, out var h0) ? (X: h0.X, Z: h0.Z) : (X: a.X, Z: a.Z);
@@ -2005,7 +2040,7 @@ static partial class Program
             {
                 aiStage[g.Key] = "ready";
                 Chat("Tower", $"{fld.StationOf("Tower")}, {cs}, holding short runway {rws}, ready for departure.",
-                     $"{cs}, runway {rws}, cleared for takeoff.", $"Cleared for takeoff runway {rws}, {cs}.");
+                     $"{cs}, runway {rws}{WindSay(fld)}, cleared for takeoff.", $"Cleared for takeoff runway {rws}, {cs}.");   // R386: wind like the player clearance
             }
             else if (flag == "dep-go" && a.InAir && stage is "taxi" or "ready" && Dist(a.X, a.Z, fld.X, fld.Z) > 5000)
             {
@@ -2096,11 +2131,13 @@ static partial class Program
             Player(Phase.Parked, rw);
             aiStage["DEP1"] = aiStage["DEP2"] = "taxi";
             Ai = new() { Plane("DEP1", "dep-go:Kutaisi", e.At(500, 150), false, 6), Plane("DEP2", "dep-go:Kutaisi", e.At(550, 150), false, 6) };
+            Wx[fld.Name] = (-e.Dx * 5, -e.Dz * 5, 15, 101325);   // R386: 10 kt headwind on the runway in use
             Run();
             var s1 = Said();
-            if (aiStage["DEP1"] != "ready" || aiStage["DEP2"] != "taxi" || !s1.Contains("cleared for takeoff") || s1.Split("cleared for takeoff").Length != 2)
+            Wx = new();
+            if (aiStage["DEP1"] != "ready" || aiStage["DEP2"] != "taxi" || !s1.Contains("cleared for takeoff") || s1.Split("cleared for takeoff").Length != 2 || !s1.Contains(", wind ") || !s1.Contains("one zero knots"))
                 throw new Exception($"KI-Startfreigabe: {aiStage["DEP1"]}/{aiStage["DEP2"]} \"{s1}\"");
-            Console.WriteLine("OK   KI-Startfreigabe schon bei der Annäherung, zweite KI wartet auf die Bahn");
+            Console.WriteLine("OK   KI-Startfreigabe schon bei der Annäherung (mit Wind, R386), zweite KI wartet auf die Bahn");
 
             // A82 the other way round: AI with landing clearance on final (3 NM) -> no takeoff clearance, only after landing
             aiStage["DEP2"] = "taxi"; aiStage["ARR9"] = "final";
@@ -2194,6 +2231,28 @@ static partial class Program
                 if (!rA[0].Text.Contains("cleared for takeoff") || !rB[0].Text.Contains("number 2 for departure") || rB2.Count != 0 || !(rB3.FirstOrDefault()?.Text ?? "").Contains("cleared for takeoff"))
                     throw new Exception($"A9 zwei Abflüge: \"{rA[0].Text}\" / \"{rB[0].Text}\" / {rB2.Count} / \"{rB3.FirstOrDefault()?.Text}\"");
                 Console.WriteLine("OK   A9 zwei Spieler am Rollhalt: nur einer \"cleared for takeoff\", der zweite \"number 2 for departure\" bis zum Abheben");
+
+                // R341: three players report ready one after another -> number 1/2/3; after the first lifts off the second (earlier report) is cleared, not the third
+                {
+                    var tq1 = new Tower(fld, "Enfield 1-1"); var tq2 = new Tower(fld, "Colt 1-1"); var tq3 = new Tower(fld, "Uzi 1-1");
+                    var q1 = new Pilot { Unit = "Q1", Callsign = "Enfield 1-1", Tel = new Telemetry(fld.Elev, 0, 0, e.Hdg * Math.PI / 180, hs.X, hs.Z, 0, 0, 0), Active = tq1 };
+                    var q2 = new Pilot { Unit = "Q2", Callsign = "Colt 1-1", Tel = q1.Tel with { X = hs.X + 30 }, Active = tq2 };
+                    var q3 = new Pilot { Unit = "Q0", Callsign = "Uzi 1-1", Tel = q1.Tel with { X = hs.X + 60 }, Active = tq3 };   // "Q0": sorts first, the order must come from the report time
+                    var all3 = new List<Pilot> { q3, q2, q1 };
+                    foreach (var pp in all3)
+                        pp.Active!.Load(new Tower.State(Phase.TaxiOut, rw, null, false, false, 0, null, "", false, false, false, false, null, 0, 0, null, false, false, null, null, 0, false), pp.Tel!, 0);
+                    Prep(q1, tq1, all3); var sq1 = tq1.OnTranscript("Kutaisi Tower, Enfield 1-1, ready for departure", q1.Tel, none, 1)[0].Text;
+                    Prep(q2, tq2, all3); var sq2 = tq2.OnTranscript("Kutaisi Tower, Colt 1-1, ready for departure", q2.Tel, none, 2)[0].Text;
+                    Prep(q3, tq3, all3); var sq3 = tq3.OnTranscript("Kutaisi Tower, Uzi 1-1, ready for departure", q3.Tel, none, 3)[0].Text;
+                    q1.Tel = q1.Tel! with { AltMsl = fld.Elev + 60, Agl = 60, Ias = 80 };   // first one lifts off
+                    Prep(q3, tq3, all3); var kq3 = tq3.Tick(q3.Tel, none, 4);   // the third ticks first: still waits
+                    Prep(q2, tq2, all3); var kq2 = tq2.Tick(q2.Tel, none, 4);
+                    Prep(q3, tq3, all3); var kq3b = tq3.Tick(q3.Tel, none, 5);
+                    if (!sq1.Contains("cleared for takeoff") || !sq2.Contains("number 2 for departure") || !sq3.Contains("number 3 for departure") || kq3.Count != 0
+                        || !(kq2.FirstOrDefault()?.Text ?? "").Contains("cleared for takeoff") || kq3b.Count != 0 || tq3.Phase != Phase.HoldShort)
+                        throw new Exception($"R341 drei Abflüge: \"{sq1}\" / \"{sq2}\" / \"{sq3}\" / {kq3.Count} / \"{kq2.FirstOrDefault()?.Text}\" / {kq3b.Count}");
+                    Console.WriteLine("OK   R341 drei Spieler am Rollhalt: number 1/2/3, nach dem Abheben des ersten wird der zweite (frühere Meldung) freigegeben");
+                }
 
                 // AI: player waits at the holding point (hold short) -> AI takeoff clearance; waiting on the runway (LUAW) or on final 3 NM -> not
                 string Ready(Action set)
@@ -2289,7 +2348,7 @@ static partial class Program
 
     static void FlightComms()
     {
-        if (!MissionData || Cfg.AiFlightComms == "aus") return;
+        if (!MissionData || Cfg.AiFlightComms == "aus" || !On("ai")) return;
         List<Flights.Call> calls;
         lock (TowerLock) calls = Flights.Tick(Now(), FlightWorld());
         foreach (var c in calls)
@@ -2327,6 +2386,7 @@ static partial class Program
     static readonly Dictionary<string, AtisInfo> Atis = new();
 
     /// Rebuild text; if runway, wind, QNH, weather or the full hour of the mission clock change, there is a new identifier.
+    /// R344: wind only on a significant change (speed 5 kt, direction 30° at 5 kt or more), temperature not at all (FAA JO 7110.65 2-9-2); the text stays current.
     /// true = new identifier (not at the first text of an airfield).
     static bool UpdateAtis(Airfield f)
     {
@@ -2334,18 +2394,22 @@ static partial class Program
         if (!Atis.TryGetValue(f.Name, out var a)) Atis[f.Name] = a = new AtisInfo { Letter = (char)('A' + Clock.Minute % 26) };
         var tw = new Tower(f, "");
         var tel = new Telemetry(f.Elev + 2, 0, 0, 0, f.X, f.Z, w.Wx, w.Wz, w.Pa);
-        double clk = Carrier.Clock;
-        var key = tw.AtisText("A", tel, w.TempC, Sky.Clouds, Sky.BaseM, 0, clk < 0 ? clk : clk - clk % 3600)   // Key only with the full hour, otherwise the identifier would change every minute
+        double clk = Carrier.Clock, kt5 = 5 * 0.514444;
+        double v0 = Math.Sqrt(a.W.X * a.W.X + a.W.Z * a.W.Z), v1 = Math.Sqrt(w.Wx * w.Wx + w.Wz * w.Wz), dd = Math.Abs(Math.Atan2(w.Wz, w.Wx) - Math.Atan2(a.W.Z, a.W.X)) * 180 / Math.PI;
+        bool sig = a.Key == "" || Math.Abs(v1 - v0) >= kt5 || Math.Max(v0, v1) >= kt5 && Math.Min(dd, 360 - dd) >= 30;
+        var key = tw.AtisText("A", sig ? tel : tel with { WindX = a.W.X, WindZ = a.W.Z }, a.Key == "" ? w.TempC : a.TempC, Sky.Clouds, Sky.BaseM, 0, clk < 0 ? clk : clk - clk % 3600)   // Key only with the full hour, otherwise the identifier would change every minute
                 + new[] { 800, 1500, 3000, 5000, 9500 }.Count(b => Sky.VisM >= b)
-                + (int)(clk / 3600);   // full hour also with unknown map (R125, then without time in the text); visibility only in steps like SPECI, otherwise the identifier would change every kilometer as fog rolls in
-        if (key == a.Key) return false;
-        bool neu = a.Key != "";
-        if (neu) a.Letter = (char)('A' + (a.Letter - 'A' + 1) % 26);
-        a.Key = key;
-        a.Text = tw.AtisText(a.Letter.ToString(), tel, w.TempC, Sky.Clouds, Sky.BaseM, Sky.VisM, clk);
-        a.Call = tw.AtisCall(a.Letter.ToString(), tel);
-        a.Mp3 = "";
-        Log($"[ATIS] {a.Text}");
+                + (int)(clk / 3600) + f.BestRunway(w.Wx, w.Wz);   // full hour also with unknown map (R125, then without time in the text); visibility only in steps like SPECI, otherwise the identifier would change every kilometer as fog rolls in
+        bool neu = false;
+        if (key != a.Key)
+        {
+            neu = a.Key != "";
+            if (neu) a.Letter = (char)('A' + (a.Letter - 'A' + 1) % 26);
+            (a.Key, a.W, a.TempC, a.Clk) = (key, (w.Wx, w.Wz), w.TempC, clk);
+            a.Call = tw.AtisCall(a.Letter.ToString(), tel);
+        }
+        var text = tw.AtisText(a.Letter.ToString(), tel, w.TempC, Sky.Clouds, Sky.BaseM, Sky.VisM, a.Clk);   // R344: current values, time of the identifier
+        if (text != a.Text) { a.Text = text; a.Mp3 = ""; Log($"[ATIS] {a.Text}"); }
         return neu;
     }
 
@@ -2392,6 +2456,16 @@ static partial class Program
             bool step = UpdateAtis(fld);
             Sky = (false, 0, 3100);
             if (!fog || step || !UpdateAtis(fld) || !a.Text.Contains("Visibility three kilometers")) throw new Exception($"ATIS Sichtstufen: {fog} {step} {a.Text}");
+            // R344: wind +1 kt and 1 °C warmer -> same identifier, text current; +10 kt -> new identifier
+            char l2 = a.Letter;
+            double k1 = 1 + 0.514444 / Math.Sqrt(97), k10 = 1 + 10 * 0.514444 / Math.Sqrt(97);
+            Wx[fld.Name] = (-9 * k1, 4 * k1, 16, pa);
+            bool small = UpdateAtis(fld);
+            string smallTxt = a.Text;
+            Wx[fld.Name] = (-9 * k10, 4 * k10, 16, pa);
+            if (small || !smallTxt.Contains("Temperature one six") || !smallTxt.Contains("information " + Tower.Phonetic(l2.ToString())) || !UpdateAtis(fld) || a.Letter != (char)('A' + (l2 - 'A' + 1) % 26))
+                throw new Exception($"R344 ATIS kleine Windänderung: {small} {smallTxt} / {a.Text}");
+            Console.WriteLine("OK   R344 ATIS: Wind +1 kt gleiche Kennung, +10 kt neue Kennung");
             // Announcement only to players of this airfield, on the ground or under 20 NM
             Pilot P(double agl, double nm) => new() { Active = new Tower(fld, "x"), Tel = new Telemetry(fld.Elev + agl, agl, 50, 0, fld.X + nm * NM, fld.Z, 0, 0, 0) };
             var (ground, near, far) = (P(0, 0), P(500, 15), P(3000, 30));
@@ -2462,7 +2536,7 @@ static partial class Program
         while (true)
         {
             Thread.Sleep(3000);
-            if (!Cfg.Atis) continue;
+            if (!Cfg.Atis || !On("atc")) continue;
             string name;
             int side;
             AtisInfo? a;
@@ -2669,14 +2743,16 @@ static partial class Program
 
     /// Who sees the radio call as text: only groups whose player has tuned the frequency in SRS
     /// (frequencies unknown = sees it). Intercom/info (freq ≤ 0) and without SRS: as before.
-    static IEnumerable<int> ShowTo(int gid, double freq, double freq2)
+    /// R356: "to all" (gid 0) with side only to that coalition (like the audio, A133); gid 0 then means the whole coalition (Show).
+    static IEnumerable<int> ShowTo(int gid, double freq, double freq2, int side = 0)
     {
-        if (freq <= 0 || Srs is not { } srs || freq == Flights.Guard) return new[] { gid };   // Guard is heard by everyone
+        if (freq <= 0 || Srs is not { } srs || freq == Flights.Guard && side <= 0) return new[] { gid };
         bool On(double m, double f) => f > 0 && Math.Abs(m - f) < 0.005;
-        bool Tuned(Pilot p) => srs.TunedFreqs(p.Id) is not { } fq || fq.Any(m => On(m, freq) || On(m, freq2));
+        bool Tuned(Pilot p) => freq == Flights.Guard || srs.TunedFreqs(p.Id) is not { } fq || fq.Any(m => On(m, freq) || On(m, freq2));   // Guard is heard by everyone (of the side)
         Pilot[] ps;
         try { ps = Pilots.Values.ToArray(); } catch (InvalidOperationException) { return new[] { gid }; }
         if (gid > 0) { var g = ps.Where(p => p.Gid == gid).ToArray(); return g.Length == 0 || g.Any(Tuned) ? new[] { gid } : Array.Empty<int>(); }
+        ps = ps.Where(p => side <= 0 || p.Coalition == side).ToArray();
         if (ps.Any(p => p.Gid == 0 && Tuned(p))) return new[] { 0 };   // Group unknown
         return ps.Where(p => p.Gid > 0 && Tuned(p)).Select(p => p.Gid).Distinct().ToArray();   // "to all" individually to each group on the frequency
     }
@@ -2690,6 +2766,7 @@ static partial class Program
         int n = 0;
         foreach (var tx in SayQueue.GetConsumingEnumerable())
         {
+            if (!RoleOn(tx.Role)) continue;   // module switched off (settings): also catches AI pilots on its frequency
             bool busy = tx.Standby != null && Backlog(FreqOf(tx.Standby)) > StandbySec;   // Controller still has other things to send before the reply: first "stand by", reply afterwards
             if (busy && !tx.Pilot) Say(tx.Standby!);   // Voice request (no own call before): "stand by" before the reply
             Say(tx);
@@ -2710,10 +2787,10 @@ static partial class Program
             {
                 if (tx.Gid < 0) return;
                 var dur = ShowSec(tx, label);
-                foreach (var gid in ShowTo(tx.Gid, info ? 0 : freq, freq2))
+                foreach (var gid in ShowTo(tx.Gid, info ? 0 : freq, freq2, tx.Side))
                     try
                     {
-                        var f = Path.Combine(MenuDir, Clock.Ticks + "-" + gid);
+                        var f = Path.Combine(MenuDir, Clock.Ticks + "-" + gid + (gid == 0 && tx.Side > 0 ? "-c" + tx.Side : ""));   // R356: Lua shows "-c{side}" to that coalition only
                         File.WriteAllText(f + ".tmp", $"{gid}|{dur}|{label}{text}");
                         File.Move(f + ".tmp", f + ".out");
                     }
@@ -2980,7 +3057,8 @@ static partial class Program
         Console.ReadKey(true);
     }
 
-    internal static string ConfigPath => Path.Combine(Root, "config.jsonc");
+    internal static string ConfigPath => cfgFile ?? Path.Combine(Root, "config.jsonc");
+    static string? cfgFile;   // selftest only (R392): another config for ReloadLive
     /// Saved Games\DCS (or DCS.openbeta if only that is there)
     internal static string DcsSaved => SavedGamesDcs();
     /// DCS in VR mode: start parameters --force_enable_VR / --force_disable_VR (Logs\dcs.log "Command line:") before Config\options.lua, VR = { … ["enable"] = true … }
@@ -3036,10 +3114,9 @@ static partial class Program
         LoadConfig();
         var n = Cfg;
         Cfg = old;
-        (Cfg.MyCallsign, Cfg.Volume, Cfg.SpeechRate, Cfg.ReplyPause, Cfg.RadioFx, Cfg.PilotVoice, Cfg.AiChatter, Cfg.AiFlightComms, Cfg.Atis, Cfg.AltimeterUnit, Cfg.WheelInGame, Cfg.AirspaceWatch) =
-            (n.MyCallsign, n.Volume, n.SpeechRate, n.ReplyPause, n.RadioFx, n.PilotVoice, n.AiChatter, n.AiFlightComms, n.Atis, n.AltimeterUnit, n.WheelInGame, n.AirspaceWatch);
-        Flights.Mode = Cfg.AiFlightComms;   // Tower.AltimeterUnit is set by LoadConfig
-        (Flights.Cmd, Flights.Follow) = (l => AiCmd(l), Cfg.AiFollowAwacs);   // LD1 ENGAGE only with AiFollowAwacs, LD7 RTB always
+        (Cfg.MyCallsign, Cfg.Volume, Cfg.SpeechRate, Cfg.ReplyPause, Cfg.RadioFx, Cfg.PilotVoice, Cfg.AiChatter, Cfg.AiFlightComms, Cfg.Atis, Cfg.AltimeterUnit, Cfg.WheelInGame, Cfg.AirspaceWatch, Cfg.RunwayLights) =   // R392: RunwayLights is read per call (line ~995), applies immediately
+            (n.MyCallsign, n.Volume, n.SpeechRate, n.ReplyPause, n.RadioFx, n.PilotVoice, n.AiChatter, n.AiFlightComms, n.Atis, n.AltimeterUnit, n.WheelInGame, n.AirspaceWatch, n.RunwayLights);
+        Flights.Mode = Cfg.AiFlightComms;   // Tower.AltimeterUnit, Flights.Cmd/Follow and the modules are set by LoadConfig
         (Cfg.DebugLog, TraceOn) = (n.DebugLog, n.DebugLog);
         Log("[ATC] Einstellungen übernommen");
     }
@@ -3082,6 +3159,18 @@ static partial class Program
             WithConfigValue("{\n}", "RunwayLights", "\"dcs\"", "Fehlt") != "{\n  \"RunwayLights\": \"dcs\",\n}" || JsonSerializer.Deserialize<Config>("{ \"WheelStyle\": \"hud\" }") == null || NormCallsign("viper11") != "Viper 1-1" || NormCallsign("Viper") != null)
             throw new Exception("Einstellungen: " + c);
         Console.WriteLine("OK   Einstellungen: config.jsonc-Werte setzen (Kommentare bleiben), alte Option WheelStyle stört nicht, Rufzeichen \"viper11\" -> \"Viper 1-1\"");
+        var live = Path.Combine(Path.GetTempPath(), $"DcsAtc-LiveTest-{Environment.ProcessId}.jsonc");   // R392: Bahnbefeuerung gilt nach dem Speichern sofort
+        File.WriteAllText(live, "{ \"RunwayLights\": \"off\" }");
+        var kept = Cfg;   // ReloadLive writes into the running Cfg: work on a copy
+        try
+        {
+            Cfg = JsonSerializer.Deserialize<Config>(JsonSerializer.Serialize(kept))!;
+            Cfg.RunwayLights = "silent";
+            cfgFile = live; ReloadLive();
+            if (Cfg.RunwayLights != "off") throw new Exception("Einstellungen: RunwayLights nach ReloadLive " + Cfg.RunwayLights);
+        }
+        finally { cfgFile = null; File.Delete(live); LoadConfig(); Cfg = kept; }
+        Console.WriteLine("OK   Einstellungen: RunwayLights \"off\" gilt nach ReloadLive sofort (R392)");
         var srsDir = Path.Combine(Path.GetTempPath(), $"DcsAtc-SrsTest-{Environment.ProcessId}");   // SRS on another drive/directory (forum 0.9.5)
         Directory.CreateDirectory(Path.Combine(srsDir, "ExternalAudio"));
         File.WriteAllText(Path.Combine(srsDir, "ExternalAudio", "DCS-SR-ExternalAudio.exe"), "");
@@ -3266,6 +3355,13 @@ static partial class Program
             (stateTime, session, sessionRead, Tel, TelTime) = (st0, ses0, sr0, tel0, tt0);
             Pilots.Remove("t1");
             if (ap.Count != 1 || ap[0] != me || host != me || me.Tel?.X != 1) throw new Exception($"Missionsdaten stocken: {ap.FirstOrDefault()?.Unit} statt Missions-Spieler");
+            // R358: only one player: a call from an unknown unit is not his (call sign decides, A26), an SRS client without unit is
+            var (pb358, st358) = (Pilots.ToList(), stateTime);
+            Pilots.Clear(); var one = Pilots["U1"] = new Pilot { Id = 1, Callsign = "Enfield 1-1" }; stateTime = Clock;
+            SrsListener.Transmission Sx(uint unit) => new(Array.Empty<short>(), 251, unit, "x");
+            var (x99, x0, x1, xf) = (PilotFor(Sx(99)), PilotFor(Sx(0)), PilotFor(Sx(1)), ByCallsign("Kutaisi Tower, Colt 2-1, inbound"));
+            Pilots.Clear(); foreach (var kv in pb358) Pilots[kv.Key] = kv.Value; stateTime = st358;
+            if (x99 != null || xf != null || x0 != one || x1 != one) throw new Exception($"R358: einziger Spieler nur ohne Unit-ID: {x99?.Callsign} {xf?.Callsign} {x0?.Callsign} {x1?.Callsign}");
         }
         var ch = Channels[999] = new Chan();   // without sender thread
         ch.FreeAt = Clock.AddSeconds(30);   // running call does not count (A86)
@@ -3285,10 +3381,11 @@ static partial class Program
         var mayday = new List<Tx> { rep with { Text = "Enfield one one, roger mayday, emergency services are on the way." } };
         var atis = new List<Tx> { rep with { Text = "Kutaisi information Alpha, wind calm." } };
         var infoOnly = new List<Tx> { new("Hinweis", "Info", "", 0) };
-        foreach (var l in new[] { withCall, onlyRep, urgent, mayday, atis, infoOnly }) AddStandby(sp, l);
+        var emgNoWord = new List<Tx> { rep with { Text = "Enfield one one, Kutaisi Approach, roger, all traffic is holding.", Prio = 0 } };   // R359: Request marks emergency replies Prio 0
+        foreach (var l in new[] { withCall, onlyRep, urgent, mayday, atis, infoOnly, emgNoWord }) AddStandby(sp, l);
         if (withCall[0].Standby is not { Text: "Enfield one one flight, stand by.", Prio: 0 } sb || FreqOf(sb) != 998 || withCall[1].Standby != null
             || onlyRep[0].Standby?.Text != "Enfield one one flight, stand by."
-            || urgent[0].Standby != null || mayday[0].Standby != null
+            || urgent[0].Standby != null || mayday[0].Standby != null || emgNoWord[0].Standby != null || RankOf(emgNoWord[0]) != 0 || RankOf(rep) != 3
             || atis[0].Standby?.Text != "Enfield one two, stand by." || infoOnly[0].Standby != null)
             throw new Exception("stand by: Rufzeichen/Reihenfolge/dringend");
         string mig = "\"AWACS\": \"en_US-joe-medium@1.1|en_US-ljspeech-medium\", \"Carrier\": \"en_US-ryan-medium@0.97|en_US-joe-medium@1.02\", \"SpeechRate\": 1.0,", own = "\"AWACS\": \"en_US-joe-medium@0.9\", \"SpeechRate\": 1.1,", own2 = own;   // 1.1 = pace from the settings, stays
@@ -3354,6 +3451,24 @@ static partial class Program
                 throw new Exception($"Koalition: {np} / {pick} / {p.Pinned?.F.Name} / {string.Join(" | ", hint.Select(t => t.Text))} / {string.Join(" | ", clr.Select(t => $"{t.Side}:{t.Text}"))} / " +
                                     $"{string.Join(" | ", rt.Select(t => $"{t.Side}:{t.Text}"))} / {conq} {pickC} / {string.Join(" | ", none.Select(t => t.Text))}");
             Console.WriteLine($"OK   Koalition (N1/A133): Platz wählen {np}, Pick Krymsk statt Maykop, switch/Ruf Maykop nur ein Hinweis ({hint[0].Text}), Clearance nach Maykop \"unable\", roter Lotse sendet als Rot, Eroberung per W-Zeile, alle rot ohne Absturz");
+            // R356: text "to all" only for the coalition that hears the audio: blue Gid 3 and red Gid 4 both on Guard and 251.0
+            var (pb356, srs356) = (Pilots.ToList(), Srs);
+            try
+            {
+                Pilots.Clear();
+                (Pilots["B"], Pilots["R"]) = (new Pilot { Unit = "B", Gid = 3, Id = 9, Coalition = 2 }, new Pilot { Unit = "R", Gid = 4, Id = 8, Coalition = 1 });
+                Srs = null;
+                var noSrs = string.Join(",", ShowTo(0, 251.0, 0, 2));   // without SRS: gid 0, Show -> coalition text
+                Srs = new SrsListener(5002, Array.Empty<double>(), _ => false, _ => { });
+                string Cl(int unit) => $$$"""{"ClientGuid":"g{{{unit}}}","Name":"x{{{unit}}}","RadioInfo":{"unitId":{{{unit}}},"radios":[{"freq":243000000},{"freq":251000000}]}}""";
+                Srs.OnServerMessage($$$"""{"MsgType":1,"Clients":[{{{Cl(9)}}},{{{Cl(8)}}}]}""");
+                var (gRed, aBlue, all, own) = (string.Join(",", ShowTo(0, Flights.Guard, Flights.GuardVhf, 1)), string.Join(",", ShowTo(0, 251.0, 0, 2)),
+                                               string.Join(",", ShowTo(0, 251.0, 0).OrderBy(g => g)), string.Join(",", ShowTo(3, Flights.Guard, Flights.GuardVhf, 1)));
+                if (noSrs != "0" || gRed != "4" || aBlue != "3" || all != "3,4" || own != "3")
+                    throw new Exception($"R356 Text nach Koalition: ohne SRS {noSrs}, rote Mayday auf Guard {gRed}, blaue AWACS-Zeile {aBlue}, ohne Seite {all}, an die eigene Gruppe {own}");
+                Console.WriteLine("OK   R356: Text an alle nur für die Koalition (rote Mayday auf Guard nur Gid 4, blaue AWACS-Zeile nicht an Rot, ohne SRS Koalitionstext)");
+            }
+            finally { Srs = srs356; Pilots.Clear(); foreach (var kv in pb356) Pilots[kv.Key] = kv.Value; }
         }
         finally { (SimLog, Fields, Tower.All) = (log0, fs0, all0); Take(); }
     }
@@ -3602,6 +3717,23 @@ static partial class Program
             if (!inFlight || rg.Lead != null || rmay.Count == 0 || !rmay[0].Text.StartsWith("Enfield five two, Kutaisi Approach, roger mayday") || rg.Active?.Emergency != true || rl.Active?.Emergency == true || rl.FlightSize != 1)
                 throw new Exception($"R293 Notruf Rottenflieger: im Flug {inFlight}, Lead {rg.Lead?.Callsign}, {string.Join(" | ", rmay.Select(t => t.Text))}, Notfall 5-2 {rg.Active?.Emergency} 5-1 {rl.Active?.Emergency}");
             Console.WriteLine($"OK   R293: MAYDAY des Rottenfliegers -> eigener Ablauf ({rmay[0].Text[..48]}…), Lead ohne Notfall, bleibt getrennt");
+            // R360: "May day" as transcribed from the wingman -> own flow as well; R359: "declaring emergency" without signal word -> reply with priority 0 (no "stand by")
+            Take();
+            var ml = new Pilot { Unit = "R3", Callsign = "Enfield 6-1", Gid = 14, Tel = At(12, Math.PI) };
+            var mg = new Pilot { Unit = "R4", Callsign = "Enfield 6-2", Gid = 14, Tel = At(12.2, Math.PI) };
+            var de = new Pilot { Unit = "R5", Callsign = "Enfield 7-1", Gid = 15, Tel = At(14, Math.PI) };
+            (Pilots["R3"], Pilots["R4"]) = (ml, mg);
+            FormFlights(new() { ml, mg });
+            bool mIn = mg.Lead == ml;
+            Request(mg, "May day, may day, may day, Kutaisi Approach, Enfield 6-2, engine failure", "T", false);
+            var rmd = Take().Where(t => t.Role != "Info").ToList();
+            Pilots.Remove("R3"); Pilots.Remove("R4");
+            Request(de, "Kutaisi Approach, Enfield 7-1, declaring emergency, engine failure", "T", false);
+            var rde = Take().Where(t => t.Role != "Info").ToList();
+            if (!mIn || mg.Lead != null || mg.Active?.Emergency != true || rmd.Count == 0 || !rmd[0].Text.StartsWith("Enfield six two, Kutaisi Approach, roger mayday")
+                || rde.Count == 0 || !rde[0].Text.Contains("roger, all traffic is holding") || rde[0].Prio != 0 || RankOf(rde[0]) != 0)
+                throw new Exception($"R360/R359 May day Rottenflieger / declaring emergency: im Flug {mIn}, Lead {mg.Lead?.Callsign}, {string.Join(" | ", rmd.Concat(rde).Select(t => $"{t.Prio}:{t.Text}"))}");
+            Console.WriteLine($"OK   R360/R359: \"May day\" des Rottenfliegers -> eigener Ablauf, \"declaring emergency\" mit Vorrang ({rde[0].Text[..48]}…)");
 
             // N40: Kutaisi goes red on approach -> diversion to Senaki on the old frequency (side Blue), order free, Senaki expects him
             Take();
@@ -3621,6 +3753,13 @@ static partial class Program
                 || cap[0].Side != 2 || q.Active?.F != sen || q.Pinned?.F != sen || !outQ || call.Count == 0 || !call[^1].Text.Contains("identified") || call[^1].Text.Contains("Station calling"))
                 throw new Exception($"N40 Umleitung: {inQ}/{outQ} {string.Join(" | ", cap.Select(t => $"{t.Side}:{t.Text}"))} / {q.Active?.F.Name} / {string.Join(" | ", call.Select(t => t.Text))}");
             Console.WriteLine($"OK   N40: Platz erobert im Anflug -> \"{cap[0].Text}\", Senaki erwartet den Flug ({call[^1].Text[..40]}…)");
+            // R360: "Pan-pan" as transcribed (hyphens) on the frequency of the now hostile Kutaisi: emergency to an own airfield, not only the hint
+            var q360 = new Pilot { Unit = "C3", Callsign = "Enfield 1-3", Gid = 8, Tel = At(10, Math.PI) };
+            Request(q360, "Pan-pan, pan-pan, pan-pan, Kutaisi Approach, Enfield 1-3, hydraulic failure", "SRS", false, kut);
+            var r360 = Take().Where(t => t.Role != "Info").ToList();
+            if (q360.Active?.F != sen || q360.Active?.Emergency != true || r360.Count == 0 || !r360[0].Text.Contains("roger pan pan"))
+                throw new Exception($"R360 Pan-pan am Feindplatz: {q360.Active?.F.Name}, {string.Join(" | ", r360.Select(t => t.Text))}");
+            Console.WriteLine($"OK   R360: \"Pan-pan\" auf der Frequenz des Feindplatzes -> {sen.Name} ({r360[0].Text[..40]}…)");
 
             // N40 AI: approach to captured Kutaisi -> not in the sequence, DIVERT once, no radio from Kutaisi
             (SimSec, stateTime, AiHook) = (5000, Clock, cmds.Add);
@@ -3975,6 +4114,23 @@ static partial class Program
         Srs.OnServerMessage(Radios("262000000", "261000000")); r304 += " " + Pick(pr, null)!.F.Name;
         if (r304 != "Kobuleti 261 255.5/261.0 Senaki") throw new Exception("R304 Tankerfrequenz: " + r304);
         Console.WriteLine("OK   R304: Frequenzwechsel durch DCS binnen 3 s nach dem Tankermenü wählt keinen Platz, Tanker spricht auch dort; später eingedreht wieder");
+        // R387: tanker frequency tuned by DCS is monitored and belongs to the Tanker role of its sender (before the airfield frequency, which is equal here); "complete" resets it
+        pr.TankFq = 261.0;
+        var r387 = $"{SrsRole(pr, 261.0)} {SrsRole(null, 261.0) ?? "-"}";
+        pr.TankFq = 263.0;
+        var r387l = ListenFreqs(new() { pr }).Contains(263.0);
+        Request(pr, "Tanker: Texaco, Enfield 1-1, complete", "RAD", true);
+        if (r387 != "Tanker -" || !r387l || pr.TankFq != 0 || ListenFreqs(new() { pr }).Contains(263.0)) throw new Exception($"R387 Tanker-Missionsfrequenz: {r387} / hört {r387l} / nach complete {pr.TankFq}");
+        Console.WriteLine("OK   R387: vom DCS eingestellte Tankerfrequenz wird abgehört und dem Tanker des Senders zugeordnet, nach 'complete' zurückgesetzt");
+        // R393: "say again" without a station goes to the controller who spoke last (ops role within 5 minutes), otherwise to the airfield (which clears it)
+        pr.LastOps = ("Tanker", Now());
+        Request(pr, "Enfield 1-1, say again", "RAD", false);
+        var r393 = pr.LastOps?.Role ?? "-";
+        pr.LastOps = ("Tanker", Now() - 400);
+        Request(pr, "Enfield 1-1, say again", "RAD", false);
+        r393 += " " + (pr.LastOps?.Role ?? "-");
+        if (r393 != "Tanker -") throw new Exception("R393 say again ohne Station: " + r393);
+        Console.WriteLine("OK   R393: say again ohne Stationsnamen geht an den zuletzt sprechenden Tanker/Range/AWACS (binnen 5 min), sonst an den Platz");
         Srs = null;
         // Emergency without called airfield: nearest suitable (Kobuleti); with "Platz wählen" (e.g. bingo alternate) the selected one stays
         const string May = "mayday mayday mayday, fuel emergency, request immediate landing";
@@ -4088,8 +4244,33 @@ static partial class Program
 
     static DateTime cfgAt;   // State of config.jsonc (ReloadLive)
 
+    /// Modules picked in the installer or the settings window: modules.txt next to the exe ("atc,awacs,…"), mission script: DcsAtcModules.txt. Missing file = all on.
+    internal static readonly (string Id, string De, string En)[] Modules =
+    {
+        ("atc", "Flugsicherung", "Air traffic control"), ("range", "Schießplatz", "Range"), ("awacs", "AWACS", "AWACS"), ("tanker", "Tanker", "Tanker"),
+        ("carrier", "Flugzeugträger", "Carrier"), ("ai", "KI-Funk", "AI radio"), ("crew", "Bodenpersonal", "Ground crew"),
+    };
+    static HashSet<string>? Mods;
+    internal static bool On(string m) => Mods == null || Mods.Contains(m);
+    static bool Off(string m, string text) { if (On(m)) return false; Log($"[ATC] Modul {m} aus: {text}"); return true; }
+    static bool RoleOn(string role) => role switch
+    {
+        "Ground" or "Tower" or "Approach" or "Departure" or "ATIS" => On("atc"),
+        "AWACS" or "Tanker" or "Range" or "Crew" => On(role.ToLowerInvariant()),
+        "Carrier" => On("carrier"), "Flight" => On("ai"), _ => true,
+    };
+    /// Radio wheel entry by its text: prefix = module, unprefixed = ATC (emergency, weather, ATIS); radio check, say again, debrief, settings always.
+    internal static bool TextOn(string t) =>
+        t.StartsWith("Range:") ? On("range") : t.StartsWith("AWACS:") ? On("awacs") && (t != "AWACS: vector to tanker" || On("tanker"))
+        : t.StartsWith("Tanker:") ? On("tanker") : t.StartsWith("Carrier:") ? On("carrier")
+        : t is "radio check" or "say again" or "debrief" or "settings" || On("atc");
+    internal static void LoadModules(string? text) =>
+        Mods = text?.ToLowerInvariant().Split(new[] { ',', ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).ToHashSet();
+
     static void LoadConfig()
     {
+        var mf = Path.Combine(AppContext.BaseDirectory, "modules.txt");
+        LoadModules(File.Exists(mf) && !TestRun ? File.ReadAllText(mf) : null);
         var path = ConfigPath;
         cfgAt = File.GetLastWriteTimeUtc(path);
         if (File.Exists(path))
@@ -4108,8 +4289,10 @@ static partial class Program
         (Ops.AwacsBullseye, Ops.NewGroupNm) = (Cfg.AwacsBullseye, Math.Clamp(Cfg.AwacsNewGroupNm, 40, 200));
         Carrier.OnSpeedAoa = Cfg.OnSpeedAoa;
         Ops.Vectors = Cfg.TankerVectors;
-        Tower.Watch = Cfg.AirspaceWatch;
+        Tower.Watch = Cfg.AirspaceWatch && On("atc");
         (Flights.Mode, Flights.RadiusNm, Flights.OwnWingmen) = (Cfg.AiFlightComms, Cfg.AiFlightRadiusNm, Cfg.AiOwnWingmen);
+        if (!TestRun) Flights.Cmd = l => AiCmd(l);   // was only set by ReloadLive: without a config change the AI never got ENGAGE/RTB
+        Flights.Follow = Cfg.AiFollowAwacs && On("awacs");   // LD1 ENGAGE only with AiFollowAwacs, LD7 RTB always
         Wheel.SaveSize = v => SetConfigValue("WheelSize", v.ToString(CultureInfo.InvariantCulture), "WheelButton");
     }
 
