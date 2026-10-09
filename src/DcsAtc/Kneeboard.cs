@@ -125,15 +125,11 @@ static class Kneeboard
 
     static string Trim(string s, int n) => s.Length <= n ? s : s[..n];
 
-    /// K37: taxiways apron -> threshold from the data (Airfield.Ramps: To07/To25, Tower states the same), identical aprons (North has two airfields) once.
+    /// K37: taxiways apron -> threshold from the data (Airfield.Ramps: To per runway, Tower states the same), identical aprons (North has two airfields) once.
     static IEnumerable<string> RampLines(Airfield k)
     {
         int w = k.Ramps.Select(r => r.Name.Length).DefaultIfEmpty(0).Max();
-        return k.Ramps.DistinctBy(r => (r.Name, r.To07, r.To25)).SelectMany(r => new[]
-        {
-            $"  {r.Name.PadRight(w)} -> 07: {r.To07}",
-            $"  {"".PadRight(w)} -> 25: {r.To25}",
-        });
+        return k.Ramps.DistinctBy(r => r.Name).SelectMany(r => r.To.Select((p, i) => $"  {(i == 0 ? r.Name : "").PadRight(w)} -> {p.Key}: {p.Value}"));
     }
 
     /// N35: AWACS/tanker page only from the config (Write knows no mission data); the sentences are those Ops.AwacsCall understands.

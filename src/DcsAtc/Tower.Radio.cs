@@ -12,6 +12,10 @@ public partial class Tower
         role = Addressed(Normalize(text)) ?? Owner();
         return new() { new Msg(Dep(role), $"{Cs()}, {Station}, say again.") };
     }
+    /// Low confidence on a bare acknowledgement or "say again": the phrase is clear anyway -> process normally instead of asking back ("Copied." -> "say again")
+    public bool Plain(string text) => Normalize(text) is var n && (AckOnly(n) || Ops.BareSayAgain(n, callsign));
+    /// Program: the transmission has actually gone out (radio queue) -> nag windows count from its end, not from queueing (vector repeated before the first call aired)
+    public void Aired(double now, string text) => lastVecSaid = Math.Max(lastVecSaid, now + text.Split(' ').Length / 2.5);
 
     /// Called another airfield on this airfield's frequency: "Enfield 1-1, this is Senaki Tower, you are on Senaki frequency, contact Kutaisi Tower 134.0."
     public List<Msg> OtherField(string text, Airfield o)
@@ -348,7 +352,7 @@ public partial class Tower
 
             case "ready":
             {
-                exitDir = F.Charted ? dir ?? exitDir ?? (rw == "07" ? "east" : "west") : dir ?? exitDir;   // A92: without a map the named direction stays as the departure direction (no CRP)
+                exitDir = F.Charted ? dir ?? exitDir ?? F.Exit[rw][0] : dir ?? exitDir;   // A92: without a map the named direction stays as the departure direction (no CRP)
                 bool onRwy = t != null && OnRunwayPos(t.X, t.Z);
                 if (Phase is Phase.Parked or Phase.StartupApproved && !onRwy)
                     return Neg($"{hdr}, negative, you are not cleared to taxi. {(SameFreq("Ground") ? "Request taxi." : $"Contact {Contact("Ground")} for taxi.")}");   // R104
@@ -616,7 +620,7 @@ public partial class Tower
                     var v = Cap(StartVectors(t, Ifr || wantStraight, now));
                     return Neg(no + PlanText(rw) + v);
                 }
-                var at = dir ?? entry ?? "north";
+                var at = dir ?? entry ?? Allowed(rw)[0];
                 if (!Allowed(rw).Contains(at))
                 {
                     entry = AssignEntry(t, rw, null);
@@ -645,7 +649,7 @@ public partial class Tower
                                : $"{(lastAltFt >= 0 ? "" : AltTo(t, PatternFt) + ", ")}report {(navName == "overhead" ? "overhead" : $"initial runway {RwSay(rw)}")}.") + TrafficNote(traffic, rw));   // R256: altitude already instructed by Approach (lastAltFt), Tower does not repeat it
                 if (Phase is Phase.Initial or Phase.Pattern && role == "Tower")   // already in (call crosses e.g. with the break clearance): repeat, do not re-sequence
                     return Say($"{hdr}, runway {RwSay(rw)}, {(Phase == Phase.Initial ? "" : "continue, ")}report base.");
-                if (t != null && Dist(t.X, t.Z, CX, CZ) < 4 * NM)
+                if (t != null && Dist(t.X, t.Z, CX, CZ) < 4 * NM && !(Phase == Phase.Inbound && vec != null && !holding))   // under radar vectoring (e.g. altitude report after "verify altitude", over the field): Approach continues, no pattern join
                 {
                     Phase = Phase.Pattern;
                     PatternReset();
@@ -667,13 +671,14 @@ public partial class Tower
                 holdArrived = false; lastHoldInfo = now; lastEat = -1;   // new holding: state EAT once (tick then reports only changes)
                 var hold = holding ? $"{EatNote(busy, now, fixS: t != null && HoldFix(t) is var hf0 ? Dist(t.X, t.Z, hf0.X, hf0.Z) / (HoldKt * Kt) : 0)}, " +   // R273: no EAT before arrival at the holding fix
                                      (OtherEmergency ? "emergency in progress." : QueueAhead >= 0 ? $"you are number {QueueAhead + 1}." : $"{busy} aircraft in the pattern.") : "";
-                var info = $"{hdr}, {Position(t)}. Runway {RwSay(rw)} in use, {Wind(t)}, {Qnh(t)}.{AtisNote(n)}{WxNote()} ";
+                string pos = $"{hdr}, {Position(t)}", wx = $"{Qnh(t)}.{AtisNote(n)}{WxNote()} ";   // WxNote once per approach
+                var info = $"{pos}. Runway {RwSay(rw)} in use, {Wind(t)}, {wx}";
                 if (!holding && t != null)   // Radar vectoring as in BMS: headings and altitudes up to the centerline
                 {
                     Phase = Phase.Inbound;
                     entry = null;
-                    var v = Cap(StartVectors(t, Ifr || wantStraight, now));
-                    return Say(info + PlanText(rw) + v + TrafficNote(traffic, Runway));
+                    var v = Cap(StartVectors(t, Ifr || wantStraight, now));   // no "runway in use, wind": PlanText names the runway (first call >20 s, Batumi 31 vs vectors to 13)
+                    return Say($"{pos}, {wx}" + PlanText(rw) + v + TrafficNote(traffic, Runway));
                 }
                 if (holding)
                 {
@@ -743,7 +748,7 @@ public partial class Tower
                     double w = slot ?? (cur > vecFt + 300 ? Math.Round(cur / 1000) * 1000 + (Math.Round(cur / 1000) * 1000 < cur - 300 ? 1000 : 0) : Math.Min(Slow != null ? 10000 : 20000, Math.Floor(lim / 1000) * 1000));
                     if (toGate < 25 || w > lim || w <= vecFt) return Neg($"{c}, unable higher, expect lower shortly, maintain {Alt(vecFt)}.");
                     if (!LevelFree(t, traffic, w)) return Neg($"{c}, unable higher, traffic, maintain {Alt(vecFt)}.");
-                    vecFt = lastAltFt = w; lastVecSaid = now; pdDescent = true;
+                    vecFt = lastAltFt = w; lastVecSaid = now; pdDescent = true; altFree = false;
                     keepHighR = gate + ((w - GateFt) / 265 + 5) * NM;   // up to here (remaining distance) no descent by profile
                     return Say($"{c}, {(Math.Abs(w - cur) <= 300 ? "maintain" : "climb and maintain")} {Alt(w)}.");
                 }
@@ -751,14 +756,14 @@ public partial class Tower
                 {
                     double w = Math.Max(slot ?? Math.Max(floor, GateFt + 1000), floor);   // without number: up to 1000 ft above the gate altitude (R305: no gate altitude before)
                     if (w < cur - 300 && !LevelFree(t, traffic, w)) return Neg($"{c}, unable, traffic, maintain {Alt(vecFt)}.");
-                    vecFt = lastAltFt = w; lastVecSaid = now; pdDescent = true; keepHighR = 0;
+                    vecFt = lastAltFt = w; lastVecSaid = now; pdDescent = true; keepHighR = 0; altFree = false;
                     return Say($"{c}, {(w < cur - 300 ? $"descend at pilot's discretion, maintain {Alt(w)}" : $"maintain {Alt(w)}")}.");
                 }
                 double want = slot ?? (vectors ? (up ? vecFt + 1000 : Math.Max(vecFt - 1000, floor)) : Math.Round(cur / 1000) * 1000 + (up ? 2000 : -2000));
                 var keep = vectors ? $"maintain {Alt(vecFt)}" : "maintain present altitude";
                 if (want < floor) return Neg($"{c}, unable, minimum altitude {Alt(floor)}, {keep}.");
                 if (!LevelFree(t, traffic, want)) return Neg($"{c}, unable, traffic, {keep}.");
-                if (vectors) { vecFt = want; lastVecSaid = now; if (want > cur) stepAfter = now + 120; }   // higher: 2 min, then descent by profile again
+                if (vectors) { vecFt = want; lastVecSaid = now; altFree = false; if (want > cur) stepAfter = now + 120; }   // higher: 2 min, then descent by profile again
                 if (Phase == Phase.Departing) { Phase = Phase.Away; nav = null; }   // released from the control zone
                 return Say($"{c}, {(Math.Abs(want - cur) <= 300 ? "maintain" : want > cur ? "climb and maintain" : "descend and maintain")} {Alt(want)}.");
             }
@@ -922,6 +927,7 @@ public partial class Tower
         "straightin" or "crp" or "airborne" or "ff" or "ffoff" or "leavezone" => "Approach",
         "transit" => t != null && Dist(t.X, t.Z, CX, CZ) < 5 * NM ? "Tower" : "Approach",   // N3: without a station called (OnTranscript otherwise takes the one called)
         "transitoff" => transitBy,
+        "inbound" when Phase == Phase.Inbound && vec != null && !holding => "Approach",   // under radar vectoring, also close to the field
         "inbound" => Phase == Phase.Entering || t == null && Phase is Phase.Initial or Phase.Pattern || t != null && (Dist(t.X, t.Z, CX, CZ) < 4 * NM ||
                      Phase == Phase.Initial && Dist(t.X, t.Z, OnCenterline(Runway, InitialDist).X, OnCenterline(Runway, InitialDist).Z) < 5 * NM ||
                      Phase == Phase.Pattern && Dist(t.X, t.Z, CX, CZ) < 5 * NM) ? "Tower" : "Approach",   // Entering: already handed over to Tower; R102: initial/pattern (call crosses with the break clearance) stays with Tower, but only within the airfield area (initial up to 5 NM from the initial point like the handover, circuit up to 5 NM like tick), otherwise new approach via Approach

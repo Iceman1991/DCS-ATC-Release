@@ -1,4 +1,4 @@
-DCS-ATC 0.9.9 ALPHA – sprechende Flugsicherung für DCS World (alle Karten, getestet im Kaukasus)
+DCS-ATC 0.12.0 ALPHA – sprechende Flugsicherung für DCS World (alle Karten, getestet im Kaukasus)
 =====================================================================
 
 !! ALPHA-VERSION !!
@@ -9,10 +9,10 @@ DCS-ATC 0.9.9 ALPHA – sprechende Flugsicherung für DCS World (alle Karten, ge
   Inoffizielles Fan-Projekt, nicht verbunden mit Eagle Dynamics oder dem SRS-Projekt.
 
 Was es macht
-  Tower, Ground, Approach, ATIS, AWACS, Tanker und Crew Chief sprechen über SRS mit dir – an jedem Platz
+  Tower, Ground, Approach, ATIS, AWACS, Tanker, JTAC und Crew Chief sprechen über SRS mit dir – an jedem Platz
   jeder DCS-Karte, komplett offline (Spracherkennung und Stimmen laufen auf deinem PC).
   Dazu Bodenpersonal mit Tank-/Munitions-Lkw und Träger-Funk (Marshal, Tower, LSO) für Träger aus der Mission.
-  DCS-ATC spawnt keine Flugzeuge: Es macht nur den Funk für AWACS, Tanker und Verkehr deiner Mission (auch nachträglich gespawnte).
+  DCS-ATC spawnt keine Flugzeuge: Es macht nur den Funk für AWACS, Tanker, JTACs und Verkehr deiner Mission (auch nachträglich gespawnte).
   Funktioniert in jeder Mission auf jeder Karte, auch im Mehrspieler. In VR erscheint das Funkrad als Text im Spiel.
 
 Voraussetzungen
@@ -30,7 +30,7 @@ Installation
   2. Am Ende "Tasten festlegen": Taste fürs Funkrad und Push-to-Talk (Tastatur oder HOTAS).
   3. Fertig. DCS-ATC startet ab jetzt mit jeder Mission von selbst (kleines Fenster in der Taskleiste).
   Module: Bei "Benutzerdefiniert" nimmst du Teile raus, die du nicht brauchst (Flugsicherung, Schießplatz,
-  AWACS, Tanker, Flugzeugträger, KI-Funk, Bodenpersonal), z. B. wenn ein echter Spieler AWACS macht.
+  AWACS, Tanker, JTAC, Flugzeugträger, KI-Funk, Bodenpersonal), z. B. wenn ein echter Spieler AWACS macht.
   Später änderbar im Einstellungsfenster.
   Sprache: Das Setup fragt am Anfang nach der Sprache (Deutsch oder Englisch). Später wechseln: Setup erneut
   starten und die andere Sprache wählen.
@@ -39,7 +39,7 @@ Benutzung
   1. DCS starten, beliebige Mission fliegen.
   2. Funkgeräte in SRS (AM): jeder Platz auf seiner DCS-Frequenz (wie F10-Karte), Ground, Tower und Approach
      gemeinsam, UHF oder VHF – z. B. Kutaisi 263.0 / 134.0, Senaki 261.0 / 132.0, Batumi 260.0 / 131.0.
-     Das Funkrad zeigt die Frequenz des aktuellen Platzes. Dazu: ATIS 263.5 · AWACS 251.5 · Tanker 255.5
+     Das Funkrad zeigt die Frequenz des aktuellen Platzes. Dazu: ATIS 263.5 · AWACS 251.5 · Tanker 255.5 · JTAC 133.5
   3. Sprechen: SRS-Sprechtaste auf der Frequenz, englisch, z. B.
        "Kutaisi Ground, Enfield 1-1, request startup"  ·  "Overlord, Enfield 1-1, request picture"
      Oder ohne Sprechen: Funkrad mit Taste ' (Apostroph) bzw. F10-Menü -> ATC.

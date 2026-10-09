@@ -19,7 +19,7 @@ public class Config
     public string MicName { get; set; } = "";        // part of the microphone name, empty = Windows default
     public string Callsign { get; set; } = "Enfield 1-1";   // only without mission data (otherwise call sign from DCS)
     public string MyCallsign { get; set; } = "";       // own call sign instead of the one from the DCS slot, "" = from DCS (Settings window)
-    public Dictionary<string, double> Frequencies { get; set; } = new(Tower.Freqs) { ["Range"] = 267.5, ["AWACS"] = 251.5, ["Tanker"] = 255.5, ["Carrier"] = 127.5 };   // AWACS/tanker on .5: not on an airfield frequency (Radio.lua whole MHz, K3)
+    public Dictionary<string, double> Frequencies { get; set; } = new(Tower.Freqs) { ["Range"] = 267.5, ["AWACS"] = 251.5, ["Tanker"] = 255.5, ["Carrier"] = 127.5, ["JTAC"] = 133.5 };   // AWACS/tanker on .5: not on an airfield frequency (Radio.lua whole MHz, K3)
     public bool AwacsBullseye { get; set; } = true;    // LK4: picture and situation updates to all as bullseye; false = everything BRAA from the player (fallback)
     public double AwacsNewGroupNm { get; set; } = 200;  // AWACS reports new groups (and picture clean) within this radius, 40-200 NM
     public Dictionary<string, double> OnSpeedAoa { get; set; } = new() { ["FA-18"] = 8.1 };   // LSO: on-speed AoA in degrees per type prefix (calibrate with the log "[LSO] AoA im Mittel"), unknown type = no speed calls
@@ -30,7 +30,7 @@ public class Config
     {
         ["Tower"] = "en_US-ryan-medium", ["Ground"] = "en_US-bryce-medium",
         ["Approach"] = "en_US-ryan-medium@1.05", ["ATIS"] = "en_US-ryan-medium@0.94",
-        ["Range"] = "en_US-ryan-medium@1.06", ["AWACS"] = "en_GB-alan-medium", ["Tanker"] = "en_US-bryce-medium", ["Crew"] = "en_US-ryan-medium",
+        ["Range"] = "en_US-ryan-medium@1.06", ["AWACS"] = "en_GB-alan-medium", ["Tanker"] = "en_US-bryce-medium", ["Crew"] = "en_US-ryan-medium", ["JTAC"] = "en_US-bryce-medium@0.94", ["FACA"] = "en_GB-alan-medium@1.04",
         ["Carrier"] = "en_US-ryan-medium@0.97|en_GB-alan-medium@1.02",   // one per station (Marshal, Tower, Paddles); AWACS/carrier without the pilot model (joe)
     };
     public string PilotVoice { get; set; } = "en_US-joe-medium";   // speaks your menu/wheel requests, "" = off
@@ -102,7 +102,7 @@ class Pilot
 /// Output: in-game text (to group Gid) and speech via SRS. Role "Info" = text only.
 /// Prio: 0 urgent (before everything else), 1 normal, 2 AI radio. Standby: "…, stand by" beforehand if the frequency is still busy.
 record Tx(string Text, string Role, string Station, int Gid, bool Pilot = false, string? Voice = null, uint Unit = 0, double[]? Freqs = null,   // Unit: intercom target (Role "Crew")
-          int Prio = 1, Tx? Standby = null, double MaxAge = 0, bool Stress = false, int Side = 0, Func<string?>? Live = null);   // MaxAge: afterwards text only (0 = per prio); Stress: combat voice; Side: SRS coalition of the sender (A133), 0 = Cfg.Coalition
+          int Prio = 1, Tx? Standby = null, double MaxAge = 0, bool Stress = false, int Side = 0, Func<string?>? Live = null, Action? Aired = null);   // MaxAge: afterwards text only (0 = per prio); Stress: combat voice; Side: SRS coalition of the sender (A133), 0 = Cfg.Coalition; Aired: when it goes out (Approach vectoring)
 
 class AtisInfo { public char Letter = 'A'; public string Key = "", Text = "", Mp3 = "", Call = ""; public double Sec, Clk, TempC; public (double X, double Z) W; }   // Call: announcement on new identifier; Clk/TempC/W: time, temperature and wind of the identifier (R344)
 
@@ -130,7 +130,7 @@ static partial class Program
         Tower.FreeLevel = FreeLevel;
         Ops.Callsigns = AiCallsign;
         TestRun = args.Any(a => a is "--selftest" or "--anflugtest" or "--mptest" or "--asr-test" or "--srs-test");
-        if (args.Contains("--selftest")) { RadioTest(); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); AtisTest(); CrewTest(); ExpectTest(); return Tower.SelfTest(); }
+        if (args.Contains("--selftest")) { RadioTest(); ChartTest(); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); AtisTest(); CrewTest(); ExpectTest(); return Tower.SelfTest(); }
         LoadConfig();
         if (args.Contains("--settings")) { Dedicated = DedicatedNow(); Settings.Show(Cfg); return 0; }   // language then also in the server's Saved Games
         if (args.Contains("--buttons")) { ShowButtons(); return 0; }
@@ -231,6 +231,7 @@ static partial class Program
         {
             lock (TowerLock) { var h = Host(); return h == null ? (false, false) : Ops.WheelUp(TrafficFor(h), MeOf(h)); }
         };
+        Wheel.Jtac = () => { lock (TowerLock) { var h = Host(); return h != null && Ops.Leaders.Any(l => l.Alive && l.Side == h.Coalition); } };   // J11
         Wheel.Log = Log;   // screenshot (press with wheel open) into atc-log
         Wheel.InGame = text =>   // VR: headset shows only DCS, wheel additionally as in-game text (mission reads .cmd every 0.25 s)
         {
@@ -412,7 +413,7 @@ static partial class Program
         lock (TowerLock) p = PilotFor(tx);
         var role = SrsRole(p, tx.FreqMHz);
         Airfield? via = null;   // airfield frequency: this airfield, controller by content (Ground/Tower/Approach) or the one with its own frequency
-        if (role is not ("AWACS" or "Tanker" or "Range" or "Carrier")) lock (TowerLock) (via, role) = FreqRoute(tx.FreqMHz, role);
+        if (role is not ("AWACS" or "Tanker" or "Range" or "Carrier" or "JTAC")) lock (TowerLock) (via, role) = FreqRoute(tx.FreqMHz, role);
         role ??= via == null ? "Tower" : null;
         var (text, conf) = Transcribe(SaveWav(tx.Pcm), p);
         var who = p == null ? "Rufzeichen im Spruch" : !MissionData ? "Host" : tx.UnitId != 0 && p.Id == tx.UnitId ? "Unit-ID" : p.Name == tx.Name ? "SRS-Name" : "einziger Spieler";   // Debug log
@@ -433,6 +434,7 @@ static partial class Program
         (p is { TankFq: > 0 } && Math.Abs(p.TankFq - mhz) < 0.01 ? "Tanker" : null)
         ?? Cfg.Frequencies.FirstOrDefault(f => f.Key != "ATIS" && Math.Abs(f.Value - mhz) < 0.01).Key
         ?? (Ops.AwacsFreq.Values.Any(f => Math.Abs(f - mhz) < 0.01) ? "AWACS" : null)   // mission AWACS
+        ?? (Ops.Leaders.Any(l => l.Freq > 0 && Math.Abs(l.Freq - mhz) < 0.01) ? "JTAC" : null)   // J5: mission JTAC / FAC(A)
         ?? (Carrier.Boats.Any(b => b.Freq > 0 && Math.Abs(b.Freq - mhz) < 0.01) ? "Carrier" : null);   // mission carrier
 
     /// Sender of an SRS call (under TowerLock). R358: the only player only for an SRS client without unit (otherwise slot change, spectator, second client: call sign, A26)
@@ -459,10 +461,10 @@ static partial class Program
         var n = Tower.Normalize(text);
         if (Tower.ExtractCallsign(n) is not { } cs) return null;
         if (Regex.Match(n, $@"^{Regex.Escape(cs.ToLowerInvariant()).Replace("-", " ?")} ([a-z]+)") is { Success: true } m
-            && (StationWords.Contains(m.Groups[1].Value) || Fields.Any(f => $"{f.Name}-{f.Callsign}".ToLowerInvariant().Split('-', ' ').Contains(m.Groups[1].Value)))) return null;
+            && (StationWords.Contains(m.Groups[1].Value) || Ops.Leaders.Any(l => Tower.Normalize(l.Cs).Split(' ')[0] == m.Groups[1].Value) || Fields.Any(f => $"{f.Name}-{f.Callsign}".ToLowerInvariant().Split('-', ' ').Contains(m.Groups[1].Value)))) return null;
         return Pilots.Values.FirstOrDefault(x => Tower.SameCallsign(cs, x.Callsign) || x.SlotCallsign != "" && Tower.SameCallsign(cs, x.SlotCallsign));
     }
-    static readonly HashSet<string> StationWords = new() { "tower", "ground", "approach", "departure", "radar", "control", "center", "centre", "marshal", "paddles", "mother", "overlord", "awacs", "magic", "moscow", "darkstar", "wizard", "focus", "texaco", "shell", "arco", "tanker", "range" };
+    static readonly HashSet<string> StationWords = new() { "tower", "ground", "approach", "departure", "radar", "control", "center", "centre", "marshal", "paddles", "mother", "overlord", "awacs", "magic", "moscow", "darkstar", "wizard", "focus", "texaco", "shell", "arco", "tanker", "range", "jtac", "faca" };
 
     static Ops.Me MeOf(Pilot p) => new(p.Callsign, p.Tel, p.Type, p.Coalition, p.FlightSize + (p.Gid == 0 ? 0 : Ai.Count(a => AiGid.GetValueOrDefault(a.Group) == p.Gid)), p.Fuel);
     static Tx OpsTx(Pilot p, Ops.Call c)
@@ -563,7 +565,7 @@ static partial class Program
     {
         var e = line.Split(';');
         if (e.Length < 2) return;
-        if (e[0] == "X") { lock (TowerLock) try { Ops.OnEvent(e, Now()); Flights.OnEvent(e, Now(), FlightWorld()); } catch (FormatException x) { Trace("FEHLER", $"Ereignis {line}: {x.Message}"); } return; }   // AI radio
+        if (e[0] == "X") { lock (TowerLock) try { Ops.OnEvent(e, Now()); foreach (var q in Pilots.Values) q.Ops.OnCasEvent(e, q.Unit, Now()); Flights.OnEvent(e, Now(), FlightWorld()); } catch (FormatException x) { Trace("FEHLER", $"Ereignis {line}: {x.Message}"); } return; }   // AI radio
         List<Ops.Call> calls = new();
         Pilot? p;
         lock (TowerLock)
@@ -590,7 +592,8 @@ static partial class Program
                     Wheel.PressDcs(MenuKeys(e[2], mi, int.Parse(e[4])));
                     if (e[2] == "tanker") p.TankMenuAt = Now();   // R304: DCS then tunes the tanker frequency itself (Pick)
                 }
-                else Log($"[DCS] Funkmenü {e[2]} nicht gedrückt: {(mi == 0 ? e[4] : mi > 10 ? $"Nr. {mi}, DCS listet nur 10" : "keine Funkmenü-Taste (CommsKey 0)")}");
+                else if (mi == 0) Trace("DCS", $"Funkmenü {e[2]} nicht gedrückt: {e[4]}");
+                else Log($"[DCS] Funkmenü {e[2]} nicht gedrückt: {(mi > 10 ? $"Nr. {mi}, DCS listet nur 10" : "keine Funkmenü-Taste (CommsKey 0)")}");
             }
             else if (e[0] == "C" && e.Length >= 3 && e[2] == "stopped") p.Active?.EngineOff(p.Tel);   // R6/N25: engine off at the parking spot after taxi-in = parked (debrief in TickAll), not on the taxiway; R107: also before departure at the parking spot
             else if (e[0] == "C" && e.Length >= 3 && CrewLines.TryGetValue(e[2], out var crewLine))
@@ -649,6 +652,7 @@ static partial class Program
             string? to = colon > 0 ? text[..colon].Trim() : null;
             var spoken = colon > 0 ? text[(colon + 1)..].Trim() : text;
             if (fromMenu && spoken == "report airspeed" && p.Tel is { } it) (spoken, text) = (Tower.IasSay(it), $"{to ?? "Approach"}: {Tower.IasSay(it)}");   // R129: radio wheel "Fahrt melden" -> "340 knots"
+            if (fromMenu && to == "JTAC" && p.Ops.CasWheel(spoken) is { } cw) (spoken, text) = (cw, "JTAC: " + cw);   // J11: readback with lines 4/6, IN / OFF with direction
             if (Regex.IsMatch(spoken, @"^\s*debrief", RegexOptions.IgnoreCase)) { SayQueue.Add(DebriefTx(p, false)); return; }
             if (Regex.IsMatch(spoken, @"\b(?:fox (?:one|two|three)|defensive|defending)\b", RegexOptions.IgnoreCase)) HotUntil = Clock.AddSeconds(5);   // LD3: radio pause for picture/replies
             if (!fromMenu && MissionData && Flights.Ask(Tower.Normalize(spoken), p.Coalition, Now(), FlightWorld())) return;   // LK15: "Ford one, say status" to an AI flight (reply comes via FlightComms)
@@ -672,7 +676,7 @@ static partial class Program
                 return;
             }
             // ground/tower/approach request on a station frequency (mission preset): no station action (no DCS tanker menu), no "say again", hint to the airfield frequency
-            if (!fromMenu && to is "Tanker" or "AWACS" or "Carrier" or "Range" && On("atc") && Fields.Count > 0 && FieldRole(sn) is { } fr && !(to == "Carrier" && fr == "Approach") && !p.Boat.OnDeck   // R24: no airfield on the deck, the carrier gives the deck hint
+            if (!fromMenu && to is "Tanker" or "AWACS" or "Carrier" or "Range" or "JTAC" && On("atc") && Fields.Count > 0 && FieldRole(sn) is { } fr && !(to == "Carrier" && fr == "Approach") && !p.Boat.OnDeck   // R24: no airfield on the deck, the carrier gives the deck hint
                 && Ops.RoleOf(sn, p.Callsign) == null && !p.Boat.Wants(sn) && !Tower.Has(sn, "vector", "home plate", "bingo", "nearest airfield", "recovery", "divert"))   // AWACS: "bingo, vectors … full stop" stays with the AWACS
             {
                 var wf = (p.Lead ?? p).Active?.F ?? Pick(p.Lead ?? p, spoken).F;
@@ -696,7 +700,7 @@ static partial class Program
                 return;
             }
             // Range / AWACS / tanker: frequency or menu ("Range: ...") or name in the radio call
-            var opsRole = to is "Range" or "AWACS" or "Tanker" ? to : to == null ? Ops.RoleOf(Tower.Normalize(text), p.Callsign) : null;
+            var opsRole = to is "Range" or "AWACS" or "Tanker" or "JTAC" ? to : to == null ? Ops.RoleOf(Tower.Normalize(text), p.Callsign) : null;
             if (opsRole == null && to == null && p.LastOps is { } lo && Now() - lo.At < 300 && Ops.BareSayAgain(sn, p.Callsign)) opsRole = lo.Role;   // R393: the controller who spoke last repeats
             if (opsRole != null && Off(opsRole.ToLowerInvariant(), text)) return;
             if (opsRole != null)
@@ -708,6 +712,8 @@ static partial class Program
                     else AiCmd($"MENU;{p.Unit};tanker;{mn.Group};s");   // R304: s = DCS tanker stays mute, our controller speaks (without s: audible 15 s like the airfields)
                 }
                 p.Ops.Menu = null;
+                foreach (var cm in p.Ops.Cmds.ToList()) AiCmd(cm);   // J4/J6: MARK / LASE / LASEOFF
+                p.Ops.Cmds.Clear();
                 if (fromMenu && Cfg.PilotVoice != "" && calls.Count > 0)
                     outq.Add(new Tx($"{calls[0].Station}, {p.Callsign.Replace('-', ' ')}, {spoken}.", opsRole, p.Callsign, p.Gid, true, PilotVoiceFor(p.Unit), Freqs: OpsTx(p, calls[0]).Freqs, Prio: 0, Side: p.Coalition));
                 foreach (var c in calls) AwacsNote(p, c);
@@ -762,6 +768,7 @@ static partial class Program
             List<Msg> msgs;
             p.LastOps = null;   // R393: the airfield spoke last
             var intent = tw.IntentOf(text, q.Tel);   // Debug log
+            if (conf < MinConf && tw.Plain(text)) conf = MinConf;   // "copied"/"say again": closed phrase, no ask-back
             if (Regex.IsMatch(text, @"^\s*atis\s*$", RegexOptions.IgnoreCase))
             {
                 if (MissionData) UpdateAtis(tw.F);   // R120: without fresh mission data no weather from the previous mission
@@ -882,11 +889,12 @@ static partial class Program
     static IEnumerable<double> ListenFreqs(List<Pilot> pilots)
     {
         bool known = Fields.Any(f => f.HasFreq);
-        var roles = Cfg.Frequencies.Where(f => RoleOn(f.Key)).Where(f => f.Key is "AWACS" or "Tanker" || (f.Key == "Range" && Ops.Range != null)
+        var roles = Cfg.Frequencies.Where(f => RoleOn(f.Key)).Where(f => f.Key is "AWACS" or "Tanker" || (f.Key == "JTAC" && Ops.Leaders.Count > 0) || (f.Key == "Range" && Ops.Range != null)
                                                || (f.Key == "Carrier" && Carrier.Boats.Count > 0)
                                                || (!known && f.Key is "Ground" or "Tower" or "Approach")).Select(f => f.Value)
                         .Concat(Carrier.Boats.Where(b => b.Freq > 0 && On("carrier")).Select(b => b.Freq))
-                        .Concat(pilots.Where(p => p.TankFq > 0 && RoleOn("Tanker")).Select(p => p.TankFq));   // R387: tanker frequency tuned by DCS
+                        .Concat(pilots.Where(p => p.TankFq > 0 && RoleOn("Tanker")).Select(p => p.TankFq))   // R387: tanker frequency tuned by DCS
+                        .Concat(Ops.Leaders.Where(l => l.Freq > 0 && RoleOn("JTAC")).Select(l => l.Freq));   // J5: mission JTAC / FAC(A)
         // A22: order active airfields of all players, then taxiing, then neighboring airfields (SrsListener takes at most Max, duplicates count once)
         static IEnumerable<double> Fq(IEnumerable<Airfield> fs) => fs.SelectMany(f => f.FreqsOf("*") ?? Array.Empty<double>());   // UHF, VHF or own per controller
         var act = pilots.Where(p => p.Active != null && Served(p.Coalition, p.Active.F)).Select(p => p.Active!.F);   // N1: own and neutral airfields only
@@ -895,7 +903,8 @@ static partial class Program
         return Fq(act).Where(_ => atc).Concat(roles).Concat(Ops.AwacsFreq.Values.Where(_ => On("awacs"))).Concat(Fq(near).Where(_ => atc));
     }
 
-    static Tx ToTx(Pilot p, Msg m) => new(m.Text, m.Role, p.Active!.F.StationOf(m.Role), p.Gid, Freqs: FieldFreqs(p.Active.F, m.Role), Side: SideOf(p.Active.F, p));
+    static Tx ToTx(Pilot p, Msg m) => new(m.Text, m.Role, p.Active!.F.StationOf(m.Role), p.Gid, Freqs: FieldFreqs(p.Active.F, m.Role), Side: SideOf(p.Active.F, p),
+        Aired: m.Role == "Approach" && p.Active is { } tw ? () => tw.Aired(Now(), m.Text) : null);
 
     /// Ground/Tower/Approach/Departure of an airfield (Airfield.FreqsOf): own from AirfieldFrequencies, otherwise its DCS frequency (UHF, VHF), null = the one from the config;
     /// ATIS: the own, otherwise the airfield's ATIS frequency (A35, like AtisLoop).
@@ -1034,6 +1043,7 @@ static partial class Program
             foreach (var p in ActivePilots())   // range, AWACS, tanker; debrief after shutdown
             {
                 var oc = p.Ops.Tick(MeOf(p), TrafficFor(p), Now(), awacs: p.Lead == null && On("awacs"), lead: p.Lead?.Ops).ToList();
+                if (p.Ops.Cmds.Count > 0) { foreach (var cm in p.Ops.Cmds.ToList()) AiCmd(cm); p.Ops.Cmds.Clear(); }   // J4: MARK / LASE / LASEOFF
                 foreach (var c in oc) AwacsNote(p, c);
                 outq.AddRange(oc.Select(c => OpsTx(p, c)));
                 foreach (var c in oc.Where(c => c.Role == "AWACS" && Urgent.IsMatch(c.Text)))   // KF84: not tuned to AWACS -> repeat on Guard
@@ -1605,6 +1615,16 @@ static partial class Program
         missionSec = sec;
     }
 
+    /// J/Q/N lines of the state file (JTAC-PLAN, interface mission-app): J;id;kind;cs;side;x;z;alt;freq;mod;code;alive  Q;id;group;type;count;x;z;alt;moving;flak;mgrs;lat;lon;fx;fz  N;side;name;x;z
+    internal static void JtacLine(string[] p, List<Ops.Leader> jl, List<Ops.Trg> jt, List<(int, string, double, double)> jn)
+    {
+        double D(int i) => double.Parse(p[i], CultureInfo.InvariantCulture);
+        double F(int i) => p[i] == "" ? double.NaN : D(i);
+        if (p[0] == "J" && p.Length >= 12) jl.Add(new(p[1], p[2], p[3], (int)D(4), D(5), D(6), D(7), p[8] == "" ? 0 : D(8), p[9], p[10], p[11] == "1"));
+        else if (p[0] == "Q" && p.Length >= 15) jt.Add(new(p[1], p[2], p[3], (int)D(4), D(5), D(6), D(7), p[8] == "1", p[9] == "1", p[10], D(11), D(12), F(13), F(14)));
+        else if (p[0] == "N" && p.Length >= 5) jn.Add(((int)D(1), p[2], D(3), D(4)));
+    }
+
     static void ReadState()
     {
         if (!File.Exists(StateFile)) return;
@@ -1620,6 +1640,7 @@ static partial class Program
         var gci = new HashSet<int>();
         var boats = new List<Carrier.Boat>();
         var fu = new Dictionary<string, Flights.Unit>();
+        var jl = new List<Ops.Leader>(); var jt = new List<Ops.Trg>(); var jn = new List<(int, string, double, double)>();   // J/Q/N: JTAC leaders, their targets, navigation points
         (double, double, double)? rz = null;   // A17: mission without range zone (mission change) -> no range controller any more
         foreach (var line in lines)
         {
@@ -1631,6 +1652,7 @@ static partial class Program
                 {
                     case "G" when p.Length >= 4: Sky = (D(1) > 0, D(2), D(3)); Carrier.Ceiling = p.Length < 5 || D(4) > 0; break;
                     case "S" when p.Length >= 2: MissionGap(D(1)); break;   // R120: mission runtime
+                    case "J" or "Q" or "N": JtacLine(p, jl, jt, jn); break;   // J1-J3: JTAC leaders, their targets, navigation points
                     case "Z" when p.Length >= 4: rz = (D(1), D(2), D(3)); break;     // Range Alpha
                     case "B" when p.Length >= 3: Ops.Bulls[p.Length >= 4 && int.TryParse(p[3], out var bs) ? bs : 0] = (D(1), D(2)); break;   // Bullseye per side
                     case "K" when p.Length >= 3:                                                 // Tanker TACAN[;track]
@@ -1669,7 +1691,6 @@ static partial class Program
                         {
                             Pilots[p[1]] = pl = new Pilot { Unit = p[1], Callsign = CallsignFrom(p[3], p[4]) };
                             pl.SlotCallsign = pl.Callsign;
-                            Log($"[ATC] Spieler {p[4]} ({p[5]}) als {pl.Callsign}");
                         }
                         pl.Gid = int.Parse(p[2]);
                         pl.Name = p[4];
@@ -1680,7 +1701,8 @@ static partial class Program
                         bool air = p[16] == "1";
                         pl!.Tel = new Telemetry(D(8), air ? Math.Max(D(9), 3.5) : 0, D(10), D(11), D(6), D(7), D(12), D(13), D(14), D(15), p.Length > 20 ? D(20) : -1);
                         pl.Seen = Clock;
-                        if ((Cfg.MyCallsign != "" && Host() == pl ? Cfg.MyCallsign : pl.SlotCallsign) is var want && want != pl.Callsign) Rename(pl, want);   // own callsign (settings)
+                        if ((Cfg.MyCallsign != "" && Host() == pl ? Cfg.MyCallsign : pl.SlotCallsign) is var want && want != pl.Callsign) { if (fresh) pl.Callsign = want; else Rename(pl, want); }   // own callsign (settings)
+                        if (fresh) Log($"[ATC] Spieler {p[4]} ({p[5]}) als {pl.Callsign}");
                         if (fresh) RestoreSession(pl);
                         break;
                     }
@@ -1695,6 +1717,8 @@ static partial class Program
         Ops.Detected = det;
         Ops.Gci = gci;
         Ops.Range = rz;
+        (Ops.Leaders, Ops.Targets, Ops.NavPts) = (jl, jt, jn);
+        Ops.DefFreq = Cfg.Frequencies.GetValueOrDefault("JTAC", 133.5);
         Carrier.Boats = boats;
         Flights.Units = fu;
         Carrier.Air = ai;
@@ -2371,7 +2395,8 @@ static partial class Program
 
     static void AiCmd(string line, bool log = true)   // log: false for the VR wheel text (every wheel movement)
     {
-        if (log) Log($"[KI ] {line}");
+        if (log && line.StartsWith("MENU;")) Trace("KI", line);   // radio menu entries: debug file only, not the console
+        else if (log) Log($"[KI ] {line}");
         if (AiHook != null) { AiHook(line); return; }
         try
         {
@@ -2623,7 +2648,7 @@ static partial class Program
         try { File.Delete(json + ".json"); } catch (IOException) { }   // do not read old confidence
         var sw = Stopwatch.StartNew();
         var (output, _) = Run(Path.Combine(Root, "tools", "whisper", "Release", "whisper-cli.exe"), null,
-            "-m", model, "-t", Math.Min(8, Environment.ProcessorCount).ToString(), "-f", wav, "-nt", "-np", "-l", "en", "--prompt", prompt, "-ojf", "-of", json);
+            "-m", model, "-t", Math.Clamp(Environment.ProcessorCount / 2 - 2, 2, 8).ToString(), "-f", wav, "-nt", "-np", "-l", "en", "--prompt", prompt, "-ojf", "-of", json);   // ponytail: -t leaves two cores to DCS (main/render thread), 16 threads -> 6; raise if replies lag, lower if DCS stutters while talking
         double conf = 1;
         try { conf = Confidence(File.ReadAllText(json + ".json")); File.Delete(json + ".json"); } catch (Exception e) when (e is IOException or JsonException or KeyNotFoundException or InvalidOperationException) { Trace("FEHLER", $"Whisper-Sicherheit: {e.GetType().Name}: {e.Message}"); }
         Trace("WHISPER", $"{Path.GetFileName(wav)} {Path.GetFileName(model)} {sw.ElapsedMilliseconds} ms conf {conf:0.00} (Sender {cs}): {output.Trim()}");
@@ -2785,6 +2810,7 @@ static partial class Program
             var text = tx.Text;   // LD4: may change until sending (live)
             void Show()   // Text for the mission (*.out in the game, to the player's group; Gid -1 = speech only)
             {
+                tx.Aired?.Invoke();
                 if (tx.Gid < 0) return;
                 var dur = ShowSec(tx, label);
                 foreach (var gid in ShowTo(tx.Gid, info ? 0 : freq, freq2, tx.Side))
@@ -2822,7 +2848,7 @@ static partial class Program
     internal static int RankOf(Tx tx)
     {
         if (tx.Role == "AWACS")
-            return AwacsRow(tx.Text) is { Fresh: true } || tx.Text.Contains("pop-up group") ? 2 : Tasking.IsMatch(tx.Text) ? 3 : Scope.IsMatch(tx.Text) ? 4 : 3;
+            return tx.Text.Contains("merged") ? 1 : AwacsRow(tx.Text) is { Fresh: true } || tx.Text.Contains("pop-up group") ? 2 : Tasking.IsMatch(tx.Text) ? 3 : Scope.IsMatch(tx.Text) ? 4 : 3;
         int p = PrioOf(tx);
         if (p == 0) return 0;
         if (tx.Role == "Flight") return Brevity.IsMatch(tx.Text) ? 1 : p <= 1 || Tasking.IsMatch(tx.Text) ? 3 : 4;
@@ -2867,7 +2893,10 @@ static partial class Program
         if (!PiperWarm(model, scale, say, wav))
             Run(Path.Combine(Root, "tools", "piper", "piper.exe"), say, "--model", model, "--length_scale", scale, "--output_file", wav);
         double sec = 0;
-        try { using var r = new WaveFileReader(wav); sec = r.TotalTime.TotalSeconds; } catch (Exception e) { Trace("FEHLER", $"Piper-WAV {voice}: {e.GetType().Name}: {e.Message}"); }
+        for (int i = 0; ; i++)   // warm Piper reports the file before it closes it: otherwise 0.2 s transmission, call lost
+            try { using var r = new WaveFileReader(wav); sec = r.TotalTime.TotalSeconds; break; }
+            catch (IOException) when (i < 40) { Thread.Sleep(25); }
+            catch (Exception e) { Trace("FEHLER", $"Piper-WAV {voice}: {e.GetType().Name}: {e.Message}"); break; }
         // ponytail: Piper medium models deliver 22050 Hz; other rate -> pitch slightly different
         var pre = Math.Abs(pitch - 1) > 0.01 ? FormattableString.Invariant($"asetrate={22050 * pitch:0},atempo={1 / pitch:0.###},") : "";
         var graph = Cfg.RadioFx
@@ -2915,6 +2944,7 @@ static partial class Program
                     };
                     foreach (var a in new[] { "--model", model, "--length_scale", scale, "--json-input", "-q" }) psi.ArgumentList.Add(a);
                     e.P = Process.Start(psi)!;
+                    try { e.P.PriorityClass = ProcessPriorityClass.BelowNormal; } catch (Exception) { }   // onnxruntime takes all cores: DCS frames first
                     e.P.ErrorDataReceived += (_, _) => { };
                     e.P.BeginErrorReadLine();
                 }
@@ -2955,7 +2985,7 @@ static partial class Program
         try
         {
             using var p = Process.Start(psi)!;
-            if (exe.Contains("ExternalAudio")) try { p.PriorityClass = ProcessPriorityClass.High; } catch (Exception) { }   // steady rhythm, otherwise choppy when DCS maxes out the CPU
+            try { p.PriorityClass = exe.Contains("ExternalAudio") ? ProcessPriorityClass.High : ProcessPriorityClass.BelowNormal; } catch (Exception) { }   // ExternalAudio: steady rhythm, otherwise choppy when DCS maxes out the CPU; whisper/piper/ffmpeg: DCS frames first (stutter)
             if (stdin != null) { p.StandardInput.WriteLine(stdin); p.StandardInput.Close(); }
             var err = p.StandardError.ReadToEndAsync();
             var o = p.StandardOutput.ReadToEnd();
@@ -3270,6 +3300,14 @@ static partial class Program
     static void RadioTest()
     {
         Kneeboard.SelfTest();
+        // Etappe 1 (PLATZVERFAHREN-PLAN.md): Kutaisi from charts/caucasus.jsonc, CRPs as printed within 5 m of the old hand values, entries/exits/hand as before
+        var kc = Airfield.Kutaisi();
+        var oldCrp = new Dictionary<string, (double X, double Z)> { ["north"] = (-274941.1, 684425.5), ["south"] = (-292546.7, 688832.8), ["west"] = (-291835.5, 669472.3), ["east"] = (-280476.7, 697687.8) };
+        double crpErr = oldCrp.Max(o => Math.Sqrt(Math.Pow(kc.Crp[o.Key].X - o.Value.X, 2) + Math.Pow(kc.Crp[o.Key].Z - o.Value.Z, 2)));
+        if (crpErr > 5 || kc.PatternFt != 2000 || kc.MaxFt != 2200 || kc.Hand("07") != "right hand" || kc.Hand("25") != "left hand" || kc.Ramps.Length != 5 ||
+            string.Join(",", kc.Entry["07"].Select(e => e.Crp + "/" + e.Via)) != "north/overhead,south/initial,west/initial" || string.Join(",", kc.Exit["25"]) != "west,north,south")
+            throw new Exception($"Kartendaten Kutaisi: CRP {crpErr:F1} m, {kc.PatternFt}/{kc.MaxFt}, {kc.Ramps.Length} Vorfeldpunkte");
+        Console.WriteLine($"OK   Kartendaten Kutaisi: CRPs aus caucasus.jsonc ({crpErr:F1} m), Einflug/Ausflug/Platzrunde wie bisher");
         // Paths: Known Folder Saved Games with environment variable, Steam libraries from libraryfolders.vdf
         var home = Environment.GetEnvironmentVariable("USERPROFILE");
         var libs = SteamLibraries("\"libraryfolders\"\n{\n\t\"0\"\n\t{\n\t\t\"path\"\t\t\"C:\\\\Program Files (x86)\\\\Steam\"\n\t}\n\t\"1\"\n\t{\n\t\t\"path\"\t\t\"D:\\\\SteamLibrary\"\n\t\t\"label\"\t\t\"\"\n\t}\n}").ToList();
@@ -3302,6 +3340,59 @@ static partial class Program
         Airfield.LoadBeacons(new[] { ana }, DcsDir());
         if (ana.NdbText() != "AP 443 / P 215 / AN 443 / N 215") throw new Exception($"Beacons.lua: Anapa NDB \"{ana.NdbText()}\"");
         Console.WriteLine($"OK   Beacons.lua: Anapa NDB {ana.NdbText()}");
+        // Projection (charts/caucasus.jsonc): all Caucasus beacons, position vs. positionGeo
+        var geo = Regex.Matches(File.ReadAllText(Path.Combine(DcsDir(), "Mods", "terrains", "Caucasus", "Beacons.lua")),
+            @"position = \{ ([-\d.]+), [-\d.]+, ([-\d.]+) \};[\s\S]*?positionGeo = \{ latitude = ([-\d.]+), longitude = ([-\d.]+) \}");
+        double G(Match m, int i) => double.Parse(m.Groups[i].Value, CultureInfo.InvariantCulture);
+        double projErr = geo.Max(m => Airfield.Ll2Xz(G(m, 3), G(m, 4)) is var (x, z) ? Math.Sqrt(Math.Pow(x - G(m, 1), 2) + Math.Pow(z - G(m, 2), 2)) : 0);
+        if (geo.Count < 100 || projErr > 5) throw new Exception($"Projektion: {geo.Count} Baken, max. {projErr:F1} m");
+        Console.WriteLine($"OK   Projektion Kaukasus: {geo.Count} Baken aus Beacons.lua, max. {projErr:F1} m");
+    }
+
+    /// ChartTest (PLATZVERFAHREN-PLAN.md Etappe 2): every entry of charts/caucasus.jsonc fits the DCS data in airfields.txt.
+    static void ChartTest()
+    {
+        var file = Path.Combine(Root, "airfields.txt");
+        if (!File.Exists(file)) { Console.WriteLine("--   ChartTest: airfields.txt fehlt"); return; }
+        Airfield.ChartAll = true;
+        List<Airfield> all;
+        try { all = Airfield.Load(file); } finally { Airfield.ChartAll = false; }
+        var err = new List<string>();
+        foreach (var c in Airfield.Chart.EnumerateObject())
+        {
+            var f = all.FirstOrDefault(f => f.Name == c.Name);
+            if (f == null) { err.Add($"{c.Name}: nicht in airfields.txt"); continue; }
+            var ends = f.Ends.Select(e => e.Name).ToHashSet();
+            void Chk(bool ok, string what) { if (!ok) err.Add($"{f.Name}: {what}"); }
+            double Nm(double x, double z) => Math.Sqrt((x - f.X) * (x - f.X) + (z - f.Z) * (z - f.Z)) / 1852;
+            double ctrTop = c.Value.TryGetProperty("ctr_top_ft", out var ct) ? ct.GetDouble() : double.MaxValue;
+            Chk(f.PatternFt < f.MaxFt && f.MaxFt <= ctrTop, $"Höhen {f.PatternFt}/{f.MaxFt}/{ctrTop}");
+            if (c.Value.TryGetProperty("rwy", out var rwy))
+                foreach (var r in rwy.EnumerateObject())
+                {
+                    Chk(ends.Contains(r.Name), $"Bahn {r.Name} nicht in DCS ({string.Join(",", ends)})");
+                    if (r.Value.TryGetProperty("initial_nm", out var ini)) Chk(ini.GetDouble() is >= 1.5 and <= 6, $"initial_nm {r.Name}");
+                    foreach (var leg in new[] { "entry", "exit" })
+                        if (r.Value.TryGetProperty(leg, out var l))
+                            foreach (var x in l.EnumerateObject()) Chk(x.Value.TryGetProperty("crs", out var crs) && crs.GetDouble() is >= 1 and <= 360, $"{leg} {r.Name} {x.Name}: crs");
+                }
+            Chk(f.HandOf.Values.All(h => h is "left hand" or "right hand"), "hand");
+            foreach (var (k, p) in f.Crp) Chk(Nm(p.X, p.Z) is >= 3 and <= 11, $"CRP {k} {Nm(p.X, p.Z):F1} NM vom Platz");
+            if (f.Charted) foreach (var e in ends) Chk(f.Entry.ContainsKey(e) && f.Exit.ContainsKey(e), $"Bahn {e} ohne entry/exit");
+            foreach (var (rw, l) in f.Entry) foreach (var (crp, via) in l) Chk(f.Crp.ContainsKey(crp) && via is "initial" or "overhead", $"entry {rw} {crp}/{via}");
+            foreach (var (rw, l) in f.Exit) foreach (var crp in l) Chk(f.Crp.ContainsKey(crp), $"exit {rw} {crp}");
+            // holding points beside a runway (DCS runways can be shorter than charted: Batumi 2070 m vs. 2455 m)
+            foreach (var (k, h) in f.Holds)
+                Chk(h.Rwy.Length > 0 && h.Rwy.All(ends.Contains) && f.Ends.Any(e => Math.Abs((h.X - e.CX) * e.Dx + (h.Z - e.CZ) * e.Dz) < e.Len / 2 + 400 && Math.Abs((h.X - e.CX) * e.Dz - (h.Z - e.CZ) * e.Dx) < 400), $"Rollhalt {k}");
+            foreach (var r in f.Ramps)
+            {
+                Chk(Nm(r.X, r.Z) < 2, $"Vorfeld {r.Name} {Nm(r.X, r.Z):F1} NM vom Platz");
+                Chk(ends.All(r.To.ContainsKey) && r.To.Keys.Concat(r.Hold.Keys).Concat(r.Vacate.Keys).Concat(r.In.Keys).All(k => k == "*" || ends.Contains(k)), $"Vorfeld {r.Name}: Bahnschlüssel");
+                Chk(r.Hold.Values.All(f.Holds.ContainsKey), $"Vorfeld {r.Name}: Rollhalt unbekannt");
+            }
+        }
+        if (err.Count > 0) throw new Exception("ChartTest: " + string.Join(" | ", err));
+        Console.WriteLine($"OK   ChartTest: {Airfield.Chart.EnumerateObject().Count()} Plätze aus caucasus.jsonc passen zu airfields.txt");
     }
 
     /// Radio: confidence from Whisper JSON, priorities, "stand by" only on an occupied frequency (AI radio does not count).
@@ -4078,10 +4169,10 @@ static partial class Program
             }
             string Hint(string on, string mhz) => $"#Info:{L($"Du funkst auf {on} {mhz}. ", $"You are transmitting on {on} {mhz}. ")}Kutaisi Ground: 263.0 / 134.0";
             if (wr[0] != Hint("Tanker", "255.5") || wr[1] != Hint("AWACS", "251.5") || wr[2] != Hint("AWACS", "251.5") || wr[3] != Hint("Carrier", "127.5") || !wr[4].StartsWith("#Tanker:") || !wr[4].EndsWith("say again.")
-                || !wr[5].StartsWith("#AWACS:") || !wr[5].Contains("Kutaisi bears") || !wr[6].StartsWith("MENU;U6;tanker;Aerial-1;s#Tanker:") || !wr[7].StartsWith("MENU;U6;tanker;Aerial-1;s#Tanker:")
-                || !wr[7].EndsWith("report visual."))   // R304: DCS tanker silent (s), our tanker replies anyway
+                || !wr[5].StartsWith("#AWACS:") || !wr[5].Contains("Kutaisi bears") || !wr[6].StartsWith("#Tanker:") || !wr[7].StartsWith("#Tanker:") || !wr[7].Contains("continue")
+                || !wr[7].EndsWith("report visual."))   // TP6: the request presses no DCS menu (only the join), TP1: the second request does not restart
                 throw new Exception("Falsche Frequenz: " + string.Join(" || ", wr));
-            Console.WriteLine("OK   Falsche Frequenz: \"Request startup\" auf Tanker 255.5 (AWACS/Träger ebenso) -> kein DCS-Tankermenü, kein \"say again\", Hinweis \"Kutaisi Ground: 263.0 / 134.0\"; unbekanntes \"request …\" -> \"say again\" ohne Tankermenü; \"request rejoin\" drückt es weiter (s: DCS-Tanker stumm), unser Tanker antwortet (R304)");
+            Console.WriteLine("OK   Falsche Frequenz: \"Request startup\" auf Tanker 255.5 (AWACS/Träger ebenso) -> kein DCS-Tankermenü, kein \"say again\", Hinweis \"Kutaisi Ground: 263.0 / 134.0\"; unbekanntes \"request …\" -> \"say again\" ohne Tankermenü; \"request rejoin\" ohne Menüdruck (erst beim Join, TP6), zweiter Request -> \"continue\" (TP1)");
         }
         // Frequency selects the airfield (radio wheel/F10, without via): without SRS the nearest; only Batumi tuned -> Batumi despite nearer Kobuleti; two tuned -> running flow (not parked/logged out), otherwise the nearest;
         // selecting an airfield overrides that; called on Batumi (SRS state still old) applies until tuned away from the airfield
@@ -4248,7 +4339,7 @@ static partial class Program
     internal static readonly (string Id, string De, string En)[] Modules =
     {
         ("atc", "Flugsicherung", "Air traffic control"), ("range", "Schießplatz", "Range"), ("awacs", "AWACS", "AWACS"), ("tanker", "Tanker", "Tanker"),
-        ("carrier", "Flugzeugträger", "Carrier"), ("ai", "KI-Funk", "AI radio"), ("crew", "Bodenpersonal", "Ground crew"),
+        ("carrier", "Flugzeugträger", "Carrier"), ("ai", "KI-Funk", "AI radio"), ("crew", "Bodenpersonal", "Ground crew"), ("jtac", "JTAC / FAC(A)", "JTAC / FAC(A)"),
     };
     static HashSet<string>? Mods;
     internal static bool On(string m) => Mods == null || Mods.Contains(m);
@@ -4257,12 +4348,13 @@ static partial class Program
     {
         "Ground" or "Tower" or "Approach" or "Departure" or "ATIS" => On("atc"),
         "AWACS" or "Tanker" or "Range" or "Crew" => On(role.ToLowerInvariant()),
+        "JTAC" or "FACA" => On("jtac"),
         "Carrier" => On("carrier"), "Flight" => On("ai"), _ => true,
     };
     /// Radio wheel entry by its text: prefix = module, unprefixed = ATC (emergency, weather, ATIS); radio check, say again, debrief, settings always.
     internal static bool TextOn(string t) =>
         t.StartsWith("Range:") ? On("range") : t.StartsWith("AWACS:") ? On("awacs") && (t != "AWACS: vector to tanker" || On("tanker"))
-        : t.StartsWith("Tanker:") ? On("tanker") : t.StartsWith("Carrier:") ? On("carrier")
+        : t.StartsWith("Tanker:") ? On("tanker") : t.StartsWith("Carrier:") ? On("carrier") : t.StartsWith("JTAC:") ? On("jtac")
         : t is "radio check" or "say again" or "debrief" or "settings" || On("atc");
     internal static void LoadModules(string? text) =>
         Mods = text?.ToLowerInvariant().Split(new[] { ',', ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).ToHashSet();

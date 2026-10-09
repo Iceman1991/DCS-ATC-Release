@@ -368,7 +368,8 @@ do local g, tx = {}, {}   -- R390: F10 like the radio wheel – groups, wheel na
     and tx["Approach: traffic in sight"] and tx["Approach: report airspeed"] and tx["Tanker: visual"] and tx["Tanker: refuel complete"]
     and tx["Range: in hot"] == "In hot" and tx["Carrier: ball"] and tx["AWACS: checking in"] and tx["AWACS: bingo, RTB"] and tx["Tower: request S F O"] and tx["Approach: cancel approach"], "F10 Antwort-Einträge (R390)") end
 do local fh = realOpen(tmp .. "\\DcsAtc-Terrain-Caucasus-map.txt.tmp", "r"); assert(fh and fh:read("*l"):find("^Map;"), "Kartenraster (V15) fehlt"); fh:close() end
-for _, id in ipairs({ "23", "26" }) do local fh = realOpen(tmp .. "\\DcsAtc-Terrain-Caucasus-" .. id .. ".txt.tmp", "r"); assert(fh, "Platzraster " .. id .. " fehlt"); fh:close() end   -- one after another (queue)
+for _, id in ipairs({ "23", "26" }) do local fh = realOpen(tmp .. "\\DcsAtc-Terrain-Caucasus-" .. id .. ".txt.tmp", "r"); assert(fh, "Platzraster " .. id .. " fehlt"); local s = fh:read("*a") fh:close()
+  assert(select(2, s:gsub("\n", "")) == 62 and select(2, s:match("\n([^\n]*)"):gsub(",", "")) == 60, "Platzraster " .. id .. " nicht 61x61") end   -- one after another (queue)
 -- AI radio: AI Viper (flight frequency 141) fires AIM-120 at Bandit1 -> X;shot, Pitbull under 10 NM, Trashed without a hit; kill, ejection
 local vip = plane("Viper", 60000, 0); vip.air = true; vip.group = "Viper"
 vip.ammo = { { count = 4, desc = { category = 1, missileCategory = 1, guidance = 3 } }, { count = 2, desc = { category = 1, missileCategory = 1, guidance = 2 } }, { count = 500, desc = { category = 0 } } }

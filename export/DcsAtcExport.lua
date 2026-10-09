@@ -1,4 +1,4 @@
--- DCS-ATC: sends the state of the own aircraft (2x/s) and the air traffic in the vicinity (1x/s)
+-- DCS-ATC: sends the state of the own aircraft (2x/s) and the air traffic in the vicinity (1x/s, only without mission script)
 -- to the ATC app (UDP 127.0.0.1:18500). Loaded at the end of Saved Games\DCS\Scripts\Export.lua.
 local ok, err = pcall(function()
   package.path  = package.path  .. ";.\\LuaSocket\\?.lua"
@@ -8,6 +8,8 @@ local ok, err = pcall(function()
   udp:settimeout(0)
   local RANGE = 40000   -- Traffic within 40 km of the own aircraft
   local nextSelf, nextTraffic = 0, 0
+  local lfs = require("lfs")
+  local stateFile = (os.getenv("TMP") or os.getenv("TEMP") or "") .. "\\DcsAtc-State.txt"
 
   local function sendTraffic()
     local me = LoGetPlayerPlaneId and LoGetPlayerPlaneId()
@@ -50,7 +52,9 @@ local ok, err = pcall(function()
     end
     if t >= nextTraffic then
       nextTraffic = t + 1
-      pcall(sendTraffic)
+      -- mission script running (state file fresh): the app takes traffic from there; LoGetWorldObjects (every object in the world) only as fallback, it costs frame time
+      local m = lfs.attributes(stateFile, "modification")
+      if not (m and os.time() - m < 5) then pcall(sendTraffic) end
     end
   end
 end)

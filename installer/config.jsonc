@@ -28,7 +28,7 @@
 
   // Lotsen-Frequenzen (MHz) – alle gleich setzen = alles auf einer Frequenz
   "Frequencies": { "ATIS": 263.5, "Ground": 264.5, "Tower": 265.0, "Approach": 266.5,
-                   "Range": 267.5, "AWACS": 251.5, "Tanker": 255.5 },
+                   "Range": 267.5, "AWACS": 251.5, "Tanker": 255.5, "JTAC": 133.5 },
   "AwacsBullseye": true,     // AWACS-Picture und Lage-Updates an alle als Bullseye (Mission mit Bullseye); false = alles BRAA vom Spieler
   "AwacsNewGroupNm": 200,    // AWACS meldet neue Gruppen von selbst bis zu dieser Entfernung (40-200 NM), auch Umkreis für "picture clean"
   "Modulation": "AM",
@@ -43,13 +43,15 @@
     "Range": "en_US-ryan-medium@1.06",
     "AWACS": "en_GB-alan-medium|en_US-ljspeech-medium",   // AWACS/Träger ohne die Pilotenstimme (joe), damit man Lotse und Pilot hört
     "Tanker": "en_US-bryce-medium",
+    "JTAC": "en_US-ryan-medium@1.02",
+    "FACA": "en_US-bryce-medium@1.04",
     "Crew": "en_US-ryan-medium"   // Crew Chief am Parkplatz, spricht auf deinem Intercom
   },
   "PilotVoice": "en_US-joe-medium",   // spricht deine Menü-/Rad-Anfragen vor der Antwort, "" = aus
 
   "RadioFx": true,   // Funkklang: Bandpass, leises Rauschen, Squelch am Ende
   "Volume": 0.6,     // Lautstärke der Lotsen in SRS (0–1), zu laut/schmerzhaft -> kleiner
-  "AiFlightComms": "voll",   // KI-Flights im Funk (Fox, Splash, Defending, Bingo …): voll / taktisch / aus
+  "AiFlightComms": "voll",   // KI-Flights im Funk (Fox, Splash, Defending, Bingo …): voll / taktisch / aus
   "AiFollowAwacs": true,   // KI-Jäger fliegen die Gruppe an, die ihnen das AWACS zuweist, das AWACS weicht Bedrohungen aus; false: KI fliegt die Mission, der Funk folgt ihr
   "AiFlightRadiusNm": 60,     // nur KI im Umkreis eigener Spieler
   "AiOwnWingmen": false,      // eigene KI-Wingmen mitfunken lassen (DCS spricht sie schon selbst)

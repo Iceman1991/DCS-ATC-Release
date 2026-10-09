@@ -10,5 +10,5 @@
 
   // nur zur Anzeige im Rad
   "Frequencies": { "ATIS": 263.5, "Ground": 264.5, "Tower": 265.0, "Approach": 266.5,
-                   "Range": 267.5, "AWACS": 251.5, "Tanker": 255.5 }
+                   "Range": 267.5, "AWACS": 251.5, "Tanker": 255.5, "JTAC": 133.5 }
 }

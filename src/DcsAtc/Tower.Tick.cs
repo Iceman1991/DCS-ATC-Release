@@ -987,7 +987,7 @@ public partial class Tower
         double? ft = early ? null : dAlt + a.Vs * cf.Tc / Ft > 300 ? (down >= floor ? down : null) : up;
         // already assigned altitude separates 1000 ft on the same side: keep it (no new number at every warning)
         if (have is { } hv && ft is { } nf && Math.Abs(hv - itFt) >= 1000 && hv >= floor && hv > itFt == nf > itFt) ft = hv;
-        if (vec != null) { if (ft is { } f) vecFt = f; vecHdg = (my + turn + 360) % 360; lastVecSaid = now; }
+        if (vec != null) { if (ft is { } f) (vecFt, altFree) = (f, false); vecHdg = (my + turn + 360) % 360; lastVecSaid = now; }
         if (holding && ft is { } hf) holdFt = alertFt = hf;
         if (depClr && Phase == Phase.Departing && ft is { } df) depFt = df;   // R213: avoidance altitude applies (otherwise afterwards "check altitude, maintain" with the old departure altitude)
         lastHoldInfo = lastVector = now;
@@ -1019,8 +1019,8 @@ public partial class Tower
             return null;
         }
         if (Phase != Phase.Inbound && !Following && t.Vs > 2.5) return null;   // Departure in climb (ODP): terrain proximity is normal there, warn only in level flight/descent
-        // Radar vectoring/holding: assigned altitude (MVA-protected, holding circles, look-ahead point says nothing) applies; warning only below it (> 300 ft) and 20 s after a new instruction (reaction time)
-        if (Phase == Phase.Inbound && (holding ? holdFt : vec != null ? vecFt : 0) is > 0 and var asg && (IndFt(t) >= asg - 300 || now - lastVecSaid < 20)) return null;
+        // Radar vectoring/holding: assigned altitude (MVA-protected, holding circles, look-ahead point says nothing) applies; warning only below it (> 300 ft) and 20 s after the end of a new instruction (reaction time; first contact with vectors ~25 s of speech, ~2.5 words/s as the readback window)
+        if (Phase == Phase.Inbound && (holding ? holdFt : vec != null ? vecFt : 0) is > 0 and var asg && (IndFt(t) >= asg - 300 || now - lastVecSaid < 20 + (last?.Text.Split(' ').Length ?? 0) / 2.5)) return null;
         if (terr <= -1e6 || t.AltMsl / Ft >= terr + 500) return null;
         lowTold = true; lowSafe = -1;
         // R214: wake word first, "The MVA in your area is …" (FAA JO 7110.65 2-1-6 a)

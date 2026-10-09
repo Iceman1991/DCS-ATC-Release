@@ -18,7 +18,7 @@ class SimPilot
     readonly bool strict;
     readonly (double X, double Z) wind;
     public double X, Z, Alt, Hdg, Ias, Vs;           // m, m MSL, degrees true, m/s
-    double tHdg, tAlt, tIas, side = 1;               // side: traffic pattern 1 left, -1 right
+    double tHdg, tAlt, tIas, side = 1, tDir;         // side: traffic pattern 1 left, -1 right; tDir: "turn right" 1, "turn left" -1 (also the long way round)
     public string Mode = "hdg";                      // hdg: heading; loc: centerline; brk: initial to runway center, then break; dw: downwind; fin: base + final
     public string Rw = "";
     string icpt = "";
@@ -54,7 +54,7 @@ class SimPilot
     void Apply(string s, double now)
     {
         bool fixedTrack = Mode is "brk" or "dw" or "fin" || Mode == "loc" && Glide;   // Pattern/final: headings (PAR, steering) are advisory only
-        if (HdgOf(s) is { } h && !fixedTrack && !(Mode == "loc" && Tower.HdgDiff(h, F.End(Rw).Hdg) < 15)) { tHdg = h; Mode = "hdg"; Glide = false; }   // ≈ runway heading: stays on the centerline
+        if (HdgOf(s) is { } h && !fixedTrack && !(Mode == "loc" && Tower.HdgDiff(h, F.End(Rw).Hdg) < 15)) { tHdg = h; Mode = "hdg"; Glide = false; tDir = s.Contains("urn right") ? 1 : s.Contains("urn left") ? -1 : 0; }   // ≈ runway heading: stays on the centerline
         if (!strict && IcptRe.Match(s) is { Success: true } ic) icpt = RwOf(ic.Groups[1].Value);
         var alt = Regex.Replace(s, @"[Tt]raffic[^.]*?(?=advise you|\.|$)\.?", "");   // Traffic advisories ("..., 100 feet", "climbing through 1500 feet") are not an altitude instruction, the avoidance altitude in the safety alert ("advise you … climb to …", R214) is
         var fm = FtRe.Match(alt);
@@ -125,7 +125,10 @@ class SimPilot
         if (Mode == "orb") want = Hdg - 90;
         double bank = Mode is "dw" ? 60 : Mode == "fin" ? 45 : 30, rate = 9.81 * Math.Tan(bank * Math.PI / 180) / tas * 180 / Math.PI;
         if (Landed) want = e!.Hdg;
-        Hdg = (Hdg + Math.Clamp(((want - Hdg) % 360 + 540) % 360 - 180, -rate, rate) + 360) % 360;
+        double dt = ((want - Hdg) % 360 + 540) % 360 - 180;
+        if (Mode == "hdg" && tDir * dt < 0 && Math.Abs(dt) > 2 * rate) dt += 360 * tDir;   // the announced way round
+        if (Math.Abs(dt) <= rate) tDir = 0;
+        Hdg = (Hdg + Math.Clamp(dt, -rate, rate) + 360) % 360;
         Ias += Math.Clamp(tIas - Ias, -1, 1);
         double ta = tAlt;
         bool gl = e != null && (Mode == "fin" || Mode == "loc" && Glide);
@@ -213,6 +216,9 @@ public partial class Tower
         double x = f.X + 38 * NM * Math.Cos(dir * Math.PI / 180), z = f.Z + 38 * NM * Math.Sin(dir * Math.PI / 180);
         double ft = Math.Max(10000, Math.Ceiling(f.MvaLeg(x, z, f.X, f.Z) / 1000) * 1000);   // like a pilot: above the minimum altitude of the direct route
         var p = new SimPilot(f, x, z, ft * Ft, Bearing(x, z, f.X, f.Z), 300 * Kt, wind, strict);
+        // ANFLUGSTART=x,z,ft,hdg,kt: start from a logged position ([TEL] line) instead of 38 NM out
+        if (Environment.GetEnvironmentVariable("ANFLUGSTART")?.Split(',').Select(s => double.Parse(s, System.Globalization.CultureInfo.InvariantCulture)).ToArray() is [var sx, var sz, var sf, var sh, var sk])
+            p = new SimPilot(f, sx, sz, sf * Ft, sh, sk * Kt, wind, strict);
         var tw = new Tower(f, "Enfield 1-1") { FieldWind = wind };
         var none = new List<Traffic>();
         var log = new List<string>();

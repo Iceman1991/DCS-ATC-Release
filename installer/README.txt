@@ -1,4 +1,4 @@
-DCS-ATC 0.9.9 ALPHA – talking air traffic control for DCS World (all maps, tested on Caucasus)
+DCS-ATC 0.12.0 ALPHA – talking air traffic control for DCS World (all maps, tested on Caucasus)
 ========================================================================
 
 !! ALPHA VERSION !!
@@ -9,10 +9,10 @@ DCS-ATC 0.9.9 ALPHA – talking air traffic control for DCS World (all maps, tes
   Unofficial fan project, not affiliated with Eagle Dynamics or the SRS project.
 
 What it does
-  Tower, Ground, Approach, ATIS, AWACS, tanker and crew chief talk to you over SRS – at every airfield
+  Tower, Ground, Approach, ATIS, AWACS, tanker, JTAC and crew chief talk to you over SRS – at every airfield
   of every DCS map, completely offline (speech recognition and voices run on your PC).
   Plus ground crew with fuel/ammo trucks and carrier radio (Marshal, Tower, LSO) for carriers in the mission.
-  DCS-ATC spawns no aircraft: it only does the radio for the AWACS, tankers and traffic of your mission (also when spawned later).
+  DCS-ATC spawns no aircraft: it only does the radio for the AWACS, tankers, JTACs and traffic of your mission (also when spawned later).
   Works in any mission on any map, multiplayer too. In VR the radio wheel shows as text in the game.
 
 Requirements
@@ -29,7 +29,7 @@ Installation
      MissionScripting.lua (see "What setup changes in DCS").
   2. At the end, "Set keys": key for the radio wheel and push-to-talk (keyboard or HOTAS).
   3. Done. From now on DCS-ATC starts with every mission by itself (small window in the taskbar).
-  Modules: "Custom" lets you untick parts you don't need (ATC, Range, AWACS, Tanker, Carrier, AI radio,
+  Modules: "Custom" lets you untick parts you don't need (ATC, Range, AWACS, Tanker, JTAC, Carrier, AI radio,
   ground crew), e.g. when a real player runs the AWACS. You can change this later in the settings window.
   Language: the setup asks for the language at the start (German or English). To change the language
   of the program and menus later, simply run the setup again and choose the other language.
@@ -38,7 +38,7 @@ Usage
   1. Start DCS, fly any mission.
   2. Radios in SRS (AM): each airfield on its DCS frequency (as on the F10 map), Ground, Tower and Approach
      shared, UHF or VHF – e.g. Kutaisi 263.0 / 134.0, Senaki 261.0 / 132.0, Batumi 260.0 / 131.0.
-     The radio wheel shows the frequency of the current airfield. Also: ATIS 263.5 · AWACS 251.5 · Tanker 255.5
+     The radio wheel shows the frequency of the current airfield. Also: ATIS 263.5 · AWACS 251.5 · Tanker 255.5 · JTAC 133.5
   3. Talk: SRS push-to-talk on the frequency, in English, e.g.
        "Kutaisi Ground, Enfield 1-1, request startup"  ·  "Overlord, Enfield 1-1, request picture"
      Or without talking: radio wheel with the ' (apostrophe) key or F10 menu -> ATC.

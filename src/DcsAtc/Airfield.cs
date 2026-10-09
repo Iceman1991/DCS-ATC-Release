@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace DcsAtc;
@@ -12,8 +13,8 @@ public record RwyEnd(string Name, double ThrX, double ThrZ, double Hdg, double L
     public (double X, double Z) At(double a, double l) => (ThrX - a * Dx + l * Dz, ThrZ - a * Dz - l * Dx);
 }
 
-/// Apron with taxiway to runway 07 / 25 (Kutaisi only, from the Aerodrome Chart).
-public record Ramp(string Name, double X, double Z, string To07, string To25);
+/// Apron point from the chart data (charts/caucasus.jsonc): per runway taxiway to it (To), vacate instruction after landing (Vacate), taxiway back (In, "*" = any runway).
+public record Ramp(string Name, double X, double Z, Dictionary<string, string> To, Dictionary<string, string> Hold, Dictionary<string, string> Vacate, Dictionary<string, string> In);
 
 public class Airfield
 {
@@ -55,8 +56,12 @@ public class Airfield
     public List<RwyEnd> Ends = new();
     public Dictionary<string, (double X, double Z)> Crp = new();   // Compulsory reporting points (map only)
     public Ramp[] Ramps = Array.Empty<Ramp>();
+    public Dictionary<string, (double X, double Z, string[] Rwy)> Holds = new();   // Named holding points (map)
+    public Dictionary<string, string> HandOf = new();                          // Runway -> "right hand"/"left hand" (map)
+    public Dictionary<string, List<(string Crp, string Via)>> Entry = new();   // Runway -> entry CRPs (last = default without position), via "overhead"/"initial"
+    public Dictionary<string, List<string>> Exit = new();                      // Runway -> exit CRPs (first = default)
     public List<(double X, double Z, int Num, int Type)> Spots = new();   // Parking positions from DCS (Airbase:getParking): Term_Index, Term_Type (16 runway, 40 helicopter)
-    public bool Charted => Crp.Count > 0;     // Kutaisi: procedures per DCS kneeboard chart
+    public bool Charted => Crp.Count > 0;     // procedures per DCS kneeboard chart (charts/caucasus.jsonc)
     /// A100: control zone (ICAO Annex 11): with map, farthest CRP + 0.5 NM (Kutaisi about 9 NM), otherwise 5 NM; up to 3000 ft above the airfield.
     public double CtrNm => Charted ? Crp.Values.Max(p => Math.Sqrt((p.X - X) * (p.X - X) + (p.Z - Z) * (p.Z - Z))) / 1852 + 0.5 : 5;
     public double CtrTopFt => Elev / Ft + 3000;
@@ -140,13 +145,10 @@ public class Airfield
         return m;
     }
 
-    /// Kutaisi: pattern always south (07 right, 25 left). Otherwise left, unless on the right the terrain in the pattern is more than 300 ft lower
+    /// Map: as charted (Kutaisi always south: 07 right, 25 left). Otherwise left, unless on the right the terrain in the pattern is more than 300 ft lower
     /// (downwind 1.5 NM abeam to 2 NM before the threshold, base).
-    public string Hand(string rw)
-    {
-        if (Charted) return rw == "07" ? "right hand" : "left hand";
-        return SideFt(rw, -1) < SideFt(rw, 1) - 300 ? "right hand" : "left hand";
-    }
+    public string Hand(string rw) =>
+        HandOf.TryGetValue(rw, out var h) ? h : SideFt(rw, -1) < SideFt(rw, 1) - 300 ? "right hand" : "left hand";
 
     /// Highest terrain (ft) of the pattern on one side (1 left, -1 right): downwind 1.5 NM abeam to 2 NM before the threshold, base.
     double SideFt(string rw, int s)
@@ -169,22 +171,66 @@ public class Airfield
         double cx = (t07x + t25x) / 2, cz = (t07z + t25z) / 2;
         return new Airfield
         {
-            Name = "Kutaisi", X = cx, Z = cz, Elev = 45, MagVar = 6, PatternFt = 2000, MaxFt = 2200, Main = "25",   // DCS getRunways: "25"
+            Name = "Kutaisi", X = cx, Z = cz, Elev = 45, MagVar = 6, Main = "25",   // DCS getRunways: "25"
             Ends = { new("07", t07x, t07z, h07, len, cx, cz), new("25", t25x, t25z, h07 + 180, len, cx, cz) },
-            Crp =
+        }.ApplyChart();
+    }
+
+    // ------------------------------------------------------------------ Kneeboard chart data (charts/caucasus.jsonc, PLATZVERFAHREN-PLAN.md)
+    static JsonDocument? chart;
+    internal static JsonElement Chart => (chart ??= JsonDocument.Parse(typeof(Airfield).Assembly.GetManifestResourceStream("caucasus.jsonc")!,
+        new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true })).RootElement;
+
+    /// Procedures from the chart data if the airfield is in there; without entry everything stays as before (E5).
+    /// Until Etappe 3/4 arm them, only Kutaisi is applied; ChartAll (ChartTest) loads all entries.
+    public static bool ChartAll;
+    public Airfield ApplyChart()
+    {
+        if (Name != "Kutaisi" && !ChartAll || !Chart.TryGetProperty(Name, out var a)) return this;
+        static Dictionary<string, string> Strs(JsonElement e, string key) =>
+            e.TryGetProperty(key, out var v) ? v.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString()!) : new();
+        if (a.TryGetProperty("pattern_ft", out var p)) PatternFt = p.GetDouble();
+        if (a.TryGetProperty("arrdep_max_ft", out var m)) MaxFt = m.GetDouble();
+        if (a.TryGetProperty("crp", out var crp)) foreach (var c in crp.EnumerateObject()) Crp[c.Name] = Pos(c.Value);
+        if (a.TryGetProperty("rwy", out var rwy))
+            foreach (var r in rwy.EnumerateObject())
             {
-                ["north"] = (-274941.1, 684425.5), ["south"] = (-292546.7, 688832.8),
-                ["west"] = (-291835.5, 669472.3), ["east"] = (-280476.7, 697687.8),
-            },
-            Ramps = new Ramp[]
+                if (r.Value.TryGetProperty("hand", out var h)) HandOf[r.Name] = h.GetString() + " hand";
+                if (r.Value.TryGetProperty("entry", out var en)) Entry[r.Name] = en.EnumerateObject().Select(e => (e.Name, e.Value.GetProperty("via").GetString()!)).ToList();
+                if (r.Value.TryGetProperty("exit", out var ex)) Exit[r.Name] = ex.EnumerateObject().Select(e => e.Name).ToList();
+            }
+        if (a.TryGetProperty("ground", out var g) && g.TryGetProperty("holds", out var holds))
+            foreach (var h in holds.EnumerateObject()) { var (x, z) = Pos(h.Value.GetProperty("pos")); Holds[h.Name] = (x, z, h.Value.GetProperty("rwy").EnumerateArray().Select(v => v.GetString()!).ToArray()); }
+        if (a.TryGetProperty("ground", out g) && g.TryGetProperty("ramps", out var ramps))
+            Ramps = ramps.EnumerateObject().SelectMany(r =>
             {
-                new("Ramp North", -284246.6, 683966.5, "November, Alpha", "November, Delta"),
-                new("Ramp North", -284870.8, 682749.8, "November, Alpha", "November, Delta"),
-                new("Ramp West", -284527.8, 682377.9, "Alpha", "November, Delta"),
-                new("Ramp South", -285894.4, 683024.9, "Whiskey", "Whiskey, Sierra, Echo"),
-                new("Ramp East", -284727.6, 685163.4, "Echo, Sierra, Whiskey", "Echo"),
-            },
-        };
+                var (to, hold, vac, inb) = (Strs(r.Value, "to"), Strs(r.Value, "hold"), Strs(r.Value, "vacate"), Strs(r.Value, "in"));
+                return r.Value.GetProperty("pts").EnumerateArray().Select(q => { var (x, z) = Pos(q); return new Ramp(r.Name, x, z, to, hold, vac, inb); });
+            }).ToArray();
+        return this;
+    }
+
+    /// Point as printed ("42°15.924'N 042°30.086'E") or DCS [x, z].
+    static (double X, double Z) Pos(JsonElement v)
+    {
+        if (v.ValueKind == JsonValueKind.Array) return (v[0].GetDouble(), v[1].GetDouble());
+        var m = Regex.Match(v.GetString()!, @"(\d+)°([\d.]+)'([NS])\s+(\d+)°([\d.]+)'([EW])");
+        if (!m.Success) throw new FormatException("Kartenkoordinate: " + v.GetString());
+        double D(int i) => double.Parse(m.Groups[i].Value, CultureInfo.InvariantCulture);
+        return Ll2Xz((D(1) + D(2) / 60) * (m.Groups[3].Value == "S" ? -1 : 1), (D(4) + D(5) / 60) * (m.Groups[6].Value == "W" ? -1 : 1));
+    }
+
+    /// WGS84 -> DCS Caucasus (Transverse Mercator lon_0 33°, k0 0.9996, Snyder series; selftest against Beacons.lua: 164 beacons under 1 m).
+    public static (double X, double Z) Ll2Xz(double lat, double lon)
+    {
+        const double a = 6378137, f = 1 / 298.257223563, k0 = 0.9996, e2 = f * (2 - f), ep2 = e2 / (1 - e2);
+        double p = lat * Math.PI / 180, s = Math.Sin(p), c = Math.Cos(p), t = Math.Tan(p);
+        double n = a / Math.Sqrt(1 - e2 * s * s), T = t * t, C = ep2 * c * c, A = (lon - 33) * Math.PI / 180 * c;
+        double M = a * ((1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 * e2 * e2 / 256) * p - (3 * e2 / 8 + 3 * e2 * e2 / 32 + 45 * e2 * e2 * e2 / 1024) * Math.Sin(2 * p)
+                        + (15 * e2 * e2 / 256 + 45 * e2 * e2 * e2 / 1024) * Math.Sin(4 * p) - 35 * e2 * e2 * e2 / 3072 * Math.Sin(6 * p));
+        double east = k0 * n * (A + (1 - T + C) * Math.Pow(A, 3) / 6 + (5 - 18 * T + T * T + 72 * C - 58 * ep2) * Math.Pow(A, 5) / 120);
+        double north = k0 * (M + n * t * (A * A / 2 + (5 - T + 9 * C + 4 * C * C) * Math.Pow(A, 4) / 24 + (61 - 58 * T + T * T + 600 * C - 330 * ep2) * Math.Pow(A, 6) / 720));
+        return (north - 4998115, east - 99517);
     }
 
     // ------------------------------------------------------------------ all others: data from DCS (Airbase:getRunways)
@@ -229,7 +275,7 @@ public class Airfield
         return f;
     }
 
-    /// File from the mission script: "A;Name;x;z;elev" followed by "R;Name;course;x;z;length". Kutaisi always from the map.
+    /// File from the mission script: "A;Name;x;z;elev" followed by "R;Name;course;x;z;length". Kutaisi always from the map, Caucasus airfields with chart data get it (ApplyChart).
     public static List<Airfield> Load(string? file)
     {
         var list = new List<Airfield> { Kutaisi() };
@@ -242,7 +288,7 @@ public class Airfield
         void Flush()
         {
             if (name == "Kutaisi") list[0].Spots = spots.ToList();
-            else if (name != null && rw.Count > 0) { var f = FromDcs(name, ax, az, el, rw); f.Id = id; f.Side = side; f.Spots = spots.ToList(); list.Add(f); }
+            else if (name != null && rw.Count > 0) { var f = FromDcs(name, ax, az, el, rw); if (Theatre == "Caucasus") f.ApplyChart(); f.Id = id; f.Side = side; f.Spots = spots.ToList(); list.Add(f); }
             spots.Clear();
             rw.Clear();
         }

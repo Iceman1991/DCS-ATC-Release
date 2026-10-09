@@ -87,7 +87,7 @@ local function start()
   local function textOn(t)   -- like Program.TextOn (radio wheel): prefix = module, unprefixed = ATC; radio check, say again, debrief always
     local p = t:match("^(%a+):")
     if p == "Range" then return on("range") elseif p == "AWACS" then return on("awacs") and (not t:find("tanker") or on("tanker"))
-    elseif p == "Tanker" then return on("tanker") elseif p == "Carrier" then return on("carrier") end
+    elseif p == "Tanker" then return on("tanker") elseif p == "Carrier" then return on("carrier") elseif p == "JTAC" then return on("jtac") end
     return t == "radio check" or t == "say again" or t == "debrief" or on("atc")
   end
   local onOpt = {}   -- [name] = function() – apply immediately
@@ -204,10 +204,15 @@ local function start()
       { L("Verkehr", "Traffic"), nil, { { "Traffic in sight", "Approach: traffic in sight" }, { "Negative contact", "Approach: negative contact" } } },
       { "C R P", "Approach: C R P" },
       { L("Mehr", "More"), nil, {
-        { L("Fahrt melden", "Report airspeed"), "Approach: report airspeed" }, { "Say again", "Approach: say again" }, { "Request higher", "Approach: request higher" } } } } },
+        { L("Fahrt melden", "Report airspeed"), "Approach: report airspeed" }, { "Say again", "Approach: say again" }, { "Request higher", "Approach: request higher" },
+        { "Leaving the zone", "Approach: leaving the control zone" } } } } },   -- R7 / N3
     { "Range", nil, {
       { "Check in", "Range: checking in" }, { "IP inbound", "Range: IP inbound" }, { "In hot", "Range: in hot" }, { "Off safe", "Range: off safe" },
       { "Check out", "Range: checking out" }, { "Check out, hung ordnance", "Range: checking out, hung ordnance" } }, need = "range" },
+    { "JTAC", nil, {   -- J11: only if the own side has a JTAC / FAC(A) in the mission
+      { "Check in", "JTAC: checking in" }, { "Ready to copy", "JTAC: ready to copy" }, { "Readback", "JTAC: readback" },
+      { "Request mark", "JTAC: request mark" }, { "Tally", "JTAC: tally target" }, { "In", "JTAC: in" }, { "Off", "JTAC: off" },
+      { "Laser on", "JTAC: laser on" }, { "Check out", "JTAC: checking out" } }, need = "jtac" },
     { "AWACS / Tanker", nil, {
       { "AWACS", nil, {
         { "Check in", "AWACS: checking in" }, { "Picture", "AWACS: request picture" }, { "Bogey dope", "AWACS: bogey dope" }, { "Sort", "AWACS: request sort" },
@@ -219,7 +224,7 @@ local function start()
           { "Winchester", "AWACS: winchester" }, { "Bingo, RTB", "AWACS: bingo, RTB" }, { "Say again", "AWACS: say again" } } } } },
       { "Tanker", nil, {
         { "Request rejoin", "Tanker: request rejoin" }, { "Visual", "Tanker: visual" }, { "Observation", "Tanker: observation" },
-        { "Pre-contact", "Tanker: pre contact" }, { "Refuel complete", "Tanker: refuel complete" } } } } },
+        { "Pre-contact", "Tanker: pre contact" }, { "Refuel complete", "Tanker: refuel complete" }, { "Say position", "Tanker: say position" } } } } },
     { "Carrier", nil, {
       { "Marshal check in", "Carrier: Marshal, checking in" }, { "See you at", "Carrier: see you at angels" },
       { "Initial", "Carrier: initial" }, { "Commencing", "Carrier: commencing" }, { "Platform", "Carrier: platform" },
@@ -282,7 +287,8 @@ local function start()
   local function addItems(gid, parent, items, gname, unit, u)
     for _, c in ipairs(items) do
       local a = { gid = gid, gname = gname, unit = unit, text = c[2] }
-      if c.need and not HAS[c.need] then   -- Range / Carrier only if the mission has one
+      local h = c.need and HAS[c.need]   -- true, or function(side) (JTAC: own side has a living leader)
+      if c.need and not (h == true or type(h) == "function" and h(u:getCoalition())) then   -- Range / Carrier / JTAC only if the mission has one
       elseif c[3] then addItems(gid, missionCommands.addSubMenuForGroup(gid, c[1], parent), c[3], gname, unit, u)
       elseif c[4] then   -- Emergency: submenu with the type (like the radio wheel), position/altitude/heading added by the app
         local k = missionCommands.addSubMenuForGroup(gid, c[1], parent)
@@ -451,7 +457,9 @@ local function start()
       if not (isAi(u) or isAi(t)) then return end
       local ty = ""
       pcall(function() ty = clean(t:getTypeName()) end)
-      evt(string.format("X;kill;%s;%s;%s;%s;%s;%d", uname(u), gname(u), uname(t), gname(t), ty, air(t) and 1 or 0))
+      local tc = 0
+      pcall(function() tc = t:getCoalition() end)
+      evt(string.format("X;kill;%s;%s;%s;%s;%s;%d;%d", uname(u), gname(u), uname(t), gname(t), ty, air(t) and 1 or 0, tc))   -- J9: victim side for check fire
     elseif e.id == E.S_EVENT_EJECTION then
       if not air(u) then return end   -- also players (N45): the app finds the player via the unit
       local p = u:getPoint()
@@ -759,38 +767,38 @@ local function start()
   end
 
   -- Terrain around airfields (minimum altitudes of radar vectoring): grid 1 NM, ±30 NM, per cell highest of 3×3 points.
-  -- Airfields near players first and every mission anew, the rest once per map (file missing); one after another, 4 lines per 0.1 s.
+  -- Airfields near players first and every mission anew, the rest once per map (file missing); one after another.
   -- File %TMP%\DcsAtc-Terrain-<map>-<Id>.txt
+  -- n×n cells from x0/z0, per cell highest of 3×3 points; at most 1.5 ms per 0.1 s (land.getHeight in bulk = stutter), done(rows) at the end
+  local function grid(x0, z0, cell, n, done)
+    local rows, r, i, j = {}, {}, 0, 0
+    timer.scheduleFunction(function()
+      local t0 = os.clock()
+      while os.clock() - t0 < 0.0015 do
+        if i >= n then done(table.concat(rows, "\n")) return nil end
+        local m = 0
+        for a = 0, 2 do for b = 0, 2 do
+          local h = land.getHeight({ x = x0 + (i + a / 2) * cell, y = z0 + (j + b / 2) * cell })
+          if h > m then m = h end
+        end end
+        r[#r + 1] = string.format("%.0f", m)
+        j = j + 1
+        if j >= n then rows[#rows + 1] = table.concat(r, ","); r, i, j = {}, i + 1, 0 end
+      end
+      return timer.getTime() + 0.1
+    end, nil, timer.getTime() + 0.1)
+  end
   local terrainDone, terrainQ, terrainBusy = {}, {}, false
   local function terrainFile(f) return TMP .. "\\DcsAtc-Terrain-" .. tostring(env.mission.theatre) .. "-" .. f.id .. ".txt" end
   local function terrainNext()
     local f = table.remove(terrainQ, 1)
     terrainBusy = f ~= nil
     if not f then return end
-    local n, cell = 61, NM
-    local x0, z0 = f.p.x - 30 * NM, f.p.z - 30 * NM
-    local rows, i = {}, 0
-    timer.scheduleFunction(function()
-      for _ = 1, 4 do
-        if i >= n then
-          writeFile(terrainFile(f), string.format("%s;%.1f;%.1f;%.1f;%d\n", f.name, x0, z0, cell, n) .. table.concat(rows, "\n") .. "\n")
-          terrainNext()
-          return nil
-        end
-        local r = {}
-        for j = 0, n - 1 do
-          local m = 0
-          for a = 0, 2 do for b = 0, 2 do
-            local h = land.getHeight({ x = x0 + (i + a / 2) * cell, y = z0 + (j + b / 2) * cell })
-            if h > m then m = h end
-          end end
-          r[#r + 1] = string.format("%.0f", m)
-        end
-        rows[#rows + 1] = table.concat(r, ",")
-        i = i + 1
-      end
-      return timer.getTime() + 0.1
-    end, nil, timer.getTime() + 0.1)
+    local n, x0, z0 = 61, f.p.x - 30 * NM, f.p.z - 30 * NM
+    grid(x0, z0, NM, n, function(rows)
+      writeFile(terrainFile(f), string.format("%s;%.1f;%.1f;%.1f;%d\n", f.name, x0, z0, NM, n) .. rows .. "\n")
+      terrainNext()
+    end)
   end
   local function terrainFor(f, first)
     if terrainDone[f.id] then return end
@@ -819,27 +827,7 @@ local function start()
     local cell = 2 * NM
     x0, z0 = x0 - 60 * NM, z0 - 60 * NM
     local n = math.ceil(math.max(x1 - x0, z1 - z0) / cell + 60 * NM / cell)
-    local rows, i = {}, 0
-    timer.scheduleFunction(function()
-      for _ = 1, 2 do
-        if i >= n then
-          writeFile(file, string.format("Map;%.1f;%.1f;%.1f;%d\n", x0, z0, cell, n) .. table.concat(rows, "\n") .. "\n")
-          return nil
-        end
-        local r = {}
-        for j = 0, n - 1 do
-          local m = 0
-          for a = 0, 2 do for b = 0, 2 do
-            local h = land.getHeight({ x = x0 + (i + a / 2) * cell, y = z0 + (j + b / 2) * cell })
-            if h > m then m = h end
-          end end
-          r[#r + 1] = string.format("%.0f", m)
-        end
-        rows[#rows + 1] = table.concat(r, ",")
-        i = i + 1
-      end
-      return timer.getTime() + 0.1
-    end, nil, timer.getTime() + 1)
+    grid(x0, z0, cell, n, function(rows) writeFile(file, string.format("Map;%.1f;%.1f;%.1f;%d\n", x0, z0, cell, n) .. rows .. "\n") end)
   end
   timer.scheduleFunction(function() pcall(mapTerrain) pcall(allTerrain) return nil end, nil, timer.getTime() + 15)
 
@@ -1214,13 +1202,20 @@ local function start()
   -- KF6 (LK14): hostile radars (aircraft, SAMs on the ground and on ships) tracking an AI flyer (unit:getRadar() -> on, tracked object).
   -- Newly locked: "X;spike;target;emitter type;air|sam;x;z" (x/z = emitter), no radar on the target anymore: "X;naked;target". Only on change; AWACS/EWR (search radar) not.
   local spiked = {}   -- Target -> { Emitter = true }
+  local radarOf = {}   -- unit id -> has a radar at all: getRadar on hundreds of ground units without one every 2 s costs frame time
+  local function hasRadar(e)
+    local k = e.id_ or e:getName()
+    if radarOf[k] == nil then local ok, r = pcall(function() return e:hasSensors(Unit.SensorType.RADAR) end) radarOf[k] = not ok or r == true end
+    return radarOf[k]
+  end
   local function spikes()
     local now = {}
     for side = 1, 2 do
       for _, cat in ipairs({ Group.Category.AIRPLANE, Group.Category.GROUND, Group.Category.SHIP }) do
         for _, g in ipairs(coalition.getGroups(side, cat) or {}) do
           for _, e in ipairs(g:getUnits() or {}) do
-            local ok, on, o = pcall(e.getRadar, e)
+            local ok, on, o = false
+            if hasRadar(e) then ok, on, o = pcall(e.getRadar, e) end
             if ok and on and o and isAi(o) and o:getCoalition() ~= side and not (e:hasAttribute("AWACS") or e:hasAttribute("EWR")) then
               local t, en = uname(o), uname(e)
               now[t] = now[t] or {}
@@ -1236,6 +1231,207 @@ local function start()
     end
     for t in pairs(spiked) do if not now[t] then evt("X;naked;" .. t) end end
     spiked = now
+  end
+
+  -- JTAC / FAC(A) (JTAC-PLAN J1-J4): leaders from the mission editor (E1), visible enemy groups, MARK / LASE / LASEOFF ---------
+  local jLeaders, jBy, jNav, jQ, jQTime = {}, {}, {}, {}, -100   -- jBy: clean id -> leader; jQ: cached Q lines (every 2 s)
+  local FACCS = { "Axeman", "Darknight", "Warrior", "Pointer", "Eyeball", "Moonbeam", "Whiplash", "Finger", "Pinpoint", "Ferret",
+    "Shaba", "Playboy", "Hammer", "Jaguar", "Deathstar", "Anvil", "Firefly", "Mantis", "Badger" }   -- DCS FAC callname index
+  local FACT = { FAC = true, FAC_AttackGroup = true, FAC_EngageGroup = true }
+  local function facScan(t, acc)   -- route/task tree: first values of the FAC tasks (also inside ComboTask)
+    for _, v in pairs(t) do
+      if type(v) == "table" then
+        if FACT[v.id] then
+          acc.has = true
+          for _, k in ipairs({ "frequency", "modulation", "callname", "laserCode", "code" }) do
+            if acc[k] == nil and type(v.params) == "table" then acc[k] = v.params[k] end
+          end
+        end
+        facScan(v, acc)
+      end
+    end
+  end
+  if on("jtac") then pcall(function()
+    for sideName, coa in pairs(env.mission.coalition or {}) do
+      local side = sideName == "red" and 1 or sideName == "blue" and 2
+      if side then
+        for _, ctry in pairs(coa.country or {}) do
+          for _, cat in ipairs({ "vehicle", "plane", "helicopter" }) do
+            for _, g in pairs(ctry[cat] and ctry[cat].group or {}) do
+              local name = tostring(g.name or "")
+              local up, ground, acc, kind = name:upper(), cat == "vehicle", {}, nil
+              pcall(facScan, g.route or {}, acc)
+              if slots[name] then kind = nil   -- player flight is never a leader
+              elseif up:find("FACA") then kind = "faca"
+              elseif ground then kind = (acc.has or up:find("JTAC")) and "jtac" or nil
+              else kind = (acc.has or g.task == "AFAC" or up:find("JTAC")) and "faca" or nil end
+              if kind and not jBy[clean(name)] then
+                local f = tonumber(acc.frequency)
+                if f and f > 1e6 then f = f / 1e6 end   -- editor stores Hz
+                local L = { name = name, kind = kind, side = side, range = kind == "faca" and 15000 or 8000,
+                  cs = FACCS[tonumber(acc.callname) or 0] or FACCS[(#jLeaders % #FACCS) + 1],
+                  freq = f and f > 0 and string.format("%.3f", f) or "", mod = f and f > 0 and (tonumber(acc.modulation) == 1 and "FM" or "AM") or "",
+                  code = tostring(tonumber(acc.laserCode or acc.code) or "") }
+                jLeaders[#jLeaders + 1] = L
+                jBy[clean(name)] = L
+                log(string.format("JTAC/FAC(A): %s %s '%s' side %d freq %s code %s", kind, L.cs, name, side, L.freq, L.code))
+              end
+            end
+          end
+        end
+      end
+      for _, n in pairs(side and coa.nav_points or {}) do   -- N: navigation points (IP/BP for the 9-line)
+        local nm = n.callsignStr or n.text or n.comment
+        if nm and n.x and n.y then jNav[#jNav + 1] = string.format("N;%d;%s;%.1f;%.1f", side, clean(nm), n.x, n.y) end   -- editor y = DCS z
+      end
+    end
+  end) end
+  HAS.jtac = function(side)   -- F10 JTAC group: own side has a leader that is not dead
+    for _, L in ipairs(jLeaders) do if L.side == side and not L.dead then return true end end
+    return false
+  end
+  local function jUnit(L)   -- first living unit of the leader group
+    local g = Group.getByName(L.name)
+    for _, u in ipairs(g and g:getUnits() or {}) do
+      if u:isExist() and u:getLife() >= 1 then return u end
+    end
+  end
+  local function jSee(L, lu, p)   -- sight model per role: JTAC from +2 m above ground, 8 km; FAC(A) from the aircraft, 15 km
+    local lp = lu:getPoint()
+    if d2(lp, p) > L.range ^ 2 then return false end
+    return land.isVisible(L.kind == "faca" and lp or { x = lp.x, y = land.getHeight({ x = lp.x, y = lp.z }) + 2, z = lp.z }, p)
+  end
+  local function jTarget(gname)   -- point of the first living unit of an enemy group
+    local g = Group.getByName(gname)
+    for _, u in ipairs(g and g:getUnits() or {}) do
+      if u:isExist() and u:getLife() >= 1 then return u:getPoint(), u end
+    end
+  end
+  local function jTargets()   -- Q lines: per living leader at most 5 visible enemy groups, nearest first
+    jQ = {}
+    local gs = {}   -- side -> { { g, p } } (first unit of each ground group; ponytail: group granularity for friendlies, per-unit scan if too coarse)
+    local function ground(side)
+      if not gs[side] then
+        local t = {}
+        for _, g in ipairs(coalition.getGroups(side, Group.Category.GROUND) or {}) do
+          local u1 = g:getUnit(1)
+          if u1 then t[#t + 1] = { g = g, p = u1:getPoint() } end
+        end
+        gs[side] = t
+      end
+      return gs[side]
+    end
+    for _, L in ipairs(jLeaders) do
+      local lu = L.p and not L.dead and jUnit(L)
+      if lu then
+        local cand = {}
+        for _, e in ipairs(ground(3 - L.side)) do
+          local d = d2(L.p, e.p)
+          if d < L.range ^ 2 then cand[#cand + 1] = { e = e, d = d } end
+        end
+        table.sort(cand, function(a, b) return a.d < b.d end)
+        local n = 0
+        for _, c in ipairs(cand) do
+          if n >= 5 then break end
+          local g = c.e.g
+          local p, u1 = jTarget(g:getName())
+          if p and jSee(L, lu, { x = p.x, y = land.getHeight({ x = p.x, y = p.z }) + 1.5, z = p.z }) then
+            local cnt, flak = 0, 0
+            for _, u in ipairs(g:getUnits() or {}) do
+              if u:isExist() and u:getLife() >= 1 then
+                cnt = cnt + 1
+                local at = (u:getDesc() or {}).attributes or {}
+                if at["Air Defence"] or at.AAA or at.SAM then flak = 1 end
+              end
+            end
+            local v = u1:getVelocity()
+            local lat, lon = coord.LOtoLL(p)
+            local m = coord.LLtoMGRS(lat, lon)
+            local fx, fz, fd = "", "", 5000 ^ 2
+            for _, f in ipairs(ground(L.side)) do
+              local d = d2(p, f.p)
+              if d < fd then fd, fx, fz = d, string.format("%.1f", f.p.x), string.format("%.1f", f.p.z) end
+            end
+            n = n + 1
+            jQ[#jQ + 1] = string.format("Q;%s;%s;%s;%d;%.1f;%.1f;%.1f;%d;%d;%s %s %05d %05d;%.6f;%.6f;%s;%s",
+              clean(L.name), clean(g:getName()), clean(u1:getTypeName()), cnt, p.x, p.z, land.getHeight({ x = p.x, y = p.z }),
+              v.x * v.x + v.z * v.z > 1 and 1 or 0, flak, m.UTMZone, m.MGRSDigraph, math.floor(m.Easting), math.floor(m.Northing), lat, lon, fx, fz)
+          end
+        end
+      end
+    end
+  end
+  local function jtacLines(l)   -- J lines every state write, N lines, Q lines from cache
+    if #jLeaders == 0 then return end
+    local now = timer.getTime()
+    for _, L in ipairs(jLeaders) do
+      local u = jUnit(L)
+      if u then L.p, L.dead = u:getPoint(), nil
+      elseif L.p then L.dead = L.dead or now end   -- never seen (late activation) = not written; dead stays 60 s with alive 0
+      if L.p and (not L.dead or now - L.dead < 60) then
+        l[#l + 1] = string.format("J;%s;%s;%s;%d;%.1f;%.1f;%.1f;%s;%s;%s;%d", clean(L.name), L.kind, L.cs, L.side, L.p.x, L.p.z, L.p.y,
+          L.freq, L.mod, L.code, u and 1 or 0)
+      end
+    end
+    if now - jQTime >= 2 then jQTime = now; if not pcall(jTargets) then jQ = {} end end
+    for _, q in ipairs(jQ) do l[#l + 1] = q end
+    for _, n in ipairs(jNav) do l[#l + 1] = n end
+  end
+  local spots, spotRun = {}, false   -- leader id -> { s = Spot, grp, t0, dur }; one spot per leader
+  local function spotOff(id)
+    local s = spots[id]
+    if s then pcall(function() s.s:destroy() end) spots[id] = nil end
+  end
+  local function spotTick(_, t)   -- every second: spot follows the target; ends after dur, on sight loss or target dead
+    for id, s in pairs(spots) do
+      local L = jBy[id]
+      local lu = L and jUnit(L)
+      local p = jTarget(s.grp)
+      if t - s.t0 > s.dur then spotOff(id)
+      elseif not (lu and p and jSee(L, lu, p)) then spotOff(id) evt("X;spotlost;" .. id)
+      else pcall(s.s.setPoint, s.s, p) end
+    end
+    spotRun = next(spots) ~= nil
+    return spotRun and t + 1 or nil
+  end
+  local function spotOn(L, grp, ir, code)
+    local id = clean(L.name)
+    local lu, p = jUnit(L), jTarget(grp)
+    spotOff(id)
+    if not (lu and p and jSee(L, lu, p)) then return evt("X;spotlost;" .. id) end
+    local ok, s = pcall(function()
+      if ir then return Spot.createInfraRed(lu, { x = 0, y = 2, z = 0 }, p) end
+      return Spot.createLaser(lu, { x = 0, y = 2, z = 0 }, p, code)
+    end)
+    if not ok or not s then return evt("X;spotlost;" .. id) end
+    spots[id] = { s = s, grp = grp, t0 = timer.getTime(), dur = ir and 60 or 300 }
+    if not spotRun then spotRun = true; timer.scheduleFunction(spotTick, nil, timer.getTime() + 1) end
+  end
+  local function jtacCmd(line)   -- MARK;id;group;kind;delay | LASE;id;group;code | LASEOFF;id
+    local f = {}
+    for s in (line:gsub("%s+$", "") .. ";"):gmatch("([^;]*);") do f[#f + 1] = s end
+    local L = jBy[f[2] or ""]
+    if not L then return end
+    if f[1] == "LASEOFF" then spotOff(clean(L.name)) return end
+    local grp = f[3]
+    if not grp or not Group.getByName(grp) then return end
+    if f[1] == "LASE" then spotOn(L, grp, false, tonumber(f[4]) or tonumber(L.code) or 1688) return end
+    if f[1] ~= "MARK" then return end
+    local kind, delay = f[4] or "", tonumber(f[5]) or 0
+    local sm, SM = trigger.smokeColor or {}, { smoke_green = "Green", smoke_red = "Red", smoke_white = "White", smoke_orange = "Orange", smoke_blue = "Blue", wp = "White" }
+    local col = SM[kind] and (sm[SM[kind]] or ({ Green = 0, Red = 1, White = 2, Orange = 3, Blue = 4 })[SM[kind]])
+    if not col and kind ~= "ir" and kind ~= "illum" then return end
+    local p0 = jTarget(grp)
+    timer.scheduleFunction(function()
+      pcall(function()
+        local p = jTarget(grp) or p0   -- target may have moved or died during the delay
+        if not p then return end
+        local gp = { x = p.x, y = land.getHeight({ x = p.x, y = p.z }), z = p.z }
+        if col then trigger.action.smoke(gp, col)
+        elseif kind == "illum" then trigger.action.illuminationBomb({ x = gp.x, y = gp.y + 500, z = gp.z }, 1000000)
+        else spotOn(L, grp, true) end
+      end)
+    end, nil, timer.getTime() + math.max(delay, 0.1))
   end
 
   local sunAt   -- defined below (state() needs it for the Y line)
@@ -1258,6 +1454,7 @@ local function start()
       l[#l + 1] = string.format("Y;%.0f", timer.getAbsTime()) .. (ok and string.format(";%.1f", sun) or "")
     end
     l[#l + 1] = string.format("S;%.1f", timer.getTime())   -- Mission run time: if it jumps back, it is a new mission (ATIS identifiers anew)
+    pcall(jtacLines, l)   -- J1-J3
     for side = 0, 2 do
       for _, cat in ipairs({ Group.Category.AIRPLANE, Group.Category.HELICOPTER }) do
         for _, g in ipairs(coalition.getGroups(side, cat) or {}) do
@@ -1384,6 +1581,7 @@ local function start()
       if u then trigger.action.outTextForUnit(u:getID(), wt, wt == "" and 1 or 600, true) end   -- clearView: replaces the previous wheel text
       return
     end
+    if line:match("^MARK;") or line:match("^LASE") then pcall(jtacCmd, line) log("Befehl " .. line) return end   -- J4
     if line:match("^CV") then carrierCmd(line) return end
     local dv = line:match("^DIVERT;([^;]+)")
     if dv then   -- N40: approach to captured airfield -> new airfield, there anew in the sequence

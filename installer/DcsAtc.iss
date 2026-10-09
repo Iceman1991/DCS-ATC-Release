@@ -1,5 +1,5 @@
 ﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe
-#define AppVer "0.11.0-alpha"
+#define AppVer "0.12.0-alpha"
 #define Src ".."
 
 [Setup]
@@ -76,6 +76,8 @@ de.CompAi=KI-Funk (KI-Verkehr spricht mit den Lotsen, Fox, Splash, Bingo)
 en.CompAi=AI radio (AI traffic talks to the controllers, fox, splash, bingo)
 de.CompCrew=Bodenpersonal (Crew Chief, Tankwagen, Munition, Feuerwehr)
 en.CompCrew=Ground crew (crew chief, fuel and ammo trucks, fire service)
+de.CompJtac=JTAC / FAC(A) (9-Liner, Zielmarkierung, Laser, BDA)
+en.CompJtac=JTAC / FAC(A) (9-line, target marking, laser, BDA)
 
 [Types]
 Name: "full"; Description: "{cm:TypeFull}"
@@ -91,6 +93,7 @@ Name: "tanker"; Description: "{cm:CompTanker}"; Types: full custom
 Name: "carrier"; Description: "{cm:CompCarrier}"; Types: full custom
 Name: "ai"; Description: "{cm:CompAi}"; Types: full custom
 Name: "crew"; Description: "{cm:CompCrew}"; Types: full custom
+Name: "jtac"; Description: "{cm:CompJtac}"; Types: full custom
 
 [Files]
 Source: "{#Src}\tmp\sc\DcsAtc.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -234,7 +237,7 @@ begin
     CompSet := True;
     if LoadStringFromFile(ExpandConstant('{app}\modules.txt'), S) then begin
       S := ',' + Lowercase(Trim(S)) + ',';
-      Untick(S, 'atc'); Untick(S, 'range'); Untick(S, 'awacs'); Untick(S, 'tanker'); Untick(S, 'carrier'); Untick(S, 'ai'); Untick(S, 'crew');
+      Untick(S, 'atc'); Untick(S, 'range'); Untick(S, 'awacs'); Untick(S, 'tanker'); Untick(S, 'carrier'); Untick(S, 'ai'); Untick(S, 'crew'); Untick(S, 'jtac');
     end;
   end;
   if (CurPageID = wpSelectTasks) and not TaskSet then begin

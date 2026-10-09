@@ -5,7 +5,7 @@ namespace DcsAtc;
 
 /// Further controllers per player: range control (Range Alpha), AWACS (Overlord), tanker (Shell/Texaco …)
 /// and notes for the debriefing. Rule-based like Tower: text/telemetry in, radio calls out.
-class Ops
+partial class Ops
 {
     const double NM = 1852, Ft = 0.3048, Kt = 0.514444;
     public record Call(string Role, string Station, string Text, double Freq = 0, Ops? To = null, bool All = false, int Lead = 0);   // Freq: own frequency (mission AWACS), 0 = from the config; To: call to this other player (tanker: the next one); All: to everyone (Gid 0, tanker turn A121)
@@ -98,6 +98,7 @@ class Ops
           : Has(n, "overlord", "awacs", "magic", "moscow", "darkstar", "wizard", "focus", "spike", "request sort", "picture", "bogey dope")
             || Has(n, "declare") && !Has(n, "tower", "ground", "approach", "departure", "mayday", "pan pan", "emergency") && Regex.IsMatch(n, @"\bdeclare\b(?: [a-z]+){0,3}? \d") ? "AWACS"
           : Has(n, "tanker", "shell", "texaco", "arco", "refuel") ? "Tanker"
+          : Regex.IsMatch(n, @"\b(?:jtac|fac a|faca|forward air controller)\b") || Leaders.Any(l => CsKey(l) is { Length: > 2 } k && Has(n, k)) ? "JTAC"   // J5
           : null;
     }
 
@@ -114,6 +115,7 @@ class Ops
     public List<Call> OnTranscript(string role, string text, Me me, IReadOnlyList<Traffic> air, IReadOnlyList<Airfield> fields, double now, bool unsure = false, double cfgAwacs = 251.5, Func<Airfield, (double Qnh, double Wx, double Wz)>? qnhOf = null)   // cfgAwacs: AWACS frequency from the config (handover at range check-out); qnhOf: QNH (0 = unknown) and wind of an airfield from the mission weather
     {
         var n = Normalize(text.Contains(':') ? text[(text.IndexOf(':') + 1)..] : text);
+        if (role == "JTAC") { var jr = JtacCall(n, me, now, unsure); if (jr.Count > 0 && !jr.Any(c => c.Text.Contains("say again"))) lastRole[role] = jr; return jr; }   // J6
         if (unsure || Has(n, "radio check", "how do you read"))
         {
             var st = role == "Range" ? "Range Alpha" : role == "AWACS" ? AwacsName(AwacsOf(air, me), me) : Tankers(air, me).FirstOrDefault()?.Name ?? "Tanker";
@@ -224,7 +226,7 @@ class Ops
         return pass.Count + gunHits == 0 ? $"pass {passes}" : $"pass {passes}, {res}";   // A18: no impact yet (bomb still falling): scoring comes with the impact, no "no hits scored"
     }
     /// Player gone (crash, left slot): range free again.
-    public void Leave() { RangeReset(); checkedIn = false; OffLine(); }
+    public void Leave() { RangeReset(); checkedIn = false; OffLine(); if (cas > 0) CasEnd(); }
 
     /// Save session (app crash/restart): AWACS check-in and debriefing; range/tanker must be checked in again.
     public record State(bool AwacsIn, bool RadarContact, List<string> Debrief);
@@ -463,6 +465,10 @@ class Ops
     {
         (@"^F/?A-18", "Hornet"), (@"^F-16", "Viper"), (@"^F-15E", "Strike Eagle"), (@"^F-15", "Eagle"), (@"^F-14", "Tomcat"), (@"^A-10", "Warthog"),
         (@"^F-5", "Tiger"), (@"^AV8B", "Harrier"), (@"^F-4E", "Phantom"), (@"^AH-64", "Apache"), (@"^UH-1H", "Huey"),
+        // J12: ground targets as a JTAC says them
+        (@"^(?:T-\d\d|M-1 |M-60|Leopard|Challenger|Merkava)", "tanks"), (@"^(?:BTR|BRDM|M-113|M1126|LAV|Stryker|MTLB|AAV)", "APCs"), (@"^(?:BMP|M-2 Bradley|Marder|Warrior|BMD)", "IFVs"),
+        (@"^ZSU-23", "Shilka"), (@"^2S6", "Tunguska"), (@"^Strela", "Strela"), (@"^Osa", "SA-8"), (@"^2S1", "Gvozdika"), (@"^(?:SA-18|Igla|Stinger)", "MANPADS"),
+        (@"^(?:Ural|KAMAZ|ZIL|GAZ|M 818|M-818)", "trucks"), (@"^(?:Hummer|HMMWV)", "vehicles"), (@"^(?:Soldier|Infantry|Paratrooper)", "infantry"),
     };
     internal static string TypeSay(string type) => TypeNames.FirstOrDefault(n => Regex.IsMatch(type, n.Re)).Name
         ?? Regex.Replace(type.Split('_')[0], @"(?<=[A-Za-z])-?(?=\d)", " ");
@@ -633,6 +639,7 @@ class Ops
             return new() { A($"{c}, {awName} copies splash{(k.Success ? " " + Digits(k.Groups[1].Value) : "")}{(kg != null ? ", " + kg : "")}{left}") };
         }
         if (Has(n, "merged") && (groups.FirstOrDefault(Own) ?? groups.FirstOrDefault()) is { } mg) { foreach (var id in mg.Ids!) mergeTold[id] = now; return new(); }   // LD3: if he said it himself, no "merged" from the AWACS
+        if (tank == 1 && Has(n, "judy")) { vecEnd = true; return new() { A($"{c}, {awName}, roger.") }; }   // E1: radar contact with the tanker ends the AWACS join vectors
         if (Has(n, "commit", "targeting", "targeted", "engaged", "engaging", "fox", "judy") && t != null)   // Confirm target: named group/direction, otherwise the assigned one, otherwise the nearest
         {
             var dir = Regex.Match(n, @"\b(?:north|south|east|west)\b").Value;
@@ -1053,8 +1060,28 @@ class Ops
         // R119: "Texaco 2-1" (n: "texaco 2 1") selects the tanker with the number; "Texaco" only: the own, otherwise the nearest
         bool Said(Tk k, bool num) => TankerName(k.A).ToLowerInvariant() is var w && (num ? k.Num != "" && Regex.IsMatch(n, $@"\b{w} ?{Regex.Replace(k.Num, @"\d", "$0 ?")}\b") : n.Contains(w));
         var tk = all.FirstOrDefault(k => Said(k, true)) ?? all.FirstOrDefault(k => tank > 0 && k.A.Group == tanker && Said(k, false)) ?? all.FirstOrDefault(k => Said(k, false)) ?? all.FirstOrDefault(k => k.A.Group == tanker) ?? all.FirstOrDefault();
+        // wrong type named (e.g. A-10 calls the basket tanker): that tanker refuses at once and names the matching one, instead of a silent switch to another tanker
+        if (!NoAar.IsMatch(me.Type) && (any.FirstOrDefault(k => Said(k, true)) ?? any.FirstOrDefault(k => Said(k, false))) is { } wt && all.All(k => k.A.Group != wt.A.Group))
+        {
+            string Kind(Tk k) => Boom(k.A) ? "boom" : "basket";
+            var tw = me.Tel;
+            var ok = tk == null ? $"no {(Boom(wt.A) ? "basket" : "boom")} tanker airborne"
+                : $"{tk.Name} has the {Kind(tk)}, {(tw == null ? "" : $"bearing {Brg(Bearing(tw.X, tw.Z, tk.A.X, tk.A.Z))}, {MilesTxt(Dist(tw.X, tw.Z, tk.A.X, tk.A.Z))}, ")}{TkInfo(tk, true, false, false, TacanSay(tk.A) != "")}";
+            return new() { new("Tanker", wt.Name, $"{c}, {wt.Name}, negative, {Kind(wt)} only, {ok}.") };
+        }
         if (tk == null) return new() { any.Count == 0 ? new("Tanker", "Tanker", $"{c}, no tanker airborne.") : new("Tanker", any[0].Name, $"{c}, {any[0].Name}, negative, no compatible tanker.") };
         List<Call> T(string s) => new() { new("Tanker", tk.Name, s) };   // R304: our controller always speaks, the DCS tanker is mute (only radio menu for basket/boom)
+        var tp = me.Tel;
+        double dTk = tp == null ? 0 : Dist(tp.X, tp.Z, tk.A.X, tk.A.Z);
+        var brg = tp == null ? "" : $"bearing {Brg(Bearing(tp.X, tp.Z, tk.A.X, tk.A.Z))}, {MilesTxt(dTk)}, ";
+        // TP2: queries in every state, without state change or radio menu; "say position/status" names everything
+        bool qa = Has(n, "altitude", "angels", "level", "block"), qs = Has(n, "airspeed", "speed", "knots"), qh = Has(n, "heading", "track", "course"), qt = Has(n, "tacan"), qp = Has(n, "position", "bearing", "range", "where", "status") || tank == 1 && Has(n, "vector");   // "vector" only during the rendezvous (otherwise e.g. "request radar vectors" on the wrong frequency)
+        if ((qa || qs || qh || qt || qp) && Has(n, "say", "request", "confirm", "what") && !Has(n, "join", "rejoin", "rendezvous", "refuel"))
+        {
+            if (tank == 1 && Has(n, "vector") && TankVec(me, air, now, true) is { } v) return new() { v };   // "request vector": the next vector at once
+            return T($"{c}, {tk.Name}, {(qp ? brg + TkInfo(tk) : TkInfo(tk, qa, qh, qs, qt))}.");
+        }
+        var was = tanker;
         tanker = tk.A.Group;
         cs = c;
         var l = Line(tk.A.Group);
@@ -1079,12 +1106,13 @@ class Ops
         if (Has(n, "right wing"))   // back on the right wing: no clearance, continue with "pre contact" or "complete"
             return T($"{c}, {tk.Name}, roger, report complete or request more.");
         // R56: confirm join/pre-contact only if the receiver is close enough to the tanker (ATP-56(C)), otherwise state the situation
-        var tp = me.Tel;
-        double dTk = tp == null ? 0 : Dist(tp.X, tp.Z, tk.A.X, tk.A.Z);
-        List<Call> Far() => T($"{c}, {tk.Name}, negative, bearing {Brg(Bearing(tp!.X, tp.Z, tk.A.X, tk.A.Z))}, {MilesTxt(dTk)}, report visual.");
+        List<Call> Far() => T($"{c}, {tk.Name}, negative, {brg}report visual.");
         bool far = dTk > 2 * NM;
         List<Call> Join(string neg)   // "cleared to join, left observation" (R287: before that without clearance "negative, not cleared pre-contact, ")
         {
+            if (tp != null && Along(tp, tk.A) > 0.5 * NM)   // TP5 (ATP-56(C)): join only from astern
+                return T($"{c}, {tk.Name}, negative, rejoin from astern, {Clock(tp, tk)}, report visual.");
+            Menu = ("intent", tk.A.Group);   // TP6: DCS "Intent to refuel" only now, not with the request
             if (!l.Contains(this)) l.Add(this);
             Arrive(l);
             tank = 2;
@@ -1103,7 +1131,8 @@ class Ops
             tank = 3;
             return T($"{c}, cleared contact, {(Boom(tk.A) ? "boom" : "basket")} ready.");
         }
-        if (tank < 2 && Has(n, "visual", "tally", "in sight", "judy"))
+        if (tank < 2 && Has(n, "judy", "radar contact")) { vecEnd = true; return T($"{c}, {tk.Name}, roger, report visual."); }   // TP3: radar contact ends the vectors, the join needs "visual"
+        if (tank < 2 && Has(n, "visual", "tally", "in sight"))
             return dTk > 8 * NM ? T($"{c}, {tk.Name}, continue, {MilesTxt(dTk)}, report visual.") : Join("");   // R117: "visual" releases the join (2-5 NM as in TankVec), only not beyond 8 NM (TickLive discards over 10 NM); R286: continue with "visual", the tanker understands that
         if (Has(n, "observation", "left wing", "visual", "tally", "in sight", "joined"))
         {
@@ -1116,20 +1145,32 @@ class Ops
         // Only a real request starts the rendezvous; chatter with the tanker (fuel state etc.) does not reset contact
         if (tank >= 2 || !Has(n, "join", "rejoin", "rendezvous", "refuel", "fuel", "tank", "gas", "check in", "checking in", "aar", "a a r", "texaco", "shell", "arco"))
             return new() { new("Tanker", tk.Name, $"{c}, {tk.Name}, say again.") };
+        if (tank == 1 && was == tk.A.Group) return T($"{c}, {tk.Name}, continue, {brg}report visual.");   // TP1: repeated request during the rendezvous: no restart, no radio menu
         tank = 1; offload = 0;
         if (!l.Contains(this)) l.Add(this);
-        Menu = ("intent", tk.A.Group);
-        var t = me.Tel;
-        double kias = tk.A.Speed / Kt / (1 + 0.02 * tk.A.AltMsl / Ft / 1000);   // Ground speed/TAS -> displayed
-        int ang = (int)Math.Round(tk.A.AltMsl / Ft / 1000);
-        var where = Tracks.TryGetValue(tk.A.Group, out var trk) ? $"anchor {trk}, block {ang - 1} to {ang + 1}" : Angels(tk.A.AltMsl);
-        var info = $"{where}, track {Card(tk.A.Hdg * 180 / Math.PI)}, {Math.Round(kias / 10) * 10:0} knots{TacanSay(tk.A)}.";
         // R56: rendezvous 1000 ft below the tanker (ATP-56(C)), climb only with "cleared to join"
-        if (t == null) return T($"{c}, {tk.Name}, {info} Join 1000 feet below, report visual.");
-        double brg = Bearing(t.X, t.Z, tk.A.X, tk.A.Z), d = Dist(t.X, t.Z, tk.A.X, tk.A.Z);
-        double closure = Math.Max(50, Tas(t) - tk.A.Speed * Math.Cos(tk.A.Hdg - brg * Math.PI / 180));   // R370: straight to it at current TAS (both as ground speed, as in TankVec)
-        var min = Math.Max(1, Math.Ceiling(d / closure / 60));
-        return T($"{c}, {tk.Name}, bearing {Brg(brg)}, {MilesTxt(d)}, {info} Expect the join in {min} minute{(min > 1 ? "s" : "")}, 1000 feet below, report visual.");
+        if (tp == null) return T($"{c}, {tk.Name}, {TkInfo(tk)}. Join 1000 feet below, report visual.");
+        double closure = Math.Max(50, Tas(tp) - tk.A.Speed * Math.Cos(tk.A.Hdg - Bearing(tp.X, tp.Z, tk.A.X, tk.A.Z) * Math.PI / 180));   // R370: straight to it at current TAS (both as ground speed, as in TankVec)
+        var min = Math.Max(1, Math.Ceiling(dTk / closure / 60));
+        return T($"{c}, {tk.Name}, {brg}{TkInfo(tk)}. Expect the join in {min} minute{(min > 1 ? "s" : "")}, 1000 feet below, report visual.");
+    }
+
+    // TP2: tanker data for the initial call and queries (displayed speed from ground speed/TAS); TACAN with everything if the tanker has one, "negative TACAN" only when asked
+    static string TkInfo(Tk tk, bool alt = true, bool hdg = true, bool spd = true, bool tcn = false)
+    {
+        var a = tk.A; var p = new List<string>();
+        int ang = (int)Math.Round(a.AltMsl / Ft / 1000);
+        if (alt) p.Add(Tracks.TryGetValue(a.Group, out var trk) ? $"anchor {trk}, block {ang - 1} to {ang + 1}" : Angels(a.AltMsl));
+        if (hdg) p.Add($"track {Card(a.Hdg * 180 / Math.PI)}");
+        if (spd) p.Add($"{Math.Round(a.Speed / Kt / (1 + 0.02 * a.AltMsl / Ft / 1000) / 10) * 10:0} knots");
+        if (tcn || alt && hdg && spd && TacanSay(a) != "") p.Add(TacanSay(a) is { Length: > 0 } tc ? tc[2..] : "negative TACAN");
+        return string.Join(", ", p);
+    }
+    static double Along(Telemetry t, Traffic a) => (t.X - a.X) * Math.Cos(a.Hdg) + (t.Z - a.Z) * Math.Sin(a.Hdg);   // > 0: ahead of the tanker's 3-9 line
+    static string Clock(Telemetry t, Tk tk)
+    {
+        int clock = (int)Math.Round(((Bearing(t.X, t.Z, tk.A.X, tk.A.Z) - t.Hdg * 180 / Math.PI + 360) % 360) / 30) % 12;
+        return $"{tk.Name} {(clock == 0 ? 12 : clock)} o'clock, {MilesTxt(Dist(t.X, t.Z, tk.A.X, tk.A.Z))}";
     }
 
     // Order per tanker (V11/A65): whoever was at the tanker first (insert on arrival); position counts only for those already at the tanker (tank ≥ 2)
@@ -1149,31 +1190,38 @@ class Ops
         var res = Flush(me, now);   // A72: completed drop (3 s without impact) as one call, also on the ground
         if (TankerBlock(me, air, now, lead) is { } tb) res.Add(tb);   // N44
         res.AddRange(TickLive(me, air, now, awacs));
-        if (TankVec(me, air, now) is { } tv) res.Add(tv);   // N38: join vectors, separate from TickLive
+        if (lead == null) res.AddRange(JtacTick(me, now));   // J9/J10 (wingmen: lead only)
+        if (TankVec(me, air, now, aw: awacs) is { } tv) res.Add(tv);   // N38: join vectors, separate from TickLive
         return res;
     }
 
-    // N38: join vectors to the tanker (tank == 1), until "visual"/"judy", 5 NM or turning away (5 NM beyond the smallest distance); lead-pursuit intercept course, target 1000 ft below the tanker.
-    // Call only on heading deviation > 20° or when crossing 20/10/5 NM, at most every 30 s (the first no earlier than 30 s after the request).
+    // N38: join vectors to the tanker (tank == 1), until "visual"/"judy", "report visual" (within 5 NM behind the 3-9 line, not on opposite course) or turning away (5 NM beyond the smallest distance against the vector);
+    // lead-pursuit intercept on a point 2 NM in trail, ahead of the 3-9 line 2 NM offset to the receiver's side (TP4: no head-on into the nose), target 1000 ft below the tanker.
+    // TP3: first vector 30 s after the request, then only on deviation > 30° or when crossing 10 NM, at most every 60 s (30 s in the turn behind the tanker); force: "request vector".
     public static bool Vectors = true;   // Config TankerVectors
     double vecAt;
     int vecBand = 99;
     double vecMin = 1e9;   // smallest distance since the request (NM)
     bool vecEnd, vecFirst;
     internal static double Tas(Telemetry t) => Math.Max(50, t.Ias * (1 + 0.02 * t.AltMsl / Ft / 1000));   // R370: TAS approximation in m/s (+2 % per 1000 ft)
-    Call? TankVec(Me me, IReadOnlyList<Traffic> air, double now)
+    Call? TankVec(Me me, IReadOnlyList<Traffic> air, double now, bool force = false, bool aw = false)
     {
         var t = me.Tel;
         if (tank != 1) { vecAt = now; vecBand = 99; vecMin = 1e9; vecEnd = vecFirst = false; return null; }
-        if (!Vectors || vecEnd || t == null || OnGround(t) || now - vecAt < 30) return null;
+        if (force) { vecEnd = vecFirst = false; vecMin = 1e9; }
+        else if (!Vectors || vecEnd || now - vecAt < 30) return null;
+        if (t == null || OnGround(t)) return null;
         var tk = Tankers(air, me).FirstOrDefault(k => k.A.Group == tanker);
         if (tk == null) return null;
         var a = tk.A;
-        double d = Dist(t.X, t.Z, a.X, a.Z), nm = d / NM, hdg = t.Hdg * 180 / Math.PI;
-        vecMin = Math.Min(vecMin, nm);
-        if (nm > vecMin + 5) { vecEnd = true; return null; }   // turned away or flew off (e.g. back to the airfield, new flight in the same slot): no more vectors until the next request
-        // Intercept time tt from |P + V·tt| = s·tt (P: tanker relative to us, V: tanker velocity, s: our TAS); without a solution, straight to it
-        double s = Tas(t), px = a.X - t.X, pz = a.Z - t.Z, vx = a.Speed * Math.Cos(a.Hdg), vz = a.Speed * Math.Sin(a.Hdg);
+        bool byAw = aw && awacsIn && AwacsUp(air, me);   // E1: checked in with the AWACS -> it gives the join vectors (as in reality), otherwise the tanker
+        if (byAw) SetAwacs(air, me);
+        Call V(string s) => byAw ? A(s) : new("Tanker", tk.Name, s);
+        double d = Dist(t.X, t.Z, a.X, a.Z), nm = d / NM, hdg = t.Hdg * 180 / Math.PI, fx = Math.Cos(a.Hdg), fz = Math.Sin(a.Hdg), along = Along(t, a);
+        bool conv = along > 0 || HdgDiff(hdg, a.Hdg * 180 / Math.PI) >= 90;   // still ahead of the 3-9 line or not yet turned behind the tanker
+        // Intercept time tt from |P + V·tt| = s·tt (P: aim point relative to us, V: tanker velocity, s: our TAS); without a solution, straight to it
+        double off = along > 0 ? (Along(t, a with { Hdg = a.Hdg + Math.PI / 2 }) > 0 ? 2 : -2) * NM : 0;   // side of the receiver: + right of the tanker
+        double s = Tas(t), px = a.X - 2 * NM * fx - off * fz - t.X, pz = a.Z - 2 * NM * fz + off * fx - t.Z, vx = a.Speed * fx, vz = a.Speed * fz;
         double qa = vx * vx + vz * vz - s * s, qb = 2 * (px * vx + pz * vz), qc = px * px + pz * pz, tt = 0;
         if (Math.Abs(qa) < 1e-6) { if (qb < 0) tt = -qc / qb; }
         else if (qb * qb - 4 * qa * qc is var disc and >= 0)
@@ -1181,17 +1229,18 @@ class Ops
             var r = new[] { (-qb - Math.Sqrt(disc)) / (2 * qa), (-qb + Math.Sqrt(disc)) / (2 * qa) }.Where(x => x > 0).ToList();
             if (r.Count > 0) tt = Math.Min(r.Min(), 3600);
         }
-        double want = Bearing(t.X, t.Z, a.X + vx * tt, a.Z + vz * tt);
-        int band = nm <= 5 ? 5 : nm <= 10 ? 10 : nm <= 20 ? 20 : 99;
-        if (band >= vecBand && vecFirst && HdgDiff(want, hdg) <= 20) return null;
+        double want = Bearing(t.X, t.Z, t.X + px + vx * tt, t.Z + pz + vz * tt);
+        vecMin = Math.Min(vecMin, nm);
+        if (nm > vecMin + 5 && HdgDiff(want, hdg) > 90) { vecEnd = true; return null; }   // turned away or flew off (e.g. back to the airfield, new flight in the same slot): no more vectors until the next request
+        var pos = Clock(t, tk);
+        if (nm <= 5 && !conv) { vecEnd = true; return V(byAw ? $"{Cs(me)}, {awName}, {pos}, report visual to {tk.Name}." : $"{Cs(me)}, {pos}, report visual."); }
+        int band = nm <= 10 ? 10 : 99;
+        if (vecFirst && (band >= vecBand && HdgDiff(want, hdg) <= 30 || !conv && now - vecAt < 60)) return null;
         vecAt = now; vecFirst = true; vecBand = Math.Min(vecBand, band);
-        int clock = (int)Math.Round(((Bearing(t.X, t.Z, a.X, a.Z) - hdg + 360) % 360) / 30) % 12;
-        var pos = $"{tk.Name} {(clock == 0 ? 12 : clock)} o'clock, {MilesTxt(d)}";
-        if (band == 5) { vecEnd = true; return new("Tanker", tk.Name, $"{Cs(me)}, {pos}, report visual."); }
         double turn = ((want - hdg) % 360 + 540) % 360 - 180;
         var go = Math.Abs(turn) > 5 ? $"turn {(turn > 0 ? "right" : "left")} heading {Brg(want)}" : $"continue heading {Brg(want)}";
         double dAlt = (a.AltMsl - 1000 * Ft - t.AltMsl) / Ft;   // R372: climb/descend verb as with the tower's AltTo; within ±500 ft plain maintain
-        return new("Tanker", tk.Name, $"{Cs(me)}, {tk.Name}, {go} for the join, {pos}, {(Math.Abs(dAlt) <= 500 ? "" : dAlt > 0 ? "climb and " : "descend and ")}maintain {Angels(a.AltMsl - 1000 * Ft)}.");
+        return V($"{Cs(me)}, {(byAw ? awName : tk.Name)}, {go} for the join, {pos}, {(Math.Abs(dAlt) <= 500 ? "" : dAlt > 0 ? "climb and " : "descend and ")}maintain {Angels(a.AltMsl - 1000 * Ft)}.");
     }
 
     List<Call> TickLive(Me me, IReadOnlyList<Traffic> air, double now, bool awacs)
@@ -1773,16 +1822,39 @@ class Ops
         var dj = od.OnTranscript("Tanker", "Texaco, request rejoin", me, air, f, 0);
         var dm = od.Menu; od.Menu = null;
         var dv = od.OnTranscript("Tanker", "Texaco, visual", meN, air, f, 1);
-        var dv2 = od.Menu;   // Join: no radio menu
+        var dv2 = od.Menu; od.Menu = null;   // TP6: Intent only with the join
         var dq0 = od.OnTranscript("Tanker", "Texaco, ready pre contact", meN, air, f, 1);
         var dq = od.Menu; od.Menu = null;   // Intent rejected (DCS-ATC dialog open): not F1 directly, via the mission again
         od.DcsIntent = true;
         var dp = od.OnTranscript("Tanker", "Texaco, ready pre contact", meN, air, f, 1);
         var dk = od.OnRefuel(me, true, 0.4, air, 2);
-        check(dj.Count == 1 && dj[0].Text.Contains("report visual") && dm?.Step == "intent" && dv.Count == 1 && dv[0].Text.Contains("cleared to join") && dv2 == null
+        check(dj.Count == 1 && dj[0].Text.Contains("report visual") && dm == null && dv.Count == 1 && dv[0].Text.Contains("cleared to join") && dv2?.Step == "intent"
               && dq0.Count == 1 && dq0[0].Text.Contains("cleared contact") && dq?.Step == "intent" && dp.Count == 1 && od.Menu?.Step == "precontact" && dk.FirstOrDefault()?.Text == "Contact.",
               $"Tanker R304: Lotse spricht, Menü {dm} -> {dv2} -> {dq} -> {od.Menu} | {string.Join(" | ", dj.Concat(dv).Concat(dq0).Concat(dp).Concat(dk).Select(x => x.Text))}");
         line.Clear();
+        {   // TP1/TP2/TP5/TP3: queries without state change or menu, second request without restart, join only from astern, "judy" ends the vectors
+            var oq = new Ops();
+            var meA = me with { Tel = me.Tel! with { X = 2 * NM, Z = 30 * NM } };   // 2 NM ahead of Texaco (flies north)
+            var tkq = new List<string>();
+            string Q(Me m, string text) { var r = string.Join(" | ", oq.OnTranscript("Tanker", text, m, air, f, 0).Select(x => x.Text)); tkq.Add($"{oq.tank}{(oq.Menu == null ? "" : "M")} {r}"); oq.Menu = null; return r; }
+            var q0 = Q(me, "Texaco, Enfield 1-1, say altitude and airspeed");
+            Q(me, "Texaco, Enfield 1-1, request rejoin");
+            var q1 = Q(me, "Texaco, say altitude and airspeed");
+            var r2 = Q(me, "Texaco, Enfield 1-1, request rejoin");
+            var a5 = Q(meA, "Texaco, visual");
+            Q(meN, "Texaco, visual");
+            var q2 = Q(meN, "say altitude and airspeed");
+            var qp2 = Q(meN, "say position");
+            var oj = new Ops { tank = 1, tanker = "Texaco (KC-135MPRS Korb)" };
+            var me15 = me with { Tel = me.Tel! with { Z = 15 * NM } };
+            var j = oj.OnTranscript("Tanker", "Texaco, judy", me15, air, f, 0);
+            int jv = Enumerable.Range(1, 300).Sum(s => oj.Tick(me15, air, s, false).Count);
+            check(q0.Contains("angels") && q0.EndsWith("knots.") && q1 == q0 && q2 == q0 && r2.Contains("continue, bearing") && a5.Contains("negative, rejoin from astern, Texaco one one 6 o'clock, 2 miles")
+                  && qp2.Contains("bearing") && !qp2.Contains("contact") && string.Join(",", tkq.Select(x => x[..2].Trim())) == "0,1,1,1,1,2M,2,2"
+                  && j.Count == 1 && j[0].Text.EndsWith("roger, report visual.") && jv == 0 && oj.tank == 1,
+                  $"Tanker TP1/TP2/TP5: Abfragen, zweiter Request, Join von vorn, judy -> {string.Join(" / ", tkq)} / {jv}");
+            line.Clear();
+        }
         var atc = new Traffic(7, "KC135MPRS", 0, 30 * NM, 6700, 0, 140, "ATC Texaco #3", "", true, 2);
         check(TankerName(atc) == "Texaco", "Tanker: Name ohne ATC-Präfix -> " + TankerName(atc));
         var kc = Callsigns; Callsigns = new Dictionary<string, string> { ["ATC Texaco #3"] = "Texaco31", ["KC-135 North"] = "Arco 2-1", ["Zahl"] = "247" };
@@ -1829,6 +1901,14 @@ class Ops
         check(Boom(new Traffic(0, "KC_10_Extender", 0, 0, 0, 0, 0)) && !Boom(new Traffic(0, "KC_10_Extender_D", 0, 0, 0, 0, 0)) && !Boom(atc), "Tanker A125: KC_10_Extender_D hat den Korb");
         var tneg = Ta("Enfield 1-1, request rejoin", new Ops(), me, air.Where(a => !a.Group.StartsWith("Texaco")).ToList());
         check(tneg == "Shell two one: Enfield one one, Shell two one, negative, no compatible tanker.", "Tanker A125: Hornet nur mit Boom-Tanker -> " + tneg);
+        // wrong type named: that tanker refuses at once and names the matching one, no join started
+        var owt = new Ops();
+        var wtH = Ta("Shell 2-1, Enfield 1-1, request rejoin", owt, me);
+        var wtA = Ta("Texaco, Enfield 1-1, request rejoin", new Ops(), me with { Type = "A-10C_2" });
+        var wtN = Ta("Shell 2-1, Enfield 1-1, request rejoin", new Ops(), me, air.Where(a => !a.Group.StartsWith("Texaco")).ToList());
+        check(Regex.IsMatch(wtH, @"^Shell two one: Enfield one one, Shell two one, negative, boom only, Texaco.* has the basket, bearing .*angels \d+") && owt.tank == 0
+              && Regex.IsMatch(wtA, @"^Texaco.*negative, basket only, Shell two one has the boom, bearing") && wtN.EndsWith("negative, boom only, no basket tanker airborne."),
+              $"Tanker: falscher Typ angefragt -> {wtH} | {wtA} | {wtN}");
         check(Ta("Enfield 1-1, request rejoin", new Ops(), me with { Type = "MiG-21Bis" }).Contains("negative, no compatible tanker")
               && Ta("Enfield 1-1, request rejoin", new Ops(), me with { Type = "UH-1H" }).Contains("negative, no compatible tanker")
               && Ta("Enfield 1-1, request rejoin", new Ops(), me with { Type = "Su-25T" }).Contains("bearing"), "Tanker A125: ohne Tankanlage abgelehnt, Su-25T nicht");
@@ -2345,6 +2425,27 @@ class Ops
             }
             check(said.Count is >= 3 and <= 5 && said[0].Contains("for the join") && said[0].Contains("maintain angels 21.")
                   && said[^2].EndsWith(", report visual.") && said[^1] == "ok", "Tanker N38: Abfang aus 30 NM, höchstens 4 Sprüche -> " + string.Join(" / ", said));
+            // TP4: head-on from 30 NM (tanker flies south towards the player), the player flies every vector: offset, turn behind; "report visual" behind the 3-9 line, close, not on opposite course
+            {
+                var ohd = new Ops { tank = 1, tanker = "Texaco (KC-135MPRS Korb)" };
+                double hx = 0, hz = 0, hh = 0, tx = 30 * NM, ra = 1, rd = 99, rh = 180;
+                var hds = new List<string>();
+                for (int s = 1; s <= 1200 && ra > 0; s++)
+                {
+                    tx -= 140; var tkv = air.First(a => a.Group.StartsWith("Texaco")) with { X = tx, Z = 0, Hdg = Math.PI };
+                    var mv = me with { Tel = new Telemetry(6400, 6000, 200, hh * Math.PI / 180, hx, hz, 0, 0, 0) };
+                    foreach (var c in ohd.Tick(mv, air.Select(a => a.Group.StartsWith("Texaco") ? tkv : a).ToList(), s, false))
+                    {
+                        hds.Add(c.Text);
+                        if (c.Text.EndsWith("report visual.")) (ra, rd, rh) = (Along(mv.Tel!, tkv) / NM, Dist(hx, hz, tx, 0) / NM, HdgDiff(hh, 180));
+                        if (Regex.Match(c.Text, @"heading ((?:\w+ ){2}\w+) for") is { Success: true } hm)
+                            hh = (int.Parse(string.Concat(hm.Groups[1].Value.Split(' ').Select(w => Array.IndexOf(DigitWords, w)))) + MagVar) % 360;
+                    }
+                    double spd = 200 * (1 + 0.02 * 6400 / Ft / 1000);
+                    (hx, hz) = (hx + spd * Math.Cos(hh * Math.PI / 180), hz + spd * Math.Sin(hh * Math.PI / 180));
+                }
+                check(ra < 0 && rd <= 6 && rh < 60 && hds.Count <= 8, $"Tanker TP4: Gegenkurs -> hinter 3-9 {ra:0.0} NM, {rd:0.0} NM, Kursdiff {rh:0}° -> " + string.Join(" / ", hds));
+            }
             // R372: tanker at 21000 ft -> rendezvous altitude angels 20; player at 8000 ft climbs, at 30000 ft descends
             foreach (var (altM, verb) in new[] { (2438.0, "climb and maintain angels 20."), (9144.0, "descend and maintain angels 20.") })
             {
@@ -2370,11 +2471,22 @@ class Ops
                 gone.AddRange(ow.Tick(mv, air.Select(a => a.Group.StartsWith("Texaco") ? tkv : a).ToList(), s, false).Select(c => c.Text));
             }
             check(gone.Count is 1 or 2 && gone[0].Contains("for the join"), "Tanker N38: abgedreht -> höchstens 2 Vektoren, dann still -> " + string.Join(" / ", gone));
+            // E1: checked in with the AWACS -> it speaks the join vectors on its frequency, "judy" to it ends them; without check-in the tanker
+            var oaw = new Ops { tank = 1, tanker = "Texaco (KC-135MPRS Korb)", awacsIn = true };
+            var aaw = air.Select(a => a.Group.StartsWith("Texaco") ? a with { X = 0, Z = 30 * NM, Hdg = 0 } : a).ToList();
+            var maw = me with { Tel = new Telemetry(6400, 6000, 200, 0, 0, 0, 0, 0, 0) };
+            var vaw = oaw.TankVec(maw, aaw, 31, aw: true);
+            var vtk = new Ops { tank = 1, tanker = "Texaco (KC-135MPRS Korb)" }.TankVec(maw, aaw, 31, aw: true);
+            var jaw = oaw.OnTranscript("AWACS", "Overlord, Enfield 1-1, judy", maw, aaw, f, 32, false);
+            check(vaw is { Role: "AWACS" } && vaw.Text.Contains(", Overlord, turn right") && vaw.Text.Contains("for the join") && vtk?.Role == "Tanker"
+                  && jaw is [{ Text: "Enfield one one, Overlord, roger." }] && oaw.TankVec(maw, aaw, 100, aw: true) == null,
+                  $"Tanker E1: AWACS gibt die Vektoren -> {vaw?.Role}: {vaw?.Text} / {vtk?.Role} / {string.Join(" / ", jaw.Select(c => c.Text))}");
             var oq = new Ops { tank = 1, tanker = "Texaco (KC-135MPRS Korb)" };
             Vectors = false;
             check(Enumerable.Range(1, 300).All(s => oq.Tick(me, air, s, false).Count == 0), "Tanker N38: Schalter aus -> keine Vektoren");
             Vectors = true;
         }
+        JtacTest(check);   // J6-J12
         Bulls.Clear(); Range = null; Beacons.Clear(); Tracks.Clear(); (IdSec, AwacsBullseye, FadeSec, ScanSec) = (idSec, awBulls, fadeSec, scanSec); labels.Clear(); killed.Clear(); scope.Clear(); firstSeen.Clear(); hostileAct.Clear(); net.Clear(); Abm.Reset();
         return 0;
     }

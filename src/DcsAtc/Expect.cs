@@ -66,12 +66,20 @@ static partial class Program
             "Approach: request zone transit" => air && ph is null or Phase.Away or Phase.Departing,   // R389: not in the landing flow, not on the ground
             "Approach: traffic in sight" or "Approach: negative contact" => Now() - h.TrafficAt < 120,
             "Approach: C R P" => ask.Contains("c r p") || flow == "crp",   // Reporting obligation: only on call or at the CRP
+            "Approach: leaving the control zone" => flow == "leaving the control zone" || ask.Contains("leaving the control zone") || ask.Contains("clear of the zone"),   // R7 / N3: only when the report is due
             "Approach: report airspeed" => ask == "say airspeed" || flow == "report airspeed",
             "Range: checking in" => air && !h.Ops.RangeIn,
+            "JTAC: checking in" => air && h.Ops.Cas == 0,
+            "JTAC: ready to copy" => h.Ops.Cas is 1 or 6,
+            "JTAC: readback" => h.Ops.Cas == 2,
+            "JTAC: request mark" or "JTAC: tally target" or "JTAC: in" or "JTAC: laser on" => h.Ops.Cas is >= 3 and <= 5,
+            "JTAC: off" => h.Ops.Cas >= 4,
+            "JTAC: checking out" => h.Ops.Cas > 0,
             "AWACS: checking in" => air && !h.Ops.AwacsIn,
             "AWACS: checking out" => h.Ops.AwacsIn,
             "Tanker: request rejoin" => air && tk == 0,
             "Tanker: visual" => tk == 1,
+            "Tanker: say position" => air,
             "Tanker: observation" => tk is 1 or 2,
             "Tanker: pre contact" or "Tanker: refuel complete" => tk >= 2,   // after the join
             "Carrier: Marshal, checking in" => air && h.Boat.Stage == 0,
@@ -254,6 +262,7 @@ static partial class Program
         WheelFitsTest();
         ModulesTest();
         F10ParityTest();
+        JtacProgramTest();
     }
 
     /// Selftest R390: F10 menu of the mission script (Lua MENU) against the radio wheel – same names and texts, deliberate omissions on a list
@@ -320,7 +329,7 @@ static partial class Program
         Want(Top() is var top2 && !top2.Contains("Ground") && top2.Contains("Tower"), "Abflug Oberebene", top2);
         // on approach: without a question no speed report and no traffic; after "say airspeed" and traffic advisory both, no Airborne
         Ph(Phase.Inbound, air);
-        Want(Sub("Approach") is var a3 && !a3.Contains("Approach: report airspeed") && !a3.Contains(L("Verkehr", "Traffic")) && !a3.Contains("Approach: airborne, climbing"), "Anflug Approach ohne Frage", a3);
+        Want(Sub("Approach") is var a3 && !a3.Contains("Approach: report airspeed") && !a3.Contains(L("Verkehr", "Traffic")) && !a3.Contains("Approach: airborne, climbing") && !a3.Contains("Approach: leaving the control zone"), "Anflug Approach ohne Frage", a3);
         Heard(new Tx("Colt three two, traffic, 2 o'clock, 3 miles, westbound, same altitude, Hornet.", "Approach", "", 9));
         Heard(new Tx("Colt three two, turn left heading two seven zero, say airspeed.", "Approach", "", 9));
         Want(Sub("Approach") is var a4 && a4.Contains("Approach: report airspeed") && a4.Contains(L("Verkehr", "Traffic")) && a4.Contains("Approach: say again") && a4.Contains("Approach: request higher"), "Anflug Approach nach Frage/Verkehr", a4);
@@ -330,6 +339,8 @@ static partial class Program
         Want(!zt.Contains("Approach: request zone transit"), "Anflug ohne zone transit", zt);
         Ph(Phase.Away, air);
         Want(Sub(L("Allgemein", "General")) is var zt2 && zt2.Contains("Approach: request zone transit"), "Away mit zone transit", zt2);
+        Heard(new Tx("Colt three two, radar contact, 1 mile east of the field. Continue as cleared, report leaving the control zone.", "Approach", "", 9));   // R7: report due -> entry visible
+        Want(Sub("Approach") is var lz && lz.Contains("Approach: leaving the control zone"), "Away nach report leaving the control zone", lz);
         Ph(Phase.Parked, gnd);
         Want(Sub(L("Allgemein", "General")) is var zt3 && !zt3.Contains("Approach: request zone transit"), "geparkt ohne zone transit", zt3);
         Ph(Phase.Inbound, air);
@@ -342,10 +353,51 @@ static partial class Program
         Want(Sub("Ground") is var g2 && g2.Contains("Ground: runway vacated, request taxi to parking") && !g2.Contains("Ground: request startup"), "gelandet Ground", g2);
         Want(Top() is var top3 && !top3.Contains("Tower") && top3.Contains("Ground"), "gelandet Oberebene", top3);
         // without flight state (other player): everything
-        Want(Wheel.Vis(Wheel.All, WheelFits(null)).Length == Wheel.All.Length, "ohne Zustand Oberebene", Top());
+        Want(Wheel.Vis(Wheel.All, WheelFits(null)).Length == Math.Min(9, Wheel.All.Length), "ohne Zustand Oberebene", Top());
         Pilots.Remove(p.Unit);
         if (err.Count > 0) throw new Exception("R307 Funkrad: " + string.Join(" | ", err));
         Console.WriteLine("OK   R307 Funkrad nur passende Einträge: geparkt Startup/Taxi/Ready, kein Airborne/Fahrt; nach dem Start Airborne + Request higher, kein Ground; Fahrt melden nur nach say airspeed, Traffic nur nach Verkehrshinweis; High/Low key nach SFO; gelandet Vacated, kein Tower; ohne Zustand alles; je Ebene max. 9");
+    }
+
+    /// Selftest J1-J3/J5/J11: J/Q/N state lines, radio wheel rules per CAS state, module "jtac".
+    static void JtacProgramTest()
+    {
+        var (jl, jt, jn) = (new List<Ops.Leader>(), new List<Ops.Trg>(), new List<(int, string, double, double)>());
+        foreach (var s in new[] { "J;JTAC-1;jtac;Axeman 1-1;2;1000.5;2000.5;150;;AM;;1", "J;FAC-1;faca;Rover 2-1;2;1;2;3;251.5;FM;1514;0",
+                                  "Q;JTAC-1;T-1;T-72B;4;3000;0;200;0;1;37T GG 12345 67890;42.1234;42.5678;;", "Q;FAC-1;T-2;BTR-80;2;5;6;7;1;0;37T GG 1 2;42;43;-500;12", "N;2;IP Hammer;-8000;0", "J;kurz" })
+            JtacLine(s.Split(';'), jl, jt, jn);
+        var err = new List<string>();
+        void Want(bool ok, string what) { if (!ok) err.Add(what); }
+        Want(jl.Count == 2 && jl[0] is { Freq: 0, Code: "", Alive: true, Kind: "jtac", Side: 2, X: 1000.5 } && jl[1] is { Freq: 251.5, Code: "1514", Alive: false, Mod: "FM" }, "J-Zeilen");
+        Want(jt.Count == 2 && jt[0] is { Count: 4, Flak: true, Moving: false, Mgrs: "37T GG 12345 67890", Lat: 42.1234 } && double.IsNaN(jt[0].Fx) && jt[1] is { Fx: -500, Fz: 12, Moving: true }, "Q-Zeilen");
+        Want(jn.Count == 1 && jn[0] == (2, "IP Hammer", -8000.0, 0.0), "N-Zeilen");
+        var (ol, ot, on) = (Ops.Leaders, Ops.Targets, Ops.NavPts);
+        (Ops.Leaders, Ops.Targets) = (jl.Select(l => l with { Alive = true }).ToList(), jt);
+        var p = new Pilot { Unit = "JT1", Callsign = "Colt 4-1", Gid = 9, Coalition = 2, Type = "FA-18C_hornet", Tel = new(3000, 3000, 200, 0, -15000, 0, 0, 0, 0) };
+        string Fit() => string.Join(",", new[] { "checking in", "ready to copy", "readback", "request mark", "tally target", "in", "off", "laser on", "checking out" }.Where(x => WheelFits(p)("JTAC: " + x)));
+        Want(Fit() == "checking in", "Funkrad JTAC vor Check-in: " + Fit());
+        string Say(string t) => string.Join(" | ", p.Ops.OnTranscript("JTAC", t, MeOf(p), Array.Empty<Traffic>(), Fields, 0).Select(c => c.Text));
+        Say("JTAC: checking in");
+        Want(Fit() == "ready to copy,checking out", "Funkrad JTAC nach Check-in: " + Fit());
+        Say("JTAC: ready to copy");
+        Want(Fit() == "readback,checking out", "Funkrad JTAC nach 9-Liner: " + Fit());
+        Say("JTAC: " + p.Ops.CasWheel("readback"));
+        Want(Fit() == "request mark,tally target,in,laser on,checking out", "Funkrad JTAC nach Readback: " + Fit());
+        Say("JTAC: tally target"); Say("JTAC: " + p.Ops.CasWheel("in"));
+        Want(Fit() == "request mark,tally target,in,off,laser on,checking out" && p.Ops.Cas == 5, "Funkrad JTAC nach IN: " + Fit());
+        Say("JTAC: checking out");
+        Want(Fit() == "checking in" && p.Ops.Cas == 0, "Funkrad JTAC nach Check-out: " + Fit());
+        var (aw, jf, ff) = (Cfg.Frequencies["AWACS"], Cfg.Frequencies["JTAC"], 251.5);
+        LoadModules("core,atc,tanker");
+        Want(!RoleOn("JTAC") && !RoleOn("FACA") && !TextOn("JTAC: checking in") && !ListenFreqs(new()).Contains(jf) && !Wheel.Mod(Wheel.All).Any(i => i.Label == "JTAC"), "jtac aus: Rolle/Funkrad/Frequenz");
+        LoadModules("jtac");
+        Want(RoleOn("JTAC") && RoleOn("FACA") && TextOn("JTAC: in") && ListenFreqs(new()).Contains(jf) && ListenFreqs(new()).Contains(ff) && string.Join(",", Wheel.Mod(Wheel.All).Select(i => i.Label)) is "JTAC,Allgemein" or "JTAC,General",
+             "nur jtac: Rolle/Funkrad/Frequenzen " + string.Join(",", Wheel.Mod(Wheel.All).Select(i => i.Label)));
+        LoadModules(null);
+        (Ops.Leaders, Ops.Targets, Ops.NavPts) = (ol, ot, on);
+        p.Ops.Leave();
+        if (err.Count > 0) throw new Exception("JTAC (Programm): " + string.Join(" | ", err));
+        Console.WriteLine("OK   JTAC: J/Q/N-Zeilen, Funkrad-Regeln je Zustand, Modul jtac (Rolle, Funkrad, Frequenzen)");
     }
 
     /// Selftest modules (installer/settings, modules.txt): deselected = no wheel entry, frequency not monitored, request dropped; missing file = all on.

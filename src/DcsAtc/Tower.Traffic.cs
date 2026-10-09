@@ -9,35 +9,29 @@ public partial class Tower
     /// Traffic pattern always south of the runway: 07 right-hand pattern, 25 left-hand pattern.
     string Hand(string rw) => F.Hand(rw);
 
-    /// Entry point: North/South always, West only for 07, East only for 25. Otherwise the nearest.
-    static List<string> Allowed(string rw) => new() { "north", "south", rw == "07" ? "west" : "east" };
+    /// Entry points of the runway from the map (Kutaisi: North/South always, West only for 07, East only for 25). Otherwise the nearest.
+    List<string> Allowed(string rw) => F.Entry.TryGetValue(rw, out var e) ? e.Select(x => x.Crp).ToList() : new();
 
     string AssignEntry(Telemetry? t, string rw, string? wanted)
     {
         var allowed = Allowed(rw);
         if (wanted != null && allowed.Contains(wanted)) return wanted;
-        if (t == null) return allowed[2];
+        if (t == null) return allowed[^1];
         return allowed.OrderBy(k => Dist(t.X, t.Z, Crp[k].X, Crp[k].Z)).First();
     }
 
-    string Route(string rw) => home == null ? "" : " via " + (rw == "07" ? home.To07 : home.To25);
+    string Route(string rw) => home != null && home.To.TryGetValue(rw, out var r) ? " via " + r : "";
 
-    bool HomeNorth => home?.Name is "Ramp North" or "Ramp West";
-
-    /// Tower after landing: vacate runway (Kutaisi: taxiway towards the apron side).
+    /// Tower after landing: vacate runway (map: taxiway towards the apron side).
     string Vacate(string rw)
     {
         landedRw = rw;
-        if (!F.Charted || home == null) return "Vacate runway when able.";
-        if (rw == "25") return HomeNorth ? "Vacate right via Alpha or Bravo." : "Vacate left via Whiskey.";
-        return HomeNorth ? "Vacate left via Charlie or Delta." : "Vacate right via Echo.";
+        return F.Charted && home != null && home.Vacate.TryGetValue(rw, out var v) ? $"Vacate {v}." : "Vacate runway when able.";
     }
     string landedRw = "";
 
     /// Ground: taxiway to the apron after vacating the runway.
-    string ParkRoute() =>
-        HomeNorth ? " via November"
-        : (landedRw == "25" && home?.Name == "Ramp East") || (landedRw == "07" && home?.Name == "Ramp South") ? " via Sierra" : "";
+    string ParkRoute() => home != null && (home.In.TryGetValue(landedRw, out var r) || home.In.TryGetValue("*", out r)) ? " via " + r : "";
 
     /// Landing evaluation at touchdown: glidepath and centreline on final (0.3–3 NM), touchdown point, sink rate.
     string Grade(Telemetry t)

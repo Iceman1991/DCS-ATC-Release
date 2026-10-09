@@ -16,7 +16,7 @@ DCS-ATC never spawns aircraft. It only provides the radio for units that are alr
    - [Airfields, callsigns and frequencies](#airfields-callsigns-and-frequencies) · [ATIS](#atis) · [Runway selection](#runway-selection) · [Weather: VFR and IFR](#weather-vfr-and-ifr) · [Ground](#ground) · [Tower: departure](#tower-departure) · [Tower: arrival](#tower-arrival) · [Approach](#approach) · [Airspace](#airspace) · [Emergencies](#emergencies) · [Landing grade and debriefing](#landing-grade-and-debriefing) · [Mandatory reports](#mandatory-reports) · [Phrase table](#phrase-table)
 4. [Carrier operations](#carrier-operations)
 5. [AWACS, tankers and ranges](#awacs-tankers-and-ranges)
-   - [AWACS](#awacs) · [Tankers](#tankers) · [Range](#range) · [AI flights on the radio](#ai-flights-on-the-radio) · [Ground crew and crew chief](#ground-crew-and-crew-chief)
+   - [AWACS](#awacs) · [Tankers](#tankers) · [Range](#range) · [JTAC and FAC(A)](#jtac-and-faca) · [AI flights on the radio](#ai-flights-on-the-radio) · [Ground crew and crew chief](#ground-crew-and-crew-chief)
 6. [Multiplayer, dedicated server, custom frequencies and other maps](#multiplayer-dedicated-server-custom-frequencies-and-other-maps)
    - [How multiplayer works](#how-multiplayer-works) · [Dedicated server, step by step](#dedicated-server-step-by-step) · [Custom frequencies per airfield](#custom-frequencies-per-airfield) · [Other maps than Caucasus](#other-maps-than-caucasus)
 7. [Appendix: settings, logs and troubleshooting](#appendix-settings-logs-and-troubleshooting)
@@ -71,6 +71,7 @@ Setup asks which parts of DCS-ATC you want. **Full** ticks everything. With **Cu
 | Tanker | Rejoin, pre-contact, refueling help |
 | Carrier | Marshal, Tower and LSO |
 | AI radio | AI traffic talking to the controllers, AI flight calls (fox, splash, bingo) |
+| JTAC / FAC(A) | Situation, 9-line, marking, laser, damage report |
 | Ground crew | Crew chief, fuel and ammo trucks, fire service |
 
 An unticked module stays silent, DCS-ATC doesn't listen on its frequency, and it is gone from the radio wheel and the F10 menu. Use this when a real player runs the AWACS or the tower, or if you only want tankers and AWACS. All files are installed either way. Radio check, say again and the debriefing are always there.
@@ -107,7 +108,7 @@ DCS-ATC can also run on a PC that hosts a DCS dedicated server (`DCS_server.exe`
 - **Multiplayer.** Everyone connects their SRS client to the SRS server on the host's PC, which is the PC running DCS-ATC.
 - **Tuning frequencies.** All frequencies are AM.
   - **Airfields** use their own DCS frequency, the one shown on the F10 map. Ground, Tower and Approach share it, and you can use either the UHF or the VHF frequency. Examples on Caucasus: Kutaisi 263.0 / 134.0, Senaki 261.0 / 132.0, Batumi 260.0 / 131.0.
-  - **Other stations** have defaults: ATIS 263.5, AWACS 251.5, Tanker 255.5, Range 267.5, Carrier 127.5. An AWACS or carrier that has its own frequency in the mission uses that frequency instead.
+  - **Other stations** have defaults: ATIS 263.5, AWACS 251.5, Tanker 255.5, Range 267.5, Carrier 127.5, JTAC 133.5. An AWACS, carrier, JTAC or FAC(A) that has its own frequency in the mission uses that frequency instead.
   - **The radio wheel** shows the frequency of every station on its top level. A station is shown in red with ✗ when none of your SRS radios is tuned to it.
 - **You only hear what you are tuned to.** Controllers transmit on their own frequency. A controller's call also appears as text in the game for your group, but only if one of your radios is on that frequency. If SRS can't tell which radios you have, you see all text.
 
@@ -280,7 +281,7 @@ The frequency you transmit on decides who answers:
 | You transmit on | Who answers |
 |---|---|
 | An **airfield frequency from the DCS map** (UHF or VHF, for example Kutaisi 263.0 / 134.0) | That airfield. Ground, Tower and Approach share the frequency, and the content of your call picks the controller ("request taxi" → Ground, "ready for departure" → Tower, "inbound for landing" → Approach). If you start the call with a station name ("Kutaisi Tower, …"), that controller answers. |
-| A frequency from `"Frequencies"` in config.jsonc | The controller of that role at your current airfield. Defaults: Ground 264.5, Tower 265.0, Approach 266.5, Range 267.5, AWACS 251.5, Tanker 255.5 (MHz). |
+| A frequency from `"Frequencies"` in config.jsonc | The controller of that role at your current airfield. Defaults: Ground 264.5, Tower 265.0, Approach 266.5, Range 267.5, AWACS 251.5, Tanker 255.5, JTAC 133.5 (MHz). |
 | The frequency of a mission **AWACS** or **carrier** | That AWACS or carrier |
 | An **own airfield frequency** from `frequencies.jsonc` | Exactly that controller (a Ground frequency reaches Ground). See [Custom frequencies per airfield](#custom-frequencies-per-airfield). |
 
@@ -288,6 +289,7 @@ Without a matching frequency, a station name in your call can still route it:
 
 - **AWACS:** "Overlord", "Magic", "Darkstar", "Wizard", "Focus", "Moscow", "AWACS", plus "picture", "bogey dope", "request sort", "declare", "spike"
 - **Tanker:** "Texaco", "Shell", "Arco", "tanker", "refuel"
+- **JTAC:** "JTAC", "FAC A", "forward air controller" and the callsign of a controller of your side (only when the mission has one)
 - **Range:** "Range …" (only when the mission has a range)
 - **Carrier:** "Marshal", "Mother", "Paddles", "ball", "Clara", "pigeons", "carrier" (only when the mission has a carrier)
 
@@ -463,6 +465,7 @@ Whole controllers are also hidden when they don't apply:
 - **Range:** only when the mission has a range.
 - **AWACS:** only when an AWACS of your side is airborne or your side has a GCI radar.
 - **Tanker:** only when a tanker of your side is airborne that your aircraft can refuel from.
+- **JTAC:** only when your side has a JTAC or FAC(A) that is still alive.
 - **Carrier:** only when the mission has a carrier.
 
 Each level shows at most 9 entries.
@@ -527,7 +530,9 @@ The IFR clearance list shows nearby airfields; carriers and your current airfiel
 | Vector nearest airfield | `vector to nearest airfield` | In the air |
 | Check out | `checking out` | Checked in |
 
-**Tanker:** Request rejoin (in the air, before the rejoin), Visual (during the rejoin), Observation (during the rejoin and in observation), Pre-contact (`pre contact`) and Refuel complete (after "cleared to join").
+**JTAC:** Check in, Ready to copy, Readback (DCS-ATC adds lines 4 and 6 and the restrictions), Request mark, Tally, In and Off (DCS-ATC adds the direction), Laser on, Check out. Details in [JTAC and FAC(A)](#jtac-and-faca).
+
+**Tanker:** Request rejoin (in the air, before the rejoin), Visual (during the rejoin), Observation (during the rejoin and in observation), Pre-contact (`pre contact`), Refuel complete (after "cleared to join") and Say position (in the air).
 
 **Carrier:** Marshal check in (in the air, DCS-ATC fills in your full check-in) and Pigeons (in the air); after the Marshal check-in: See you at (`see you at angels`), Initial, Commencing, Platform, Ball, Clara. Details in [Carrier operations](#carrier-operations).
 
@@ -597,7 +602,7 @@ In every mission with DCS-ATC, each player group gets **F10 Other → ATC**. If 
 | Tower | Ready for departure · Ready, closed pattern · Initial · Overhead · Base, gear down · Final, gear down, full stop · Base, touch and go · Going around · Closed / SFO → Request closed · Request SFO · High key · Low key, gear down · Ready, practice approach |
 | Approach | Airborne (after takeoff) · Inbound for landing · Inbound, pattern work · Request ILS / straight in · Flight following · Cancel approach · Traffic → Traffic in sight / Negative contact · C R P · More → Report airspeed / Say again / Request higher |
 | Range (only if the mission has a range) | Check in · IP inbound · In hot · Off safe · Check out · Check out, hung ordnance |
-| AWACS / Tanker | AWACS → Check in · Picture · Bogey dope · Sort · Nearest tanker · Vector nearest airfield · Check out · Combat → Committing / Fox three / Splash / Defending / Request support / Unable / Winchester / Bingo, RTB / Say again. Tanker → Request rejoin · Visual · Observation · Pre-contact · Refuel complete |
+| AWACS / Tanker | AWACS → Check in · Picture · Bogey dope · Sort · Nearest tanker · Vector nearest airfield · Check out · Combat → Committing / Fox three / Splash / Defending / Request support / Unable / Winchester / Bingo, RTB / Say again. Tanker → Request rejoin · Visual · Observation · Pre-contact · Refuel complete · Say position |
 | Carrier (only if the mission has a carrier) | Marshal check in · See you at · Initial · Commencing · Platform · Ball · Clara · Pigeons |
 | Emergency | MAYDAY → kind · PAN PAN → kind · Minimum fuel · Hung ordnance · Flameout, high key · Cancel emergency (kinds: engine failure, fuel (MAYDAY only), hydraulic failure, battle damage, medical, bird strike) |
 | General | Radio check · Say again · QNH / weather · Listen to ATIS · Request zone transit · Debriefing |
@@ -649,6 +654,8 @@ Voices are Piper models in the `models` folder of the installation (`%LOCALAPPDA
   "Range": "en_US-ryan-medium@1.06",
   "AWACS": "en_GB-alan-medium|en_US-ljspeech-medium",
   "Tanker": "en_US-bryce-medium",
+  "JTAC": "en_US-ryan-medium@1.02",
+  "FACA": "en_US-bryce-medium@1.04",
   "Crew": "en_US-ryan-medium"
 },
 "PilotVoice": "en_US-joe-medium"
@@ -1755,7 +1762,7 @@ Approach: Enfield one one, Approach, turn left heading three four five, intercep
 
 ## AWACS, tankers and ranges
 
-Besides the airfield controllers, DCS-ATC also provides the voice of the mission's **AWACS** (or of a ground radar acting as GCI), its **tankers** and a **bombing range**. It also provides a **crew chief** on the intercom and **radio calls from AI flights** during combat. DCS-ATC never spawns aircraft. It only talks for the AWACS and tankers that the mission designer placed. If a station isn't in the mission, nobody answers, and its entry stays hidden in the radio wheel.
+Besides the airfield controllers, DCS-ATC also provides the voice of the mission's **AWACS** (or of a ground radar acting as GCI), its **tankers**, a **bombing range** and the **JTAC** or **FAC(A)** of a close air support mission. It also provides a **crew chief** on the intercom and **radio calls from AI flights** during combat. DCS-ATC never spawns aircraft. It only talks for the AWACS, tankers and controllers that the mission designer placed. If a station isn't in the mission, nobody answers, and its entry stays hidden in the radio wheel.
 
 ### How to reach these stations
 
@@ -1764,11 +1771,12 @@ Besides the airfield controllers, DCS-ATC also provides the voice of the mission
 | AWACS | Nearest friendly airborne E-3, E-2, A-50 or KJ-2000 in the mission | The mission's AWACS frequency if the AWACS group has one, otherwise `"AWACS": 251.5` | An AWACS of your side is airborne, or your side has an early-warning radar (GCI) |
 | Tanker | Nearest compatible friendly tanker (KC-135, KC-135MPRS, KC-10, IL-78 …) | `"Tanker": 255.5` | A tanker of your side is airborne |
 | Range | "Range Alpha" | `"Range": 267.5` | The mission has a trigger zone whose name starts with `Range` |
+| JTAC | The JTAC or FAC(A) of your side, by its callsign (Axeman, Darknight …) | The frequency set on the controller in the mission, otherwise `"JTAC": 133.5` | The mission has a ground or air group of your side that acts as JTAC or FAC(A) (see [JTAC and FAC(A)](#jtac-and-faca)) |
 
 You can call a station in three ways:
 
 - **SRS (voice):** tune the station's frequency and transmit. DCS-ATC routes each call by the frequency you are on.
-- **Station name in your call:** on an airfield frequency, or with push-to-talk without SRS, a call that names the station still reaches it: *Overlord / AWACS / Magic / Moscow / Darkstar / Wizard / Focus*, *Texaco / Shell / Arco / Tanker* (also *refuel*), *Range Alpha / Range control*. Some words also go straight to AWACS: *picture*, *bogey dope*, *declare*, *spike*, *request sort*.
+- **Station name in your call:** on an airfield frequency, or with push-to-talk without SRS, a call that names the station still reaches it: *Overlord / AWACS / Magic / Moscow / Darkstar / Wizard / Focus*, *Texaco / Shell / Arco / Tanker* (also *refuel*), *Range Alpha / Range control*, *JTAC / FAC A / forward air controller* or the callsign of the controller (*Axeman one one*). Some words also go straight to AWACS: *picture*, *bogey dope*, *declare*, *spike*, *request sort*.
 - **Radio wheel** or the F10 menu **ATC → AWACS / Tanker**. If the pilot voice is on (`"PilotVoice"`), your request is read out first, in the form *"Overlord, Enfield 1-1, request picture."*
 
 Radio wheel entries:
@@ -1778,6 +1786,7 @@ Radio wheel entries:
 | Range | Check in · In hot · Off safe · Check out |
 | AWACS | Check in · Picture · Bogey dope · Sort · Nearest tanker · Vector nearest airfield · Check out · Combat (Committing · Fox three · Splash · Defending · Request support · Unable · Winchester · Bingo, RTB · Say again) |
 | Tanker | Request rejoin · Visual · Observation · Pre-contact · Refuel complete |
+| JTAC | Check in · Ready to copy · Readback · Request mark · Tally · In · Off · Laser on · Check out |
 
 The centre of the wheel suggests the answer to whatever the controller just asked for. For example, after *"Report in hot"* it suggests **Range: in hot**, after *"cleared pre-contact"* it suggests **Tanker: pre contact**, and after *"report complete or request more"* it suggests **Tanker: complete**.
 
@@ -1900,14 +1909,14 @@ Overlord: Enfield one one, Overlord, Kutaisi bears 245, 62 miles.
 - **Name:** the tanker's DCS callsign (Texaco, Shell, Arco …), not its group name.
 - **Two tankers with the same name:** if two are airborne (e.g. Texaco 1-1 and Texaco 2-1), each is addressed with its number, *"Texaco two one"*. Each has its own queue and its own turn calls. Say *"Texaco 2-1, …"* to pick one.
 - **Choice:** the tanker you name. If you don't name one, the tanker you are already working with, otherwise the nearest compatible one.
-- **Boom or basket:** boom tankers (KC-135, KC-10) serve the F-16, F-15, F-4, A-10, B-1, B-52, C-17 and E-3. Basket tankers (KC-135MPRS, KC-10 with drogue and others) serve everything else.
+- **Boom or basket:** boom tankers (KC-135, KC-10) serve the F-16, F-15, F-4, A-10, B-1, B-52, C-17 and E-3. Basket tankers (KC-135MPRS, KC-10 with drogue and others) serve everything else. If you call a tanker of the wrong kind, it refuses right away and names the matching one, without a join: *"Enfield one one, Texaco, negative, basket only, Shell two one has the boom, bearing 264, 30 miles, angels 22."*
 - **No air refueling:** aircraft without a refueling probe or receptacle get *"negative, no compatible tanker"*. That includes helicopters, the MiG-15/19/21/29, F-5, F-86, Su-27, Su-25 (not the Su-25T), trainers and warbirds.
 
 #### Who does the talking, basket and boom
 
 **DCS-ATC's tanker** always does the talking, even when the mission has its own DCS tanker. It runs the whole sequence as described below. DCS's own tankers stay silent.
 
-DCS still only operates the basket or boom through its own F-menu tanker dialog. So for **the player on the PC that runs DCS-ATC**, DCS-ATC presses the DCS radio menu for you in the background: *Intent to refuel* when you make your request, *Ready pre-contact* when you call "pre-contact". The DCS tanker doesn't answer out loud.
+DCS still only operates the basket or boom through its own F-menu tanker dialog. So for **the player on the PC that runs DCS-ATC**, DCS-ATC presses the DCS radio menu for you in the background: *Intent to refuel* only at the join (*"cleared to join"*), not already at your request, *Ready pre-contact* when you call "pre-contact". The DCS tanker doesn't answer out loud.
 
 - With Easy Communication, DCS then tunes your radio to the tanker's mission frequency by itself. DCS-ATC's tanker also talks on that frequency. If the tanker shares it with an airfield (e.g. 261.0 = Senaki UHF), DCS-ATC doesn't switch you to that airfield.
 - This uses `"CommsKey"` (the DCS radio menu key as a scan code, default `43`, which is `\` on US and `#` on German keyboards). With `0`, DCS-ATC doesn't press the menu.
@@ -1918,8 +1927,13 @@ DCS still only operates the basket or boom through its own F-menu tanker dialog.
 | You say (recognised words) | Tanker answers |
 |---|---|
 | **request rejoin**, *join*, *rendezvous*, *refuel*, *fuel*, *tank*, *gas*, *AAR*, *checking in* | Rendezvous: *"Enfield one one, Texaco, bearing 084, 30 miles, angels 22, track north, 280 knots, TACAN 52 X-ray. Expect the join in 5 minutes, 1000 feet below, report visual."* |
-| **visual** (*tally*, *in sight*, *judy*), more than 8 NM away | *"continue, 20 miles, report visual."* |
-| **visual**, within 8 NM | *"cleared to join, observation left wing, number 1."* If several aircraft are waiting: *"number 2. Enfield one two first, then Enfield one one."* |
+| **request rejoin** again during the rendezvous | *"continue, bearing 084, 18 miles, report visual."* The rendezvous does not start over. |
+| **say altitude** / *angels* / *block*, **say speed** / *airspeed* / *knots*, **say track** / *heading* / *course*, **say TACAN** (also with *request*, *confirm*, *what*) | Only what you asked, several in one call: *"Enfield one one, Texaco, angels 22, 280 knots."* Without a beacon: *"negative TACAN"*. Changes nothing in the sequence, works in any state. |
+| **say position** / *status* / *bearing* / *range* / *where* | Everything: *"bearing 084, 18 miles, angels 22, track north, 280 knots, TACAN 52 X-ray."* Radio wheel: Tanker → Say position. |
+| **request vector** (during the rendezvous) | A new vector with heading right away. |
+| **judy** / *radar contact* | *"roger, report visual."* The join guidance ends, the join itself still needs "visual". |
+| **visual** (*tally*, *in sight*), more than 8 NM away | *"continue, 20 miles, report visual."* |
+| **visual**, within 8 NM | *"cleared to join, observation left wing, number 1."* If several aircraft are waiting: *"number 2. Enfield one two first, then Enfield one one."* In front of the tanker's 3-9 line (more than 0.5 NM ahead of it): *"negative, rejoin from astern, Texaco 6 o'clock, 2 miles, report visual."* You only join from behind. |
 | **observation** / **left wing** / **joined** | Once joined: *"cleared pre-contact."* If others are ahead: *"stabilize observation left wing, number 2."* Not yet cleared to join (within 2 NM): *"cleared to join, left observation, number 1."* |
 | **pre-contact** (*precontact*, *in position*, *ready for contact*, *stabilized*, *ready to refuel*) | *"Enfield one one, cleared contact, basket ready."* or *"boom ready"*. More than 2 NM away: *"negative, bearing 084, 12 miles, report visual."* Not your turn yet: *"negative, hold observation left wing, number 2."* Not yet cleared to join: *"negative, not cleared pre-contact, cleared to join, left observation, number 1."* |
 | **disconnect** | *"copy disconnect, move to the right wing."* |
@@ -1938,7 +1952,7 @@ DCS-ATC reacts to the real DCS refueling contact:
 
 #### Join vectors and coaching
 
-- **Join vectors** (`"TankerVectors": true`, default): after your request, the tanker steers you onto an intercept course aimed 1,000 ft below it. For example: *"Enfield one one, Texaco, turn left heading 040 for the join, Texaco 11 o'clock, 25 miles, maintain angels 21."* The first vector comes 30 s after the request. After that you get a new one at 20, 10 and 5 NM, or when you are more than 20° off, at most every 30 s. At 5 NM: *"Enfield one one, Texaco 12 o'clock, 5 miles, report visual."* If you turn away, the vectors stop. With `false`, you only get the first bearing.
+- **Join vectors** (`"TankerVectors": true`, default): after your request, the tanker steers you onto an intercept course aimed 1,000 ft below it. For example: *"Enfield one one, Texaco, turn left heading 040 for the join, Texaco 11 o'clock, 25 miles, maintain angels 21."* The target is a point 2 NM behind the tanker. If you approach from the front, the course passes you by at a 2 NM offset on your side and then goes behind the tanker, not into its nose. The first vector comes 30 s after the request. After that you get a new one only at 10 NM or when you are more than 30° off, at most once per minute (every 30 s while turning in behind the tanker). Within 5 NM behind the tanker: *"Enfield one one, Texaco 12 o'clock, 5 miles, report visual."* *"judy"* or turning away ends the guidance, *"request vector"* gets a new vector right away. If you are checked in with AWACS, the AWACS gives the vectors on its frequency, like in real life (*"Enfield one one, Overlord, turn left heading 040 for the join, …"*, ending with *"… report visual to Texaco."*). *"judy"* then goes to the AWACS, *"visual"* to the tanker. Without AWACS the tanker guides you itself. With `false`, you only get the first bearing, vectors then only on request.
 - **Coaching** behind the tanker:
   - *"slow closure."*
   - *"stabilize."*
@@ -1962,7 +1976,9 @@ DCS-ATC reacts to the real DCS refueling contact:
 You:     Texaco, Enfield 1-1, request rejoin.
 Texaco:  Enfield one one, Texaco, bearing 084, 30 miles, angels 22, track north, 280 knots, TACAN 52 X-ray.
          Expect the join in 5 minutes, 1000 feet below, report visual.
-Texaco:  Enfield one one, Texaco, turn right heading 095 for the join, Texaco 1 o'clock, 20 miles, maintain angels 21.
+Texaco:  Enfield one one, Texaco, turn right heading 095 for the join, Texaco 1 o'clock, 30 miles, maintain angels 21.
+You:     Texaco, Enfield 1-1, say speed.
+Texaco:  Enfield one one, Texaco, 280 knots.
 Texaco:  Enfield one one, Texaco 12 o'clock, 5 miles, report visual.
 You:     Texaco, Enfield 1-1, visual.
 Texaco:  Enfield one one, Texaco, cleared to join, observation left wing, number 1.
@@ -2047,6 +2063,111 @@ Range:  Enfield one one, Range Alpha, check switches safe. 1 pass, best impact 4
         Cleared off the range to the north, contact Overlord 251.5, good day.
 ```
 
+### JTAC and FAC(A)
+
+A JTAC is a controller on the ground, a FAC(A) one in the air. Both talk you onto a ground target: situation, 9-line, readback, mark, clearance and damage report. DCS-ATC only provides the voice. The mission has to contain the controller, and the enemy has to be in its sight.
+
+- **What counts as a controller:** a ground group with a FAC task or "JTAC" in its name is a JTAC. An aircraft or helicopter group with a FAC task, the task AFAC, or "JTAC" in its name is a FAC(A). "FACA" in the group name always makes it a FAC(A). A group that a player flies is never a controller.
+- **Callsign and frequency:** the callsign is the FAC callname from the Mission Editor (Axeman, Darknight, Warrior …). The frequency is the one set on the FAC task, otherwise `"JTAC": 133.5`. The laser code is the one on the task, otherwise 1688.
+- **What it sees:** a JTAC sees enemy groups out to 8 km, a FAC(A) out to 15 km, and only with line of sight. It briefs one group at a time: air defence first, then moving groups, then the nearest.
+- **IP:** a mission navigation point of your side that is 3 to 60 km from the target is used as the IP in line 1.
+- **Without a controller** on your side nobody answers, and the **JTAC** entry stays hidden in the radio wheel. The module can also be switched off in setup.
+
+#### Calls you can make
+
+Say the controller's callsign (*Axeman one one*) or *JTAC* / *FAC A* in the call. On the controller's frequency over SRS the frequency is enough.
+
+| You say (recognised words) | JTAC / FAC(A) answers |
+|---|---|
+| **checking in** (any first call) | *"Enfield one one, Axeman one one, situation: enemy four tanks stationary, three zero zero zero meters east of my position, friendlies at my position. Type 2 control, bomb on target. Advise when ready for 9-line."* A FAC(A) gives the distance of the friendlies from the target instead, or *"friendlies none known"*. Without a target: *"no enemy observed at this time, stand by. I'll call when I have a target."* |
+| **ready to copy** (*go ahead*, *ready for 9 line*, *ready for tasking*, *ready for next*, *ready for re-attack*) | The 9-line (below). While you are holding: *"stand by, hold as directed."* |
+| **readback** (lines 4 and 6 and the restrictions) | *"readback correct, advise when ready for mark or IN."* A wrong line is corrected on its own: *"negative line 4, line 4 elevation six six zero feet. Say again your readback."* |
+| **say again line 6** (any line 1 to 9) | The line again. *"say again in MGRS"* or *"in lat long"* gives line 6 in that format. |
+| **laser code** | *"laser code one six eight eight."* |
+| **threats** (*air defense*) | The air defence it knows of, or *"no threats observed."* |
+| **request mark** (*mark my target*, *smoke*, *request smoke*) | JTAC: *"mark on the way, three zero seconds."*, then *"mark is red smoke, advise contact."* FAC(A): *"rocket away, mark is white phosphorus."* Before the readback: *"negative, readback first."* |
+| **laser on** (*request laser*, *sparkle*) / **laser off** | *"laser on, code one six eight eight."* / *"laser off."* If the controller loses the target: *"lost the target, laser off."* |
+| **tally** (*visual*, *contact the mark*, *have the target*) | *"roger, advise IN."* |
+| **in from the west** (*in*, *in from the south* …) | Cleared hot, continue or abort (below). |
+| **off** (*off north*, *winchester*, *complete*) | The damage report (below). |
+| **bda** (*status*) | The damage report, or *"no attack yet."* |
+| **abort** | *"copy abort, standing by."* |
+| **checking out** (*off station*, *signing off*) | *"copy checking out, 3 destroyed in total. Good work."* |
+| **radio check** | *"read you five."* |
+| anything else | *"say again."* |
+
+#### The 9-line
+
+After *ready to copy* you get *"standby for 9-line"*, lines 1 to 9 and the remarks. The wheel entry **Readback** reads back lines 4 and 6 and the restrictions for you. By voice you say them yourself.
+
+| Line | Content |
+|---|---|
+| 1 to 3 | IP, heading from the IP to the target (with *offset left* or *right* if friendlies are close), distance IP to target. Without an IP: *"IP none, from your position"*, and lines 2 and 3 are left out. |
+| 4 | Target elevation in feet |
+| 5 | Number and type, *moving* or *stationary* |
+| 6 | Target position |
+| 7 | Mark. JTAC: *laser* and the code for laser-capable types (A-10, F/A-18, F-16, AV-8B, AH-64, F-15E, F-14, Ka-50), otherwise *red smoke*. FAC(A): *WP* |
+| 8 | Friendlies: distance and direction from the target, or *"none within five kilometers"* |
+| 9 | Egress direction, away from the friendlies |
+| Remarks | *final attack heading*, *danger close* (friendlies under 1000 m), *laser to target line* (JTAC only), *threats* |
+
+Line 6 depends on the aircraft. The A-10, AH-64 and Ka-50 get MGRS (*"MGRS three seven tango, golf golf, one two three four five, six seven eight nine zero"*), all others latitude and longitude in degrees and decimal minutes.
+
+#### Type of control
+
+| Type | When | What it means |
+|---|---|---|
+| 1 | FAC(A) with you inside 15 km of it | You are cleared hot without a tally or mark. |
+| 2 | Default | *"bomb on target."* Cleared hot needs a tally on the target or the mark. |
+| 3 | The controller sees two or more groups | After the readback: *"you are cleared to engage when ready."* |
+
+#### Attack and damage report
+
+Say *in from the south* (the side you approach from). Your attack heading is the opposite of that side. It is compared with the final attack heading:
+
+- More than 90 degrees off: *"abort, abort, abort, final attack heading …"*
+- More than 40 degrees off: *"continue, fly final attack heading …"*
+- Type 2 or 3 without a tally: *"continue, advise tally target or mark."*
+- Otherwise: *"cleared hot."* (*"danger close, cleared hot."* with friendlies under 1000 m)
+
+When the target group is destroyed, or after *off*, you get the report: *"good hits, one tank destroyed, three remaining. Advise ready for re-attack."*, or *"good hits, … destroyed. Advise ready for the next 9-line."* With no kill: *"no damage observed, target still active. Advise ready for re-attack."* Say *ready to copy* again for the next target.
+
+**Check fire:** if your weapons hit or kill a unit of your own side during an attack, you hear *"check fire, check fire, check fire, abort, abort, abort"* and the clearance is withdrawn. If the target group is gone for 10 s, the controller says *"target no longer observed, stand by for an update."*
+
+#### Several players and handover
+
+- **Hold:** only one player attacks at a time. A second player checking in gets *"hold at IP Hammer, angels 10, I'll call you when I'm ready for you."* (*"present position"* if there is no IP). Each further player is stacked 1000 ft higher. When the attack is finished, the next player gets the situation without calling.
+- **Handover:** if the FAC(A) is lost, a JTAC of your side takes over: *"I have control."* and a new situation. If no controller is left, the contact ends with a text message.
+
+#### Example
+
+```
+You:    Axeman one one, Enfield 1-1, checking in.
+JTAC:   Enfield one one, Axeman one one, situation: enemy four tanks stationary, three zero zero zero
+        meters east of my position, friendlies at my position. Type 2 control, bomb on target.
+        Advise when ready for 9-line.
+You:    Axeman one one, Enfield 1-1, ready to copy.
+JTAC:   Enfield one one, Axeman one one, standby for 9-line. Line 1, IP Hammer. Line 2, heading zero nine zero.
+        Line 3, 6 miles. Line 4, elevation six six zero feet. Line 5, four tanks, stationary. Line 6, north four two
+        degrees zero seven decimal four zero minutes, east zero four two degrees three four decimal zero seven
+        minutes. Line 7, laser one six eight eight. Line 8, friendlies none within five kilometers. Line 9,
+        egress east. Remarks, final attack heading zero nine zero. Read back lines 4, 6 and restrictions.
+You:    Axeman one one, Enfield 1-1, readback, line 4 six six zero, line 6 north four two degrees zero seven
+        decimal four zero minutes, east zero four two degrees three four decimal zero seven minutes,
+        restrictions final attack heading zero nine zero.
+JTAC:   Enfield one one, Axeman one one, readback correct, advise when ready for mark or IN.
+You:    Axeman one one, Enfield 1-1, request mark.
+JTAC:   Enfield one one, Axeman one one, mark on the way, three zero seconds.
+JTAC:   Enfield one one, Axeman one one, mark is red smoke, advise contact.
+You:    Axeman one one, Enfield 1-1, tally target.
+JTAC:   Enfield one one, Axeman one one, roger, advise IN.
+You:    Axeman one one, Enfield 1-1, in from the west.
+JTAC:   Enfield one one, Axeman one one, cleared hot.
+JTAC:   Enfield one one, Axeman one one, good hits, two tanks destroyed, two remaining. Advise ready for re-attack.
+You:    Axeman one one, Enfield 1-1, checking out.
+JTAC:   Enfield one one, Axeman one one, copy checking out, 2 destroyed in total. Good work.
+```
+
 ### AI flights on the radio
 
 Friendly AI flights within 60 NM of a player on their side talk on the radio during combat. These are the mission's own flights, not airfield traffic and not your own AI wingmen. They speak on the tactical net, which is the AWACS frequency (from the mission or the config). Calls within their own flight (defending, spike, naked, hit, joker, ops check) go out only on that flight's frequency from the Mission Editor, and only if it differs from the AWACS frequency. If the mission's AWACS or GCI is up, it acknowledges.
@@ -2111,6 +2232,7 @@ The crew chief's voice is set in `config.jsonc` → `"Voices"` → `"Crew"` (def
 | AWACS | checking in · picture · bogey dope · declare [bullseye 030 45] · spiked 270 · request sort · committing north group · splash one · request nearest tanker · bingo, vectors to Kutaisi · mayday · checking out · Ford one, say status (AI flight) | check-in with picture · picture · nearest group BRAA · ID · spike source · targets per element · confirmation · copy · tanker position and TACAN · bearing and distance to the field · nearest field and handover · no more unprompted calls · the AI flight answers with its status |
 | Tanker | request rejoin · visual · observation · pre-contact · disconnect · right wing · refuel complete | rendezvous · cleared to join / number · cleared pre-contact · cleared contact · move to the right wing · report complete or request more · total offload, cleared to depart |
 | Range | checking in · in hot · in dry · off safe · winchester · checking out | range briefing · cleared hot · cleared dry · pass result · switches safe · summary and exit |
+| JTAC / FAC(A) | checking in · ready to copy · readback · request mark · laser on · tally target · in from the west · off north · checking out | situation · 9-line · readback check · mark · laser · advise IN · cleared hot / continue / abort · damage report · copy checking out |
 
 The settings for these stations (`AwacsBullseye`, `AwacsNewGroupNm`, `TankerVectors`, `CommsKey`, voices) are listed in the [config.jsonc reference](#configjsonc-reference).
 
@@ -2403,7 +2525,7 @@ The file is in the installation folder: `%LOCALAPPDATA%\Programs\DCS-ATC\config.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `Frequencies` | `{ "ATIS": 263.5, "Ground": 264.5, "Tower": 265.0, "Approach": 266.5, "Range": 267.5, "AWACS": 251.5, "Tanker": 255.5, "Carrier": 127.5 }` | Station frequencies in MHz. **ATIS** is the shared ATIS frequency. **Range** is the range controller. **Tanker** is DCS-ATC's tanker radio. **AWACS** and **Carrier** are used only when the mission unit has no frequency of its own. **Ground / Tower / Approach** are fallbacks for airfields without DCS frequency data; normally every airfield uses its own map frequency. DCS-ATC warns in its window if a station frequency is the same as an airfield frequency. |
+| `Frequencies` | `{ "ATIS": 263.5, "Ground": 264.5, "Tower": 265.0, "Approach": 266.5, "Range": 267.5, "AWACS": 251.5, "Tanker": 255.5, "Carrier": 127.5, "JTAC": 133.5 }` | Station frequencies in MHz. **ATIS** is the shared ATIS frequency. **Range** is the range controller. **JTAC** is the frequency of a JTAC or FAC(A) that has none of its own in the mission. **Tanker** is DCS-ATC's tanker radio. **AWACS** and **Carrier** are used only when the mission unit has no frequency of its own. **Ground / Tower / Approach** are fallbacks for airfields without DCS frequency data; normally every airfield uses its own map frequency. DCS-ATC warns in its window if a station frequency is the same as an airfield frequency. |
 | `AtisFreqs` | `{}` | Own ATIS frequency per airfield, e.g. `{ "Kutaisi": 262.0 }`. Airfields not listed use `Frequencies.ATIS`. Applies after a restart. |
 | `Modulation` | `"AM"` | Modulation of all DCS-ATC transmissions. |
 | `Coalition` | `2` | SRS side (1 red, 2 blue) for stations without a side of their own. Airfields, AWACS, tankers and AI use their own side. |

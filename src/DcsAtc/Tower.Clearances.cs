@@ -34,9 +34,10 @@ public partial class Tower
                $"{Cap(Wind(w))}. {Cap(vis)}, {sky}. Temperature {temp}. {Cap(AtisQnh(w))}. " +
                (F.FreqsOf("Tower") is { } tf ? (tf.Any(x => x < 200) && tf.Any(x => x >= 200) ? $"Tower {FreqSay(tf.First(x => x < 200))}, UHF {FreqSay(tf.First(x => x >= 200))}. " : $"Tower {FreqSay(tf[0])}. ")   // K5: map frequency (VHF) first; own (AirfieldFrequencies) likewise
                           : $"Ground {FreqSay(Freqs["Ground"])}, tower {FreqSay(Freqs["Tower"])}, approach {FreqSay(Freqs["Approach"])}. ") +
-               (!Ifr ? "" : FinalOk(rw) ? $"Instrument conditions, expect vectors for {ProcSay(rw)}. "
-                    : FinalOk(Airfield.Opposite(rw)) && TailKt(w, Airfield.Opposite(rw)) <= 10 ? $"Instrument conditions, due to terrain expect vectors for {ProcSay(Airfield.Opposite(rw))}. "
-                    : $"Instrument conditions, due to terrain expect vectors for circling approach runway {RwSay(rw)}. ") +
+               (FinalOk(rw) ? (Ifr ? $"Instrument conditions, expect vectors for {ProcSay(rw)}. " : "")
+                    : FinalOk(Airfield.Opposite(rw)) && TailKt(w, Airfield.Opposite(rw)) <= 10 ? (Ifr ? $"Instrument conditions, due to terrain expect vectors for {ProcSay(Airfield.Opposite(rw))}. "
+                                                                                                       : $"Due to terrain, straight in and instrument approaches runway {RwSay(Airfield.Opposite(rw))}. ")   // VMC too (Batumi 31 in use, Approach vectors straight in to 13)
+                    : Ifr ? $"Instrument conditions, due to terrain expect vectors for circling approach runway {RwSay(rw)}. " : "") +
                $"Advise on initial contact you have information {word}.";
     }
 
@@ -234,7 +235,7 @@ public partial class Tower
         Phase = Phase.Entering; lastAltFt = PatternFt;   // R256: Approach states the altitude, the Tower does not repeat it
         handoffAt = lastSeen; towerDue = true; towerNag = false;   // R32: no "check altitude" for 60 s after this handover either
         entry = at;
-        if (at == "north")
+        if (F.Entry[rw].Contains((at, "overhead")))
         {
             nav = Ovh; navName = "overhead";
             return Say($"{c}, {pre}proceed overhead, {Alt(PatternFt)}, contact {Contact("Tower")}, report overhead.", "Approach");

@@ -811,7 +811,7 @@ public partial class Tower
         twKA.OnTranscript("Kutaisi Approach Enfield one one inbound for landing", west, none, 1);
         double kaFt = twKA.vecFt + 2000;
         var lowP = At(-291000, 660000, twKA.vecFt * Ft - FieldElev, twKA.vecHdg, twKA.VecKt(west) is > 0 and var kv ? kv * Kt : 150);
-        twKA.vecFt = kaFt;
+        twKA.vecFt = kaFt; twKA.altFree = false;   // R394: assigned altitude (not at his discretion)
         string? kickA = null;
         var kamsg = new List<string>();
         for (double tt = 2; tt < 600 && kickA == null; tt += 1)
@@ -821,6 +821,7 @@ public partial class Tower
         var twV = new Tower("Enfield 1-1");
         twV.Tick(west, none, 0);
         twV.OnTranscript("Kutaisi Approach Enfield one one inbound for landing", west, none, 1);
+        twV.altFree = false;   // R394: assigned altitude (not at his discretion)
         var calm = At(-291000, 660000, twV.vecFt * Ft - FieldElev + 120, twV.vecHdg + 6, twV.VecKt(west) is > 0 and var vk ? (vk + 25) * Kt : 150);
         var nag = Enumerable.Range(2, 120).SelectMany(s => twV.Tick(calm, none, s)).Select(m => m.Text).ToList();
         Check(nag.Count == 0, "Toleranz: " + string.Join(" | ", nag));
@@ -852,6 +853,7 @@ public partial class Tower
         var twM = new Tower("Enfield 1-1");
         twM.Tick(west, none, 0);
         twM.OnTranscript("Kutaisi Approach Enfield one one inbound for landing", west, none, 1);
+        twM.altFree = false;   // R394: assigned altitude (not at his discretion)
         var mild = At(-291000, 660000, twM.vecFt * Ft - FieldElev + 700 * Ft, twM.vecHdg + 15, (twM.VecKt(west) is > 0 and var mk ? mk : 300) * Kt);
         var early = Enumerable.Range(2, 85).SelectMany(s => twM.Tick(mild, none, s)).Select(m => m.Text).ToList();
         var later = Enumerable.Range(87, 10).SelectMany(s => twM.Tick(mild, none, s)).Select(m => m.Text).ToList();
@@ -863,6 +865,8 @@ public partial class Tower
         var twSp = new Tower("Enfield 1-1");
         twSp.Tick(west, none, 0);
         var spM = twSp.OnTranscript("Kutaisi Approach Enfield one one inbound for landing", west, none, 1).Select(m => m.Text).ToList();
+        Check(!spM[0].Contains("speed") && spM[0].Contains("altitude at your discretion"), "VFR weit draußen ohne Fahrtvorgabe (wie Höhe): " + spM[0]);
+        twSp.altFree = false;   // R129: assigned altitude and speed (not at his discretion)
         for (int s = 2; s < 400; s++) spM.AddRange(twSp.Tick(At(-291000, 660000, twSp.vecFt * Ft - FieldElev, twSp.vecHdg, (twSp.VecKt(west) is > 0 and var sk ? sk + 80 : 380) * Kt), none, s).Select(m => m.Text));
         var spK = spM.Where(m => m.Contains("speed")).ToList();
         Check(spK.Count == 3 && spK[0].Contains("speed 300 knots") && spK[1].Contains("say airspeed") && spK[2].Contains("resume normal speed") && twSp.VecKt(west) == 0,
@@ -871,6 +875,7 @@ public partial class Tower
         var twSl = new Tower("Enfield 1-1");
         twSl.Tick(west with { Ias = 450 * Kt }, none, 0);
         var slM = twSl.OnTranscript("Kutaisi Approach Enfield one one inbound for landing", west with { Ias = 450 * Kt }, none, 1).Select(m => m.Text).ToList();
+        twSl.altFree = false;   // R129: assigned speed
         for (int s = 2; s < 60; s++)
         {
             var ts = At(-291000, 660000, twSl.vecFt * Ft - FieldElev, twSl.vecHdg, (450 - 2 * s) * Kt);
@@ -885,6 +890,7 @@ public partial class Tower
             var tw = new Tower("Enfield 1-1");
             tw.Tick(west with { Ias = 380 * Kt }, none, 0);
             var l = tw.OnTranscript("Kutaisi Approach Enfield one one inbound for landing", west with { Ias = 380 * Kt }, none, 1).Select(m => (1.0, m.Text)).ToList();
+            tw.altFree = false;   // R129: assigned speed
             Telemetry T(double kt) => At(-291000, 660000, tw.vecFt * Ft - FieldElev, tw.vecHdg, kt * Kt);
             double s = 2;
             for (; s < 33; s++) l.AddRange(tw.Tick(T(380), none, s).Select(m => (s, m.Text)));
@@ -1050,6 +1056,12 @@ public partial class Tower
         Check(r.Count == 1 && r[0].Contains("roger, ") && r[0].Contains("heading") && !r[0].Contains("identified") && !r[0].Contains("Runway two five in use") && twRe.Phase == Phase.Inbound && twRe.Vectoring, "Zweites inbound unter Radarführung: " + (r.FirstOrDefault()?.Text ?? "-"));
         r = twRe.OnTranscript("Kutaisi Approach Enfield 11 initial", re1, none, 11);
         Check(r.Count == 1 && r[0].Contains("roger, ") && !r[0].Contains("identified") && twRe.Phase == Phase.Inbound, "initial unter Radarführung, weit vom IP: " + (r.FirstOrDefault()?.Text ?? "-"));
+        // Altitude report ("verify altitude") under radar vectoring over the field: Approach continues, Tower does not take over with "join downwind"
+        var twAlt = new Tower("Enfield 1-1");
+        twAlt.Tick(re0, none, 0);
+        twAlt.OnTranscript("Kutaisi Approach Enfield 11 inbound for landing", re0, none, 1);
+        r = twAlt.OnTranscript("Kutaisi Approach Enfield 11 6900 feet", At(P("25", -2 * NM).Item1, P("25", -2 * NM).Item2, 2000, 254, 300), none, 6);
+        Check(r.Count == 1 && r[0].Role == "Approach" && (r[0].Contains("heading") || r[0].Contains("direct initial")), "Höhenmeldung unter Radarführung über dem Platz: " + (r.FirstOrDefault()?.Text ?? "-"));
         twRe.vec!.Clear();
         var re2 = At(P("25", InitialDist + 3.5 * NM).Item1, P("25", InitialDist + 3.5 * NM).Item2, 900, 254, 150);
         r = twRe.OnTranscript("Kutaisi Approach Enfield 11 initial", re2, none, 16);
@@ -1413,6 +1425,8 @@ public partial class Tower
 
         Check(new Tower("Enfield 1-1").OnTranscript("blah blah", parked, none, 0)[0].StartsWith("Station calling"), "Unbekanntes");
         Check(new Tower("Enfield 1-1").SayAgain("Kutaisi Tower, blorf garble") is [{ Role: "Tower", Text: "Enfield one one, Kutaisi Tower, say again." }], "Unsicher verstanden -> say again");
+        var twPl = new Tower("Enfield 1-1") { last = new Msg("Approach", "Enfield one one, turn left heading two seven zero.") };
+        Check(twPl.Plain("Copied.") && twPl.Plain("Enfield 1-1, say again") && !twPl.Plain("Kutaisi Tower, blorf garble"), "Unsicher, aber Quittung/say again -> kein Rückfragen");
 
         // R39 · R48: Enter suggestion only if it fits (null = none): IMC first IFR clearance, "ready" only at the holding point, nothing after takeoff/landing/taxi-in clearance, no CRP in holding
         var twSg = new Tower("Enfield 1-1");
@@ -3422,6 +3436,8 @@ public partial class Tower
         Check(new Tower(bat, "x").AtisText("B", new Telemetry(bat.Elev + 2, 0, 0, 0, bat.X, bat.Z, 0, 0, 760), 15, true, 200, 3000).Contains("expect vectors for ILS approach runway one three, localizer one one zero decimal three"),
               "Batumi ATIS IFR -> 13");
         ForceIfr = false;
+        var atV = new Tower(bat, "x").AtisText("B", new Telemetry(bat.Elev + 2, 0, 0, 0, bat.X, bat.Z, 0, 0, 760), 15, false, 0, 9999);
+        Check(atV.Contains("Due to terrain, straight in and instrument approaches runway one three"), "Batumi ATIS Sicht: Approach fuehrt auf die 13: " + atV);
         // Review R212: visual, straight-in request, without procedure on the 13: no contradictory "cleared straight in approach runway 13, circle to runway 31", but downwind 31;
         // after taking over the pattern "circle" remains (report point base), go-around (PatternReset) clears it
         bat.Ils.Remove("13");
@@ -3613,6 +3629,7 @@ public partial class Tower
                 Telemetry T302(double f, double vs = 0) => new(f * Ft, f * Ft - k302.Elev, 300 * Kt, t302.vecHdg * Math.PI / 180, p302.X, p302.Z, fw302.X, fw302.Z, 1013, vs);
                 t302.Tick(T302(4000), none, 0);
                 t302.OnTranscript("Kutaisi Approach, Enfield 1-1, inbound for landing", T302(4000), none, 1);
+                t302.altFree = false;   // R394: assigned altitude (not at his discretion)
                 for (int s = 2; s < 40; s++) t302.Tick(T302(t302.vecFt), none, s);   // at the assigned altitude
                 double hi = t302.vecFt + 1200;
                 var said = new List<string>();
@@ -3666,6 +3683,23 @@ public partial class Tower
             var pdTick3 = Enumerable.Range(11, 150).SelectMany(s => tp3.Tick(tlp3(20000), none, s)).Select(m => m.Text).ToList();   // not descending yet
             Check(pd31.Contains($"descend at pilot's discretion, maintain {tp3.GateFt + 1000:0} feet") && !pdTick3.Any(m => m.Contains("descend and maintain") || m.Contains("expedite") || m.Contains("verify")),
                   $"R303 descent at pilot's discretion: {pd31} | " + string.Join(" / ", pdTick3));
+            // R394 (game 09.10., Kutaisi 54 NM, climbs unasked 4500 -> 9000): VFR altitude at his discretion (no call), descent with the profile; IFR (instrument approach) assigned altitude "maintain 4500 feet, expect lower in …", climbing is a deviation
+            (string First, List<string> Ticks, int Qd) R394(bool ifr)
+            {
+                ForceIfr = ifr;
+                var tq = new Tower(k3, "Dagger 1-1") { FieldWind = fw303 };
+                Telemetry Tq(double a, double f) { var q = e3.At(a, 0); return new(f * Ft, f * Ft - k3.Elev, 300 * Kt, e3.Hdg * Math.PI / 180, q.X, q.Z, fw303.X, fw303.Z, 1013); }
+                tq.Tick(Tq(54 * NM, 4500), none, 0);
+                var first = string.Join(" / ", tq.OnTranscript("Kutaisi Approach, Dagger 1-1, inbound for landing", Tq(54 * NM, 4500), none, 1).Select(m => m.Text));
+                var ticks = Enumerable.Range(2, 600).SelectMany(s => { double a = 54 * NM - (s - 1) * 300 * Kt; return tq.Tick(Tq(a, Math.Min(4500 + (s - 1) * 50, 9000)), none, s).Select(m => $"{a / NM:0}:{m.Text}"); }).ToList();
+                return (first, ticks, ticks.FindIndex(m => m.Contains("descend")));
+            }
+            var (q4v, q4vt, qdv) = R394(false);
+            Check(q4v.Contains("altitude at your discretion, expect lower in") && !q4v.Contains("maintain") && qdv >= 0 && !q4vt.Take(qdv).Any(m => Regex.IsMatch(m, "maintain|altitude|verify|climb")),
+                  $"R394 VFR Höhe nach eigenem Ermessen bis zum Profil: {q4v} | " + string.Join(" / ", q4vt.Take(qdv + 1)));
+            var (q4i, q4it, _) = R394(true);
+            Check(q4i.Contains("maintain 4500 feet, expect lower in") && !q4i.Contains("discretion") && q4it.Take(20).Any(m => m.Contains("4500")),
+                  $"R394 IFR zugewiesene Höhe, expect lower: {q4i} | " + string.Join(" / ", q4it.Take(5)));
             ForceIfr = false;
         }
 

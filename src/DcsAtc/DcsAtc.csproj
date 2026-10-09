@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
+    <EmbeddedResource Include="..\..\charts\caucasus.jsonc" LogicalName="caucasus.jsonc" />
   </ItemGroup>
 
 </Project>

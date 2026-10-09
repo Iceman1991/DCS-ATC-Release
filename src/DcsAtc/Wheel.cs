@@ -41,12 +41,20 @@ sealed class Wheel : Form
             new(L("Verkehr", "Traffic"), Sub: new Item[] { new("Traffic in sight", "Approach: traffic in sight"), new("Negative contact", "Approach: negative contact") }),   // max. 9: answers to traffic advisories bundled (no procedure suggestion)
             new("C R P", "Approach: C R P"),   // Reporting duty: handoff at C R P only when called
             new(L("Fahrt melden", "Report airspeed"), "Approach: report airspeed"),   // R129: answer to "say airspeed", Program inserts the speed ("340 knots")
-            new("Say again", "Approach: say again"), new("Request higher", "Approach: request higher"),   // R307: only if enough before it is hidden (fellow players: the first 9 as before)
+            new("Say again", "Approach: say again"), new("Request higher", "Approach: request higher"),
+            new("Leaving the zone", "Approach: leaving the control zone"),   // R7 / N3: only when due (after "report leaving the control zone" / "report clear of the zone"), last: fellow players see the first 9
+            // R307: only if enough before it is hidden (fellow players: the first 9 as before)
         }),
         new("Range", Sub: new Item[]
         {
             new("Check in", "Range: checking in"), new("IP inbound", "Range: IP inbound"), new("In hot", "Range: in hot"), new("Off safe", "Range: off safe"),
             new("Check out", "Range: checking out"), new("Check out, hung ordnance", "Range: checking out, hung ordnance"),   // R251
+        }),
+        new("JTAC", Sub: new Item[]   // J11: only if the own side has a JTAC / FAC(A) (Jtac); readback/in/off get lines 4+6 / direction from the app (Ops.CasWheel)
+        {
+            new("Check in", "JTAC: checking in"), new("Ready to copy", "JTAC: ready to copy"), new("Readback", "JTAC: readback"),
+            new("Request mark", "JTAC: request mark"), new("Tally", "JTAC: tally target"), new("In", "JTAC: in"), new("Off", "JTAC: off"),
+            new("Laser on", "JTAC: laser on"), new("Check out", "JTAC: checking out"),
         }),
         new("AWACS", Sub: new Item[]
         {
@@ -63,7 +71,7 @@ sealed class Wheel : Form
         new("Tanker", Sub: new Item[]
         {
             new("Request rejoin", "Tanker: request rejoin"), new("Visual", "Tanker: visual"), new("Observation", "Tanker: observation"), new("Pre-contact", "Tanker: pre contact"),
-            new("Refuel complete", "Tanker: refuel complete"),
+            new("Refuel complete", "Tanker: refuel complete"), new("Say position", "Tanker: say position"),
         }),
         new("Carrier", Sub: new Item[]
         {
@@ -103,12 +111,13 @@ sealed class Wheel : Form
         get
         {
             var (aw, tk) = Up();
-            var t = Vis(Mod(All.Where(i => i.Label switch { "Range" => Ops.Range != null, "Carrier" => Carrier.Boats.Count > 0, "AWACS" => aw, "Tanker" => tk, _ => true })), Fits());
+            var t = Vis(Mod(All.Where(i => i.Label switch { "Range" => Ops.Range != null, "Carrier" => Carrier.Boats.Count > 0, "AWACS" => aw, "Tanker" => tk, "JTAC" => Jtac(), _ => true })), Fits());
             if (top == null || !t.SequenceEqual(top)) top = t;
             return top;
         }
     }
     public static Func<(bool Awacs, bool Tanker)> Up = () => (true, true);   // own AWACS/GCI or tanker in the air, Program sets it (fellow players, preview: both)
+    public static Func<bool> Jtac = () => true;   // J11: own side has a living JTAC / FAC(A), Program sets it (fellow players, preview: yes)
     /// R307: does this radio call fit right now (Program.WheelFits: phase, open question, traffic advisory, Range/Tanker/Carrier)? Fellow players/preview: no state, everything.
     public static Func<Func<string, bool>> Fits = () => _ => true;
     /// R307: visible with text if it fits; submenu if one in it fits; with neither (Platz wählen) always. At most 9 (keys 1–9); if nothing fits, everything.
@@ -126,7 +135,7 @@ sealed class Wheel : Form
     public static void SelfTest(Action<bool, string> check)
     {
         foreach (var (name, n) in All.Where(i => i.Sub != null).SelectMany(i => i.Sub!.Where(s => s.Sub != null).Select(s => ($"{i.Label}/{s.Label}", s.Sub!.Length)).Prepend((i.Label, i.Sub!.Length))).Prepend(("Top", All.Length)))
-            check(n <= 9 || name == "Approach", $"Funkrad {name}: {n} Einträge (max. 9)");   // R307: Approach has 11, visible at most 9 (Vis)
+            check(n <= 9 || name is "Approach" or "Top", $"Funkrad {name}: {n} Einträge (max. 9)");   // R307: Approach has 12, visible at most 9 (Vis); Top 10 with JTAC (only shown with a leader)
         // R307: without state (fellow players, preview) everything as before: Approach the first 9, without Say again/Request higher
         var apC = string.Join(",", Vis(All.First(i => i.Label == "Approach").Sub!, _ => true).Select(i => i.Label));
         check(apC == $"{L("Airborne (nach Start)", "Airborne (after takeoff)")},Inbound for landing,Inbound, pattern work,Request ILS / straight in,Flight following,{L("Abmelden (cancel approach)", "Cancel approach")},{L("Verkehr", "Traffic")},C R P,{L("Fahrt melden", "Report airspeed")}",
@@ -489,19 +498,20 @@ sealed class Wheel : Form
             using var bad = new SolidBrush(sl.Mark ? Color.FromArgb(150, 0, 0) : Bad);   // darker on amber
             if (sl.Freq != null) g.DrawString(sl.Freq, small, sl.Off ? bad : bDim, new RectangleF(p.X - 60, top + lz.Height, 120, nh), Mid);
         }
-        using var hub = new SolidBrush(Color.FromArgb(248, Hub));
+        bool on = sug != null;   // Enter suggestion: hub amber like the marked slice, dark text on it
+        using var hub = new SolidBrush(on ? Color.FromArgb(235, accent) : Color.FromArgb(248, Hub));
         g.FillEllipse(hub, c - rIn + 6, c - rIn + 6, 2 * rIn - 12, 2 * rIn - 12);
         using var ring = new Pen(Color.FromArgb(200, accent), 2.5f);
         g.DrawEllipse(ring, c - rIn + 6, c - rIn + 6, 2 * rIn - 12, 2 * rIn - 12);
         using var white = new SolidBrush(Color.White);
-        using var acc = new SolidBrush(accent);
-        using var grey = new SolidBrush(Grey);
+        using var acc = new SolidBrush(on ? Dark : accent);
+        using var grey = new SolidBrush(on ? Color.FromArgb(190, Dark) : Grey);
         float th = sug == null ? 0.5f : 0.24f;   // with suggestion: airfield small at top, the suggestion is the main thing
         using var big = Fit(g, title.ToUpperInvariant(), Font1, sug == null ? s / 28f : s / 44f, FontStyle.Bold, new SizeF(rIn * (sug == null ? 1.7f : 1.2f), rIn * th * 0.64f));   // one line
         g.DrawString(title.ToUpperInvariant(), big, sug == null ? white : grey, new RectangleF(c - rIn, c - rIn * (sug == null ? 0.62f : 0.84f), 2 * rIn, rIn * th), Mid);
         if (sug is { } sg2)
         {
-            // Key label ENTER (amber, dark text), next to it the controller small; below it the suggestion large, bold, max. three lines
+            // Key label ENTER (dark, amber text on the amber hub), next to it the controller small; below it the suggestion large, bold, max. three lines
             var role = sg2.Role.ToUpperInvariant();
             var (kz, rz) = (g.MeasureString("ENTER", num), g.MeasureString(role, small));
             float kw = kz.Width + 8, kh = kz.Height + 2, x0 = c - (kw + 6 + rz.Width) / 2, y0 = c - rIn * 0.56f;
@@ -512,7 +522,7 @@ sealed class Wheel : Form
                 key.CloseFigure();
                 g.FillPath(acc, key);
             }
-            using var dark = new SolidBrush(Dark);
+            using var dark = new SolidBrush(accent);   // inverted on the amber hub
             g.DrawString("ENTER", num, dark, new RectangleF(x0, y0, kw, kh), Mid);
             g.DrawString(role, small, grey, new RectangleF(x0 + kw + 6, y0, rz.Width + 4, kh), new StringFormat { LineAlignment = StringAlignment.Center });
             var box = new RectangleF(c - rIn * 0.8f, c - rIn * 0.3f, rIn * 1.6f, rIn * 0.8f);

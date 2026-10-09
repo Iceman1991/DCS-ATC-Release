@@ -322,7 +322,7 @@ static class Flights
                 downAt.Remove(u.Name);
                 Down(u);
                 var bulls = Bulls(u);
-                if (Wingman(u) is { } wing) Say(now, 2 + Rnd(), "down", wing, $"{Cs(wing)}, {Elem(u)} is down, good chute{Opt(bulls)}.", Tac(wing, w), 1, 15);
+                if (Wingman(u) is { } wing) Say(now, 2 + Rnd(), "down", wing, $"{Cs(wing)}, {Elem(u)} is down, good chute{Opt(bulls)}.", Tac(wing, w), 1, 45);   // maxAge 45: behind the threat calls it must still air (was dropped after 15 s)
                 else Say(now, 0.2, "down", u, $"{Cs(u)}, ejecting, ejecting.", Tac(u, w), 0, 5, stress: true);
                 down.Add((u, now, 0, bulls, e.Length > 6 && e[6] == "1"));
                 break;
@@ -331,7 +331,7 @@ static class Flights
             {
                 var pu = new Unit(pl.Unit, pl.Gid > 0 ? Units.Values.FirstOrDefault(x => x.Gid == pl.Gid)?.Group ?? "" : "", "", pl.Callsign, pl.Side, pl.X, pl.Z, 0, false, 0, 0, Array.Empty<int>(), "", pl.Gid);
                 var bulls = Bulls(pu);   // "ejecting" is said by the player himself; only an AI wingman can report him (principle 8: with OwnWingmen)
-                if (Wingman(pu) is { } wing && Ours(wing, w, RadiusNm * 2)) Say(now, 2 + Rnd(), "down", wing, $"{Cs(wing)}, {Elem(pu)} is down, good chute{Opt(bulls)}.", Tac(wing, w), 1, 15);
+                if (Wingman(pu) is { } wing && Ours(wing, w, RadiusNm * 2)) Say(now, 2 + Rnd(), "down", wing, $"{Cs(wing)}, {Elem(pu)} is down, good chute{Opt(bulls)}.", Tac(wing, w), 1, 45);   // maxAge 45: behind the threat calls it must still air (was dropped after 15 s)
                 down.Add((pu, now, 0, bulls, e.Length > 6 && e[6] == "1"));
                 break;
             }
@@ -366,7 +366,7 @@ static class Flights
         foreach (var (name, (v, _)) in downAt.Where(kv => now - kv.Value.At > 6).ToList())   // shot down, no ejection
         {
             downAt.Remove(name);
-            if (Wingman(v) is { } wing) Say(now, 0, "down", wing, $"{Cs(wing)}, {Elem(v)} is down, no chute{Opt(Bulls(v))}.", Tac(wing, w), 1, 15);
+            if (Wingman(v) is { } wing) Say(now, 0, "down", wing, $"{Cs(wing)}, {Elem(v)} is down, no chute{Opt(Bulls(v))}.", Tac(wing, w), 1, 45);   // maxAge 45: behind the threat calls it must still air (was dropped after 15 s)
         }
         if (now - lastScan >= 2) { lastScan = now; Scan(now, w); }
 

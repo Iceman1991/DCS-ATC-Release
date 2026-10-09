@@ -135,6 +135,7 @@ local KOBULETI = { id = 24, x = -317900, y = 636600 }
 -- Armament (CLSIDs from ED missions or MissionEditor\data\scripts\UnitPayloads)
 local AIM9M, AIM120C, AIM7M_H, AIM120_HF, FPU8A = "{6CEB49FC-DED8-4DED-B053-E1F033FF72D3}", "{40EF17B7-F508-45de-8566-6FFECC0C1AB8}", "{LAU-115 - AIM-7M}", "{C8E06185-7CD6-4C90-959F-044679E90751}", "{FPU_8A_FUEL_TANK}"
 local function pyl(t) local r = {} for n, c in pairs(t) do r[n] = { CLSID = c } end return r end
+local GBU12 = "{DB769D48-67D7-42ED-A2BE-108D566C8B1E}"
 local LOAD = {
   hornetAA = { pylons = pyl({ [1] = AIM9M, [2] = AIM7M_H, [3] = AIM7M_H, [4] = AIM120_HF, [5] = FPU8A, [6] = AIM120_HF, [7] = AIM7M_H, [8] = AIM7M_H, [9] = AIM9M }), chaff = 60, flare = 30, gun = 100 },
   hornetLight = { pylons = pyl({ [1] = AIM9M, [9] = AIM9M }), chaff = 60, flare = 30, gun = 100 },   -- Carrier: below the landing weight
@@ -153,9 +154,11 @@ local LOAD = {
   foxhound = { pylons = pyl({ [1] = "{5F26DBC2-FB43-4153-92DE-6BBCE26CB0FF}", [2] = "{F1243568-8EF0-49D4-9CB5-4DA90D92BC1D}", [3] = "{F1243568-8EF0-49D4-9CB5-4DA90D92BC1D}",
                               [4] = "{F1243568-8EF0-49D4-9CB5-4DA90D92BC1D}", [5] = "{F1243568-8EF0-49D4-9CB5-4DA90D92BC1D}", [6] = "{5F26DBC2-FB43-4153-92DE-6BBCE26CB0FF}" }), chaff = 0, flare = 0, gun = 100 },
   none = { pylons = {}, chaff = 0, flare = 0, gun = 100 },
+  hornetCAS = { pylons = pyl({ [1] = AIM9M, [2] = GBU12, [3] = GBU12, [5] = FPU8A, [7] = GBU12, [8] = GBU12, [9] = AIM9M }), chaff = 60, flare = 30, gun = 100 },   -- J: JTAC test, laser bombs on the JTAC spot
+  viperCAS = { pylons = pyl({ [1] = AIM120C, [2] = AIM9M, [3] = GBU12, [4] = "{F376DBEE-4CAE-41BA-ADD9-B2910AC95DEC}", [6] = "{F376DBEE-4CAE-41BA-ADD9-B2910AC95DEC}", [7] = GBU12, [8] = AIM9M, [9] = AIM120C }), chaff = 60, flare = 60, gun = 100 },
 }
 local FUELMAX = { ["FA-18C_hornet"] = 4900, ["F-16C_50"] = 3249, ["F-15C"] = 6103, ["E-2C"] = 5624, ["E-3A"] = 65000, ["KC-135"] = 90700, ["KC135MPRS"] = 90700,
-                  ["S-3B Tanker"] = 7813, ["MiG-29S"] = 3493, ["Su-27"] = 5590.18, ["Su-25"] = 2835, ["MiG-31"] = 15500 }
+                  ["S-3B Tanker"] = 7813, ["MiG-29S"] = 3493, ["Su-27"] = 5590.18, ["Su-25"] = 2835, ["MiG-31"] = 15500, ["MQ-9 Reaper"] = 1300 }
 local CS = { Enfield = 1, Springfield = 2, Uzi = 3, Colt = 4, Dodge = 5, Ford = 6, Chevy = 7, Pontiac = 8, Texaco = 1, Arco = 2, Shell = 3, Overlord = 1, Magic = 2 }
 
 -- Radio presets of the players (channel 1..n, rest like the template)
@@ -332,7 +335,7 @@ function Mission:build()
   ms.coalition.blue.country = { { id = 2, name = "USA" } }
   for k, v in pairs(self.blue) do if type(v) == "table" and v.group then ms.coalition.blue.country[1][k] = v end end
   ms.coalition.red.country = {}
-  if self.red.plane then ms.coalition.red.country[1] = { id = 0, name = "Russia", plane = self.red.plane } end
+  if self.red.plane or self.red.vehicle then ms.coalition.red.country[1] = { id = 0, name = "Russia", plane = self.red.plane, vehicle = self.red.vehicle } end
   ms.maxDictId = 5
   ms.descriptionText, ms.descriptionRedTask, ms.descriptionBlueTask, ms.descriptionNeutralsTask, ms.sortie =
     "DictKey_descriptionText_1", "DictKey_descriptionRedTask_2", "DictKey_descriptionBlueTask_3", "DictKey_descriptionNeutralsTask_4", "DictKey_sortie_5"
@@ -344,7 +347,8 @@ end
 ---------------------------------------------------------------------------------------------------
 -- Check (after packing, on the unpacked .miz)
 local KNOWN = { ["FA-18C_hornet"] = 1, ["F-16C_50"] = 1, ["F-15C"] = 1, ["E-2C"] = 1, ["E-3A"] = 1, ["KC-135"] = 1, ["KC135MPRS"] = 1, ["S-3B Tanker"] = 1,
-                ["MiG-29S"] = 1, ["Su-27"] = 1, ["Su-25"] = 1, ["MiG-31"] = 1, Stennis = 1, TICONDEROG = 1, PERRY = 1, ["M-113"] = 1, Hummer = 1 }
+                ["MiG-29S"] = 1, ["Su-27"] = 1, ["Su-25"] = 1, ["MiG-31"] = 1, Stennis = 1, TICONDEROG = 1, PERRY = 1, ["M-113"] = 1, Hummer = 1,
+                ["T-72B"] = 1, ["BTR-80"] = 1, ["ZSU-23-4 Shilka"] = 1, ["MQ-9 Reaper"] = 1 }
 local FIELD = {}   -- DCS airfield frequencies Caucasus (whole MHz UHF 250-270, VHF 121-141) and DCS-ATC controllers
 for f = 250, 270 do FIELD[f * 10] = true end
 for f = 121, 141 do FIELD[f * 10] = true end
@@ -700,6 +704,8 @@ Prüfen: nur von blauen Sensoren erfasste Kontakte werden genannt, neue Gruppen 
   fighters(m, { name = "Ford 1 (F-16C CAP)", cs = "Ford", type = "F-16C_50", n = 2, load = "viperAA", skill = "High", freq = 251.5,
                 p1 = { x = -255000, y = 615000 }, p2 = { x = -245000, y = 600000 }, p3 = { x = -230000, y = 580000 }, alt = 22000 * FT, spd = 200 })
   m:vehicles({ name = "Konvoi Senaki", p = { x = SENAKI.x + 5500, y = SENAKI.y + 200 }, hdg = 0, units = { { type = "M-113" }, { type = "M-113" }, { type = "Hummer" }, { type = "Hummer" } } })
+  m:vehicles({ name = "JTAC Axeman", p = { x = SENAKI.x + 9000, y = SENAKI.y + 1500 }, hdg = 0, units = { { type = "Hummer" } } })   -- J1: JTAC by name (leader detection), red armor 3 km east in sight
+  m:vehicles({ side = "red", name = "Rot Panzer", p = { x = SENAKI.x + 12000, y = SENAKI.y + 1500 }, hdg = 0, units = { { type = "T-72B" }, { type = "T-72B" }, { type = "BTR-80" } } })
   fighters(m, { side = "red", name = "MiG-29S Rot 1", csNum = 110, type = "MiG-29S", n = 2, load = "fulcrum", skill = "Good", freq = 124.5, start = 120,
                 p1 = { x = -150000, y = 520000 }, p2 = { x = -255000, y = 630000 }, p3 = { x = -255000, y = 680000 }, alt = 23000 * FT, spd = 250, spd2 = 220 })
   fighters(m, { side = "red", name = "Su-27 Rot 2", csNum = 120, type = "Su-27", n = 2, load = "flanker", skill = "Good", freq = 124.5, start = 600,
@@ -797,6 +803,71 @@ Ablauf:
   slot(m, { name = "Springfield 1-1 (Hornet zu S-3B)", cs = "Springfield", type = "FA-18C_hornet", p = off(arco, 270, 32), alt = 12000 * FT, spd = 280 * KT * 1.24, to = arco, load = "hornetLight", fuel = 1100, freq = 255.5, uhf = UHF_LAND })
   slot(m, { name = "Pontiac 1-1 (Hornet Kutaisi)", cs = "Pontiac", type = "FA-18C_hornet", stand = "24", to = off(K, 250, 10), load = "hornetAA", freq = 263.0, uhf = UHF_LAND })
   slot(m, { name = "Uzi 1-1 (F-16 Kutaisi)", cs = "Uzi", type = "F-16C_50", stand = "22", to = off(K, 250, 10), load = "viperAA", freq = 263.0, uhf = UHF_LAND, vhf = VHF_LAND })
+  return m
+end }
+
+missions[#missions + 1] = { file = "DCS-ATC Test - JTAC.miz", build = function()
+  local A = { x = SENAKI.x + 9000, y = SENAKI.y + 1500 }   -- JTAC Axeman; flat Colchis lowland, line of sight to the armor
+  local tgt = { x = A.x + 3000, y = A.y }
+  local m = newMission({ title = "DCS-ATC Test - JTAC", start = 10 * 3600, center = A, wind = { 70, 4, 7, 11 },
+    clouds = { preset = "Preset2", thickness = 200, density = 0, base = 2500, iprecptns = 0 }, wxName = "Few clouds",
+    brief = [[
+DCS-ATC TEST – JTAC
+
+EN
+Purpose: DCS-ATC JTAC and FAC(A): check-in, situation, 9-line, readback, marks (smoke, laser 1688), IN / cleared hot, BDA, check-out; FAC(A) and handover.
+Conditions: 15 June, 10:00 local, few clouds. JTAC frequency 133.5 AM (DCS-ATC default), laser code 1688.
+
+Ground (9 km north of Senaki):
+- Axeman  JTAC (Hummer), friendly platoon (2x M-113) 600 m west of him
+- Enemy armor 3 km north of Axeman (2x T-72B, BTR-80), ZSU-23-4 Shilka 1.5 km behind it (threat)
+- Pontiac 1-1  MQ-9 FAC(A), on station after 15 min, 15000 ft over the target area
+
+Slots:
+- Enfield 1-1  Hornet airborne 15 NM south-west, 12000 ft, 4x GBU-12, COMM1 133.5 (lat/long in line 6)
+- Colt 1-1     F-16C airborne 15 NM south, 12000 ft, 2x GBU-12, VHF preset 1 133.5 (lat/long)
+- Uzi 1-1      Hornet cold at Kutaisi stand 24 (rearm as you like, e.g. Litening/Mavericks)
+
+Flow:
+1. "Axeman, Enfield 1-1, checking in" -> situation, type 2, "advise when ready for 9-line".
+2. "ready to copy" -> 9-line; read back lines 4, 6 and restrictions -> "readback correct".
+3. "request mark" -> smoke on the target after about 30 s; "tally target"; "laser on".
+4. "Enfield 1-1, in from the south" -> "cleared hot"; GBU-12 on the spot; "off" -> BDA.
+5. Second player checks in during an attack -> hold with altitude stack.
+6. After 15 min: Pontiac 1-1 (FAC(A), MQ-9) on station.
+
+DE
+Zweck: DCS-ATC-JTAC und FAC(A): Check-in, Lage, 9-Liner, Readback, Markierung (Rauch, Laser 1688), IN / cleared hot, BDA, Check-out; FAC(A) und Übergabe.
+Lage: 15. Juni, 10:00 Ortszeit, wenige Wolken. JTAC-Frequenz 133.5 AM (DCS-ATC-Standard), Laser-Code 1688.
+
+Boden (9 km nördlich Senaki):
+- Axeman  JTAC (Hummer), eigener Zug (2x M-113) 600 m westlich von ihm
+- Feindpanzer 3 km nördlich von Axeman (2x T-72B, BTR-80), ZSU-23-4 Schilka 1,5 km dahinter (Bedrohung)
+- Pontiac 1-1  MQ-9 FAC(A), ab Minute 15 auf Station, 15000 ft über dem Zielgebiet
+
+Slots:
+- Enfield 1-1  Hornet in der Luft, 15 NM südwestlich, 12000 ft, 4x GBU-12, COMM1 133.5 (Lat/Long in Zeile 6)
+- Colt 1-1     F-16C in der Luft, 15 NM südlich, 12000 ft, 2x GBU-12, VHF-Preset 1 133.5 (Lat/Long)
+- Uzi 1-1      Hornet kalt in Kutaisi Stand 24 (Bewaffnung frei, z. B. Litening/Mavericks)
+
+Ablauf:
+1. "Axeman, Enfield 1-1, checking in" -> Lage, Type 2, "advise when ready for 9-line".
+2. "ready to copy" -> 9-Liner; Zeilen 4, 6 und Restrictions zurücklesen -> "readback correct".
+3. "request mark" -> Rauch aufs Ziel nach ca. 30 s; "tally target"; "laser on".
+4. "Enfield 1-1, in from the south" -> "cleared hot"; GBU-12 auf den Spot; "off" -> BDA.
+5. Zweiter Spieler checkt während eines Angriffs ein -> Warten mit Höhenstaffel.
+6. Nach 15 min: Pontiac 1-1 (FAC(A), MQ-9) auf Station.
+]] })
+  m:vehicles({ name = "JTAC Axeman", p = A, hdg = 0, units = { { type = "Hummer" } } })   -- J1: leader by name
+  m:vehicles({ name = "Blau Zug", p = { x = A.x, y = A.y - 600 }, hdg = 0, units = { { type = "M-113" }, { type = "M-113" } } })   -- line 8 friendlies
+  m:vehicles({ side = "red", name = "Rot Panzer", p = tgt, hdg = 180, units = { { type = "T-72B" }, { type = "T-72B" }, { type = "BTR-80" } } })
+  m:vehicles({ side = "red", name = "Rot Flak", p = { x = tgt.x + 1500, y = tgt.y + 300 }, hdg = 180, units = { { type = "ZSU-23-4 Shilka" } } })   -- threat remark
+  m:plane({ name = "FACA Pontiac", cs = "Pontiac", task = "AFAC", freq = 133.5, start = 900, skill = "Excellent",
+    units = { { type = "MQ-9 Reaper", name = "Pontiac 1-1", p = off(tgt, 200, 8), alt = 15000 * FT, spd = 70, hdg = 20 } },
+    points = function() return { wp(off(tgt, 200, 8), 15000 * FT, 70), wp(tgt, 15000 * FT, 70, { tasks = { T.cmd("SetInvisible", { value = true }), T.orbit(15000 * FT, 70, "Circle") } }) } end })
+  slot(m, { name = "Enfield 1-1 (Hornet CAS)", cs = "Enfield", type = "FA-18C_hornet", p = off(tgt, 225, 15), alt = 12000 * FT, spd = 300 * KT * 1.2, to = tgt, load = "hornetCAS", freq = 133.5, uhf = { 133.5, 251.5, 263.0, 261.0 } })
+  slot(m, { name = "Colt 1-1 (F-16 CAS)", cs = "Colt", type = "F-16C_50", p = off(tgt, 180, 15), alt = 12000 * FT, spd = 300 * KT * 1.2, to = tgt, load = "viperCAS", freq = 251.5, uhf = UHF_LAND, vhf = { 133.5, 134.0, 132.0 } })
+  slot(m, { name = "Uzi 1-1 (Hornet Kutaisi)", cs = "Uzi", type = "FA-18C_hornet", stand = "24", to = tgt, load = "hornetCAS", freq = 263.0, uhf = { 263.0, 133.5, 251.5 } })
   return m
 end }
 
