@@ -198,7 +198,8 @@ if EXTERNAL_ATC then
   local function weather()
     local v = (wx.visibility and wx.visibility.distance) or 80000
     if not pcall(function()
-      if world.weather.getFogThickness() > 0 then v = math.min(v, world.weather.getFogVisibilityDistance()) end
+      local fv = world.weather.getFogVisibilityDistance()   -- 0 = no fog (thickness alone can be > 0, e.g. ATMOS-X)
+      if world.weather.getFogThickness() > 0 and fv > 0 then v = math.min(v, fv) end
     end) then v = vis end
     G = string.format("G;%d;%.0f;%.0f", cover, cl.base or 0, v)
     W = {}

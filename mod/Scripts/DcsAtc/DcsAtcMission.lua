@@ -630,7 +630,8 @@ local function start()
   local function weather()
     local v = (wx.visibility and wx.visibility.distance) or 80000
     pcall(function()
-      if world.weather.getFogThickness() > 0 then v = math.min(v, world.weather.getFogVisibilityDistance()) end
+      local fv = world.weather.getFogVisibilityDistance()   -- 0 = no fog (thickness alone can be > 0, e.g. ATMOS-X)
+      if world.weather.getFogThickness() > 0 and fv > 0 then v = math.min(v, fv) end
     end)
     G = string.format("G;%d;%.0f;%.0f;%d", cover, cl.base or 0, v, ceil)
     W = {}
@@ -1290,10 +1291,10 @@ local function start()
     for _, L in ipairs(jLeaders) do if L.side == side and not L.dead then return true end end
     return false
   end
-  local function jUnit(L)   -- first living unit of the leader group
+  local function jUnit(L)   -- first living, active unit of the leader group (a group with a later start time already exists, inactive, at its start point)
     local g = Group.getByName(L.name)
     for _, u in ipairs(g and g:getUnits() or {}) do
-      if u:isExist() and u:getLife() >= 1 then return u end
+      if u:isExist() and u:isActive() and u:getLife() >= 1 then return u end
     end
   end
   local function jSee(L, lu, p)   -- sight model per role: JTAC from +2 m above ground, 8 km; FAC(A) from the aircraft, 15 km

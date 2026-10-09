@@ -1,4 +1,4 @@
-DCS-ATC 0.12.0 ALPHA – sprechende Flugsicherung für DCS World (alle Karten, getestet im Kaukasus)
+DCS-ATC 0.12.1 ALPHA – sprechende Flugsicherung für DCS World (alle Karten, getestet im Kaukasus)
 =====================================================================
 
 !! ALPHA-VERSION !!

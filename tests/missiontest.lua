@@ -28,6 +28,7 @@ os.rename = function(a, b)
   return true
 end
 
+FOG = { 0, 0 }
 env = { info = function(s) if os.getenv("DBG") then print(s) end end, error = function(s) print("ENV ERROR " .. s) end, mission = { theatre = "Caucasus", weather = {}, coalition = {
   blue = { bullseye = { x = 0, y = 0 }, country = { { id = 2, plane = { group = { { name = "Players", units = { { skill = "Client", parking = "1" } },
            route = { points = { { airdromeId = 26 } } } } } } } } } } } }
@@ -36,7 +37,7 @@ timer = { getTime = function() return T end, scheduleFunction = function(f, a, t
 world = { event = { S_EVENT_BIRTH = 15, S_EVENT_LAND = 4, S_EVENT_CRASH = 5, S_EVENT_DEAD = 8, S_EVENT_UNIT_LOST = 30, S_EVENT_ENGINE_SHUTDOWN = 19,
                     S_EVENT_SHOT = 1, S_EVENT_HIT = 2, S_EVENT_EJECTION = 6, S_EVENT_PILOT_DEAD = 9, S_EVENT_SHOOTING_START = 23, S_EVENT_SHOOTING_END = 24, S_EVENT_KILL = 28, S_EVENT_REFUELING = 7, S_EVENT_REFUELING_STOP = 14, S_EVENT_TAKEOFF = 3, S_EVENT_LANDING_QUALITY_MARK = 36 },
           addEventHandler = function(h) handlers[#handlers + 1] = h end, VolumeType = { SPHERE = 1 },
-          weather = { getFogThickness = function() return 0 end }, removeJunk = function() end }
+          weather = { getFogThickness = function() return FOG[1] end, getFogVisibilityDistance = function() return FOG[2] end }, removeJunk = function() end }
 MENU = {}
 GROUPS = {}   -- R390: submenus { name, n = entries } – at most 9 per level (DCS F10)
 missionCommands = { addSubMenuForGroup = function(_, name, parent) local g = { name = name, n = 0 }; if parent then parent.n = parent.n + 1 end; GROUPS[#GROUPS + 1] = g; return g end,
@@ -203,6 +204,9 @@ RADAR[1] = { object = low }
 run(T + 3); assert(stateFile():find("D;2;Bandit1;0", 1, true), "Erfassung fehlt: " .. stateFile())
 RADAR[1].type = true
 run(T + 3); assert(stateFile():find("D;2;Bandit1;1", 1, true), "Typ erkannt fehlt")
+-- fog thickness without fog visibility (ATMOS-X): no "visibility 0 m"; real fog limits
+FOG[1], FOG[2] = 300, 0; run(T + 12); assert(stateFile():find("G;%d+;%d+;80000;"), "Nebel ohne Sichtweite: " .. stateFile())
+FOG[2] = 600; run(T + 12); assert(stateFile():find("G;%d+;%d+;600;"), "Nebelsicht fehlt: " .. stateFile()); FOG[1], FOG[2] = 0, 0
 assert(("\n" .. stateFile()):find("\nP;[^\n]*;1%.00;0%.50;a\n"), "Fahrwerk/Kategorie fehlt in der P-Zeile: " .. stateFile())
 local huey = coalition.addGroup(2, Group.Category.HELICOPTER, { name = "Huey", units = { { name = "Huey", x = 900000, y = 0, alt = 300 } } })   -- N50: category h/a in P and T line
 run(T + 3); assert(("\n" .. stateFile()):find("\nT;Huey;Huey;[^\n]*;h;%d+;[^;\n]*\n") and stateFile():find("T;Hornet CV;[^\n]*;a;%d+;[^;\n]*\n"), "Kategorie fehlt in der T-Zeile: " .. stateFile())
@@ -390,7 +394,7 @@ wpn.alive = false; run(T + 3); assert(has("X;trashed;Viper;Bandit1"), "Trashed f
 for _ = 1, 40 do T = T + 0.05; fire({ id = world.event.S_EVENT_HIT, initiator = vip, target = low, weapon = wpn }) end
 local nHit = 0; for _, x in ipairs(events) do if x:find("^X;hit;Viper;") then nHit = nHit + 1 end end
 assert(nHit >= 1 and nHit <= 3, "Treffer-Drossel (R382): " .. nHit .. " X;hit in 2 s")
-fire({ id = world.event.S_EVENT_KILL, initiator = vip, target = low }); assert(has("X;kill;Viper;Viper;Bandit1;;FA-18C_hornet;1"), "X;kill fehlt")
+fire({ id = world.event.S_EVENT_KILL, initiator = vip, target = low }); assert(has("X;kill;Viper;Viper;Bandit1;;FA-18C_hornet;1;1"), "X;kill fehlt")
 landX = 30000   -- R361: Viper (x 60000) over land, P1 (x 0) over water
 fire({ id = world.event.S_EVENT_EJECTION, initiator = vip }); assert(has("X;eject;Viper;Viper;60000;0;0"), "X;eject fehlt")
 fire({ id = world.event.S_EVENT_PILOT_DEAD, initiator = low }); fire({ id = world.event.S_EVENT_PILOT_DEAD, initiator = vip })

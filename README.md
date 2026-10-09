@@ -2,7 +2,7 @@
 
 [![Downloads](https://img.shields.io/github/downloads/Iceman1991/DCS-ATC-Release/total?label=Downloads&color=2ea44f)](https://github.com/Iceman1991/DCS-ATC-Release/releases) [![Latest release](https://img.shields.io/github/v/release/Iceman1991/DCS-ATC-Release?label=Version)](https://github.com/Iceman1991/DCS-ATC-Release/releases/latest)
 
-Voice ATC for DCS World. You talk to Ground, Tower, Approach, ATIS, AWACS, tankers and JTACs over SRS in English and they answer with their own voices. Speech recognition (Whisper) and the voices (Piper) run locally on your PC, nothing goes to the internet. Works on any map in any mission, single player and multiplayer (host or dedicated server). So far only tested on Caucasus.
+Voice ATC for DCS World. You talk to Ground, Tower, Approach, ATIS, AWACS and tankers over SRS in English and they answer with their own voices. Speech recognition (Whisper) and the voices (Piper) run locally on your PC, nothing goes to the internet. Works on any map in any mission, single player and multiplayer (host or dedicated server). So far only tested on Caucasus.
 
 **Alpha:** early test version. Expect bugs (wrong or double calls, odd headings, hangs). Use at your own risk. Feedback and logs are welcome.
 
@@ -23,7 +23,6 @@ Manual: [English](docs/MANUAL.md) · [Deutsch](docs/ANLEITUNG.md) (installation,
 - AWACS of your mission: check in/out, picture, bogey dope, declare, sort, spiked, threat calls, nearest tanker, vector to the nearest field.
 - Air combat with the AWACS (ATP 1-02.1 brevity): it commits flights, assigns targets, skip it / reset / recommit, leakers, splash. AI fighters fly what it says, check in and out and land under DCS-ATC afterwards. You can answer with unable, fox, defensive, request support, winchester or say again, by voice or radio wheel.
 - Tankers of your mission: rendezvous, sequence, pre-contact, contact/disconnect, refueling help.
-- JTAC or FAC(A) of your mission: check-in, 9-line with readback, target mark (smoke, white phosphorus, laser), cleared hot with type 1, 2 or 3 control, BDA, check fire.
 - AI traffic of the mission talks to ATC (DCS-ATC doesn't spawn aircraft itself). AI flights call Fox, Splash, Defending, Bingo, Winchester and emergencies on Guard.
 - Crew chief on the SRS intercom, ground crew with fuel/ammo trucks and fire service.
 - Three ways to talk: voice over SRS, radio wheel (keyboard or HOTAS) and F10 menu. The radio wheel also works in VR (as in-game text). The middle of the wheel shows what's expected next, ENTER sends it.
@@ -43,7 +42,7 @@ Manual: [English](docs/MANUAL.md) · [Deutsch](docs/ANLEITUNG.md) (installation,
 1. Close DCS, unzip, run `DCS-ATC-Setup.exe` and pick English or German. No admin rights needed, only one Windows prompt for `MissionScripting.lua`.
 2. SmartScreen may complain because the setup is new and not signed: More info, then Run anyway. You can check the file against the SHA256 in the release (`Get-FileHash`).
 3. At the end you set the keys for the radio wheel and push-to-talk, then the settings window opens (voices, speech speed, altimeter hPa/inHg, runway lights, AWACS range).
-4. That's it, DCS-ATC starts with every mission. For a dedicated server tick "Dedicated server" in the setup (see manual). With "Custom" you can leave out modules you don't need (air traffic control, Range, AWACS, Tanker, JTAC, Carrier, AI radio, ground crew), for example when a real player runs AWACS or Tower.
+4. That's it, DCS-ATC starts with every mission. For a dedicated server tick "Dedicated server" in the setup (see manual). With "Custom" you can leave out modules you don't need (air traffic control, Range, AWACS, Tanker, Carrier, AI radio, ground crew), for example when a real player runs AWACS or Tower.
 
 ## Requirements
 

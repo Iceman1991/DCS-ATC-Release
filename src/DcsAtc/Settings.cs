@@ -227,7 +227,7 @@ static class Settings
             try
             {
                 var dcs = Path.Combine(Program.SavedGamesDcs(), "Scripts", "DcsAtc");
-                var ml = string.Join(",", mods.Where(m => m.Box.Checked).Select(m => m.Id));   // before config.jsonc: its reload reads modules.txt
+                var ml = string.Join(",", mods.Where(m => m.Box.Checked).Select(m => m.Id).Append("m2"));   // before config.jsonc: its reload reads modules.txt; m2 = list knows jtac (installer update)
                 File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "modules.txt"), ml);
                 if (Directory.Exists(dcs)) File.WriteAllText(Path.Combine(dcs, "DcsAtcModules.txt"), ml);
                 var text = File.ReadAllText(Program.ConfigPath);

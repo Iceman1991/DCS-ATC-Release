@@ -1,5 +1,5 @@
 ﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe
-#define AppVer "0.12.0-alpha"
+#define AppVer "0.12.1-alpha"
 #define Src ".."
 
 [Setup]
@@ -237,7 +237,8 @@ begin
     CompSet := True;
     if LoadStringFromFile(ExpandConstant('{app}\modules.txt'), S) then begin
       S := ',' + Lowercase(Trim(S)) + ',';
-      Untick(S, 'atc'); Untick(S, 'range'); Untick(S, 'awacs'); Untick(S, 'tanker'); Untick(S, 'carrier'); Untick(S, 'ai'); Untick(S, 'crew'); Untick(S, 'jtac');
+      Untick(S, 'atc'); Untick(S, 'range'); Untick(S, 'awacs'); Untick(S, 'tanker'); Untick(S, 'carrier'); Untick(S, 'ai'); Untick(S, 'crew');
+      if Pos(',m2,', S) > 0 then Untick(S, 'jtac');   { m2: list written by 0.12.1+, knows jtac (an older list lacks it because it did not exist) }
     end;
   end;
   if (CurPageID = wpSelectTasks) and not TaskSet then begin
@@ -304,7 +305,7 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var Mods: String;
 begin
   if CurStep = ssPostInstall then begin
-    Mods := WizardSelectedComponents(False);
+    Mods := WizardSelectedComponents(False) + ',m2';   { m2 = this list knows jtac (see CurPageChanged) }
     if HasClient() then begin
       ForceDirectories(SavedGames('') + '\Scripts\DcsAtc');
       SaveStringToFile(SavedGames('') + '\Scripts\DcsAtc\DcsAtcPath.txt', ExpandConstant('{app}\DcsAtc.exe'), False);

@@ -125,8 +125,8 @@ partial class Ops
             if (cas < 3 || cur == null) return Say(cas < 3 ? "negative, readback first" : "no target to mark");
             var (_, kind, delay) = CasKind[l.Kind];
             Cmds.Add($"MARK;{casL};{casG};{kind};{delay}");
-            (casMarkAt, casMarkTxt) = (now + delay, kind == "wp" ? "white phosphorus" : kind.Replace("smoke_", "") + " smoke");
-            return Say(delay > 0 ? $"mark on the way, {Digits(delay.ToString())} seconds" : "rocket away, mark is " + casMarkTxt);
+            (casMarkAt, casMarkTxt) = (delay > 0 ? now + delay : 0, kind == "wp" ? "white phosphorus" : kind.Replace("smoke_", "") + " smoke");
+            return Say(delay > 0 ? $"mark on the way, {Digits(delay.ToString())} seconds" : $"rocket away, mark is {casMarkTxt}, advise contact");
         }
         if (cas >= 3 && cas <= 5 && Regex.IsMatch(n, @"\bin\b") && !Has(n, "checking in", "check in") && !Regex.IsMatch(n, @"\bin (sight|trail)\b"))   // attack: IN from the west
         {
