@@ -136,7 +136,7 @@ public partial class Tower
                 : Has(n, "low pass", "fly by", "flyby") ? "low pass"   // A47: low pass, no pattern afterwards
                 : Has(n, "low approach", "practice approach", "practice ils", "practice instrument", "practice tacan", "practice vor") ? "low approach"
                 : Has(n, "closed pattern", "pattern work", "circuits", "practice") ? "touch and go" : Has(n, "full stop") ? "full stop" : null;
-        if (opt != null) { option = opt; stayPattern = opt is not ("full stop" or "low pass"); }
+        if (opt != null) { option = opt; stayPattern = opt is not ("full stop" or "low pass") && (ground || !DepWish(n)); }   // forum 0.13: "low approach, then departure": afterwards out instead of the next circuit
 
         // Runway request (V13): up to 10 kt tailwind, valid until landing; rejected -> addition at the end of the reply
         // A41: also on the ground at startup/taxi/clearance ("request taxi, runway 07"): changed runway -> "runway zero seven approved, …", rejected -> only the rejection
@@ -290,7 +290,7 @@ public partial class Tower
                 ProgStart(Has(n, "progressive"), now);
                 if (special is { } sp) { special = null; lastParkCall = -1; return Say($"{c}, taxi to the {sp}."); }   // R251: once de-arm area instead of parking position (afterwards "request taxi to parking" normal), no taxi guidance to the old parking spot
                 if (t != null && FreeSpot(t, traffic) is { } fs) { spot = (fs.X, fs.Z); parkNum = fs.Num; home = NearestRamp(t with { X = fs.X, Z = fs.Z }); }   // named ramp = that of the parking spot
-                var park = parkNum > 0 ? $"parking spot {Digits(parkNum.ToString())}" : "parking";
+                var park = parkNum > 0 ? $"parking spot {StandName(parkNum)}" : "parking";
                 var where = t != null && ParkDir(t) is { } pd ? (parkNum > 0 ? $", {pd}" : $", your parking position {pd}") : "";
                 return Say(F.Charted && home != null ? $"{c}, taxi to {home.Name}{ParkRoute()}{(parkNum > 0 ? ", " + park : "")}{where}." : $"{c}, taxi to {park}{where}.");
 
@@ -448,6 +448,14 @@ public partial class Tower
                 Phase = Phase.ClearedLand;
                 return Say($"{c}, {Wheels()}runway {RwSay(rw)}{(sw == "" ? $", {Wind(t)}" : sw)}, {ClearText()}.");
             }
+
+            case "patterndep":   // forum 0.13: out of the pattern as a departure (Tick: check-in with Departure, release at the zone edge)
+                if (opt != null && Phase != Phase.ClearedLand) goto case "option";   // "low approach, then departure": first the option (parser: no next circuit)
+                stayPattern = false;
+                if (Phase == Phase.ClearedLand) { if (option is null or "full stop") option = "low approach"; return Say($"{c}, {ClearText()}."); }   // Tick after the pass: Departing
+                Phase = Phase.Departing; option = null; nav = null; PatternReset();
+                handedOff = true; handedAt = lastSeen; dueAt = -1;   // as the Tick's handover after takeoff
+                return Say($"{c}, departure approved, contact {Contact("Approach")}.");
 
             case "option":
                 if (option == "low pass" && Phase == Phase.Away)   // A47: low pass from outside over final (pattern procedure without circuit, Pattern gives the clearance on final)
@@ -911,6 +919,7 @@ public partial class Tower
             // First call to Departure after takeoff ("Kutaisi Approach, Enfield 1-1", "…, with you"): check-in, not a landing announcement
             if ((Phase is Phase.ClearedTakeoff or Phase.Departing || Phase == Phase.Away && handedOff) && (Has(n, "with you") || Addressed(n) == "Approach" && Rest(n) == "unknown")) return "airborne";
             if (Has(n, "airborne", "climbing") && Phase is Phase.Pattern or Phase.Entering or Phase.Initial or Phase.Inbound) return Rest(n);   // R112: no departure, so no first contact ("Approach: airborne, climbing")
+            if (!Emergency && Phase is Phase.Initial or Phase.Pattern or Phase.ClearedLand && DepWish(n)) return "patterndep";   // forum 0.13: before "approach" ("low approach, then departure")
             if (Has(n, "with you") || Has(n, "approach") && !Following && !handedOff) return "inbound";
             if (Has(n, "touch and go", "touch go", "low approach", "low pass", "fly by", "flyby", "closed pattern", "pattern work", "the option")) return "option";
         }
@@ -957,6 +966,9 @@ public partial class Tower
 
     /// Controller called at the start of the transmission (first three words, long airfield names correspondingly more): "Kutaisi Approach, ..." / "Minvody Approach, ..." (call name) / "Ground: ..." (menu) / "Tower, ...".
     /// Station further back, "contact Tower" or "radar contact/service" is a readback, not a call.
+    /// Forum 0.13: departure after the option or out of the pattern ("low approach, then departure", "request departure", "Enfield 1-1 departing"), not the address "Kutaisi Departure".
+    static bool DepWish(string n) => Regex.IsMatch(n, @"\b(?:then|and|with|followed by|request|requesting|approach|go|option|\d) (?:a |the )?(?:\w+ )?depart");
+
     string? Addressed(string n)
     {
         var w = $"{F.Name}-{F.Callsign}".ToLowerInvariant().Split('-', ' ', StringSplitOptions.RemoveEmptyEntries).Distinct().ToArray();
@@ -1056,7 +1068,7 @@ public partial class Tower
 
     /// At the runway holding point of the active runway (R349: 250 m around the holding point or the threshold) or already on a runway: "ready for departure" fits.
     /// Forum 0.9.7: not while a parallel runway still lies in between (holding point 03L with assigned 03R, close together like Nellis).
-    bool AtHold(Telemetry? t) => t == null || CrossNext(t) == null && (OnRunwayPos(t.X, t.Z) || Dist(t.X, t.Z, Thr(Runway).X, Thr(Runway).Z) <= 250 ||
+    bool AtHold(Telemetry? t) => t == null || CrossNext(t) == null && (OnRunwayPos(t.X, t.Z) || OnRwySpot(t) || Dist(t.X, t.Z, Thr(Runway).X, Thr(Runway).Z) <= 250 ||
                                                                        HoldPt(Runway, t) is var h && Dist(t.X, t.Z, h.X, h.Z) <= 250);
 
     /// R339: instrument conditions without IFR clearance: no VFR taxi/departure (14 CFR 91.155, SERA.5005(b)); practice approaches fly the radar pattern (R253)

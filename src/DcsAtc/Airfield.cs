@@ -67,6 +67,24 @@ public class Airfield
     public double CtrTopFt => Elev / Ft + 3000;
 
     public RwyEnd End(string name) => Ends.First(e => e.Name == name);
+    public Dictionary<int, string> Stands = new();   // DCS stand name by Term_Index ("F125" as in the ME/kneeboard), from the hook
+    /// DcsAtc-Stands.txt (DcsAtcHook.lua): "M;theatre", then "S;airdrome id;Term_Index;name". Other map = stale file, ignored.
+    public static void LoadStands(IEnumerable<Airfield> fields, string file)
+    {
+        var lines = File.Exists(file) ? File.ReadAllLines(file) : Array.Empty<string>();
+        if (lines.FirstOrDefault() != "M;" + Theatre) return;
+        var byId = fields.Where(f => f.Id > 0).ToLookup(f => f.Id);
+        foreach (var p in lines.Select(l => l.Split(';')))
+            if (p.Length >= 4 && p[0] == "S" && int.TryParse(p[1], out var id) && int.TryParse(p[2], out var ix))
+                foreach (var f in byId[id]) f.Stands[ix] = p[3];
+    }
+    /// Debug log (TEL on the ground, forum Sinai): runway with the smallest lateral offset in the direction of travel, along from its center, heading difference, nearest DCS runway spawn point
+    public string RwyDiag(double x, double z, double hdg) =>
+        (Ends.Where(e => Diff(hdg, e.Hdg) < 90).MinBy(e => Math.Abs((x - e.CX) * e.Dz - (z - e.CZ) * e.Dx)) is { } e
+            ? FormattableString.Invariant($"Bahn {e.Name} quer {(x - e.CX) * e.Dz - (z - e.CZ) * e.Dx:0} m längs {(x - e.CX) * e.Dx + (z - e.CZ) * e.Dz:0} m (halbe Länge {e.Len / 2:0}) Kurs {e.Hdg:0.0} Kursdiff {Diff(hdg, e.Hdg):0.0}")
+            : "keine Bahn")
+        + (Spots.Where(s => s.Type == 16).Select(s => Math.Sqrt((s.X - x) * (s.X - x) + (s.Z - z) * (s.Z - z))).DefaultIfEmpty(-1).Min() is var d and >= 0
+            ? FormattableString.Invariant($", Bahnspawnpunkt {d:0} m") : ", kein Bahnspawnpunkt");
 
     /// Emergency (R37, A15 AWACS): nearest own/neutral airfield with a runway, preferably from 1800 m; null = none.
     public static Airfield? Emergency(IEnumerable<Airfield> fields, double x, double z, int side)

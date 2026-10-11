@@ -19,6 +19,7 @@ public class Config
     public string MicName { get; set; } = "";        // part of the microphone name, empty = Windows default
     public string Callsign { get; set; } = "Enfield 1-1";   // only without mission data (otherwise call sign from DCS)
     public string MyCallsign { get; set; } = "";       // own call sign instead of the one from the DCS slot, "" = from DCS (Settings window)
+    public bool CallsignFromUnit { get; set; }         // forum 0.13: call sign from the mission unit name ("VICTORY 9-1", "WOLF-2-1") instead of the DCS slot (Pontiac); other names stay DCS
     public Dictionary<string, double> Frequencies { get; set; } = new(Tower.Freqs) { ["Range"] = 267.5, ["AWACS"] = 251.5, ["Tanker"] = 255.5, ["Carrier"] = 127.5, ["JTAC"] = 133.5 };   // AWACS/tanker on .5: not on an airfield frequency (Radio.lua whole MHz, K3)
     public bool AwacsBullseye { get; set; } = true;    // LK4: picture and situation updates to all as bullseye; false = everything BRAA from the player (fallback)
     public double AwacsNewGroupNm { get; set; } = 200;  // AWACS reports new groups (and picture clean) within this radius, 40-200 NM
@@ -371,7 +372,8 @@ static partial class Program
             if (p.Tel is not { } t) continue;
             var nf = Fields.MinBy(f => Dist(t.X, t.Z, f.X, f.Z));
             Trace("TEL", FormattableString.Invariant($"{p.Callsign} ({p.Type}, unit {p.Id}, gid {p.Gid}, Seite {p.Coalition}) X {t.X:0} Z {t.Z:0} {t.AltMsl / 0.3048:0} ft MSL {t.Agl / 0.3048:0} ft AGL {t.Ias / 0.514444:0} kt Kurs {((t.Hdg * 180 / Math.PI) % 360 + 360) % 360:000} ")
-                + FormattableString.Invariant($"| nächster {nf?.Name} {(nf == null ? 0 : Dist(t.X, t.Z, nf.X, nf.Z) / NM):0.0} NM | aktiv {(p.Lead ?? p).Active?.F.Name ?? "-"} {(p.Lead ?? p).Active?.Phase} | SRS {Fq(Srs?.TunedFreqs(p.Id))} gerufen {p.CalledOn:0.0##} | Sprit {p.Fuel:0.00}"));
+                + FormattableString.Invariant($"| nächster {nf?.Name} {(nf == null ? 0 : Dist(t.X, t.Z, nf.X, nf.Z) / NM):0.0} NM | aktiv {(p.Lead ?? p).Active?.F.Name ?? "-"} {(p.Lead ?? p).Active?.Phase} | SRS {Fq(Srs?.TunedFreqs(p.Id))} gerufen {p.CalledOn:0.0##} | Sprit {p.Fuel:0.00}")
+                + (t.Agl < 3 && nf != null ? " | " + nf.RwyDiag(t.X, t.Z, ((t.Hdg * 180 / Math.PI) % 360 + 360) % 360) : ""));
         }
     }
 
@@ -1001,6 +1003,9 @@ static partial class Program
         lock (TowerLock)
         {
             if (MissionFields && File.GetLastWriteTime(AirfieldFile) != airfieldStamp) LoadFields();
+            if (MissionFields && File.GetLastWriteTime(StandFile) is var ss && ss != standStamp)
+                try { Airfield.LoadStands(Fields, StandFile); standStamp = ss; Trace("PLATZ", $"DCS-Standnamen: {Fields.Sum(f => f.Stands.Count)}"); }
+                catch (IOException) { }   // hook is still writing: next second
             FormFlights(ActivePilots());
             var pilots = ActivePilots().Where(p => p.Lead == null).ToList();   // wingmen in formation run via the lead
             foreach (var p in pilots.Where(p => p.Tel is { Agl: < 5, Ias: < 2 })) (p.Pinned, p.OnBoat) = (null, null);   // shut down: automatic again
@@ -1263,6 +1268,8 @@ static partial class Program
     // ------------------------------------------------------------ Airfields (data from the mission script, Kutaisi from the map)
     static readonly string AirfieldFile = Path.Combine(Path.GetTempPath(), "DcsAtc-Airfields.txt");
     static DateTime airfieldStamp;
+    static readonly string StandFile = Path.Combine(Path.GetTempPath(), "DcsAtc-Stands.txt");   // stand names (DcsAtcHook.lua)
+    static DateTime standStamp;
     /// Test modes (--selftest, --anflugtest, --mptest, --asr-test, --srs-test): only the repo airfields.txt. Otherwise a test read the airfield data of the
     /// running mission (Persian Gulf instead of Caucasus, different results depending on the last mission) and thereby overwrote the checked-in airfields.txt.
     internal static bool TestRun;
@@ -1278,6 +1285,7 @@ static partial class Program
         }
         Tower.Freqs = Cfg.Frequencies;
         Fields = Airfield.Load(MissionFields ? AirfieldFile : copy);
+        standStamp = default;   // new airfield objects: stand names again (TickAll)
         Tower.All = Fields;
         Ops.MagVar = MapMagVar(Fields);
         var dcs = DcsDir();
@@ -1706,7 +1714,7 @@ static partial class Program
                         bool air = p[16] == "1";
                         pl!.Tel = new Telemetry(D(8), air ? Math.Max(D(9), 3.5) : 0, D(10), D(11), D(6), D(7), D(12), D(13), D(14), D(15), p.Length > 20 ? D(20) : -1);
                         pl.Seen = Clock;
-                        if ((Cfg.MyCallsign != "" && Host() == pl ? Cfg.MyCallsign : pl.SlotCallsign) is var want && want != pl.Callsign) { if (fresh) pl.Callsign = want; else Rename(pl, want); }   // own callsign (settings)
+                        if ((Cfg.MyCallsign != "" && Host() == pl ? Cfg.MyCallsign : Cfg.CallsignFromUnit && UnitCallsign(pl.Unit) is { } uc ? uc : pl.SlotCallsign) is var want && want != pl.Callsign) { if (fresh) pl.Callsign = want; else Rename(pl, want); }   // own callsign (settings)
                         if (fresh) Log($"[ATC] Spieler {p[4]} ({p[5]}) als {pl.Callsign}");
                         if (fresh) RestoreSession(pl);
                         break;
@@ -3136,6 +3144,10 @@ static partial class Program
     internal static string? NormCallsign(string s) => Regex.Match(s.Trim(), @"^([A-Za-z]+)\s*(\d)\s*-?\s*(\d)$") is { Success: true } m
         ? $"{char.ToUpperInvariant(m.Groups[1].Value[0])}{m.Groups[1].Value[1..]} {m.Groups[2].Value}-{m.Groups[3].Value}" : null;
 
+    /// Forum 0.13: mission unit name as call sign, "VICTORY 9-1", "WOLF-2-1" -> "Victory 9-1", "Wolf 2-1"; ME default (Aerial-1-1, Rotary-1-1) and other names -> null
+    internal static string? UnitCallsign(string unit) => Regex.Match(unit.Trim(), @"^(?!(?i:aerial|rotary)\b)([A-Za-z]+)[\s-]*(\d)\s*-\s*(\d)$") is { Success: true } m
+        ? $"{char.ToUpperInvariant(m.Groups[1].Value[0])}{m.Groups[1].Value[1..].ToLowerInvariant()} {m.Groups[2].Value}-{m.Groups[3].Value}" : null;
+
     static void Rename(Pilot p, string cs)
     {
         if (p.Callsign != "") Log($"[ATC] {p.Callsign}: Rufzeichen jetzt {cs}");
@@ -3150,8 +3162,8 @@ static partial class Program
         LoadConfig();
         var n = Cfg;
         Cfg = old;
-        (Cfg.MyCallsign, Cfg.Volume, Cfg.SpeechRate, Cfg.ReplyPause, Cfg.RadioFx, Cfg.PilotVoice, Cfg.AiChatter, Cfg.AiFlightComms, Cfg.Atis, Cfg.AltimeterUnit, Cfg.WheelInGame, Cfg.AirspaceWatch, Cfg.RunwayLights) =   // R392: RunwayLights is read per call (line ~995), applies immediately
-            (n.MyCallsign, n.Volume, n.SpeechRate, n.ReplyPause, n.RadioFx, n.PilotVoice, n.AiChatter, n.AiFlightComms, n.Atis, n.AltimeterUnit, n.WheelInGame, n.AirspaceWatch, n.RunwayLights);
+        (Cfg.MyCallsign, Cfg.Volume, Cfg.SpeechRate, Cfg.ReplyPause, Cfg.RadioFx, Cfg.PilotVoice, Cfg.AiChatter, Cfg.AiFlightComms, Cfg.Atis, Cfg.AltimeterUnit, Cfg.WheelInGame, Cfg.AirspaceWatch, Cfg.RunwayLights, Cfg.CallsignFromUnit) =   // R392: RunwayLights is read per call (line ~995), applies immediately
+            (n.MyCallsign, n.Volume, n.SpeechRate, n.ReplyPause, n.RadioFx, n.PilotVoice, n.AiChatter, n.AiFlightComms, n.Atis, n.AltimeterUnit, n.WheelInGame, n.AirspaceWatch, n.RunwayLights, n.CallsignFromUnit);
         Flights.Mode = Cfg.AiFlightComms;   // Tower.AltimeterUnit, Flights.Cmd/Follow and the modules are set by LoadConfig
         (Cfg.DebugLog, TraceOn) = (n.DebugLog, n.DebugLog);
         Log("[ATC] Einstellungen übernommen");
@@ -3192,9 +3204,10 @@ static partial class Program
         c = WithConfigValue(WithConfigValue(WithConfigValue(c, "Volume", "0.8", ""), "Atis", "false", ""), "MyCallsign", "\"Viper 1-1\"", "Callsign");
         c = WithConfigValue(c, "MyCallsign", "\"\"", "Callsign");
         if (!c.Contains("\"Volume\": 0.8,   // leiser") || !c.Contains("\"Atis\": false") || !c.Contains("\"Callsign\": \"Enfield 1-1\",\n  \"MyCallsign\": \"\",") ||
-            WithConfigValue("{\n}", "RunwayLights", "\"dcs\"", "Fehlt") != "{\n  \"RunwayLights\": \"dcs\",\n}" || JsonSerializer.Deserialize<Config>("{ \"WheelStyle\": \"hud\" }") == null || NormCallsign("viper11") != "Viper 1-1" || NormCallsign("Viper") != null)
+            WithConfigValue("{\n}", "RunwayLights", "\"dcs\"", "Fehlt") != "{\n  \"RunwayLights\": \"dcs\",\n}" || JsonSerializer.Deserialize<Config>("{ \"WheelStyle\": \"hud\" }") == null || NormCallsign("viper11") != "Viper 1-1" || NormCallsign("Viper") != null ||
+            UnitCallsign("VICTORY 9-1") != "Victory 9-1" || UnitCallsign("WOLF-2-1") != "Wolf 2-1" || UnitCallsign("Aerial-1-1") != null || UnitCallsign("F-4E ADVERSARIES NELLIS 1-1") != null)
             throw new Exception("Einstellungen: " + c);
-        Console.WriteLine("OK   Einstellungen: config.jsonc-Werte setzen (Kommentare bleiben), alte Option WheelStyle stört nicht, Rufzeichen \"viper11\" -> \"Viper 1-1\"");
+        Console.WriteLine("OK   Einstellungen: config.jsonc-Werte setzen (Kommentare bleiben), alte Option WheelStyle stört nicht, Rufzeichen \"viper11\" -> \"Viper 1-1\", Unitname \"VICTORY 9-1\" -> \"Victory 9-1\"");
         var live = Path.Combine(Path.GetTempPath(), $"DcsAtc-LiveTest-{Environment.ProcessId}.jsonc");   // R392: Bahnbefeuerung gilt nach dem Speichern sofort
         File.WriteAllText(live, "{ \"RunwayLights\": \"off\" }");
         var kept = Cfg;   // ReloadLive writes into the running Cfg: work on a copy

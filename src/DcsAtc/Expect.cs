@@ -61,6 +61,7 @@ static partial class Program
                 or "Tower: ready for departure, request unrestricted climb" or "Tower: ready for departure, request tactical departure" => gnd && before,
             "Ground: runway vacated, request taxi to parking" => gnd && !before,   // after landing (or aborted takeoff back)
             "Tower: high key" or "Tower: low key, gear down" => air && (a?.Sfo == true || ask.Contains(" key") || flow.Contains(" key")),   // after "request S F O"
+            "Tower: request departure" => air && ph is Phase.Initial or Phase.Pattern or Phase.ClearedLand,   // forum 0.13: departure from the pattern
             "Approach: airborne, climbing" => airb,
             "Approach: cancel approach" => air && !airb,
             "Approach: inbound for landing" or "Approach: inbound for pattern work, touch and go" or "Approach: request straight in" or "Approach: request flight following" or "Approach: request higher" => air,
@@ -348,7 +349,7 @@ static partial class Program
         Want(Sub(L("Allgemein", "General")) is var zt3 && !zt3.Contains("Approach: request zone transit"), "geparkt ohne zone transit", zt3);
         Ph(Phase.Inbound, air);
         // SFO: High/Low key only after "request S F O"
-        Want(Sub("Tower", "Closed / SFO") is var s1 && s1.Contains("Tower: request S F O") && !s1.Contains("Tower: high key"), "Closed/SFO ohne SFO", s1);
+        Want(Sub("Tower", "Closed / SFO") is var s1 && s1.Contains("Tower: request S F O") && !s1.Contains("Tower: high key") && !s1.Contains("Tower: request departure"), "Closed/SFO ohne SFO", s1);
         p.Active.OnTranscript("Kutaisi Tower, Colt 3-2, request S F O", air, new List<Traffic>(), Now());
         Want(Sub("Tower", "Closed / SFO") is var s2 && s2.Contains("Tower: high key") && s2.Contains("Tower: low key, gear down"), "Closed/SFO nach SFO", s2);
         // landed: Vacated, no Startup, Tower without entry (not in the top level)

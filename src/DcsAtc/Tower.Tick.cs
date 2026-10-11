@@ -209,6 +209,7 @@ public partial class Tower
             Approach(t.X, t.Z, rw).along < -300)
         {
             if (option == "low pass") { Phase = Phase.Away; option = null; PatternReset(); Released = true; return new(); }   // A47: climb was in the clearance, no pattern
+            if (!stayPattern) { Phase = Phase.Departing; option = null; handedOff = false; PatternReset(); return new(); }   // forum 0.13: "departure approved" was in the clearance: handover to Departure as after takeoff
             Laps++;
             if (Ifr || wantStraight)   // Practice instrument approach: radar vectoring again right away
             {
@@ -1130,11 +1131,10 @@ public partial class Tower
         Runway = WindRunway(t);
         // R110: on the runway with speed or after landing (airfield change, app restart during rollout): rollout, no takeoff clearance.
         // At standstill (spawn on runway): line up and wait without clearance (no "hold position"), takeoff clearance only on "ready for departure" (holdSince -1)
-        if (!airborne && OnRunwayPos(t.X, t.Z))
-        {
-            if (landing || t.Ias > 5 * Kt + WindSpeed(t)) (Phase, landedAt, landRw) = (Phase.TaxiIn, now, RwyOf(t));   // Export.lua delivers IAS: at standstill it shows the headwind; landing runway for A48
-            else (Phase, lineUp, holdSince) = (Phase.HoldShort, true, -1);
-        }
+        // Forum 0.13 (Sinai Hatzerim): also on a DCS runway spawn point (getParking Term_Type 16) when getRunways is a few meters/degrees off; runway = the one he stands on (28L, not the wind runway 28R)
+        bool slow = t.Ias <= 5 * Kt + WindSpeed(t);   // Export.lua delivers IAS: at standstill it shows the headwind
+        if (!airborne && OnRunwayPos(t.X, t.Z) && (landing || !slow)) (Phase, landedAt, landRw) = (Phase.TaxiIn, now, RwyOf(t));   // landing runway for A48
+        else if (!airborne && !landing && slow && (OnRunwayPos(t.X, t.Z) || OnRwySpot(t))) (Phase, lineUp, holdSince, Runway) = (Phase.HoldShort, true, -1, RwyOf(t));
     }
 
     List<Msg> Say(string s, string? r = null) { last = new Msg(Dep(r ?? role), Regex.Replace(s + sayTail, @"\b1 miles\b", "1 mile")); sayTail = ""; if (simPair != null) { similarSaid.Add(simPair); simPair = null; } lastAt = callAt; return new() { last }; }   // Miles() from 1: "1 mile"

@@ -149,7 +149,8 @@ public partial class Tower
         "low pass" => $"cleared low pass, not below {Alt(Math.Ceiling((FieldElev / Ft + 500) / 100) * 100)}, after the pass fly runway heading, climb and maintain {Alt(TransitFt)}",   // R326: pattern altitude + 500 ft (FAA JO 7110.65 3-10-10)   // A47 (ICAO Doc 4444 Ch. 12)
         _ => "cleared to land",
     };
-    string Closed() => stayPattern && !Ifr && !wantStraight ? $", {Hand(Runway).Split(' ')[0]} closed traffic approved, report base" : "";   // FAA 7110.65 3-10: traffic pattern together with the clearance, then quiet
+    string Closed() => stayPattern && !Ifr && !wantStraight ? $", {Hand(Runway).Split(' ')[0]} closed traffic approved, report base"
+                     : !stayPattern && option is "touch and go" or "low approach" or "the option" ? ", departure approved" : "";   // forum 0.13: option, then departure (Tick: no next circuit)   // FAA 7110.65 3-10: traffic pattern together with the clearance, then quiet
 
     /// R357: emergency with the runway occupied: priority, but no clearance yet; Tick clears once the runway is clear (FAA JO 7110.65 3-10-5)
     List<Msg> EmgBusy(string c, IReadOnlyList<Traffic> traffic)

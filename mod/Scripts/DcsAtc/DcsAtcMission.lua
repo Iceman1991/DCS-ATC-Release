@@ -18,6 +18,7 @@
 if DCSATC then return end
 local io, os, lfs = io, os, lfs
 if not (io and os and lfs) then return end
+if pcall(function() assert(io.open(lfs.writedir() .. "Scripts\\DcsAtc\\DcsAtcOff.txt", "r")):close() end) then env.info("DCS-ATC: aus (Einstellungen)") return end   -- forum 0.13: switched off in the settings window, no AI muting, no F10 menu, no files
 DCSATC = { ai = {} }   -- ai[groupName] = "dep|dep-go|arr|arr-hold:airfield"
 
 -- DCS radio of the AI muted (R308/R312/R313), already from loading: DCS-ATC speaks for AWACS, tanker and AI flights.
@@ -195,7 +196,8 @@ local function start()
       { "Final, gear down, full stop", "Tower: final, gear down, full stop" }, { "Base, touch and go", "Tower: base, gear down, touch and go" },
       { "Going around", "Tower: going around" },
       { "Closed / SFO", nil, {   -- R202/R204/R253
-        { "Request closed", "Tower: request closed traffic" }, { "Request SFO", "Tower: request S F O" }, { "High key", "Tower: high key" },
+        { "Request closed", "Tower: request closed traffic" }, { "Request departure", "Tower: request departure" },   -- forum 0.13
+        { "Request SFO", "Tower: request S F O" }, { "High key", "Tower: high key" },
         { "Low key, gear down", "Tower: low key, gear down" }, { "Ready, practice approach", "Tower: ready for departure, practice approach" },
         { "Ready, unrestricted climb", "Tower: ready for departure, request unrestricted climb" },
         { "Ready, tactical departure", "Tower: ready for departure, request tactical departure" } } } } },
@@ -636,8 +638,9 @@ local function start()
   local G, W, wTime = "G;0;0;80000", {}, -100
   local function weather()
     local v = (wx.visibility and wx.visibility.distance) or 80000
-    local f2 = wx.fog2 and wx.fog2.mode   -- fog off in the ME (fog2.mode 1, older missions enable_fog): leftover fog values in the miz do not count
-    if (f2 and f2 ~= 1) or (not f2 and wx.enable_fog == true) then pcall(function()
+    local f2 = wx.fog2 and wx.fog2.mode   -- fog off in the ME: leftover fog values in the miz do not count
+    -- like the ME (me_weather fixFog): saving drops fog2 mode 1 (off); without fog2 enable_fog counts only for missions before version 23
+    if (f2 and f2 ~= 1) or (not f2 and wx.enable_fog == true and (env.mission.version or 0) < 23) then pcall(function()
       local fv = world.weather.getFogVisibilityDistance()   -- 0 = no fog (thickness alone can be > 0, e.g. ATMOS-X)
       if world.weather.getFogThickness() > 0 and fv > 0 then v = math.min(v, fv) end
     end) end

@@ -29,7 +29,8 @@ sealed class Wheel : Form
             new("Going around", "Tower: going around"),
             new("Closed / SFO", Sub: new Item[]   // R202/R204
             {
-                new("Request closed", "Tower: request closed traffic"), new("Request SFO", "Tower: request S F O"), new("High key", "Tower: high key"), new("Low key, gear down", "Tower: low key, gear down"),
+                new("Request closed", "Tower: request closed traffic"), new("Request departure", "Tower: request departure"),   // forum 0.13: out of the pattern (on final: option, then departure)
+                new("Request SFO", "Tower: request S F O"), new("High key", "Tower: high key"), new("Low key, gear down", "Tower: low key, gear down"),
                 new("Ready, practice approach", "Tower: ready for departure, practice approach"),   // R253: IMC instead of closed pattern (radar pattern)
                 new("Ready, unrestricted climb", "Tower: ready for departure, request unrestricted climb"), new("Ready, tactical departure", "Tower: ready for departure, request tactical departure"),
             }),

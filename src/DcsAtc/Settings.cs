@@ -119,6 +119,7 @@ static class Settings
         var cs = new TextBox { Text = cfg.MyCallsign, Width = 290, BackColor = Box, ForeColor = Wheel.Ink, BorderStyle = BorderStyle.FixedSingle,
                                PlaceholderText = L("leer = Rufzeichen aus dem DCS-Slot", "empty = callsign from the DCS slot") };
         Row(L("Eigenes Rufzeichen", "Your callsign"), cs);
+        var unitCs = Check(L("Rufzeichen aus dem Unitnamen der Mission (z. B. VICTORY 9-1)", "Callsign from the mission unit name (e.g. VICTORY 9-1)"), cfg.CallsignFromUnit);
         var lang = Combo(new[] { "Deutsch", "English" }, En ? 1 : 0);
         Row(L("Sprache der Oberfläche *", "Interface language *"), lang);
 
@@ -138,6 +139,8 @@ static class Settings
         Row(L("AWACS meldet neue Gruppen bis", "AWACS calls new groups within"), awNm);
 
         Group(left, L("Module", "Modules"));   // like the installer: modules.txt (app) and DcsAtcModules.txt (F10 menu)
+        var offFile = Path.Combine(Program.SavedGamesDcs(), "Scripts", "DcsAtc", "DcsAtcOff.txt");   // forum 0.13: off without uninstalling, hook and mission script check it
+        var active = Check(L("DCS-ATC aktiv (aus: startet ab der nächsten Mission nicht mehr)", "DCS-ATC active (off: no longer starts from the next mission)"), !File.Exists(offFile));
         var mods = Program.Modules.Select(m => { var b = Check(L(m.De, m.En), Program.On(m.Id)); grid.SetColumnSpan(b, 1); return (m.Id, Box: b); }).ToArray();
         var mnote = new Label { Text = L("abgewählt: kein Funk, kein Eintrag im Funkrad und F10-Menü (F10 ab der nächsten Mission)", "unticked: no radio, no entry in the wheel and F10 menu (F10 from the next mission)"),
                                 AutoSize = true, MaximumSize = new Size(520, 0), ForeColor = Wheel.Grey, Margin = new Padding(0, 4, 0, 2) };
@@ -218,7 +221,7 @@ static class Settings
             string J(object v) => JsonSerializer.Serialize(v);
             var set = new (string Key, string Value, string After)[]
             {
-                ("MyCallsign", J(call), "Callsign"), ("Volume", D(vol.Value / 100), "RadioFx"), ("SpeechRate", D(rate.Value), "Volume"),
+                ("MyCallsign", J(call), "Callsign"), ("CallsignFromUnit", J(unitCs.Checked), "MyCallsign"), ("Volume", D(vol.Value / 100), "RadioFx"), ("SpeechRate", D(rate.Value), "Volume"),
                 ("ReplyPause", D(pause.Value), "SpeechRate"), ("RadioFx", J(fx.Checked), "PilotVoice"),
                 ("PilotVoice", J(pv.Checked ? (cfg.PilotVoice != "" ? cfg.PilotVoice : new Config().PilotVoice) : ""), "Voices"),
                 ("AiChatter", J(chat.Checked), "ReplyPause"), ("AwacsBullseye", J(bull.Checked), "Coalition"), ("AwacsNewGroupNm", D(awNm.Value), "AwacsBullseye"), ("Atis", J(atis.Checked), "AiChatter"), ("RunwayLights", J(lights[light.SelectedIndex]), "Atis"), ("AltimeterUnit", J(units[unit.SelectedIndex]), "RunwayLights"), ("AiFlightComms", J(modes[combat.SelectedIndex]), "Volume"), ("AirspaceWatch", J(watch.Checked), "RunwayLights"), ("DebugLog", J(dbg.Checked), "AirspaceWatch"),
@@ -230,6 +233,8 @@ static class Settings
                 var ml = string.Join(",", mods.Where(m => m.Box.Checked).Select(m => m.Id).Append("m2"));   // before config.jsonc: its reload reads modules.txt; m2 = list knows jtac (installer update)
                 File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "modules.txt"), ml);
                 if (Directory.Exists(dcs)) File.WriteAllText(Path.Combine(dcs, "DcsAtcModules.txt"), ml);
+                if (!active.Checked && Directory.Exists(dcs)) File.WriteAllText(offFile, "DCS-ATC aus / off: DCS-ATC Einstellungen / settings -> DCS-ATC aktiv / active\n");
+                else if (active.Checked && File.Exists(offFile)) File.Delete(offFile);
                 var text = File.ReadAllText(Program.ConfigPath);
                 foreach (var s in set) text = Program.WithConfigValue(text, s.Key, s.Value, s.After);
                 File.WriteAllText(Program.ConfigPath, text);

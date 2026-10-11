@@ -528,7 +528,8 @@ do   -- fog off in the ME (fog2.mode 1 / older missions without enable_fog): lef
   run(T + 12); assert(stateFile():find("G;%d+;%d+;80000;") and stateFile():find("\nF;Aerial%-1;225%.000;t\n"), "Nebel aus (fog2) / Tanker-F-Zeile: " .. stateFile())
   w.fog2, w.enable_fog = nil, false; run(T + 12); assert(stateFile():find("G;%d+;%d+;80000;"), "Nebel aus (enable_fog): " .. stateFile())
   w.enable_fog = true; run(T + 12); assert(stateFile():find("G;%d+;%d+;25;"), "Nebel an (enable_fog, alte Mission): " .. stateFile())
-  pl[#pl], w.enable_fog, FOG[1], FOG[2] = nil, nil, 0, 0
+  env.mission.version = 23; run(T + 12); assert(stateFile():find("G;%d+;%d+;80000;"), "Nebel aus (Version 23 ohne fog2, enable_fog Rest): " .. stateFile())
+  pl[#pl], w.enable_fog, FOG[1], FOG[2], env.mission.version = nil, nil, 0, 0, nil
 end
 -- Hook: file paths with a real backslash (Lua 5.1: '\D' becomes 'D' -> %TMP%DcsAtc-..., autostart/session/DCS folder never arrived)
 local opened = {}
@@ -539,5 +540,9 @@ DCS = { setUserCallbacks = function(c) hookCb = c end, isMultiplayer = function(
 net = { log = function() end, get_my_player_id = function() return 1 end, get_player_info = function() return "Me" end }
 dofile((arg[1]:gsub("DcsAtc[\\/]DcsAtcMission%.lua$", "Hooks\\DcsAtcHook.lua")))
 hookCb.onSimulationStart()
-assert(table.concat(opened, "|") == tmp .. "\\DcsAtc-DcsDir.txt|" .. tmp .. "\\DcsAtc-WriteDir.txt|" .. tmp .. "\\DcsAtc-Session.txt|W\\Scripts\\DcsAtc\\DcsAtcPath.txt", "Hook-Pfade: " .. table.concat(opened, " "))
+assert(table.concat(opened, "|") == tmp .. "\\DcsAtc-DcsDir.txt|" .. tmp .. "\\DcsAtc-WriteDir.txt|W\\Scripts\\DcsAtc\\DcsAtcOff.txt|" .. tmp .. "\\DcsAtc-Session.txt|W\\Scripts\\DcsAtc\\DcsAtcPath.txt", "Hook-Pfade: " .. table.concat(opened, " "))
+opened = {}
+io.open = function(p) opened[#opened + 1] = p if p:find("DcsAtcOff") then return { close = function() end } end end
+hookCb.onSimulationStart()
+assert(table.concat(opened, "|") == "W\\Scripts\\DcsAtc\\DcsAtcOff.txt", "Hook aus (DcsAtcOff.txt): " .. table.concat(opened, " "))
 print("missiontest OK: " .. table.concat(events, " ") .. " | KI: " .. table.concat(ai, ", "))

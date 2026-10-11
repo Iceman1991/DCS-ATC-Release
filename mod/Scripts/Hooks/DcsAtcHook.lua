@@ -23,9 +23,22 @@ local function session(text)
 end
 
 function cb.onSimulationStart()
+  local off = io.open(lfs.writedir() .. 'Scripts\\DcsAtc\\DcsAtcOff.txt', 'r')   -- forum 0.13: switched off in the settings window, no app start
+  if off then off:close() return end
   local host = not Sim.isMultiplayer() or Sim.isServer()
   local ok, me = pcall(function() return net.get_player_info(net.get_my_player_id(), 'name') end)
   session((host and 'host' or 'client') .. '\n' .. (ok and me or '') .. '\n')
+  pcall(function()   -- stand names as in the ME/kneeboard ("F125") by airfield and Term_Index (ME: unit.parking = crossroad_index); the mission script only knows the index
+    local T, m = require('terrain'), Sim.getCurrentMission()
+    local l = { 'M;' .. tostring((m.mission or m).theatre) }
+    for id, a in pairs(T.GetTerrainConfig('Airdromes') or {}) do
+      for _, s in pairs(a.roadnet and T.getStandList(a.roadnet, {"SHELTER","FOR_HELICOPTERS","FOR_AIRPLANES","WIDTH","LENGTH","HEIGHT"}) or {}) do
+        l[#l + 1] = 'S;' .. tostring(id) .. ';' .. tostring(s.crossroad_index) .. ';' .. tostring(s.name):gsub('[;\r\n]', ' ')
+      end
+    end
+    local f = io.open(tmp .. '\\DcsAtc-Stands.txt', 'w')
+    if f then f:write(table.concat(l, '\n') .. '\n') f:close() end
+  end)
   local h = io.open(lfs.writedir() .. 'Scripts\\DcsAtc\\DcsAtcPath.txt', 'r')
   local exe = h and h:read('*l')
   if h then h:close() end

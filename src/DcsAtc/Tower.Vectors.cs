@@ -348,7 +348,7 @@ public partial class Tower
     /// Slow types get lower values or 0 (= no speed instruction, no speed reminder); jets as above.
     int VecKt(Telemetry t)
     {
-        if (spdFree || altFree || Dist(t.X, t.Z, CX, CZ) > 25 * NM) return 0;   // VFR far out (altitude at his discretion): speed too, the restriction comes with the descent
+        if (spdFree || altFree || Emergency || Dist(t.X, t.Z, CX, CZ) > 25 * NM) return 0;   // VFR far out (altitude at his discretion): speed too, the restriction comes with the descent; forum 0.13: emergency flies its own speed (bent flaps: "increase speed 300 knots")
         int tier = !vecFinal || Path(t).R > 20 * NM ? 0 : Path(t).R > 10 * NM ? 1 : 2;
         if (fromHold) tier = Math.Max(tier, 1);   // R319: from holding do not accelerate to 300 kt (FAA JO 7110.65 5-7-1)
         int kt = (Slow ?? new[] { 300, 250, 200 })[tier];

@@ -78,7 +78,7 @@ Setup fragt, welche Teile von DCS-ATC du willst. **Vollständig** hakt alles an,
 
 Ein abgewähltes Modul schweigt, DCS-ATC hört seine Frequenz nicht ab, und es fehlt im Funkrad und im F10-Menü. Das passt, wenn im Mehrspieler ein echter Spieler AWACS oder Tower macht, oder wenn du nur Tanker und AWACS willst. Installiert werden immer alle Dateien. Radio Check, Say again und das Debriefing bleiben immer da.
 
-Ändern kannst du die Module später im [Einstellungsfenster](#das-einstellungsfenster). Die App übernimmt das sofort, das F10-Menü ab der nächsten Mission. Ein Update behält deine Auswahl. Für eine stille Installation z. B. `DCS-ATC-Setup.exe /SILENT /COMPONENTS="atc,awacs"`.
+Ändern kannst du die Module später im [Einstellungsfenster](#das-einstellungsfenster). Die App übernimmt das sofort, das F10-Menü ab der nächsten Mission. Ein Update behält deine Auswahl. Für eine stille Installation z. B. `DCS-ATC-Setup.exe /SILENT /COMPONENTS="atc,awacs"`. Ganz ausschalten ohne Deinstallieren: Haken **DCS-ATC aktiv** im Einstellungsfenster entfernen.
 
 #### Was Setup an DCS ändert
 
@@ -234,7 +234,7 @@ Tower: Enfield one one, runway two five, wind …, cleared to land.
 
 - **Fahrwerksprüfung.** Ist das Fahrwerk noch oben und du hast nicht „gear down“ gesagt, antwortet Tower „check wheels down“.
 - **Falsche Bahn.** Bist du auf die falsche Bahn ausgerichtet, ruft Tower „check runway!“.
-- **Andere Optionen.** Statt „full stop“ geht „touch and go“, „low approach“ oder „the option“ (Funkrad → Tower → „Base, touch and go“).
+- **Andere Optionen.** Statt „full stop“ geht „touch and go“, „low approach“ oder „the option“ (Funkrad → Tower → „Base, touch and go“). Mit „then departure“ („final, low approach, then departure to the north“) geht es danach zu Departure statt in die nächste Runde. Aus der Platzrunde: „request departure“ (Funkrad → Tower → Closed / SFO → „Request departure“).
 - **Durchstarten.** Startest du durch, sag „going around“.
 
 Base oder Final musst du selbst melden; ohne diese Meldung gibt Tower nie eine Landefreigabe. Meldest du nicht, fragt Tower bei etwa 2,5 NM (oder im Queranflug) einmal nach: „Enfield one one, report final.“ Hast du innerhalb 0,8 NM oder unter 300 ft immer noch keine Landefreigabe, wirst du zum Durchstarten geschickt: „go around, no landing clearance, climb and maintain 2000 feet, join left hand downwind runway two five, report base.“ Das ist auch ein Verstoß im Debriefing.
@@ -309,6 +309,7 @@ Du hörst (und siehst) nur, worauf du gerastet bist. Lotsensprüche erscheinen a
 - **Herkunft:** DCS-ATC nimmt dein Rufzeichen aus deinem **DCS-Slot**, aus „Enfield11“ wird **Enfield 1-1**. Lotsen sprechen es „Enfield one one“, in einer Rotte „Enfield one one flight“.
 - **Slots ohne westliches Rufzeichen:** der erste solche Spieler bekommt `"Callsign"` aus config.jsonc (Standard `"Enfield 1-1"`). Weitere werden mit ihrem Spielernamen angesprochen.
 - **Eigenes Rufzeichen:** `"MyCallsign"` setzen (Standard `""` = aus DCS) oder Einstellungsfenster → *Eigenes Rufzeichen*. Format: Name und zwei Ziffern, etwa `Viper 1-1`. Es ersetzt das Slot-Rufzeichen des Spielers an diesem PC (Host); andere Spieler behalten ihres.
+- **Rufzeichen aus dem Unitnamen:** `"CallsignFromUnit": true` oder Einstellungsfenster → *Rufzeichen aus dem Unitnamen der Mission*. Heißt die Unit in der Mission wie ein Rufzeichen (`VICTORY 9-1`, `WOLF-2-1`), wirst du so gerufen („Victory 9-1“) statt mit dem DCS-Rufzeichen (etwa Pontiac). Andere Unitnamen (`Aerial-1-1`, `F-4E ADVERSARIES NELLIS 1-1`) behalten das DCS-Rufzeichen. Gilt für alle Spieler, „MyCallsign“ geht für den Host vor.
 - **Verhörer werden toleriert.** Dein Rufzeichen wird erkannt, wenn die Ziffern stimmen und das Wort nur leicht abweicht („Enfeld 1-1“ zählt als „Enfield 1-1“).
 - **Was du sagst, ändert dein Rufzeichen nicht.** Liefert die Mission dein Rufzeichen (oder hast du eins gesetzt), benennt dich ein anderes Rufzeichen im Gesprochenen nicht um. Ein Spruch, der mit einem anderen Rufzeichen oder einer Rottennummer beginnt und deins nicht enthält („Enfield 1-2, check fuel“, „Two, go trail“), gilt als Rottenfunk, der Lotse ignoriert ihn.
 - **Wer gesendet hat:** dein Spruch wird dir über deine SRS-/DCS-Einheit zugeordnet. Klappt das nicht, über das gesprochene Rufzeichen.
@@ -498,6 +499,7 @@ Die IFR-Liste zeigt nahe Plätze; Träger und dein aktueller Platz stehen nicht 
 | Base, touch and go | `base, gear down, touch and go` | In der Luft |
 | Going around | `going around` | In der Luft |
 | Closed / SFO → *Request closed / Request SFO* | `request closed traffic` / `request S F O` | In der Luft |
+| Closed / SFO → *Request departure* | `request departure` | In der Platzrunde; auf dem Endanflug nach der Option |
 | Closed / SFO → *High key / Low key, gear down* | `high key` / `low key, gear down` | Nach „request S F O“ (oder wenn danach gefragt) |
 | Closed / SFO → *Ready, practice approach* | `ready for departure, practice approach` | Am Boden vor dem Start |
 | Closed / SFO → *Ready, unrestricted climb / Ready, tactical departure* | `ready for departure, request unrestricted climb` (optional `flight level 250`) / `ready for departure, request tactical departure` | Am Boden vor dem Start; taktisch nur bei Bedrohung (Feindflugzeug oder Feindplatz ≤ 60 NM) |
@@ -2269,6 +2271,7 @@ Als Host behandelt DCS-ATC jeden menschlichen Spieler der Mission getrennt:
 - **Spieler sind füreinander Verkehr.** Verkehrshinweise, Rollkonflikte („give way to the FA-18C on your right“), Landereihenfolge und Abstände in der Platzrunde berücksichtigen andere Spieler und die KI der Mission.
 - **Rotten bilden sich automatisch.** Spieler derselben DCS-Gruppe innerhalb 1 NM zueinander fliegen als eine Rotte mit der Folge des Leads. Lead ist der Spieler mit dem niedrigsten Rufzeichen. Ground, Tower und Approach behandeln die Rotte dann als Einheit. Ein Rottenflieger, der sich mehr als 3 NM entfernt, bekommt wieder seine eigene Folge.
 - **Rufzeichen kommen aus dem DCS-Slot jedes Spielers** (aus `Enfield11` wird „Enfield 1-1“). „MyCallsign“ in den Einstellungen ändert nur das Rufzeichen des Hosts. Sitzen mehrere Spieler in Slots ohne westliches Rufzeichen, bekommt der erste „Callsign“ aus config.jsonc und die anderen werden mit ihrem Spielernamen gerufen.
+- Mit „CallsignFromUnit“ wird jeder Spieler mit dem Unitnamen seines Slots gerufen, wenn der wie ein Rufzeichen aussieht (`VICTORY 9-1` wird „Victory 9-1“).
 - **Textmeldungen gehen an die eigene Gruppe jedes Spielers**, du siehst also nur Lotsentext für deine Gruppe (und nur, wenn du auf die Frequenz gerastet bist). Die Stimme geht über SRS auf der Lotsenfrequenz, du hörst also genau, was du auf dieser Frequenz in echt hören würdest, auch die Sprüche an andere Spieler.
 - **Lotsen arbeiten nur für ihre Seite.** Ein Platz der Gegenseite hat für dich keinen Lotsen.
 
@@ -2473,6 +2476,7 @@ Die erzeugten Zeilen in `frequencies.jsonc` enthalten die Platznamen schon. Sons
 | Feld | Werte | config.jsonc-Schlüssel |
 |---|---|---|
 | **Eigenes Rufzeichen** | Leer = Rufzeichen aus dem DCS-Slot. Sonst Name und zwei Ziffern, etwa `Viper 1-1` (`viper11` wird angenommen und vereinheitlicht). | `MyCallsign` |
+| **Rufzeichen aus dem Unitnamen der Mission** | Aus = DCS-Rufzeichen. An = Unitname, wenn er wie ein Rufzeichen aussieht (`VICTORY 9-1` wird „Victory 9-1“), sonst DCS-Rufzeichen. | `CallsignFromUnit` |
 | **Sprache der Oberfläche** `*` | Deutsch / English. Schaltet auch die Sprache des F10-Menüs um. | (Sprachdatei) |
 | **Lautstärke Lotsen** | 0–100 %, in 5er-Schritten | `Volume` |
 | **Sprechtempo** (1 = normal, größer = langsamer) | 0,70–1,50 | `SpeechRate` |
@@ -2493,6 +2497,7 @@ Die erzeugten Zeilen in `frequencies.jsonc` enthalten die Platznamen schon. Sons
 | **SRS-Ordner** `*` | Der Pfad, mit „…“ zum Durchsuchen. Geprüft wird auf `ExternalAudio\DCS-SR-ExternalAudio.exe`. | `SrsPath` |
 | **Tasten festlegen …** | Öffnet die Tastenabfrage (Funkrad, HOTAS, Sprechtaste). | `WheelKey`, `PttKey`, … |
 | **Module** | Ein Kästchen pro Modul, wie im [Setup](#module-wählen). Das F10-Menü ändert sich ab der nächsten Mission. | (`modules.txt`, `DcsAtcModules.txt`) |
+| **DCS-ATC aktiv** | an/aus. Aus: DCS-ATC startet ab der nächsten Mission nicht mehr, ohne Deinstallieren. Kein Funkrad, kein F10-Menü, der KI-Funk von DCS läuft wie ohne DCS-ATC. Wieder an: Haken setzen. | (`DcsAtcOff.txt`) |
 
 **Alle Optionen (config.jsonc) …** öffnet die Datei im Editor.
 
@@ -2526,6 +2531,7 @@ Die Datei liegt im Installationsordner: `%LOCALAPPDATA%\Programs\DCS-ATC\config.
 |---|---|---|
 | `Callsign` | `"Enfield 1-1"` | Nur ohne Missionsdaten oder für einen Slot ohne westliches Rufzeichen. Normalerweise kommt das Rufzeichen aus deinem DCS-Slot. |
 | `MyCallsign` | `""` | Eigenes Rufzeichen statt des Slot-Rufzeichens. `""` = aus DCS. |
+| `CallsignFromUnit` | `false` | Rufzeichen aus dem Unitnamen der Mission (`VICTORY 9-1`, `WOLF-2-1`) statt aus dem DCS-Slot. Andere Unitnamen behalten das DCS-Rufzeichen. |
 | `Mode` | `"host"` | `"client"` = nur Funkrad, Anfragen gehen über DCS an den Host. DCS-ATC schaltet von selbst in den Client-Modus, wenn du einem fremden Server beitrittst. |
 | `Dedicated` | `false` | Dedicated Server ohne jemanden am PC: kein Rad, keine Tasten, kein Mikrofon, kein SRS-Client. Schaltet sich automatisch ein, wenn `DCS_server.exe` ohne `DCS.exe` läuft. |
 

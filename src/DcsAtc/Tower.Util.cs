@@ -24,6 +24,9 @@ public partial class Tower
         return s * ((x - e.CX) * e.Dz - (z - e.CZ) * e.Dx);
     }
 
+    /// DCS runway spawn point (getParking Term_Type 16, slot "From Runway") within 60 m: on the runway even if the getRunways geometry is off
+    bool OnRwySpot(Telemetry t) => F.Spots.Any(s => s.Type == 16 && Dist(t.X, t.Z, s.X, s.Z) < 60);
+
     public bool OnRunwayPos(double x, double z, double halfWidth = 30, double beyond = 50) => F.Ends.Any(e =>
     {
         double along = (x - e.CX) * e.Dx + (z - e.CZ) * e.Dz, lat = Math.Abs((x - e.CX) * e.Dz - (z - e.CZ) * e.Dx);
@@ -247,6 +250,10 @@ public partial class Tower
     };
 
     internal static string Digits(string s) => string.Join(" ", s.Where(char.IsDigit).Select(ch => DigitWords[ch - '0']));
+    /// Forum 0.13: stand as DCS shows it (ME/kneeboard "F125" -> "Foxtrot one two five"), the Term_Index ("38") is another spot there; without a name the index
+    string StandName(int n) => F.Stands.TryGetValue(n, out var s) && s.Any(char.IsAsciiLetterOrDigit)
+        ? string.Join(" ", s.Where(char.IsAsciiLetterOrDigit).Select(ch => char.IsAsciiDigit(ch) ? DigitWords[ch - '0'] : Phonetic(ch.ToString())))
+        : Digits(n.ToString());
 
     /// "Enfield 1-1" -> "Enfield one one"
     internal static string SpokenCallsign(string cs) =>

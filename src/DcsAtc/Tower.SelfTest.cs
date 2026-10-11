@@ -1311,8 +1311,12 @@ public partial class Tower
         twS.spot = (parked.X, parked.Z);
         var busy = new[] { new Traffic(5, "F-16C_50", parked.X + 5, parked.Z, FieldElev, 0, 0, "Viper", "", false, 2) };
         r = twS.OnTranscript("Kutaisi Ground, Enfield 11, runway vacated, request taxi to parking", At(CX - 400 * Uz, CZ + 400 * Ux, 0, 254, 5), busy, 20);
-        twS.F.Spots.RemoveRange(twS.F.Spots.Count - 3, 3);
         Check(r[0].Contains("parking spot seven") && !r[0].Contains("your parking position"), "Parkposition: " + r[0]);
+        twS.F.Stands[7] = "F-12 5";   // forum 0.13: DCS stand name (hook) instead of the Term_Index
+        r = twS.OnTranscript("Kutaisi Ground, Enfield 11, runway vacated, request taxi to parking", At(CX - 400 * Uz, CZ + 400 * Ux, 0, 254, 5), busy, 25);
+        twS.F.Spots.RemoveRange(twS.F.Spots.Count - 3, 3);
+        twS.F.Stands.Clear();
+        Check(r[0].Contains("parking spot Foxtrot one two five"), "Parkposition DCS-Standname: " + r[0]);
         // PARK-P1: back at the departure airfield (gap in the air -> reset) own spot; occupied -> next free, ramp that of the spot
         // (before, spot forgotten and ramp from departure: "taxi to Ramp West via November, parking spot three eight")
         string Back(Traffic[] tr)
@@ -2440,6 +2444,16 @@ public partial class Tower
         r = tw12.Tick(At(px, pz, 150, LandHdg("25"), 130), none, 2);
         Check(tw12.Laps == 1 && tw12.Phase == Phase.Pattern && r.Count == 1 && r[0].Role == "Info",   // A96: quiet after liftoff, the pattern was in the clearance
               r.FirstOrDefault()?.Text ?? "Platzrunde: -");
+        // Forum 0.13 (Lt_Jaeger): low approach, then departure -> "departure approved", after the pass handover to Departure instead of the next circuit; from the pattern "request departure"
+        var twLd = new Tower("Enfield 1-1");
+        twLd.Tick(dw, none, 0);
+        var rLd = new List<string> { twLd.OnTranscript("Enfield 11 final, low approach, then departure to the north", onFinal, none, 1)[0].Text };
+        twLd.Tick(At(px, pz, 100, LandHdg("25"), 130), none, 2);
+        var phLd = twLd.Phase;
+        rLd.Add(string.Join("|", twLd.Tick(At(px, pz, 200, LandHdg("25"), 130), none, 4).Select(m => m.Text)));
+        rLd.Add(tw12.OnTranscript("Kutaisi Tower, Enfield 11, request departure", At(px, pz, 300, LandHdg("25"), 130), none, 5)[0].Text);
+        Check(rLd[0].EndsWith("cleared low approach, departure approved.") && phLd == Phase.Departing && twLd.Laps == 0 && rLd[1].Contains("contact ") &&
+              rLd[2].StartsWith("Enfield one one, departure approved, contact ") && tw12.Phase == Phase.Departing, "Forum 0.13 Low approach, dann Abflug: " + string.Join(" | ", rLd));
         // R258: reported go-around (VFR): acknowledge instead of a second go-around instruction, with pattern request "closed traffic approved"
         var tw258 = new Tower("Enfield 1-1");
         tw258.Tick(dw, none, 0);
@@ -2545,7 +2559,7 @@ public partial class Tower
         r = tw13.OnTranscript("Mayday mayday mayday, Enfield 11, engine failure", farWest, none, 1);
         // R37: Approach vectors to final (descent at own discretion), no landing clearance from 13 NM
         Check(tw13.Mayday && tw13.Phase == Phase.Inbound && tw13.Vectoring && r[0].Role == "Approach" && r[0].Text.StartsWith("Enfield one one, Kutaisi Approach, roger mayday, all traffic is holding.") &&
-              r[0].Contains("heading") && r[0].Contains("descend at pilot's discretion") && r[0].Contains("say souls on board and fuel remaining") && !r[0].Contains("cleared to land"), "Mayday: " + r[0]);
+              r[0].Contains("heading") && r[0].Contains("descend at pilot's discretion") && r[0].Contains("say souls on board and fuel remaining") && !r[0].Contains("cleared to land") && !r[0].Contains("speed"), "Mayday: " + r[0]);   // forum 0.13: no speed instruction in an emergency
         r = tw13.OnTranscript("Enfield 11, 30 minutes of fuel, one person on board", farWest, none, 2);
         Check(r.Count == 1 && r[0].Text == "Enfield one one, roger.", "Mayday: Antwort auf die Rückfrage (A30): " + (r.FirstOrDefault()?.Text ?? "-"));
         tw13.vec = null; tw13.Phase = Phase.Entering; tw13.navName = "six mile final";   // handed over (Established)
@@ -2945,6 +2959,17 @@ public partial class Tower
         var ph18w = tw18w.Phase;
         var r18w = tw18w.OnTranscript("Kutaisi Tower, Enfield 1-1, ready for departure", w18, none, 401);
         Check(r.Count == 0 && ph18w == Phase.HoldShort && r18w.Count == 1 && r18w[0].Contains("cleared for takeoff"), $"R110 Bahnstart im Gegenwind (IAS): {ph18w} {string.Join(" | ", r)} / {r18w.FirstOrDefault()?.Text}");
+        // Forum 0.13 (Sinai Hatzerim): slot "From Runway" on a DCS runway spawn point (Term_Type 16) outside the getRunways geometry: lined up all the same, not parked
+        var (s16x, s16z) = P("25", 150);
+        var tw18p = new Tower("Enfield 1-1");
+        tw18p.Tick(At(s16x, s16z, 0, 254, 0), none, 0);
+        var tw18t = new Tower("Enfield 1-1");
+        tw18t.F.Spots.Add((s16x, s16z, 1, 16));
+        r = tw18t.Tick(At(s16x, s16z, 0, 254, 0), none, 0);
+        var r18t = tw18t.OnTranscript("Kutaisi Tower, Enfield 1-1, ready for departure", At(s16x, s16z, 0, 254, 0), none, 10);
+        tw18t.F.Spots.RemoveAt(tw18t.F.Spots.Count - 1);
+        Check(tw18p.Phase == Phase.Parked && r.Count == 0 && r18t.Count == 1 && r18t[0].Contains("cleared for takeoff"),
+              $"Bahnspawnpunkt neben getRunways: {tw18p.Phase} {string.Join(" | ", r)} / {r18t.FirstOrDefault()?.Text}");
 
         // --- Taxi traffic: AI crosses from the right -> hold position, then continue taxi
         var tw19 = new Tower("Enfield 1-1");

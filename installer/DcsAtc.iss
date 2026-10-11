@@ -1,5 +1,5 @@
 ﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe
-#define AppVer "0.13.0-alpha"
+#define AppVer "0.14.0-alpha"
 #define Src ".."
 
 [Setup]
@@ -165,6 +165,8 @@ Type: files; Name: "{app}\lang.txt"
 Type: files; Name: "{app}\modules.txt"
 Type: files; Name: "{code:SavedGames}\Scripts\DcsAtc\DcsAtcModules.txt"
 Type: files; Name: "{code:ServerSaved}\Scripts\DcsAtc\DcsAtcModules.txt"
+Type: files; Name: "{code:SavedGames}\Scripts\DcsAtc\DcsAtcOff.txt"
+Type: files; Name: "{code:ServerSaved}\Scripts\DcsAtc\DcsAtcOff.txt"
 
 [Code]
 const ExportLine = 'pcall(function() local l=require(''lfs''); dofile(l.writedir()..[[Scripts\DcsAtcExport.lua]]) end)   -- DCS-ATC';

@@ -25,6 +25,8 @@
   "Callsign": "Enfield 1-1",
   // Eigenes Rufzeichen statt dem aus dem DCS-Slot, "" = aus DCS (auch im Einstellungen-Fenster)
   "MyCallsign": "",
+  // Rufzeichen aus dem Unitnamen der Mission ("VICTORY 9-1", "WOLF-2-1") statt aus dem DCS-Slot; andere Unitnamen bleiben beim DCS-Rufzeichen
+  "CallsignFromUnit": false,
 
   // Lotsen-Frequenzen (MHz) – alle gleich setzen = alles auf einer Frequenz
   "Frequencies": { "ATIS": 263.5, "Ground": 264.5, "Tower": 265.0, "Approach": 266.5,
