@@ -821,11 +821,11 @@ Conditions: 15 June, 10:00 local, few clouds. JTAC frequency 133.5 AM (DCS-ATC d
 Ground (9 km north of Senaki):
 - Axeman  JTAC (Hummer), friendly platoon (2x M-113) 600 m west of him
 - Enemy armor 3 km north of Axeman (2x T-72B, BTR-80), ZSU-23-4 Shilka 1.5 km behind it (threat)
-- Pontiac 1-1  MQ-9 FAC(A), on station after 15 min, 15000 ft over the target area
+- Pontiac 1-1  MQ-9 FAC(A), on station after 2 min, 15000 ft over the target area, 135.5 AM
 
 Slots:
-- Enfield 1-1  Hornet airborne 15 NM south-west, 12000 ft, 4x GBU-12, COMM1 133.5 (lat/long in line 6)
-- Colt 1-1     F-16C airborne 15 NM south, 12000 ft, 2x GBU-12, VHF preset 1 133.5 (lat/long)
+- Enfield 1-1  Hornet airborne 15 NM south-west, 12000 ft, 4x GBU-12, COMM1 133.5 (JTAC), preset 2 135.5 (FAC(A)) (lat/long in line 6)
+- Colt 1-1     F-16C airborne 15 NM south, 12000 ft, 2x GBU-12, VHF preset 1 133.5, preset 2 135.5 (lat/long)
 - Uzi 1-1      Hornet cold at Kutaisi stand 24 (rearm as you like, e.g. Litening/Mavericks)
 
 Flow:
@@ -834,7 +834,7 @@ Flow:
 3. "request mark" -> smoke on the target after about 30 s; "tally target"; "laser on".
 4. "Enfield 1-1, in from the south" -> "cleared hot"; GBU-12 on the spot; "off" -> BDA.
 5. Second player checks in during an attack -> hold with altitude stack.
-6. After 15 min: Pontiac 1-1 (FAC(A), MQ-9) on station.
+6. After 2 min: Pontiac 1-1 (FAC(A), MQ-9) on station on 135.5 (own frequency).
 
 DE
 Zweck: DCS-ATC-JTAC und FAC(A): Check-in, Lage, 9-Liner, Readback, Markierung (Rauch, Laser 1688), IN / cleared hot, BDA, Check-out; FAC(A) und Übergabe.
@@ -843,11 +843,11 @@ Lage: 15. Juni, 10:00 Ortszeit, wenige Wolken. JTAC-Frequenz 133.5 AM (DCS-ATC-S
 Boden (9 km nördlich Senaki):
 - Axeman  JTAC (Hummer), eigener Zug (2x M-113) 600 m westlich von ihm
 - Feindpanzer 3 km nördlich von Axeman (2x T-72B, BTR-80), ZSU-23-4 Schilka 1,5 km dahinter (Bedrohung)
-- Pontiac 1-1  MQ-9 FAC(A), ab Minute 15 auf Station, 15000 ft über dem Zielgebiet
+- Pontiac 1-1  MQ-9 FAC(A), ab Minute 2 auf Station, 15000 ft über dem Zielgebiet, 135.5 AM
 
 Slots:
-- Enfield 1-1  Hornet in der Luft, 15 NM südwestlich, 12000 ft, 4x GBU-12, COMM1 133.5 (Lat/Long in Zeile 6)
-- Colt 1-1     F-16C in der Luft, 15 NM südlich, 12000 ft, 2x GBU-12, VHF-Preset 1 133.5 (Lat/Long)
+- Enfield 1-1  Hornet in der Luft, 15 NM südwestlich, 12000 ft, 4x GBU-12, COMM1 133.5 (JTAC), Preset 2 135.5 (FAC(A)) (Lat/Long in Zeile 6)
+- Colt 1-1     F-16C in der Luft, 15 NM südlich, 12000 ft, 2x GBU-12, VHF-Preset 1 133.5, Preset 2 135.5 (Lat/Long)
 - Uzi 1-1      Hornet kalt in Kutaisi Stand 24 (Bewaffnung frei, z. B. Litening/Mavericks)
 
 Ablauf:
@@ -856,18 +856,18 @@ Ablauf:
 3. "request mark" -> Rauch aufs Ziel nach ca. 30 s; "tally target"; "laser on".
 4. "Enfield 1-1, in from the south" -> "cleared hot"; GBU-12 auf den Spot; "off" -> BDA.
 5. Zweiter Spieler checkt während eines Angriffs ein -> Warten mit Höhenstaffel.
-6. Nach 15 min: Pontiac 1-1 (FAC(A), MQ-9) auf Station.
+6. Nach 2 min: Pontiac 1-1 (FAC(A), MQ-9) auf Station auf 135.5 (eigene Frequenz).
 ]] })
   m:vehicles({ name = "JTAC Axeman", p = A, hdg = 0, units = { { type = "Hummer" } } })   -- J1: leader by name
   m:vehicles({ name = "Blau Zug", p = { x = A.x, y = A.y - 600 }, hdg = 0, units = { { type = "M-113" }, { type = "M-113" } } })   -- line 8 friendlies
   m:vehicles({ side = "red", name = "Rot Panzer", p = tgt, hdg = 180, units = { { type = "T-72B" }, { type = "T-72B" }, { type = "BTR-80" } } })
   m:vehicles({ side = "red", name = "Rot Flak", p = { x = tgt.x + 1500, y = tgt.y + 300 }, hdg = 180, units = { { type = "ZSU-23-4 Shilka" } } })   -- threat remark
-  m:plane({ name = "FACA Pontiac", cs = "Pontiac", task = "AFAC", freq = 133.5, start = 900, skill = "Excellent",
+  m:plane({ name = "FACA Pontiac", cs = "Pontiac", task = "AFAC", freq = 135.5, start = 120, skill = "Excellent",
     units = { { type = "MQ-9 Reaper", name = "Pontiac 1-1", p = off(tgt, 200, 8), alt = 15000 * FT, spd = 70, hdg = 20 } },
     points = function() return { wp(off(tgt, 200, 8), 15000 * FT, 70), wp(tgt, 15000 * FT, 70, { tasks = { T.cmd("SetInvisible", { value = true }), T.orbit(15000 * FT, 70, "Circle") } }) } end })
-  slot(m, { name = "Enfield 1-1 (Hornet CAS)", cs = "Enfield", type = "FA-18C_hornet", p = off(tgt, 225, 15), alt = 12000 * FT, spd = 300 * KT * 1.2, to = tgt, load = "hornetCAS", freq = 133.5, uhf = { 133.5, 251.5, 263.0, 261.0 } })
-  slot(m, { name = "Colt 1-1 (F-16 CAS)", cs = "Colt", type = "F-16C_50", p = off(tgt, 180, 15), alt = 12000 * FT, spd = 300 * KT * 1.2, to = tgt, load = "viperCAS", freq = 251.5, uhf = UHF_LAND, vhf = { 133.5, 134.0, 132.0 } })
-  slot(m, { name = "Uzi 1-1 (Hornet Kutaisi)", cs = "Uzi", type = "FA-18C_hornet", stand = "24", to = tgt, load = "hornetCAS", freq = 263.0, uhf = { 263.0, 133.5, 251.5 } })
+  slot(m, { name = "Enfield 1-1 (Hornet CAS)", cs = "Enfield", type = "FA-18C_hornet", p = off(tgt, 225, 15), alt = 12000 * FT, spd = 300 * KT * 1.2, to = tgt, load = "hornetCAS", freq = 133.5, uhf = { 133.5, 135.5, 251.5, 263.0, 261.0 } })
+  slot(m, { name = "Colt 1-1 (F-16 CAS)", cs = "Colt", type = "F-16C_50", p = off(tgt, 180, 15), alt = 12000 * FT, spd = 300 * KT * 1.2, to = tgt, load = "viperCAS", freq = 251.5, uhf = UHF_LAND, vhf = { 133.5, 135.5, 134.0, 132.0 } })
+  slot(m, { name = "Uzi 1-1 (Hornet Kutaisi)", cs = "Uzi", type = "FA-18C_hornet", stand = "24", to = tgt, load = "hornetCAS", freq = 263.0, uhf = { 263.0, 133.5, 135.5, 251.5 } })
   return m
 end }
 

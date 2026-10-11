@@ -206,6 +206,7 @@ RADAR[1].type = true
 run(T + 3); assert(stateFile():find("D;2;Bandit1;1", 1, true), "Typ erkannt fehlt")
 -- fog thickness without fog visibility (ATMOS-X): no "visibility 0 m"; real fog limits
 FOG[1], FOG[2] = 300, 0; run(T + 12); assert(stateFile():find("G;%d+;%d+;80000;"), "Nebel ohne Sichtweite: " .. stateFile())
+env.mission.weather.fog2 = { mode = 2 }   -- fog "auto" in the ME (fog off: see the end)
 FOG[2] = 600; run(T + 12); assert(stateFile():find("G;%d+;%d+;600;"), "Nebelsicht fehlt: " .. stateFile()); FOG[1], FOG[2] = 0, 0
 assert(("\n" .. stateFile()):find("\nP;[^\n]*;1%.00;0%.50;a\n"), "Fahrwerk/Kategorie fehlt in der P-Zeile: " .. stateFile())
 local huey = coalition.addGroup(2, Group.Category.HELICOPTER, { name = "Huey", units = { { name = "Huey", x = 900000, y = 0, alt = 300 } } })   -- N50: category h/a in P and T line
@@ -515,6 +516,19 @@ do
   local s = "|" .. table.concat(n, "|") .. "|"
   assert(s:find("|Request taxi|", 1, true) and s:find("|Radio check|", 1, true) and s:find("|Spritmangel|", 1, true) and not s:find("AWACS", 1, true)
          and not s:find("Tanker", 1, true) and not s:find("|Picture|", 1, true) and not s:find("|Visual|", 1, true) and not s:find("Bodenpersonal", 1, true) and DCSATC.opt.crew == false, "Module F10: " .. s)
+end
+do   -- fog off in the ME (fog2.mode 1 / older missions without enable_fog): leftover fog values do not count; TP7: tanker radio as F line with "t"
+  local pl, w = env.mission.coalition.blue.country[1].plane.group, env.mission.weather
+  pl[#pl + 1] = { name = "Aerial-1", frequency = 225, task = "Refueling", units = { {} } }
+  for i = #queue, 1, -1 do queue[i] = nil end
+  for i = #handlers, 1, -1 do handlers[i] = nil end
+  DCSATC, DCSATC_SPAWNTEST, DCSATC_OPTIONS, MENU = nil, nil, { crew = true }, {}
+  w.fog2, w.enable_fog, FOG[1], FOG[2] = { mode = 1 }, true, 300, 25
+  dofile(arg[1])
+  run(T + 12); assert(stateFile():find("G;%d+;%d+;80000;") and stateFile():find("\nF;Aerial%-1;225%.000;t\n"), "Nebel aus (fog2) / Tanker-F-Zeile: " .. stateFile())
+  w.fog2, w.enable_fog = nil, false; run(T + 12); assert(stateFile():find("G;%d+;%d+;80000;"), "Nebel aus (enable_fog): " .. stateFile())
+  w.enable_fog = true; run(T + 12); assert(stateFile():find("G;%d+;%d+;25;"), "Nebel an (enable_fog, alte Mission): " .. stateFile())
+  pl[#pl], w.enable_fog, FOG[1], FOG[2] = nil, nil, 0, 0
 end
 -- Hook: file paths with a real backslash (Lua 5.1: '\D' becomes 'D' -> %TMP%DcsAtc-..., autostart/session/DCS folder never arrived)
 local opened = {}

@@ -193,7 +193,7 @@ class Carrier
                                                "No radio on deck (no land tower): start, taxi and catapult on the deck crew's signals.")) };   // R24 (EMCON)
         if (launch == 2 && Has(n, "airborne")) { radar = true; return new() { Say("Departure", $"{c}, Departure, radar contact, departure radial {Mag(depRad)}.", b) }; }   // R24: Case II/III (CV NATOPS); R283: with departure radial
         if (launch == 2 && Has(n, "on top")) return Handoff(me, b);
-        if (launch == 2 && Has(n, "passing", "arcing", "outbound", "established", "kilo")) return new() { Say("Departure", $"{c}, roger.", b) };   // R233: mandatory reports in the Case III departure are acknowledged by Departure
+        if (launch == 2 && Has(n, "passing", "arcing", "outbound", "established", "kilo")) return new() { Say("Departure", OneOf($"{c}, roger.", $"{c}, copy."), b) };   // R233: mandatory reports in the Case III departure are acknowledged by Departure
         if (Has(n, "clara", "clarence", "ball"))
         {
             if (me.Tel is { } gt && !InGroove(b, gt)) return new();   // A74: only in the groove, otherwise no radio and no stage (not checkable without position: as before)
@@ -210,7 +210,7 @@ class Carrier
                 return new() { Say("Approach", $"{c}, disregard needles, {DevText(hi, rt)}.", b) };
             return new() { Say("Approach", $"{c}, concur.", b) };
         }
-        if (caseNo >= 2 && (Stage >= 1 && Has(n, "platform") || Stage == 2 && !radar && Has(n, "commencing", "commence"))) return new() { Say("Approach", radar ? $"{c}, roger." : Contact(me, b), b) };   // R20/R282: first report to Approach (after "switch Approach") identifies Approach with distance
+        if (caseNo >= 2 && (Stage >= 1 && Has(n, "platform") || Stage == 2 && !radar && Has(n, "commencing", "commence"))) return new() { Say("Approach", radar ? OneOf($"{c}, roger.", $"{c}, copy.") : Contact(me, b), b) };   // R20/R282: first report to Approach (after "switch Approach") identifies Approach with distance
         if (caseNo >= 2 && Stage == 1 && Has(n, "commencing", "commence"))   // #17/R224: the pilot reports start of approach himself; R225: Marshal identifies with Final Bearing; R282: and hands off to Approach
         {
             // Review l4: too early (before EAT, tolerance 15 s as usual in fleet operations, ±10–15 s at the push point): Marshal declines, gives the time, the flight stays in holding
@@ -228,11 +228,11 @@ class Carrier
             return new() { Hint(ZipLip) };
         }
         if (Has(n, "initial", "commencing", "commence", "charlie"))   // R1: "Charlie" is an acknowledgment, "commencing" from stage 2 only roger (CV NATOPS CCA)
-            return new() { Say(Station, $"{c}, roger.", b) };
+            return new() { Say(Station, OneOf($"{c}, roger.", $"{c}, copy."), b) };
         if (caseNo == 2 && Stage == 2 && Has(n, "see you at"))   // #18/R227: Case II ship in sight -> Tower, from the initial Case I pattern (zip lip)
         {
             caseNo = 1;
-            return new() { Say("Approach", $"{c}, roger, switch Tower.", b),
+            return new() { Say("Approach", OneOf($"{c}, roger, switch Tower.", $"{c}, copy, switch Tower."), b),
                            Hint(L($"Sinken zum Initial: 3 NM hinter dem Heck, 800 ft, Kurs {MagNum(b.ExpBrc):000}, 350 kt; Break über dem Bug nach links, Downwind 600 ft.",
                                     $"Descend to the initial: 3 NM astern, 800 ft, heading {MagNum(b.ExpBrc):000}, 350 kt; break left over the bow, downwind 600 ft.")) };
         }
@@ -240,10 +240,10 @@ class Carrier
         {
             seeMe = true;
             if (FuelSlot(n) is { } sf && Signal(me, b, "Marshal", false, (state = sf) * 1000) is { } sg) return sg;
-            return new() { Say("Marshal", $"{c}, {(FuelSlot(n) != null ? "roger" : "update state")}, switch Tower.", b) };
+            return new() { Say("Marshal", $"{c}, {(FuelSlot(n) != null ? OneOf("roger", "copy") : "update state")}, switch Tower.", b) };
         }
         if (Stage >= 1 && Has(n, "see you at", "established", "holding", "in the stack"))
-            return new() { Say(Station, $"{c}, roger.", b) };   // R280: after "see you at" the Tower
+            return new() { Say(Station, OneOf($"{c}, roger.", $"{c}, copy."), b) };   // R280: after "see you at" the Tower
         if (Has(n, "pigeons", "tacan", "say position"))   // N29: bearing/distance to the ship, no check-in (stack, stage and Charlie stay)
         {
             var pos = "";
@@ -262,7 +262,7 @@ class Carrier
             var wrong = new[] { (Num(@"(\d+(?: \d+)*) radial", 3), MagNum(b.ExpFb + 180), $"{Mag(b.ExpFb + 180)} radial"), (Num(@"(\d+(?: \d+)*) dme", 2), angels + 15, $"{angels + 15} DME"),
                                 (Num(@"\bangels (\d+)", 2), angels,$"angels {angels}") }
                         .Where(e => e.Item1 != null && int.Parse(e.Item1) != e.Item2).Select(e => e.Item3).ToList();
-            return new() { Say("Marshal", wrong.Count == 0 ? $"{c}, readback correct." : $"{c}, negative, {string.Join(", ", wrong)}.", b) };
+            return new() { Say("Marshal", wrong.Count == 0 ? OneOf($"{c}, readback correct.", $"{c}, readback is correct.") : $"{c}, negative, {string.Join(", ", wrong)}.", b) };
         }
         if (caseNo == 1 && Stage == 1 && !Has(n, "state") && System.Text.RegularExpressions.Regex.IsMatch(n, @"\b\d+ point \d\b")) n = System.Text.RegularExpressions.Regex.Replace(n, @"\b(?=\d+ point \d\b)", "state ");   // R232: answer to "update state" ("Enfield 1-1, 5.9")
         if (Stage >= 1 && Has(n, "state") && !Has(n, "check in", "checking in", "inbound", "recovery"))   // R23: acknowledge fuel report in holding, no new check-in (stack, stage and Charlie stay)
@@ -271,7 +271,7 @@ class Carrier
             fuel = fm.Success ? Digits(fm.Groups[1].Value) + (fm.Groups[2].Success ? " point " + Digits(fm.Groups[2].Value) : "") : "";
             state = FuelSlot(n) ?? state;
             if (Signal(me, b, "Marshal", false, state * 1000) is { } sg) return sg;   // R23: reported fuel below bingo
-            return new() { Say("Marshal", $"{c}, Marshal, roger{(fuel != "" ? ", state " + fuel : "")}.", b) };
+            return new() { Say("Marshal", $"{c}, Marshal, {OneOf("roger", "copy")}{(fuel != "" ? ", state " + fuel : "")}.", b) };
         }
         if (Stage == 1 && Has(n, "marshal", "mother") && !Has(n, "check in", "checking in", "inbound", "recovery"))   // R368: repeated call in holding -> Marshal repeats the assignment, stack and EAT stay
             return Instr(me, b);

@@ -31,6 +31,7 @@ sealed class Wheel : Form
             {
                 new("Request closed", "Tower: request closed traffic"), new("Request SFO", "Tower: request S F O"), new("High key", "Tower: high key"), new("Low key, gear down", "Tower: low key, gear down"),
                 new("Ready, practice approach", "Tower: ready for departure, practice approach"),   // R253: IMC instead of closed pattern (radar pattern)
+                new("Ready, unrestricted climb", "Tower: ready for departure, request unrestricted climb"), new("Ready, tactical departure", "Tower: ready for departure, request tactical departure"),
             }),
         }),
         new("Approach", Sub: new Item[]
@@ -53,8 +54,14 @@ sealed class Wheel : Form
         new("JTAC", Sub: new Item[]   // J11: only if the own side has a JTAC / FAC(A) (Jtac); readback/in/off get lines 4+6 / direction from the app (Ops.CasWheel)
         {
             new("Check in", "JTAC: checking in"), new("Ready to copy", "JTAC: ready to copy"), new("Readback", "JTAC: readback"),
-            new("Request mark", "JTAC: request mark"), new("Tally", "JTAC: tally target"), new("In", "JTAC: in"), new("Off", "JTAC: off"),
-            new("Laser on", "JTAC: laser on"), new("Check out", "JTAC: checking out"),
+            new("Say again 9-line", "JTAC: say again 9-line"),
+            new("Mark / laser", Sub: new Item[]   // mark type without mission edits; colours / illum only from a ground JTAC (FAC(A) uses WP)
+            {
+                new("Request mark", "JTAC: request mark"), new("Red smoke", "JTAC: request red smoke"), new("Green smoke", "JTAC: request green smoke"),
+                new("White smoke", "JTAC: request white smoke"), new("Orange smoke", "JTAC: request orange smoke"), new("Blue smoke", "JTAC: request blue smoke"),
+                new("Illumination", "JTAC: request illum"), new("Sparkle (IR)", "JTAC: request sparkle"), new("Laser on", "JTAC: laser on"),
+            }),
+            new("Tally", "JTAC: tally target"), new("In", "JTAC: in"), new("Off", "JTAC: off"), new("Check out", "JTAC: checking out"),
         }),
         new("AWACS", Sub: new Item[]
         {
@@ -118,6 +125,7 @@ sealed class Wheel : Form
     }
     public static Func<(bool Awacs, bool Tanker)> Up = () => (true, true);   // own AWACS/GCI or tanker in the air, Program sets it (fellow players, preview: both)
     public static Func<bool> Jtac = () => true;   // J11: own side has a living JTAC / FAC(A), Program sets it (fellow players, preview: yes)
+    public static Func<string[]> Jtacs = Array.Empty<string>;   // callsigns of the own JTAC / FAC(A), Program sets it; with two or more "Check in" asks which one
     /// R307: does this radio call fit right now (Program.WheelFits: phase, open question, traffic advisory, Range/Tanker/Carrier)? Fellow players/preview: no state, everything.
     public static Func<Func<string, bool>> Fits = () => _ => true;
     /// R307: visible with text if it fits; submenu if one in it fits; with neither (Platz wählen) always. At most 9 (keys 1–9); if nothing fits, everything.
@@ -136,6 +144,10 @@ sealed class Wheel : Form
     {
         foreach (var (name, n) in All.Where(i => i.Sub != null).SelectMany(i => i.Sub!.Where(s => s.Sub != null).Select(s => ($"{i.Label}/{s.Label}", s.Sub!.Length)).Prepend((i.Label, i.Sub!.Length))).Prepend(("Top", All.Length)))
             check(n <= 9 || name is "Approach" or "Top", $"Funkrad {name}: {n} Einträge (max. 9)");   // R307: Approach has 12, visible at most 9 (Vis); Top 10 with JTAC (only shown with a leader)
+        var oj = Jtacs; Jtacs = () => new[] { "Axeman 1-1", "Pontiac 1-1" };
+        var jp = JtacPick(new("Check in", "JTAC: checking in"));
+        check(jp?.Length == 2 && jp[1].Text == "JTAC: Pontiac 1-1, checking in" && JtacPick(new("In", "JTAC: in")) == null, "Funkrad: zwei JTAC -> Check in fragt welcher");
+        Jtacs = () => new[] { "Axeman 1-1" }; check(JtacPick(new("Check in", "JTAC: checking in")) == null, "Funkrad: ein JTAC -> Check in direkt"); Jtacs = oj;
         // R307: without state (fellow players, preview) everything as before: Approach the first 9, without Say again/Request higher
         var apC = string.Join(",", Vis(All.First(i => i.Label == "Approach").Sub!, _ => true).Select(i => i.Label));
         check(apC == $"{L("Airborne (nach Start)", "Airborne (after takeoff)")},Inbound for landing,Inbound, pattern work,Request ILS / straight in,Flight following,{L("Abmelden (cancel approach)", "Cancel approach")},{L("Verkehr", "Traffic")},C R P,{L("Fahrt melden", "Report airspeed")}",
@@ -353,10 +365,14 @@ sealed class Wheel : Form
         (sug is { } g ? $"ENTER ▸ {g.Role}: {g.Text}\n" : "") +
         $"DCS-ATC – {title}\n" + string.Join("\n", Slots().Select(s => $"{(s.Mark ? "> " : "   ")}{s.Num} {s.Label}{(s.Freq != null ? "  " + s.Freq : "")}"));
 
+    /// Two or more own JTAC / FAC(A): "Check in" lists them, the callsign in the call picks one (later calls stay with it).
+    internal static Item[]? JtacPick(Item it) => it.Text == "JTAC: checking in" && Jtacs() is { Length: > 1 } js ? js.Select(c => new Item(c, $"JTAC: {c}, checking in")).ToArray() : null;
+
     void Choose(int i)
     {
         if (i < 0 || i >= items.Length) return;
         var it = items[i];
+        if (JtacPick(it) is { } jp) { (items, title, mark) = (jp, it.Label, 0); Render(); return; }
         if (it.Sub != null)
         {
             items = it.Sub.Length > 0 ? Vis(Mod(it.Sub), Fits()) : it.Text == null ? Near().Select(f => new Item(f, "switch " + f)).ToArray() : Dests(it.Text); title = it.Label;

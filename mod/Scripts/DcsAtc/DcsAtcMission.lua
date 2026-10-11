@@ -196,7 +196,9 @@ local function start()
       { "Going around", "Tower: going around" },
       { "Closed / SFO", nil, {   -- R202/R204/R253
         { "Request closed", "Tower: request closed traffic" }, { "Request SFO", "Tower: request S F O" }, { "High key", "Tower: high key" },
-        { "Low key, gear down", "Tower: low key, gear down" }, { "Ready, practice approach", "Tower: ready for departure, practice approach" } } } } },
+        { "Low key, gear down", "Tower: low key, gear down" }, { "Ready, practice approach", "Tower: ready for departure, practice approach" },
+        { "Ready, unrestricted climb", "Tower: ready for departure, request unrestricted climb" },
+        { "Ready, tactical departure", "Tower: ready for departure, request tactical departure" } } } } },
     { "Approach", nil, {
       { L("Airborne (nach Start)", "Airborne (after takeoff)"), "Approach: airborne, climbing" }, { "Inbound for landing", "Approach: inbound for landing" },
       { "Inbound, pattern work", "Approach: inbound for pattern work, touch and go" }, { "Request ILS / straight in", "Approach: request straight in" },
@@ -211,8 +213,12 @@ local function start()
       { "Check out", "Range: checking out" }, { "Check out, hung ordnance", "Range: checking out, hung ordnance" } }, need = "range" },
     { "JTAC", nil, {   -- J11: only if the own side has a JTAC / FAC(A) in the mission
       { "Check in", "JTAC: checking in" }, { "Ready to copy", "JTAC: ready to copy" }, { "Readback", "JTAC: readback" },
-      { "Request mark", "JTAC: request mark" }, { "Tally", "JTAC: tally target" }, { "In", "JTAC: in" }, { "Off", "JTAC: off" },
-      { "Laser on", "JTAC: laser on" }, { "Check out", "JTAC: checking out" } }, need = "jtac" },
+      { "Say again 9-line", "JTAC: say again 9-line" },
+      { "Mark / laser", nil, {   -- mark type without mission edits (colours / illum from a ground JTAC, FAC(A) marks with WP)
+        { "Request mark", "JTAC: request mark" }, { "Red smoke", "JTAC: request red smoke" }, { "Green smoke", "JTAC: request green smoke" },
+        { "White smoke", "JTAC: request white smoke" }, { "Orange smoke", "JTAC: request orange smoke" }, { "Blue smoke", "JTAC: request blue smoke" },
+        { "Illumination", "JTAC: request illum" }, { "Sparkle (IR)", "JTAC: request sparkle" }, { "Laser on", "JTAC: laser on" } } },
+      { "Tally", "JTAC: tally target" }, { "In", "JTAC: in" }, { "Off", "JTAC: off" }, { "Check out", "JTAC: checking out" } }, need = "jtac" },
     { "AWACS / Tanker", nil, {
       { "AWACS", nil, {
         { "Check in", "AWACS: checking in" }, { "Picture", "AWACS: request picture" }, { "Bogey dope", "AWACS: bogey dope" }, { "Sort", "AWACS: request sort" },
@@ -356,7 +362,7 @@ local function start()
     for _, ctry in pairs(coa.country or {}) do
       for _, g in pairs(ctry.plane and ctry.plane.group or {}) do
         scan(g.route or {}, g.name)
-        if g.task == "AWACS" and g.frequency then beacons[#beacons + 1] = string.format("F;%s;%.3f", clean(g.name), g.frequency) end   -- AWACS radio (MHz)
+        if (g.task == "AWACS" or g.task == "Refueling") and g.frequency then beacons[#beacons + 1] = string.format("F;%s;%.3f%s", clean(g.name), g.frequency, g.task == "Refueling" and ";t" or "") end   -- AWACS/tanker radio (MHz)
       end
     end
   end
@@ -410,6 +416,7 @@ local function start()
     return ok and r
   end
   local function isAi(o) return air(o) and not o:getPlayerName() end
+  local jLeaders = {}   -- JTAC leaders (filled below); here so that player hits on ground targets reach the app for BDA (R416)
   local function uname(o) local ok, n = pcall(function() return o:getName() end) return ok and clean(n) or "" end
   local function gname(o) local ok, n = pcall(function() return o:getGroup():getName() end) return ok and clean(n) or "" end
   local ammo, tracked, fmax, lastHit, ejected = {}, {}, {}, {}, {}   -- lastHit: target -> last X;hit (R382); ejected: unit -> pilot out (R361); fmax: unit -> internal tank kg (LK15); ammo: unit -> "fox3/fox1/fox2/Kanone/Luft-Boden"; tracked: air-to-air missiles (Pitbull, Trashed)
@@ -446,7 +453,7 @@ local function start()
     elseif e.id == E.S_EVENT_HIT then
       local wid = e.weapon and e.weapon.id_
       for _, m in ipairs(tracked) do if wid and m.id == wid then m.hit = true end end
-      if not (isAi(u) or isAi(t)) then return end
+      if not (isAi(u) or isAi(t) or #jLeaders > 0 and air(u) and not air(t)) then return end   -- R416: player on ground targets for the JTAC BDA
       local life = 1
       pcall(function() life = t:getLife() / math.max(1, t:getLife0()) end)
       local lh, now = lastHit[uname(t)], timer.getTime()   -- R382: gun bursts give dozens of hits per second -> one event per target and second unless the damage jumps
@@ -454,7 +461,7 @@ local function start()
       lastHit[uname(t)] = { at = now, life = life }
       evt(string.format("X;hit;%s;%s;%s;%s;%s;%.2f", uname(u), gname(u), uname(t), gname(t), clean(e.weapon and e.weapon:getTypeName() or ""), life))
     elseif e.id == E.S_EVENT_KILL then
-      if not (isAi(u) or isAi(t)) then return end
+      if not (isAi(u) or isAi(t) or #jLeaders > 0 and air(u) and not air(t)) then return end
       local ty = ""
       pcall(function() ty = clean(t:getTypeName()) end)
       local tc = 0
@@ -629,10 +636,11 @@ local function start()
   local G, W, wTime = "G;0;0;80000", {}, -100
   local function weather()
     local v = (wx.visibility and wx.visibility.distance) or 80000
-    pcall(function()
+    local f2 = wx.fog2 and wx.fog2.mode   -- fog off in the ME (fog2.mode 1, older missions enable_fog): leftover fog values in the miz do not count
+    if (f2 and f2 ~= 1) or (not f2 and wx.enable_fog == true) then pcall(function()
       local fv = world.weather.getFogVisibilityDistance()   -- 0 = no fog (thickness alone can be > 0, e.g. ATMOS-X)
       if world.weather.getFogThickness() > 0 and fv > 0 then v = math.min(v, fv) end
-    end)
+    end) end
     G = string.format("G;%d;%.0f;%.0f;%d", cover, cl.base or 0, v, ceil)
     W = {}
     for _, f in ipairs(fields) do
@@ -1235,7 +1243,7 @@ local function start()
   end
 
   -- JTAC / FAC(A) (JTAC-PLAN J1-J4): leaders from the mission editor (E1), visible enemy groups, MARK / LASE / LASEOFF ---------
-  local jLeaders, jBy, jNav, jQ, jQTime = {}, {}, {}, {}, -100   -- jBy: clean id -> leader; jQ: cached Q lines (every 2 s)
+  local jBy, jNav, jQ, jQTime = {}, {}, {}, -100   -- jLeaders above (R416); jBy: clean id -> leader; jQ: cached Q lines (every 2 s)
   local FACCS = { "Axeman", "Darknight", "Warrior", "Pointer", "Eyeball", "Moonbeam", "Whiplash", "Finger", "Pinpoint", "Ferret",
     "Shaba", "Playboy", "Hammer", "Jaguar", "Deathstar", "Anvil", "Firefly", "Mantis", "Badger" }   -- DCS FAC callname index
   local FACT = { FAC = true, FAC_AttackGroup = true, FAC_EngageGroup = true }
@@ -1297,10 +1305,10 @@ local function start()
       if u:isExist() and u:isActive() and u:getLife() >= 1 then return u end
     end
   end
-  local function jSee(L, lu, p)   -- sight model per role: JTAC from +2 m above ground, 8 km; FAC(A) from the aircraft, 15 km
+  local function jSee(L, lu, p)   -- sight model per role: JTAC from +2 m above ground, 8 km; FAC(A) from the aircraft, 15 km; target at +1.5 m (unit origin sits on the ground)
     local lp = lu:getPoint()
     if d2(lp, p) > L.range ^ 2 then return false end
-    return land.isVisible(L.kind == "faca" and lp or { x = lp.x, y = land.getHeight({ x = lp.x, y = lp.z }) + 2, z = lp.z }, p)
+    return land.isVisible(L.kind == "faca" and lp or { x = lp.x, y = land.getHeight({ x = lp.x, y = lp.z }) + 2, z = lp.z }, { x = p.x, y = land.getHeight({ x = p.x, y = p.z }) + 1.5, z = p.z })
   end
   local function jTarget(gname)   -- point of the first living unit of an enemy group
     local g = Group.getByName(gname)
@@ -1336,7 +1344,7 @@ local function start()
           if n >= 5 then break end
           local g = c.e.g
           local p, u1 = jTarget(g:getName())
-          if p and jSee(L, lu, { x = p.x, y = land.getHeight({ x = p.x, y = p.z }) + 1.5, z = p.z }) then
+          if p and jSee(L, lu, p) then
             local cnt, flak = 0, 0
             for _, u in ipairs(g:getUnits() or {}) do
               if u:isExist() and u:getLife() >= 1 then
@@ -1550,6 +1558,7 @@ local function start()
       table.sort(list, function(l, r) return key(l) < key(r) end)
       want = function(a) return a:getID() == f.id end
     else
+      if not easy and fl:find("u") then return no("Easy Communication aus und Tankerfrequenz nicht gerastet") end   -- TP7: DCS greys the entry, blind keys would get stuck in the menu
       list = coalition.getServiceProviders(side, coalition.service.TANKER) or {}
       table.sort(list, function(l, r) return d(l) < d(r) end)
       want = function(t) local g = t.getGroup and t:getGroup() return g and g:getName() == target end

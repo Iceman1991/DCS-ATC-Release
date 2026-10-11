@@ -108,7 +108,7 @@ DCS-ATC can also run on a PC that hosts a DCS dedicated server (`DCS_server.exe`
 - **Multiplayer.** Everyone connects their SRS client to the SRS server on the host's PC, which is the PC running DCS-ATC.
 - **Tuning frequencies.** All frequencies are AM.
   - **Airfields** use their own DCS frequency, the one shown on the F10 map. Ground, Tower and Approach share it, and you can use either the UHF or the VHF frequency. Examples on Caucasus: Kutaisi 263.0 / 134.0, Senaki 261.0 / 132.0, Batumi 260.0 / 131.0.
-  - **Other stations** have defaults: ATIS 263.5, AWACS 251.5, Tanker 255.5, Range 267.5, Carrier 127.5, JTAC 133.5. An AWACS, carrier, JTAC or FAC(A) that has its own frequency in the mission uses that frequency instead.
+  - **Other stations** have defaults: ATIS 263.5, AWACS 251.5, Tanker 255.5, Range 267.5, Carrier 127.5, JTAC 133.5. An AWACS, tanker, carrier, JTAC or FAC(A) that has its own frequency in the mission uses that frequency instead.
   - **The radio wheel** shows the frequency of every station on its top level. A station is shown in red with ✗ when none of your SRS radios is tuned to it.
 - **You only hear what you are tuned to.** Controllers transmit on their own frequency. A controller's call also appears as text in the game for your group, but only if one of your radios is on that frequency. If SRS can't tell which radios you have, you see all text.
 
@@ -498,6 +498,7 @@ The IFR clearance list shows nearby airfields; carriers and your current airfiel
 | Closed / SFO → *Request closed / Request SFO* | `request closed traffic` / `request S F O` | In the air |
 | Closed / SFO → *High key / Low key, gear down* | `high key` / `low key, gear down` | After "request S F O" (or when asked for it) |
 | Closed / SFO → *Ready, practice approach* | `ready for departure, practice approach` | On the ground before takeoff |
+| Closed / SFO → *Ready, unrestricted climb / Ready, tactical departure* | `ready for departure, request unrestricted climb` (optional `flight level 250`) / `ready for departure, request tactical departure` | On the ground before takeoff; tactical only with a threat (enemy aircraft or enemy airfield within 60 NM) |
 
 **Approach**
 
@@ -530,7 +531,7 @@ The IFR clearance list shows nearby airfields; carriers and your current airfiel
 | Vector nearest airfield | `vector to nearest airfield` | In the air |
 | Check out | `checking out` | Checked in |
 
-**JTAC:** Check in, Ready to copy, Readback (DCS-ATC adds lines 4 and 6 and the restrictions), Request mark, Tally, In and Off (DCS-ATC adds the direction), Laser on, Check out. Details in [JTAC and FAC(A)](#jtac-and-faca).
+**JTAC:** Check in, Ready to copy, Readback (DCS-ATC adds lines 4 and 6 and the restrictions), Say again 9-line, Mark / laser (request mark, red, green, white, orange or blue smoke, illumination, sparkle, laser on; colours and illumination only from a ground JTAC), Tally, In and Off (DCS-ATC adds the direction), Check out. No mission edits needed for the mark type. Details in [JTAC and FAC(A)](#jtac-and-faca).
 
 **Tanker:** Request rejoin (in the air, before the rejoin), Visual (during the rejoin), Observation (during the rejoin and in observation), Pre-contact (`pre contact`), Refuel complete (after "cleared to join") and Say position (in the air).
 
@@ -599,7 +600,7 @@ In every mission with DCS-ATC, each player group gets **F10 Other → ATC**. If 
 | Submenu | Entries |
 |---|---|
 | Ground | Request startup · Request taxi · Runway vacated, taxi to parking · Progressive taxi · Hot brakes · IFR clearance → *Next in departure direction* / up to 8 friendly or neutral airfields, nearest first |
-| Tower | Ready for departure · Ready, closed pattern · Initial · Overhead · Base, gear down · Final, gear down, full stop · Base, touch and go · Going around · Closed / SFO → Request closed · Request SFO · High key · Low key, gear down · Ready, practice approach |
+| Tower | Ready for departure · Ready, closed pattern · Initial · Overhead · Base, gear down · Final, gear down, full stop · Base, touch and go · Going around · Closed / SFO → Request closed · Request SFO · High key · Low key, gear down · Ready, practice approach · Ready, unrestricted climb · Ready, tactical departure |
 | Approach | Airborne (after takeoff) · Inbound for landing · Inbound, pattern work · Request ILS / straight in · Flight following · Cancel approach · Traffic → Traffic in sight / Negative contact · C R P · More → Report airspeed / Say again / Request higher |
 | Range (only if the mission has a range) | Check in · IP inbound · In hot · Off safe · Check out · Check out, hung ordnance |
 | AWACS / Tanker | AWACS → Check in · Picture · Bogey dope · Sort · Nearest tanker · Vector nearest airfield · Check out · Combat → Committing / Fox three / Splash / Defending / Request support / Unable / Winchester / Bingo, RTB / Say again. Tanker → Request rejoin · Visual · Observation · Pre-contact · Refuel complete · Say position |
@@ -1786,7 +1787,7 @@ Radio wheel entries:
 | Range | Check in · In hot · Off safe · Check out |
 | AWACS | Check in · Picture · Bogey dope · Sort · Nearest tanker · Vector nearest airfield · Check out · Combat (Committing · Fox three · Splash · Defending · Request support · Unable · Winchester · Bingo, RTB · Say again) |
 | Tanker | Request rejoin · Visual · Observation · Pre-contact · Refuel complete |
-| JTAC | Check in · Ready to copy · Readback · Request mark · Tally · In · Off · Laser on · Check out |
+| JTAC | Check in · Ready to copy · Readback · Say again 9-line · Mark / laser (Request mark · Red / Green / White / Orange / Blue smoke · Illumination · Sparkle (IR) · Laser on) · Tally · In · Off · Check out |
 
 The centre of the wheel suggests the answer to whatever the controller just asked for. For example, after *"Report in hot"* it suggests **Range: in hot**, after *"cleared pre-contact"* it suggests **Tanker: pre contact**, and after *"report complete or request more"* it suggests **Tanker: complete**.
 
@@ -1918,7 +1919,7 @@ Overlord: Enfield one one, Overlord, Kutaisi bears 245, 62 miles.
 
 DCS still only operates the basket or boom through its own F-menu tanker dialog. So for **the player on the PC that runs DCS-ATC**, DCS-ATC presses the DCS radio menu for you in the background: *Intent to refuel* only at the join (*"cleared to join"*), not already at your request, *Ready pre-contact* when you call "pre-contact". The DCS tanker doesn't answer out loud.
 
-- With Easy Communication, DCS then tunes your radio to the tanker's mission frequency by itself. DCS-ATC's tanker also talks on that frequency. If the tanker shares it with an airfield (e.g. 261.0 = Senaki UHF), DCS-ATC doesn't switch you to that airfield.
+- DCS-ATC's tanker listens and talks on the tanker's mission frequency (the AWACS and the radio wheel name it) as well as on the default 255.5. With Easy Communication, DCS tunes your radio to the mission frequency by itself. If the tanker shares it with an airfield (e.g. 261.0 = Senaki UHF), DCS-ATC doesn't switch you to that airfield.
 - This uses `"CommsKey"` (the DCS radio menu key as a scan code, default `43`, which is `\` on US and `#` on German keyboards). With `0`, DCS-ATC doesn't press the menu.
 - **Other players** in multiplayer operate the DCS tanker menu themselves.
 
@@ -2075,24 +2076,29 @@ A JTAC is a controller on the ground, a FAC(A) one in the air. Both talk you ont
 
 #### Calls you can make
 
-Say the controller's callsign (*Axeman one one*) or *JTAC* / *FAC A* in the call. On the controller's frequency over SRS the frequency is enough.
+Say the controller's callsign (*Axeman one one*) or *JTAC* / *FAC A* in the call. Over SRS the frequency is enough: the controller on that frequency answers. If two controllers share a frequency, the callsign in the call decides, otherwise the one you are working with, otherwise the nearest. In the radio wheel, "Check in" lists the controllers when your side has more than one; later calls go to the one you checked in with.
 
 | You say (recognised words) | JTAC / FAC(A) answers |
 |---|---|
-| **checking in** (any first call) | *"Enfield one one, Axeman one one, situation: enemy four tanks stationary, three zero zero zero meters east of my position, friendlies at my position. Type 2 control, bomb on target. Advise when ready for 9-line."* A FAC(A) gives the distance of the friendlies from the target instead, or *"friendlies none known"*. Without a target: *"no enemy observed at this time, stand by. I'll call when I have a target."* |
-| **ready to copy** (*go ahead*, *ready for 9 line*, *ready for tasking*, *ready for next*, *ready for re-attack*) | The 9-line (below). While you are holding: *"stand by, hold as directed."* |
-| **readback** (lines 4 and 6 and the restrictions) | *"readback correct, advise when ready for mark or IN."* A wrong line is corrected on its own: *"negative line 4, line 4 elevation six six zero feet. Say again your readback."* |
+| **checking in** (any first call; with ordnance and playtime, e.g. *"checking in, 4 GBU-12, 2 Mavericks, playtime 30 minutes"*) | With ordnance and playtime the controller confirms them first (*"copy GBU 12, Maverick, playtime three zero minutes."*), picks the weapon for the 9-line (bombs, laser-guided first, on a stationary target; missiles, rockets or guns against a moving one; remark *"ordnance GBU 12"*, line 7 laser) and calls *"your playtime is up, say intentions"* when it runs out. *"playtime 20"* later sets a new one. *"Enfield one one, Axeman one one, situation: enemy four tanks stationary, three zero zero zero meters east of my position, friendlies at my position. Type 2 control, bomb on target. Advise when ready for 9-line."* A FAC(A) gives the distance of the friendlies from the target instead, or *"friendlies none known"*. Without a target: *"no enemy observed at this time, stand by. I'll call when I have a target."* |
+| **ready to copy** (*go ahead*, *ready for 9 line*, *ready for tasking*, *ready for next*, *ready for re-attack*) | The 9-line (below). *request re-attack* on the same target after the BDA: *"re-attack approved, same 9-line, final attack heading …, advise IN"*, without a new 9-line. While you are holding: *"stand by, hold as directed."* |
+| **readback** (lines 4 and 6 and the restrictions) | *"readback correct, push when ready, advise IN."* With *danger close* the remarks give the ground commander's initials (*"danger close, ground commander's initials whiskey golf"*); they must come back in the readback (the radio wheel adds them), otherwise *"negative initials, ..."*. A wrong line is corrected on its own: *"negative line 4, line 4 elevation six six zero feet. Say again your readback."* |
+| **say again 9-line** (*repeat the 9-line*, *say again all*) | The whole 9-line again, during the readback with the readback request. |
 | **say again line 6** (any line 1 to 9) | The line again. *"say again in MGRS"* or *"in lat long"* gives line 6 in that format. |
 | **laser code** | *"laser code one six eight eight."* |
 | **threats** (*air defense*) | The air defence it knows of, or *"no threats observed."* |
-| **request mark** (*mark my target*, *smoke*, *request smoke*) | JTAC: *"mark on the way, three zero seconds."*, then *"mark is red smoke, advise contact."* FAC(A): *"rocket away, mark is white phosphorus."* Before the readback: *"negative, readback first."* |
-| **laser on** (*request laser*, *sparkle*) / **laser off** | *"laser on, code one six eight eight."* / *"laser off."* If the controller loses the target: *"lost the target, laser off."* |
+| **request mark** (*mark my target*, *smoke*, *request smoke*) | JTAC: *"mark on the way, three zero seconds."*, then *"mark is red smoke, advise contact."* FAC(A): with a laser-capable aircraft (Hornet, F-16, A-10, Harrier, Apache …) or laser-guided bombs *"laser mark, code one six eight eight, advise spot."* (line 7 is the laser too), otherwise or on *request smoke* *"rocket away, mark is white phosphorus."* Wishes: *request green smoke* (red, green, white, orange, blue; JTAC only), *request illum* (illumination round, JTAC), *request sparkle* or *IR pointer* (at once: *"sparkle, advise contact sparkle"*). *"contact smoke"* / *"contact sparkle"* is the tally. Before the readback: *"negative, readback first."* |
+| **laser on** (*request laser*) / **laser off** (*terminate*) | *"lasing, code one six eight eight."* / *"laser off."* If the controller loses the target: *"lost the target, laser off."* |
 | **tally** (*visual*, *contact the mark*, *have the target*) | *"roger, advise IN."* |
 | **in from the west** (*in*, *in from the south* …) | Cleared hot, continue or abort (below). |
+| **IP inbound** (*inbound*, *pushing*) | *"continue, advise IN"* (or *"advise tally target"*). |
+| **in from the south, dry** | *"continue dry"*, a practice run without clearance. *"cleared hot"* read back by you gets no answer. |
+| **bombs away** (*weapons away*, *rifle*, *guns*, *rockets away*, *pickle*) | After *cleared hot*: *"copy"* (with the laser on *"copy, lasing"*). Without clearance: *"you were not cleared hot."* |
+| **request talk on** (*describe the target*) | The target description as for *no joy*. |
 | **off** (*off north*, *winchester*, *complete*) | The damage report (below). |
-| **bda** (*status*) | The damage report, or *"no attack yet."* |
+| **bda** (*status*, *did I hit*) | The damage report, or *"no attack yet."* |
 | **abort** | *"copy abort, standing by."* |
-| **checking out** (*off station*, *signing off*) | *"copy checking out, 3 destroyed in total. Good work."* |
+| **checking out** (*off station*, *signing off*, *bingo*, *RTB*) | *"copy checking out, 3 destroyed in total. Good work."* |
 | **radio check** | *"read you five."* |
 | anything else | *"say again."* |
 
@@ -2610,7 +2616,8 @@ When you report a bug, include the time, the airfield, a short description, `atc
 
 **Easy Communication**
 - DCS-ATC's radio doesn't depend on DCS's Easy Communication option.
-- The option matters only for night runway lighting. With Easy Communication off, DCS answers only if your radio is tuned to the airfield frequency, so DCS-ATC requests the lights only in that case.
+- The option matters for night runway lighting. With Easy Communication off, DCS answers only if your radio is tuned to the airfield frequency, so DCS-ATC requests the lights only in that case.
+- It also matters for the DCS tanker menu. With Easy Communication off, tune a radio to the tanker's mission frequency yourself before the join. Otherwise DCS greys out the tanker entry, DCS-ATC doesn't press the menu (the log says why) and the basket or boom is not extended.
 - If the lights never come on, check that `CommsKey` matches your DCS communication-menu key.
 
 **SRS not found**

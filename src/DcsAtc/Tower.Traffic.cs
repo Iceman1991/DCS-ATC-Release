@@ -26,7 +26,7 @@ public partial class Tower
     string Vacate(string rw)
     {
         landedRw = rw;
-        return F.Charted && home != null && home.Vacate.TryGetValue(rw, out var v) ? $"Vacate {v}." : "Vacate runway when able.";
+        return F.Charted && home != null && home.Vacate.TryGetValue(rw, out var v) ? $"Vacate {v}." : OneOf("Vacate runway when able.", "Vacate the runway when able.");
     }
     string landedRw = "";
 
@@ -146,6 +146,6 @@ public partial class Tower
         if (role == "Approach") traffic = Own(traffic);   // A52: Approach names no enemies, the tower (pattern) all
         var a = traffic.Where(a => a.Speed > 30 && Dist(a.X, a.Z, CX, CZ) < 6 * NM && a.AltMsl - FieldElev < 1500)
                        .OrderBy(a => Dist(a.X, a.Z, CX, CZ)).FirstOrDefault();
-        return a == null ? "" : $" Traffic, {Describe(a, rw)}.";
+        return a == null ? "" : $" {OneOf("Traffic", "Traffic information", "Traffic advisory")}, {Describe(a, rw)}.";
     }
 }

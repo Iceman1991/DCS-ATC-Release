@@ -42,7 +42,7 @@ public partial class Tower
     }
 
     /// Announcement to everyone at the airfield when the ATIS identifier changes.
-    public string AtisCall(string letter, Telemetry w) => $"Attention all aircraft, {F.Name.Replace('-', ' ')} information {Phonetic(letter)} now current, {AtisQnh(w)}.";
+    public string AtisCall(string letter, Telemetry w) => $"{OneOf("Attention all aircraft", "All stations")}, {F.Name.Replace('-', ' ')} information {Phonetic(letter)} {OneOf("now current", "is now current")}, {AtisQnh(w)}.";
 
     string TakeoffClearance(Telemetry? t, IReadOnlyList<Traffic> traffic, Traffic? fin = null)   // fin: approach 2.5-6 NM -> "immediate" with traffic (A10)
     {
@@ -64,6 +64,16 @@ public partial class Tower
             return Closed() is var cl && cl != "" ? $"{c}, {clr}{cl}." : $"{c}, after departure join {Hand(Runway)} downwind, {Alt(PatternFt)}, {clr}. Report final.";
         }
         clr += ".";
+        if (climbOut == "tactical" && !CombatZone) { climbOut = null; c += ", unable tactical departure"; }   // spiral departure only with a threat (enemy air or enemy airfield within 60 NM)
+        if (climbOut != null && !IsHeli)   // unrestricted climb / spiral climb overhead: no level-off, own navigation
+        {
+            nav = null;
+            double to = climbFt > 0 ? climbFt : depClr ? Cruise : 0;
+            if (depClr) depFt = cruiseFt = to;   // no "check altitude" below it
+            var top = to > 0 ? $" to {Alt(to)}" : "";
+            return climbOut == "tactical" ? $"{c}, after departure spiral climb overhead, remain within 3 miles, unrestricted{top}, then own navigation, {clr}"
+                                          : $"{c}, after departure unrestricted climb{top}, own navigation, {clr}";
+        }
         if (depClr)
         {
             nav = null;
@@ -163,7 +173,7 @@ public partial class Tower
         bool lined = t != null && (OnFinalLoose(t, rw) || OnLongFinal(t, rw) || baseCall);
         if (Phase == Phase.ClearedLand && lined) return Say($"{c}, roger, runway {RwSay(rw)}, {ClearText()}.");   // R336: runway first (FAA JO 7110.65 3-10-5 a)   // already cleared (tick): confirm briefly, not everything again
         // A43: no landing clearance on the initial, first the break and "base" (FAA JO 7110.65 3-10); tick switches to Pattern on downwind
-        if (Phase == Phase.Initial && !baseCall && (t == null || lined) && !(t != null && StraightIn(t, rw))) return Say($"{c}, roger, report base.");
+        if (Phase == Phase.Initial && !baseCall && (t == null || lined) && !(t != null && StraightIn(t, rw))) return Say($"{c}, {OneOf("roger", "copy")}, report base.");
         if (t != null && !lined && Phase == Phase.Entering && navName == "circle") return CircleJoin(t, traffic, $"{c}, {F.StationOf("Tower")}");   // R212: "final" on the opposite runway = first call for circling
         if (t != null && !lined)
         {
@@ -209,7 +219,7 @@ public partial class Tower
         holdFt = RouteFt(t, traffic, fix, HoldFtAt(fix));
         double d = Dist(t.X, t.Z, fix.X, fix.Z);
         return Say($"{Cs()}, emergency in progress, {(pattern ? "leave the pattern, " : "")}{Steer(t, fix, "the hold")}, {AltTo(t, holdFt)}{HoldSpd(t)}, " +
-                   $"{(HoldAt(fix) is { } hr ? $"hold {hr}, {MilesTxt(d)} to go" : $"{MilesTxt(d)} to the holding point")}, I will call you.", by);
+                   $"{(HoldAt(fix) is { } hr ? $"hold {hr}, {MilesTxt(d)} to go" : $"{MilesTxt(d)} to the holding point")}, {OneOf("I will call you", "I will advise")}.", by);
     }
 
     /// Emergency: the runway the pilot is already aligned with, otherwise the active one.

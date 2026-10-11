@@ -531,6 +531,31 @@ public partial class Tower
         var dpB = Dep();
         dpB.Following = true;   // Following came along from another airfield: no "leaving control zone" (Kutaisi zone 9.1 NM, A100)
         Check(dpB.Tick(At(CX - 10 * NM, CZ, 3000, 270, 300), none, 12).Count == 0 && dpB.Phase == Phase.Away, "Departing mit Following: still Away");
+        {   // Departure on request: unrestricted climb (IFR: no "check altitude" below it, check-in without vector), tactical departure (spiral) only with a threat, unrestricted climb in the air
+            (Tower T, string Said) Req(string ready, double hostile = 999, string? clr = null)
+            {
+                var x = new Tower("Enfield 1-1") { HostileNm = hostile };
+                x.Tick(parked, none, 0);
+                if (clr != null) x.OnTranscript($"Kutaisi Ground, Enfield 11, request IFR clearance to {clr}", parked, none, 1);
+                x.OnTranscript("Enfield 11 request taxi", parked, none, 2);
+                return (x, x.OnTranscript("Enfield 11 " + ready, hold, none, 3).FirstOrDefault()?.Text ?? "-");
+            }
+            var (uc, u1) = Req("ready for departure, request unrestricted climb flight level 250", clr: "Batumi");
+            bool ucSaved = uc.Save() is { ClimbOut: "free", ClimbFt: 25000 };   // crash restart keeps the request
+            uc.Tick(At(dx, dz, 120, LandHdg("25"), 180), none, 10);
+            uc.Tick(At(dx, dz, 250, LandHdg("25"), 200), none, 11);
+            bool ucQuiet = !uc.Tick(At(dx, dz, 2500, LandHdg("25"), 250), none, 12).Any(m => m.Contains("check altitude"));
+            var u2 = uc.OnTranscript("Kutaisi Approach, Enfield 11, airborne, climbing", At(dx, dz, 2500, LandHdg("25"), 250), none, 13).FirstOrDefault()?.Text ?? "-";
+            Check(u1.Contains("after departure unrestricted climb to flight level two five zero, own navigation") && u1.Contains("cleared for takeoff") && ucQuiet && ucSaved && uc.AsgFt == 25000
+                  && u2.Contains("Unrestricted climb approved, resume own navigation") && !u2.Contains("heading"), $"Abflug unrestricted climb: {u1} / {u2} / {ucQuiet}");
+            var tdNo = Req("ready for departure, request tactical departure").Said;
+            var tdYes = Req("ready for departure, request tactical departure", 30).Said;
+            Check(tdNo.Contains("unable tactical departure") && !tdNo.Contains("spiral") && tdNo.Contains("cleared for takeoff")
+                  && tdYes.Contains("spiral climb overhead, remain within 3 miles") && tdYes.Contains("cleared for takeoff"), $"tactical departure nur mit Bedrohung: {tdNo} / {tdYes}");
+            var ua = Dep();
+            var u3 = ua.OnTranscript("Kutaisi Approach, Enfield 11, request unrestricted climb flight level 300", At(dx, dz, 1500, LandHdg("25"), 250), none, 20).FirstOrDefault()?.Text ?? "-";
+            Check(u3.Contains("unrestricted climb approved to flight level three zero zero, resume own navigation") && ua.Phase == Phase.Away, "unrestricted climb in der Luft: " + u3);
+        }
         // A100: one control zone per airfield (altitude check and sign-off at the same boundary): Kutaisi farthest CRP + 0.5 NM, otherwise 5 NM
         var gf5 = Airfield.FromDcs("Test-Field", 0, 0, 10, new[] { ("13", -131 * Math.PI / 180, 0.0, 0.0, 2400.0) });
         Check(Math.Abs(K.CtrNm - 9.1) < 0.2 && gf5.CtrNm == 5 && Math.Abs(gf5.CtrTopFt - (10 / Ft + 3000)) < 1, $"A100: Zone Kutaisi {K.CtrNm:0.0} NM, sonst {gf5.CtrNm} NM");
@@ -3942,6 +3967,8 @@ public partial class Tower
               ar[4] is { Row: "threat BRAA zero nine zero, 20 miles, hot", Fresh: true }, "A114/N46/R54: AWACS-Spruch -> Debriefing-Art, Threat/Merged frisch, Threat mit Gruppennamen");
         var dr = Program.ForPiper("Enfield one one, wind two four zero at eight, splash one, two five one decimal zero");
         Check(dr == "Enfield one-one, wind two-four-zero at eight, splash one, two-five-one decimal zero", "Piper: Ziffern gebunden: " + dr);
+        var d9 = Program.ForPiper("Line 6, north four two degrees two one decimal five seven minutes", true);
+        Check(d9 == "Line 6, north four two degrees two one decimal five seven minutes", "Piper: 9-Liner Ziffern einzeln: " + d9);
 
         // --- RW1 (A8-A12): runway occupied, takeoff clearances, go-around
         {

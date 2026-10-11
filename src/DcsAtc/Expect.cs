@@ -57,7 +57,8 @@ static partial class Program
         {
             "Ground: request startup" => gnd && ph is null or Phase.Parked,
             "Ground: request taxi" => gnd && ph is null or Phase.Parked or Phase.StartupApproved or Phase.TaxiOut,
-            "Ground: request IFR clearance" or "Tower: ready for departure" or "Tower: ready for departure, closed pattern" or "Tower: ready for departure, practice approach" => gnd && before,
+            "Ground: request IFR clearance" or "Tower: ready for departure" or "Tower: ready for departure, closed pattern" or "Tower: ready for departure, practice approach"
+                or "Tower: ready for departure, request unrestricted climb" or "Tower: ready for departure, request tactical departure" => gnd && before,
             "Ground: runway vacated, request taxi to parking" => gnd && !before,   // after landing (or aborted takeoff back)
             "Tower: high key" or "Tower: low key, gear down" => air && (a?.Sfo == true || ask.Contains(" key") || flow.Contains(" key")),   // after "request S F O"
             "Approach: airborne, climbing" => airb,
@@ -72,7 +73,9 @@ static partial class Program
             "JTAC: checking in" => air && h.Ops.Cas == 0,
             "JTAC: ready to copy" => h.Ops.Cas is 1 or 6,
             "JTAC: readback" => h.Ops.Cas == 2,
-            "JTAC: request mark" or "JTAC: tally target" or "JTAC: in" or "JTAC: laser on" => h.Ops.Cas is >= 3 and <= 5,
+            "JTAC: tally target" or "JTAC: in" or "JTAC: laser on" or "JTAC: request mark" or "JTAC: request sparkle" => h.Ops.Cas is >= 3 and <= 5,
+            "JTAC: request red smoke" or "JTAC: request green smoke" or "JTAC: request white smoke" or "JTAC: request orange smoke" or "JTAC: request blue smoke" or "JTAC: request illum" => h.Ops.Cas is >= 3 and <= 5 && h.Ops.GroundJtac,   // colours / illum only from a ground JTAC
+            "JTAC: say again 9-line" => h.Ops.Cas >= 2,
             "JTAC: off" => h.Ops.Cas >= 4,
             "JTAC: checking out" => h.Ops.Cas > 0,
             "AWACS: checking in" => air && !h.Ops.AwacsIn,
@@ -378,13 +381,13 @@ static partial class Program
         Want(Fit() == "checking in", "Funkrad JTAC vor Check-in: " + Fit());
         string Say(string t) => string.Join(" | ", p.Ops.OnTranscript("JTAC", t, MeOf(p), Array.Empty<Traffic>(), Fields, 0).Select(c => c.Text));
         Say("JTAC: checking in");
-        Want(Fit() == "ready to copy,checking out", "Funkrad JTAC nach Check-in: " + Fit());
+        Want(Fit() == "ready to copy,checking out" && p.Ops.CasSuggest()?.Text == "ready to copy", "Funkrad JTAC nach Check-in: " + Fit() + " Enter " + p.Ops.CasSuggest());
         Say("JTAC: ready to copy");
-        Want(Fit() == "readback,checking out", "Funkrad JTAC nach 9-Liner: " + Fit());
+        Want(Fit() == "readback,checking out" && p.Ops.CasSuggest()?.Text == "readback", "Funkrad JTAC nach 9-Liner: " + Fit() + " Enter " + p.Ops.CasSuggest());
         Say("JTAC: " + p.Ops.CasWheel("readback"));
-        Want(Fit() == "request mark,tally target,in,laser on,checking out", "Funkrad JTAC nach Readback: " + Fit());
+        Want(Fit() == "request mark,tally target,in,laser on,checking out" && p.Ops.CasSuggest()?.Text is "tally target" or "in", "Funkrad JTAC nach Readback: " + Fit() + " Enter " + p.Ops.CasSuggest());
         Say("JTAC: tally target"); Say("JTAC: " + p.Ops.CasWheel("in"));
-        Want(Fit() == "request mark,tally target,in,off,laser on,checking out" && p.Ops.Cas == 5, "Funkrad JTAC nach IN: " + Fit());
+        Want(Fit() == "request mark,tally target,in,off,laser on,checking out" && p.Ops.Cas == 5 && p.Ops.CasSuggest()?.Text == "off", "Funkrad JTAC nach IN: " + Fit() + " Enter " + p.Ops.CasSuggest());
         Say("JTAC: checking out");
         Want(Fit() == "checking in" && p.Ops.Cas == 0, "Funkrad JTAC nach Check-out: " + Fit());
         var (aw, jf, ff) = (Cfg.Frequencies["AWACS"], Cfg.Frequencies["JTAC"], 251.5);

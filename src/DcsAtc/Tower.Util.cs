@@ -55,6 +55,7 @@ public partial class Tower
     internal static double HdgDiff(double a, double b) => Math.Abs(((a - b) % 360 + 540) % 360 - 180);
     internal static int Miles(double m) => Math.Max(1, (int)Math.Round(m / NM));
     internal static string MilesTxt(double m) { int n = Miles(m); return n == 1 ? "1 mile" : $"{n} miles"; }   // R373: singular for 1
+    static string Rc => OneOf("radar contact", "identified");   // radar identification, both phrasings are standard
     internal static string Dir8(double brg) =>
         new[] { "north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest" }[(int)Math.Round(brg / 45) % 8];
     string Where(Telemetry t, string of = "the field") => $"{MilesTxt(Dist(t.X, t.Z, CX, CZ))} {Dir8(Bearing(CX, CZ, t.X, t.Z))} of {of}";
@@ -147,7 +148,7 @@ public partial class Tower
         double brg = (Math.Atan2(t.Z - CZ, t.X - CX) * 180 / Math.PI + 360) % 360;
         string[] dirs = { "north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest" };
         int d = (int)Math.Round(Dist(t.X, t.Z, CX, CZ) / NM);
-        return $"identified, {MilesTxt(d * NM)} {dirs[(int)Math.Round(brg / 45) % 8]} of {F.Name.Replace('-', ' ')}";   // R322: reference point (FAA JO 7110.65 5-3-7)
+        return $"{OneOf("identified", "radar contact")}, {MilesTxt(d * NM)} {dirs[(int)Math.Round(brg / 45) % 8]} of {F.Name.Replace('-', ' ')}";   // R322: reference point (FAA JO 7110.65 5-3-7)
     }
 
     static double WindFromTrue(Telemetry t) => (Math.Atan2(-t.WindZ, -t.WindX) * 180 / Math.PI + 360) % 360;

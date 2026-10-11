@@ -110,7 +110,7 @@ DCS-ATC läuft auch auf einem PC mit DCS Dedicated Server (`DCS_server.exe`), an
 - **Multiplayer.** Alle verbinden ihren SRS-Client mit dem SRS-Server auf dem PC des Hosts, also dem PC mit DCS-ATC.
 - **Frequenzen rasten.** Alle Frequenzen sind AM.
   - **Flugplätze** nutzen ihre eigene DCS-Frequenz, die auf der F10-Karte. Ground, Tower und Approach teilen sie sich, UHF oder VHF geht beides. Beispiele Kaukasus: Kutaisi 263.0 / 134.0, Senaki 261.0 / 132.0, Batumi 260.0 / 131.0.
-  - **Andere Stationen** haben Standardwerte: ATIS 263.5, AWACS 251.5, Tanker 255.5, Range 267.5, Carrier 127.5, JTAC 133.5. Hat ein AWACS, Träger, JTAC oder FAC(A) in der Mission eine eigene Frequenz, gilt diese.
+  - **Andere Stationen** haben Standardwerte: ATIS 263.5, AWACS 251.5, Tanker 255.5, Range 267.5, Carrier 127.5, JTAC 133.5. Hat ein AWACS, Tanker, Träger, JTAC oder FAC(A) in der Mission eine eigene Frequenz, gilt diese.
   - **Das Funkrad** zeigt in der obersten Ebene die Frequenz jeder Station. Rot mit ✗ heißt: keines deiner SRS-Funkgeräte ist darauf gerastet.
 - **Du hörst nur, worauf du gerastet bist.** Lotsen senden auf ihrer Frequenz. Ein Lotsenspruch erscheint zusätzlich als Text für deine Gruppe, aber nur, wenn eines deiner Funkgeräte auf dieser Frequenz steht. Kennt SRS deine Funkgeräte nicht, siehst du allen Text.
 
@@ -500,6 +500,7 @@ Die IFR-Liste zeigt nahe Plätze; Träger und dein aktueller Platz stehen nicht 
 | Closed / SFO → *Request closed / Request SFO* | `request closed traffic` / `request S F O` | In der Luft |
 | Closed / SFO → *High key / Low key, gear down* | `high key` / `low key, gear down` | Nach „request S F O“ (oder wenn danach gefragt) |
 | Closed / SFO → *Ready, practice approach* | `ready for departure, practice approach` | Am Boden vor dem Start |
+| Closed / SFO → *Ready, unrestricted climb / Ready, tactical departure* | `ready for departure, request unrestricted climb` (optional `flight level 250`) / `ready for departure, request tactical departure` | Am Boden vor dem Start; taktisch nur bei Bedrohung (Feindflugzeug oder Feindplatz ≤ 60 NM) |
 
 **Approach**
 
@@ -532,7 +533,7 @@ Die IFR-Liste zeigt nahe Plätze; Träger und dein aktueller Platz stehen nicht 
 | Vektor nächster Platz | `vector to nearest airfield` | In der Luft |
 | Check out | `checking out` | Eingecheckt |
 
-**JTAC:** Check in, Ready to copy, Readback (DCS-ATC ergänzt die Zeilen 4 und 6 und die Einschränkungen), Request mark, Tally, In und Off (DCS-ATC ergänzt die Richtung), Laser on, Check out. Details unter [JTAC und FAC(A)](#jtac-und-faca).
+**JTAC:** Check in, Ready to copy, Readback (DCS-ATC ergänzt die Zeilen 4 und 6 und die Einschränkungen), Say again 9-line, Mark / laser (request mark, roter, grüner, weißer, oranger oder blauer Rauch, Illumination, Sparkle, Laser on; Farben und Illumination nur vom Boden-JTAC), Tally, In und Off (DCS-ATC ergänzt die Richtung), Check out. Für die Markierungsart muss nichts in die Mission. Details unter [JTAC und FAC(A)](#jtac-und-faca).
 
 **Tanker:** Request rejoin (in der Luft, vor dem Rejoin), Visual (im Rejoin), Observation (im Rejoin und in der Beobachtung), Pre-contact (`pre contact`), Refuel complete (nach „cleared to join“) und Say position (in der Luft).
 
@@ -601,7 +602,7 @@ In jeder Mission mit DCS-ATC bekommt jede Spielergruppe **F10 Andere → ATC**. 
 | Untermenü | Einträge |
 |---|---|
 | Ground | Request startup · Request taxi · Runway vacated, taxi to parking · Progressive taxi · Hot brakes · IFR clearance → *Nächster in Abflugrichtung* / bis zu 8 eigene oder neutrale Plätze, nächster zuerst |
-| Tower | Ready for departure · Ready, closed pattern · Initial · Overhead · Base, gear down · Final, gear down, full stop · Base, touch and go · Going around · Closed / SFO → Request closed · Request SFO · High key · Low key, gear down · Ready, practice approach |
+| Tower | Ready for departure · Ready, closed pattern · Initial · Overhead · Base, gear down · Final, gear down, full stop · Base, touch and go · Going around · Closed / SFO → Request closed · Request SFO · High key · Low key, gear down · Ready, practice approach · Ready, unrestricted climb · Ready, tactical departure |
 | Approach | Airborne (nach Start) · Inbound for landing · Inbound, pattern work · Request ILS / straight in · Flight following · Abmelden (cancel approach) · Verkehr → Traffic in sight / Negative contact · C R P · Mehr → Fahrt melden / Say again / Request higher |
 | Range (nur wenn die Mission eine Range hat) | Check in · IP inbound · In hot · Off safe · Check out · Check out, hung ordnance |
 | AWACS / Tanker | AWACS → Check in · Picture · Bogey dope · Sort · Nächster Tanker · Vektor nächster Platz · Check out · Gefecht → Committing / Fox three / Splash / Defending / Request support / Unable / Winchester / Bingo, RTB / Say again. Tanker → Request rejoin · Visual · Observation · Pre-contact · Refuel complete · Say position |
@@ -1788,7 +1789,7 @@ Funkrad-Einträge:
 | Range | Check in · In hot · Off safe · Check out |
 | AWACS | Check in · Picture · Bogey dope · Sort · Nächster Tanker · Vektor nächster Platz · Check out · Gefecht (Committing · Fox three · Splash · Defending · Request support · Unable · Winchester · Bingo, RTB · Say again) |
 | Tanker | Request rejoin · Visual · Observation · Pre-contact · Refuel complete |
-| JTAC | Check in · Ready to copy · Readback · Request mark · Tally · In · Off · Laser on · Check out |
+| JTAC | Check in · Ready to copy · Readback · Say again 9-line · Mark / laser (Request mark · Red / Green / White / Orange / Blue smoke · Illumination · Sparkle (IR) · Laser on) · Tally · In · Off · Check out |
 
 Die Radmitte schlägt die Antwort auf das vor, was der Lotse gerade verlangt hat. Nach *„Report in hot“* etwa **Range: in hot**, nach *„cleared pre-contact“* **Tanker: pre contact**, nach *„report complete or request more“* **Tanker: complete**.
 
@@ -1920,7 +1921,7 @@ Es spricht immer der **DCS-ATC-Tanker**, auch wenn die Mission einen eigenen DCS
 
 DCS bedient Korb bzw. Boom aber nur über seinen eigenen Tankerdialog im F-Menü. Für **den Spieler am PC mit DCS-ATC** drückt DCS-ATC deshalb im Hintergrund das DCS-Funkmenü für dich: *Intent to refuel* erst beim Join (*„cleared to join“*), nicht schon bei der Anfrage, *Ready pre-contact* bei deinem „pre-contact“. Der DCS-Tanker antwortet darauf nicht hörbar.
 
-- Mit Easy Communication rastet DCS dabei dein Funkgerät selbst auf die Missionsfrequenz des Tankers. Der DCS-ATC-Tanker spricht dann auch auf dieser Frequenz. Teilt sie sich der Tanker mit einem Platz (etwa 261.0 = Senaki UHF), wechselt DCS-ATC deshalb nicht den Platz.
+- Der DCS-ATC-Tanker hört und spricht auf der Missionsfrequenz des Tankers (AWACS und Funkrad nennen sie) und auf dem Standard 255.5. Mit Easy Communication rastet DCS dein Funkgerät selbst auf die Missionsfrequenz. Teilt sie sich der Tanker mit einem Platz (etwa 261.0 = Senaki UHF), wechselt DCS-ATC deshalb nicht den Platz.
 - Das nutzt `"CommsKey"` (DCS-Funkmenü-Taste als Scancode, Standard `43`, also `\` auf US- und `#` auf deutschen Tastaturen). Mit `0` drückt DCS-ATC das Menü nicht.
 - **Andere Spieler** im Multiplayer bedienen das DCS-Tankermenü selbst.
 
@@ -2077,24 +2078,29 @@ Ein JTAC ist ein Lotse am Boden, ein FAC(A) einer in der Luft. Beide sprechen di
 
 #### Deine Sprüche
 
-Nenne das Rufzeichen des Lotsen (*Axeman one one*) oder *JTAC* / *FAC A* im Spruch. Auf der Frequenz des Lotsen über SRS reicht die Frequenz.
+Nenne das Rufzeichen des Lotsen (*Axeman one one*) oder *JTAC* / *FAC A* im Spruch. Über SRS reicht die Frequenz: es antwortet der Lotse auf dieser Frequenz. Teilen sich zwei Lotsen eine Frequenz, entscheidet das Rufzeichen im Spruch, sonst der, mit dem du gerade arbeitest, sonst der nächste. Im Funkrad listet „Check in“ die Lotsen, wenn deine Seite mehrere hat; spätere Sprüche gehen an den, bei dem du eingecheckt hast.
 
 | Du sagst (erkannte Wörter) | JTAC / FAC(A) antwortet |
 |---|---|
-| **checking in** (jeder erste Spruch) | *„Enfield one one, Axeman one one, situation: enemy four tanks stationary, three zero zero zero meters east of my position, friendlies at my position. Type 2 control, bomb on target. Advise when ready for 9-line.“* Ein FAC(A) nennt stattdessen den Abstand der eigenen Truppen zum Ziel oder *„friendlies none known“*. Ohne Ziel: *„no enemy observed at this time, stand by. I'll call when I have a target.“* |
-| **ready to copy** (*go ahead*, *ready for 9 line*, *ready for tasking*, *ready for next*, *ready for re-attack*) | Der 9-Liner (unten). Solange du in der Warteschleife bist: *„stand by, hold as directed.“* |
-| **readback** (Zeilen 4 und 6 und die Einschränkungen) | *„readback correct, advise when ready for mark or IN.“* Eine falsche Zeile wird einzeln berichtigt: *„negative line 4, line 4 elevation six six zero feet. Say again your readback.“* |
+| **checking in** (jeder erste Spruch; mit Bewaffnung und Playtime, z. B. *„checking in, 4 GBU-12, 2 Mavericks, playtime 30 minutes“*) | Mit Bewaffnung und Playtime bestätigt die Leitstelle beides zuerst (*„copy GBU 12, Maverick, playtime three zero minutes.“*), wählt die Waffe für den 9-Liner (Bomben, lasergelenkte zuerst, auf ein stehendes Ziel; Flugkörper, Raketen oder Bordkanone auf ein fahrendes; Bemerkung *„ordnance GBU 12“*, Zeile 7 Laser) und meldet *„your playtime is up, say intentions“*, wenn sie abläuft. *„playtime 20“* setzt später eine neue. *„Enfield one one, Axeman one one, situation: enemy four tanks stationary, three zero zero zero meters east of my position, friendlies at my position. Type 2 control, bomb on target. Advise when ready for 9-line.“* Ein FAC(A) nennt stattdessen den Abstand der eigenen Truppen zum Ziel oder *„friendlies none known“*. Ohne Ziel: *„no enemy observed at this time, stand by. I'll call when I have a target.“* |
+| **ready to copy** (*go ahead*, *ready for 9 line*, *ready for tasking*, *ready for next*, *ready for re-attack*) | Der 9-Liner (unten). *request re-attack* auf dasselbe Ziel nach dem BDA: *„re-attack approved, same 9-line, final attack heading …, advise IN“*, ohne neuen 9-Liner. Solange du in der Warteschleife bist: *„stand by, hold as directed.“* |
+| **readback** (Zeilen 4 und 6 und die Einschränkungen) | *„readback correct, push when ready, advise IN.“* Bei *danger close* nennen die Bemerkungen das Kürzel des Bodenkommandeurs (*„danger close, ground commander's initials whiskey golf“*); es muss im Readback zurückkommen (das Funkrad ergänzt es), sonst *„negative initials, ...“*. Eine falsche Zeile wird einzeln berichtigt: *„negative line 4, line 4 elevation six six zero feet. Say again your readback.“* |
+| **say again 9-line** (*repeat the 9-line*, *say again all*) | Der ganze 9-Liner noch einmal, beim Readback mit der Readback-Aufforderung. |
 | **say again line 6** (jede Zeile 1 bis 9) | Die Zeile noch einmal. *„say again in MGRS“* oder *„in lat long“* gibt Zeile 6 in diesem Format. |
 | **laser code** | *„laser code one six eight eight.“* |
 | **threats** (*air defense*) | Die bekannte Luftabwehr oder *„no threats observed.“* |
-| **request mark** (*mark my target*, *smoke*, *request smoke*) | JTAC: *„mark on the way, three zero seconds.“*, danach *„mark is red smoke, advise contact.“* FAC(A): *„rocket away, mark is white phosphorus.“* Vor dem Readback: *„negative, readback first.“* |
-| **laser on** (*request laser*, *sparkle*) / **laser off** | *„laser on, code one six eight eight.“* / *„laser off.“* Verliert der Lotse das Ziel: *„lost the target, laser off.“* |
+| **request mark** (*mark my target*, *smoke*, *request smoke*) | JTAC: *„mark on the way, three zero seconds.“*, danach *„mark is red smoke, advise contact.“* FAC(A): bei laserfähigem Flugzeug (Hornet, F-16, A-10, Harrier, Apache …) oder lasergelenkten Bomben *„laser mark, code one six eight eight, advise spot.“* (auch Zeile 7 ist dann der Laser), sonst oder auf *request smoke* *„rocket away, mark is white phosphorus.“* Wunsch: *request green smoke* (red, green, white, orange, blue; nur JTAC), *request illum* (Leuchtgranate, JTAC), *request sparkle* oder *IR pointer* (sofort: *„sparkle, advise contact sparkle“*). *„contact smoke“* / *„contact sparkle“* ist das Tally. Vor dem Readback: *„negative, readback first.“* |
+| **laser on** (*request laser*) / **laser off** (*terminate*) | *„lasing, code one six eight eight.“* / *„laser off.“* Verliert der Lotse das Ziel: *„lost the target, laser off.“* |
 | **tally** (*visual*, *contact the mark*, *have the target*) | *„roger, advise IN.“* |
 | **in from the west** (*in*, *in from the south* …) | Cleared hot, continue oder abort (unten). |
+| **IP inbound** (*inbound*, *pushing*) | *„continue, advise IN“* (oder *„advise tally target“*). |
+| **in from the south, dry** | *„continue dry“*, ein Übungsanflug ohne Freigabe. Liest du *„cleared hot“* zurück, kommt keine Antwort. |
+| **bombs away** (*weapons away*, *rifle*, *guns*, *rockets away*, *pickle*) | Nach *cleared hot*: *„copy“* (mit Laser *„copy, lasing“*). Ohne Freigabe: *„you were not cleared hot.“* |
+| **request talk on** (*describe the target*) | Die Zielbeschreibung wie bei *no joy*. |
 | **off** (*off north*, *winchester*, *complete*) | Die Wirkungsmeldung (unten). |
-| **bda** (*status*) | Die Wirkungsmeldung oder *„no attack yet.“* |
+| **bda** (*status*, *did I hit*) | Die Wirkungsmeldung oder *„no attack yet.“* |
 | **abort** | *„copy abort, standing by.“* |
-| **checking out** (*off station*, *signing off*) | *„copy checking out, 3 destroyed in total. Good work.“* |
+| **checking out** (*off station*, *signing off*, *bingo*, *RTB*) | *„copy checking out, 3 destroyed in total. Good work.“* |
 | **radio check** | *„read you five.“* |
 | alles andere | *„say again.“* |
 
@@ -2612,7 +2618,8 @@ Für einen Fehlerbericht: Uhrzeit, Platz, kurze Beschreibung, `atc-log.txt` und 
 
 **Easy Communication**
 - Der Funk von DCS-ATC hängt nicht von der DCS-Option Easy Communication ab.
-- Die Option zählt nur für die Bahnbefeuerung nachts. Mit Easy Communication aus antwortet DCS nur, wenn dein Funkgerät auf die Platzfrequenz gerastet ist, deshalb fordert DCS-ATC das Licht nur dann an.
+- Die Option zählt für die Bahnbefeuerung nachts. Mit Easy Communication aus antwortet DCS nur, wenn dein Funkgerät auf die Platzfrequenz gerastet ist, deshalb fordert DCS-ATC das Licht nur dann an.
+- Sie zählt auch für das DCS-Tankermenü. Mit Easy Communication aus raste vor dem Join selbst ein Funkgerät auf die Missionsfrequenz des Tankers. Sonst graut DCS den Tanker aus, DCS-ATC drückt das Menü nicht (Grund steht im Log) und Korb oder Boom fahren nicht aus.
 - Geht das Licht nie an, prüfen, ob `CommsKey` deiner DCS-Taste für das Kommunikationsmenü entspricht.
 
 **SRS nicht gefunden**

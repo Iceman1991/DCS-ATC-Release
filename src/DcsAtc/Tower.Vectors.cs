@@ -46,7 +46,7 @@ public partial class Tower
 
     /// "Expect vectors ..." for the plan; was: active runway before the plan.
     string PlanText(string was) =>
-        (vecOver || Runway != was ? "Due to terrain, expect " : "Expect ") +
+        (vecOver || Runway != was ? "Due to terrain, expect " : "Expect ") + OneOf("", "radar ") +
         (vecOver ? (Ifr || wantStraight ? (CircleIfr ? $"vectors for {ProcSay(vrw)}, circle to runway {RwSay(Runway)}. " : $"vectors for {Hand(Runway)} downwind runway {RwSay(Runway)} via the extended centerline runway {RwSay(vrw)}. ")
                                         : $"vectors for overhead join runway {RwSay(Runway)} via the extended centerline runway {RwSay(vrw)}. ")
                  : vecFinal ? $"vectors for {(wantVisual ? $"visual approach runway {RwSay(Runway)}" : ProcSay(Runway))}. " : $"vectors to initial runway {RwSay(Runway)} for overhead break. ");
@@ -91,7 +91,7 @@ public partial class Tower
         (advised[a.Id], followAt) = (new Advice { At = now }, now);
         int clock = (int)Math.Round(((Bearing(t.X, t.Z, a.X, a.Z) - t.Hdg * 180 / Math.PI) % 360 + 360) % 360 / 30) % 12;
         double dAlt = (a.AltMsl - t.AltMsl) / Ft;
-        return VecCall(t, now) + $" Traffic {(clock == 0 ? 12 : clock)} o'clock, {MilesTxt(Dist(t.X, t.Z, a.X, a.Z))}, " +
+        return VecCall(t, now) + $" {OneOf("Traffic", "Traffic information,")} {(clock == 0 ? 12 : clock)} o'clock, {MilesTxt(Dist(t.X, t.Z, a.X, a.Z))}, " +
                $"{(Math.Abs(dAlt) < 300 ? "same altitude" : $"{Math.Round(Math.Abs(dAlt) / 100) * 100:0} feet {(dAlt > 0 ? "above" : "below")}")}, {Ops.TypeSay(a.Type)}.";
     }
 
@@ -416,7 +416,7 @@ public partial class Tower
                   : traffic.Count(a => a.InAir && a.Speed > 30 && a.AltMsl - FieldElev < 2500 && Dist(a.X, a.Z, CX, CZ) < Math.Min(mine, 20 * NM));
         if (ahead == lastAhead) return "";   // R315: only on change (not the same every 90 s)
         lastAhead = ahead; lastSeqSaid = now;
-        return ahead == 0 ? " No traffic ahead, you are number one." : $" You are number {ahead + 1}, {ahead} aircraft ahead.";
+        return ahead == 0 ? OneOf(" No traffic ahead, you are number one.", " You are number one, no traffic ahead.") : OneOf($" You are number {ahead + 1}, {ahead} aircraft ahead.", $" Number {ahead + 1}, {ahead} aircraft ahead.");
     }
 
     /// Minimum altitude (terrain) on the remaining path: waypoints up to the turn-in point. Already on the intercept heading in the final approach area: like the
@@ -694,7 +694,7 @@ public partial class Tower
     {
         missAt = -1;
         var v = Cap(StartVectors(t, true, now, missFt));
-        return Say($"{Cs()}, {F.StationOf("Approach")}, identified. {v}{(stayPattern ? "" : " Say intentions.")}", "Approach");
+        return Say($"{Cs()}, {F.StationOf("Approach")}, {OneOf("identified", "radar contact")}. {v}{(stayPattern ? "" : " Say intentions.")}", "Approach");
     }
     /// Climb after takeoff or missed approach on runway heading: zone altitude, at least the terrain 10 NM ahead (full 1000 ft).
     double ClimbFt(string rw) { var (ux, uz) = OnCenterline(rw, -10 * NM); return Math.Ceiling(Math.Max(MaxFt, F.MvaFt(ux, uz)) / 1000) * 1000; }
@@ -709,7 +709,7 @@ public partial class Tower
     /// R7: VFR departure leaves the zone after check-in: "leaving control zone, resume own navigation, squawk VFR, frequency change approved."
     List<Msg> LeaveZone(string c, string head)
     {
-        var bye = Say($"{c}, {head}, resume own navigation, " + (AwacsContact is { } aw ? $"contact {aw}." : SquawkVfr() + "frequency change approved. Good day."), "Approach");   // still as Departure (Dep)
+        var bye = Say($"{c}, {head}, resume own navigation, " + (AwacsContact is { } aw ? $"contact {aw}." : SquawkVfr() + OneOf("frequency change approved. Good day.", "frequency change approved, good day.", "frequency change approved. Goodbye.")), "Approach");   // still as Departure (Dep)
         zoneReport = handedOff = false; Released = true;   // signed off: no second sign-off at 15 NM, pin released (R47)
         return bye;
     }
@@ -757,7 +757,7 @@ public partial class Tower
         Phase = Phase.Away;
         needWx = holding = false; vec = null; nav = null; entry = null; option = wantRw = null; stayPattern = wantStraight = wantVisual = wantOverhead = visAsk = visSeen = fromHold = false;
         PatternReset(); devAt.Clear(); ignored = 0; optedOut = true; wxTold = false;   // A145: next approach states the weather again
-        return $"approach cancelled, resume own navigation, {Qnh(t)}. Call me when ready for another approach.";
+        return $"approach cancelled, resume own navigation, {Qnh(t)}. {OneOf("Call me when ready for another approach.", "Call when ready for another approach.")}";
     }
 
     /// On the centreline: handover to the tower.

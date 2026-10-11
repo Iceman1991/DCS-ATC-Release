@@ -46,11 +46,11 @@ public partial class Tower
             if (t != null && Phase == Phase.Inbound && vec != null) return Say($"{c}, {VecCall(t, now, full: true, again: true)}", "Approach");
             if (t != null && holding && nav is { } hn) return Say($"{c}, {Steer(t, hn, "the hold")}, {AltTo(t, holdFt, true)}{HoldSpd(t)}.", "Approach");
             if (t != null && Phase == Phase.Entering && nav is { } en) return Say($"{c}, {Steer(t, en, navName)}, {AltTo(t, PatternFt, true)}, report {navName}.");
-            if (last == null) return Say($"{c}, {Station}, go ahead.");
+            if (last == null) return Say($"{c}, {Station}, {OneOf("go ahead", "pass your message")}.");
             lastAt = now;   // "Enfield 1-1, I say again, taxi to …" (last is kept, otherwise "I say again" doubles)
             return new() { last with { Text = Regex.Replace(last.Text, $@"^(?:{Regex.Escape(c)}, (?:{Regex.Escape(F.StationOf(last.Role))}, )?)?", $"{c}, I say again, ") } };
         }
-        if (Has(n, "radio check", "how do you read")) return Say($"{c}, {Station}, read you five.");   // A108: standard phrase (CAP 413)
+        if (Has(n, "radio check", "how do you read")) return Say($"{c}, {Station}, {OneOf("read you five", "readability five", "loud and clear")}.");   // A108: standard phrase (CAP 413)
         if (Has(n, "terrain in sight", "low level")) { lowAck = true; return Say($"{c}, roger.", "Approach"); }   // A106: terrain warning acknowledged
         // R129: reply to "say airspeed" (or "unable speed"): within 30 kt "roger", otherwise the speed once, unable -> cancel the restriction
         if (t != null && Phase == Phase.Inbound && vec != null && VecKt(t) is > 0 and var sk && (spdTold == 2 || Has(n, @"unable (?:the )?speed")) && IasSlot(n) is { } rep)
@@ -58,7 +58,7 @@ public partial class Tower
             lastIntent = "speed";
             if (rep < 0) { spdFree = true; return Say($"{c}, roger, resume normal speed.", "Approach"); }
             (spdTold, spdAt, lastVecSaid) = (3, now, now);   // still off after another 90 s: "resume normal speed"
-            return Say(rep == 0 || Math.Abs(rep - sk) <= 30 ? $"{c}, roger." : $"{c}, roger, {(rep > sk ? "reduce" : "increase")} speed {sk} knots.", "Approach");
+            return Say(rep == 0 || Math.Abs(rep - sk) <= 30 ? $"{c}, {OneOf("roger", "copy")}." : $"{c}, roger, {(rep > sk ? "reduce" : "increase")} speed {sk} knots.", "Approach");
         }
 
         // Readback / acknowledgement -> stay silent. Readbacks contain "report ..."/"cleared ..." or read back the controller's last transmission (ReadsBack),
@@ -235,7 +235,7 @@ public partial class Tower
             // hot brakes -> hot-brake area, fire service comes
             case "hung":
                 special = "de-arm area";
-                if (ground) { if (Phase == Phase.TaxiIn) goto case "taxiin"; return Say($"{c}, roger."); }
+                if (ground) { if (Phase == Phase.TaxiIn) goto case "taxiin"; return Say($"{c}, {OneOf("roger", "copy")}."); }
                 wantStraight = true;
                 return Say($"{hdr}, roger {(Has(n, "hot gun") ? "hot gun" : "hung ordnance")}, expect straight-in runway {RwSay(rw)}.");
 
@@ -263,12 +263,12 @@ public partial class Tower
 
             case "cancelemergency":
                 // R295: clearances remain valid (FAA JO 7110.65 3-10-5, 4-8-1); downwind only from initial/pattern, without emergency or far out only "roger"
-                if (!Emergency) return Say($"{c}, roger.");
+                if (!Emergency) return Say($"{c}, {OneOf("roger", "copy")}.");
                 Emergency = false;
                 if (ground) return Say($"{c}, roger, emergency cancelled.");
                 if (Phase == Phase.ClearedLand) return Say($"{c}, roger, emergency cancelled, runway {RwSay(EmergencyRunway(t))}, cleared to land.");
                 if (Phase is Phase.Inbound or Phase.Entering) return Say($"{c}, roger, emergency cancelled, continue as cleared.");   // Radar vectoring or approach continues
-                if (Phase is not (Phase.Initial or Phase.Pattern)) return Say($"{c}, roger.");
+                if (Phase is not (Phase.Initial or Phase.Pattern)) return Say($"{c}, {OneOf("roger", "copy")}.");
                 Phase = Phase.Pattern;
                 PatternReset();
                 return Say($"{c}, roger, emergency cancelled. Join {Hand(rw)} downwind, {Alt(PatternFt)}, report base.");
@@ -331,6 +331,7 @@ public partial class Tower
                 if (VfrBlocked) return Neg(VfrUnable(hdr));
                 bool first = Phase == Phase.Parked;   // First call: check ATIS identifier, "request startup and taxi" answers both; A33: QNH only here and only without reported ATIS, not again after "start up approved"
                 Phase = Phase.TaxiOut;
+                climbOut = null;   // new departure
                 home = NearestRamp(t);
                 exitDir = dir ?? exitDir;
                 ProgStart(Has(n, "progressive"), now);
@@ -346,13 +347,15 @@ public partial class Tower
             case "progressive":   // N26: only TaxiOut/TaxiIn (intent), otherwise the request runs within the taxi request
             {
                 ProgStart(true, now);
-                if (t == null || ProgTarget(t) is not { } tg || ParkDir(t, tg) is not { } pdir) return Say($"{c}, roger.");
+                if (t == null || ProgTarget(t) is not { } tg || ParkDir(t, tg) is not { } pdir) return Say($"{c}, {OneOf("roger", "copy")}.");
                 return Say($"{c}, {ProgName(rw)} {pdir}.", "Ground");
             }
 
             case "ready":
             {
                 exitDir = F.Charted ? dir ?? exitDir ?? F.Exit[rw][0] : dir ?? exitDir;   // A92: without a map the named direction stays as the departure direction (no CRP)
+                if (Has(n, "unrestricted", "spiral", "tactical departure", "combat departure"))   // kept until the takeoff clearance (also while still taxiing)
+                    (climbOut, climbFt) = (Has(n, "spiral", "tactical", "combat") ? "tactical" : "free", AltSlot(n) ?? 0);
                 bool onRwy = t != null && OnRunwayPos(t.X, t.Z);
                 if (Phase is Phase.Parked or Phase.StartupApproved && !onRwy)
                     return Neg($"{hdr}, negative, you are not cleared to taxi. {(SameFreq("Ground") ? "Request taxi." : $"Contact {Contact("Ground")} for taxi.")}");   // R104
@@ -395,14 +398,14 @@ public partial class Tower
             case "traffic":   // "traffic in sight", "looking", "negative contact": acknowledge, remember the state of the last advisory (N24), never radar vectoring
                 if (advised.Count > 0 && advised.Values.MaxBy(v => v.At) is { } last)
                     last.St = Has(n, "negative", "not in sight", "no joy") ? 2 : Has(n, "in sight", "tally") ? 1 : 0;
-                return Say($"{c}, roger.");
+                return Say($"{c}, {OneOf("roger", "copy")}.");
 
             case "airborne_ready":
                 return Say($"{c}, you are airborne. Report intentions.");
 
             case "airborne":   // Report to Departure (Approach) after handover
                 // R7: VFR still in the zone (not at the departure CRP): departure clearance remains valid, sign-off at the zone edge
-                zoneReport = !depClr && Phase is Phase.ClearedTakeoff or Phase.Departing && t != null && Dist(t.X, t.Z, CX, CZ) < CtrM && !AtExit(t);
+                zoneReport = !depClr && climbOut == null && Phase is Phase.ClearedTakeoff or Phase.Departing && t != null && Dist(t.X, t.Z, CX, CZ) < CtrM && !AtExit(t);
                 dueAt = -1;   // Reporting obligation: checked in; #10 "leaving the control zone" is due from now on
                 Phase = Phase.Away;
                 nav = null; handedOff = true;
@@ -485,7 +488,7 @@ public partial class Tower
 
             case "separate":   // V17: flight lands individually, Program dissolves the section
             {
-                if (FlightSize < 2) return Say($"{c}, roger.");
+                if (FlightSize < 2) return Say($"{c}, {OneOf("roger", "copy")}.");
                 Separate = true;
                 if (!Has(n, "trail")) return Say($"{c}, separate landing approved, flight members report final individually.");
                 var res = OnTranscript("request instrument approach", t, traffic, now, true);
@@ -540,8 +543,8 @@ public partial class Tower
             }
 
             case "fieldinsight":   // R115: reply to "report field in sight" -> visual approach clear; otherwise acknowledge only (remember visibility in case radar vectoring to the visual is running)
-                if (Has(n, "negative", "not in sight", "no joy")) return Say($"{c}, roger, report field in sight.");
-                if (!visAsk) { visSeen |= wantVisual; return Say($"{c}, roger."); }
+                if (Has(n, "negative", "not in sight", "no joy")) return Say($"{c}, {OneOf("roger", "copy")}, report field in sight.");
+                if (!visAsk) { visSeen |= wantVisual; return Say($"{c}, {OneOf("roger", "copy")}."); }
                 visAsk = false; visSeen = true;
                 goto case "straightin";
 
@@ -636,7 +639,7 @@ public partial class Tower
                                $"{Cap(Steer(t, Crp[at], $"C R P {at}"))}, report C R P {at}.");
                 }
                 entry = at;
-                if (holding) { holdFt = HoldFtAt(Crp[at]); holdArrived = false; lastHoldInfo = now; Phase = Phase.Inbound; nav = Crp[at]; navName = $"C R P {at}"; return Say($"{c}, hold at C R P {at}, {Alt(holdFt)}{HoldSpd(null)}, I will call you."); }
+                if (holding) { holdFt = HoldFtAt(Crp[at]); holdArrived = false; lastHoldInfo = now; Phase = Phase.Inbound; nav = Crp[at]; navName = $"C R P {at}"; return Say($"{c}, hold at C R P {at}, {Alt(holdFt)}{HoldSpd(null)}, {OneOf("I will call you", "I will advise")}."); }
                 return AtCrp(at);
             }
 
@@ -733,12 +736,21 @@ public partial class Tower
             case "altitude":   // "request higher / lower", "request flight level 200", "request 6000 feet"
             {
                 if (t == null) return Say($"{c}, say altitude.");
-                if (holding) return Neg($"{c}, unable, maintain {Alt(holdFt)} in the hold, I will call you.");
+                if (holding) return Neg($"{c}, unable, maintain {Alt(holdFt)} in the hold, {OneOf("I will call you", "I will advise")}.");
                 if (Phase is Phase.Entering or Phase.Initial or Phase.Pattern or Phase.ClearedLand) return Neg($"{c}, negative, continue as cleared.");
                 bool vectors = Phase == Phase.Inbound && vec != null, up = Has(n, "higher", "climb"), pdAsk = Has(n, "discretion");
                 double cur = IndFt(t), floor = vectors ? Math.Max(PathMva(t), GateFt) : F.MvaFt(t.X, t.Z);
                 double? slot = AltSlot(n);
                 if (pdAsk && slot > cur - 300) slot = null;   // "flight level 200, request descent at pilot's discretion": the number is his current altitude
+                if (!vectors && Has(n, "unrestricted") && Phase is Phase.Departing or Phase.Away)   // "request unrestricted climb (to flight level 250)": no level-off, own navigation
+                {
+                    double? to = slot ?? (depClr ? Cruise : null);
+                    if (to is { } u && !LevelFree(t, traffic, u)) return Neg($"{c}, unable unrestricted climb, traffic, maintain present altitude.");
+                    if (depClr && to is { } d) depFt = cruiseFt = d;
+                    climbOut = "free";
+                    if (Phase == Phase.Departing) { Phase = Phase.Away; nav = null; }   // released from the control zone
+                    return Say($"{c}, unrestricted climb approved{(to is { } a ? $" to {Alt(a)}" : "")}, resume own navigation.");
+                }
                 if (vectors && !pdAsk && (up && slot == null || slot > vecFt + 300))   // R303: higher under radar vectoring (radio wheel "request higher" or with number)
                 {
                     // Approved far out, rejected close in (approach needs the descent) – never "descend" on "request higher", no 1000-ft ladder:
@@ -776,7 +788,7 @@ public partial class Tower
                     if (HdgSlot(n) == null && Direct(t) is { } dv) { vec = dv; return Say($"{c}, direct approved, {VecCall(t, now)}", "Approach"); }
                     return Neg($"{c}, unable, {VecCall(t, now)}");
                 }
-                if (Phase is not (Phase.Away or Phase.Departing)) return Neg($"{c}, unable, {(holding ? "continue holding, I will call you" : "continue as cleared")}.");
+                if (Phase is not (Phase.Away or Phase.Departing)) return Neg($"{c}, unable, {(holding ? $"continue holding, {OneOf("I will call you", "I will advise")}" : "continue as cleared")}.");
                 if (Phase == Phase.Departing) Phase = Phase.Away;   // like "altitude": released from the control zone, counts as check-in (A105 would otherwise still call "radar contact" with the old heading)
                 if (HdgSlot(n) is { } h) { nav = null; return Say($"{c}, fly heading {Digits(h.ToString("000"))}, approved."); }   // own heading replaces the departure vector
                 // R41: the named airfield ("request direct Batumi"), otherwise the route clearance destination, otherwise his own
@@ -787,7 +799,7 @@ public partial class Tower
 
             case "callup":   // A27: only station + callsign (+ altitude, "information X"): expected after handover -> instructions right away, otherwise report (last stays)
                 if ((Phase == Phase.Entering && role == "Tower" || Expected && !ground) && t != null) goto case "inbound";   // N40: diverted, is expected
-                return new() { new Msg(Dep(role), $"{c}, {Station}.") };
+                return new() { new Msg(Dep(role), $"{c}, {Station}{OneOf("", ", go ahead", ", pass your message")}.") };
             case "unable":   // A28: pilot cannot comply with an instruction (terrain, weather, fuel): acknowledge and ask for intentions
                 if (addressed == null && Chatter(n)) return new();   // A140: "Two, unable" is flight radio
                 if (ground) return Say($"{c}, roger, hold position.");
@@ -795,13 +807,13 @@ public partial class Tower
             case "weather":
                 return Say($"{hdr}, {Wind(t)}, {Qnh(t)}, runway {RwSay(rw)} in use.");
             case "bye":
-                return Say($"{c}, good day.");
+                return Say($"{c}, {OneOf("good day", "good bye")}.");
             case "ground_say":
                 return Say($"{c}, you are on the ground. Say request.");
             default:   // not understood: ask back, keep the last transmission ("say again" then repeats it), the repeat does not count as a readback
                 lastIntent = "";
                 if (addressed == null && Chatter(n)) return new();   // A140: flight radio does not go to the station
-                if (Emergency) return Say($"{c}, roger.");   // A30: reply to "say souls on board and fuel remaining" or nature of the emergency
+                if (Emergency) return Say($"{c}, {OneOf("roger", "copy")}.");   // A30: reply to "say souls on board and fuel remaining" or nature of the emergency
                 return new() { new Msg(Dep(role), ExtractCallsign(n) != null ? $"{c}, say again." : $"Station calling {Station}, say again your callsign.") };
         }
     }
@@ -855,7 +867,7 @@ public partial class Tower
             if (Has(n, "taxi")) return "taxi";   // A6: before "start" ("engines started, request taxi"); "request startup and taxi" is answered by case "taxi" too
             if (StartReq(n) && Phase is Phase.Parked or Phase.StartupApproved) return "startup";   // otherwise e.g. the takeoff clearance would be lost
             if (Phase == Phase.TaxiOut && lastTel is { } ct && CrossNext(ct) is { } cx && NearRwy(ct, cx) && Has(n, "cross", "ready", "departure", "take off", "takeoff", "holding short", "holding point")) return "cross";   // Forum 0.9.7: at the parallel runway holding point
-            if (Has(n, "ready", "departure", "take off", "takeoff", "holding short", "holding point")) return "ready";
+            if (Has(n, "ready", "departure", "take off", "takeoff", "holding short", "holding point", "unrestricted", "spiral")) return "ready";
             if (Has(n, "inbound", "landing", "final", "initial")) return "ground_say";
         }
         else
@@ -983,6 +995,8 @@ public partial class Tower
     Airfield? Named(string n) => ByName(All.Where(f => f.Name != F.Name), w => Regex.IsMatch(n, $@"\b{w}\b"));
     /// N1: airfield of the opposing side (neutral and without player's side: never).
     bool Hostile(Airfield? f) => f is { Side: > 0 } && Side > 0 && f.Side != Side;
+    /// Threat for a tactical departure: enemy aircraft airborne or an enemy airfield within 60 NM
+    bool CombatZone => HostileNm <= 60 || All.Any(f => Hostile(f) && Dist(f.X, f.Z, CX, CZ) < 60 * NM);
 
     /// N40: this airfield is captured: diversion to the nearest own one (null = none), last transmission on the old frequency, then silently signed off.
     /// "Enfield 1-1, Kutaisi Approach, Kutaisi is closed, divert Senaki, fly heading 270, 25 miles, climb and maintain 3000 feet, contact Senaki Approach 261.0."

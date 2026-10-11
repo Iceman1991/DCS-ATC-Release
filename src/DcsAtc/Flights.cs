@@ -270,11 +270,11 @@ static class Flights
                         Say(now, 2 + Rnd(), "guard", t, $"Mayday, mayday, mayday, {Cs(t)}, hit, RTB{Opt(Bulls(t))}.", Guard, 0, 10, true, GuardVhf);
                         // R252: AWACS acknowledges on Guard with the nearest own airfield (ICAO Annex 10 Vol II 5.3.2, JO 7110.65 10-1-3); without AWACS silent
                         if (w.Awacs(t.Side, t.X, t.Z) is { } aw)
-                            SayAwacs(now, 9 + Rnd(), "guard", t.Side, aw.Name, $"{Cs(t)}, {aw.Name}, copy mayday" + (Airfield.Emergency(Tower.All, t.X, t.Z, t.Side) is { } ef
+                            SayAwacs(now, 9 + Rnd(), "guard", t.Side, aw.Name, $"{Cs(t)}, {aw.Name}, " + OneOf("copy mayday", "copy your mayday") + (Airfield.Emergency(Tower.All, t.X, t.Z, t.Side) is { } ef
                                 ? $", {ef.Name.Replace('-', ' ')} bears {Ops.Brg(Bearing(t.X, t.Z, ef.X, ef.Z))}, {Miles(Dist(t.X, t.Z, ef.X, ef.Z))}." : "."), Guard, 0, GuardVhf);
                     }
                     else if (life < 0.95 && Once("hit:" + t.Name, now, 1e9))
-                        Say(now, 1 + Rnd(), "hit", t, $"{Cs(t)}, I'm hit.", Intra(t, w), 0, 6, stress: true);
+                        Say(now, 1 + Rnd(), "hit", t, $"{Cs(t)}, " + OneOf("I'm hit", "I've been hit") + ".", Intra(t, w), 0, 6, stress: true);
                 }
                 // own bomb hits a ground target
                 if (U(2) is { } s && Ours(s, w) && !Units.ContainsKey(e[4]) && Pos(e[4], w) == null &&
@@ -359,7 +359,7 @@ static class Flights
             {
                 Say(now, 0, "guard", d.U, $"Mayday, mayday, mayday, {Cs(d.U)}, {(d.Water ? "in the water" : "on the ground")}{Opt(d.Bulls)}.", Guard, 1, 30, freq2: GuardVhf);   // R361: only known facts
                 if (w.Awacs(d.U.Side, d.U.X, d.U.Z) is { } aw)
-                    SayAwacs(now, 7, "guard", d.U.Side, aw.Name, $"{Cs(d.U)}, {aw.Name}, copy, SAR notified, monitor guard.", Guard, 1, GuardVhf);
+                    SayAwacs(now, 7, "guard", d.U.Side, aw.Name, $"{Cs(d.U)}, {aw.Name}, " + OneOf("copy, SAR notified, monitor guard.", "copy, SAR is notified, monitor guard.", "roger, SAR notified, monitor guard."), Guard, 1, GuardVhf);
                 down.RemoveAt(i);
             }
         }
@@ -411,7 +411,7 @@ static class Flights
                 if (low != lead) Say(now, 0, "bingo", low, $"{Cs(low)}, bingo.", Intra(low, w), 1, 20);
                 Say(now, low != lead ? 2 : 0, "bingo", lead, $"{Fl(lead)}, bingo, RTB.", Tac(lead, w), 1, 20);
                 Home(lead);
-                if (w.Awacs(low.Side, low.X, low.Z) is { } aw) SayAwacs(now, 4 + Rnd(), "bingo", lead.Side, aw.Name, $"{Fl(lead)}, {aw.Name}, copy bingo.", Tac(lead, w), 2);
+                if (w.Awacs(low.Side, low.X, low.Z) is { } aw) SayAwacs(now, 4 + Rnd(), "bingo", lead.Side, aw.Name, $"{Fl(lead)}, {aw.Name}, " + OneOf("copy bingo.", "roger bingo."), Tac(lead, w), 2);
             }
             else if (low.Fuel is < 0.35 and >= 0.22 && Once("joker:" + g.Key, now, 1e9)) Say(now, 0, "joker", low, $"{Cs(low)}, joker.", Intra(low, w), 2, 20);
             foreach (var u in g.Where(u => Aam(u) == 0 && now - shotAt.GetValueOrDefault(u.Name, -1e9) < 60))
@@ -587,7 +587,7 @@ static class Flights
             Say(now, 0.5, "fence", lead, $"{Fence(lead)}, fence out.", Intra(lead, w), 2, 20);
             Say(now, Reaction(), "rtb", lead, $"{aw!.Value.Name}, {fl}, RTB, checking out.", tac, 2, 20);   // LD7: check-out, then Approach (Home)
             Home(lead);
-            SayAwacs(now, 3 + Rnd(), "rtb", lead.Side, aw.Value.Name, $"{fl}, {aw.Value.Name}, check out approved.", tac, 2);
+            SayAwacs(now, 3 + Rnd(), "rtb", lead.Side, aw.Value.Name, $"{fl}, {aw.Value.Name}, " + OneOf("check out approved.", "copy, check out approved."), tac, 2);
         }
     }
 

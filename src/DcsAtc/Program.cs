@@ -201,7 +201,7 @@ static partial class Program
         }
         if (!Dedicated) Wheel.Start(Cfg, text => { lock (TowerLock) Request(Host(), text, "RAD", true); }, () =>   // dedicated server: no radio wheel, no key hook
         {
-            lock (TowerLock) { var h = Host(); var q = h?.Lead ?? h; Wheel.Field = q?.OnBoat ?? q?.Active?.F.Name ?? "ATC"; return Expected(h, q != null && (q.OnBoat != null || h!.Boat.Stage > 0 || h.Boat.Launching) ? h!.Boat.Suggest(q.Tel) : q?.Active?.Suggest(q.Tel)); }   // A76: at the carrier the suggestion of the carrier stage, not from the land tower; R24: on the deck nothing, on departure Departure; open question first (Expect.cs)
+            lock (TowerLock) { var h = Host(); var q = h?.Lead ?? h; Wheel.Field = q?.OnBoat ?? q?.Active?.F.Name ?? "ATC"; return Expected(h, h?.Ops.CasSuggest() ?? (q != null && (q.OnBoat != null || h!.Boat.Stage > 0 || h.Boat.Launching) ? h!.Boat.Suggest(q.Tel) : q?.Active?.Suggest(q.Tel))); }   // CAS contact: the next JTAC step first   // A76: at the carrier the suggestion of the carrier stage, not from the land tower; R24: on the deck nothing, on departure Departure; open question first (Expect.cs)
         });
         Wheel.Fits = () => { lock (TowerLock) return WheelFits(Host()); };   // R307: only matching entries
         Wheel.FreqOf = role =>
@@ -210,6 +210,7 @@ static partial class Program
             {
                 var h = Host(); var f = (h?.Lead ?? h)?.Active?.F;
                 if (role == "AWACS" && h != null && Ops.AwacsFreqFor(TrafficFor(h), MeOf(h)) is > 0 and var af) return af;   // mission AWACS
+                if (role == "Tanker" && h != null && h.Ops.TankerFreqFor(TrafficFor(h), MeOf(h)) is > 0 and var tf) return tf;   // TP7: mission tanker
                 if (role == "Carrier" && h?.Tel is { } ht && Carrier.Boats.Where(b => b.Freq > 0 && b.Coalition == h.Coalition).MinBy(b => Dist(ht.X, ht.Z, b.X, b.Z)) is { } cb) return cb.Freq;
                 return f != null && SpokenFreq(f, h!, (h!.Lead ?? h).Active!.Dep(role)) is > 0 and var sf ? sf : null;   // K4: tuned airfield frequency, otherwise VHF (= map); approach on departure: Departure (AirfieldFrequencies)
             }
@@ -232,6 +233,7 @@ static partial class Program
             lock (TowerLock) { var h = Host(); return h == null ? (false, false) : Ops.WheelUp(TrafficFor(h), MeOf(h)); }
         };
         Wheel.Jtac = () => { lock (TowerLock) { var h = Host(); return h != null && Ops.Leaders.Any(l => l.Alive && l.Side == h.Coalition); } };   // J11
+        Wheel.Jtacs = () => { lock (TowerLock) { var h = Host(); return h == null ? Array.Empty<string>() : Ops.Leaders.Where(l => l.Alive && l.Side == h.Coalition).Select(l => l.Cs).ToArray(); } };   // several JTAC / FAC(A): check in picks one
         Wheel.Log = Log;   // screenshot (press with wheel open) into atc-log
         Wheel.InGame = text =>   // VR: headset shows only DCS, wheel additionally as in-game text (mission reads .cmd every 0.25 s)
         {
@@ -434,6 +436,7 @@ static partial class Program
         (p is { TankFq: > 0 } && Math.Abs(p.TankFq - mhz) < 0.01 ? "Tanker" : null)
         ?? Cfg.Frequencies.FirstOrDefault(f => f.Key != "ATIS" && Math.Abs(f.Value - mhz) < 0.01).Key
         ?? (Ops.AwacsFreq.Values.Any(f => Math.Abs(f - mhz) < 0.01) ? "AWACS" : null)   // mission AWACS
+        ?? (Ops.TankerFreq.Values.Any(f => Math.Abs(f - mhz) < 0.01) ? "Tanker" : null)   // TP7: mission tanker
         ?? (Ops.Leaders.Any(l => l.Freq > 0 && Math.Abs(l.Freq - mhz) < 0.01) ? "JTAC" : null)   // J5: mission JTAC / FAC(A)
         ?? (Carrier.Boats.Any(b => b.Freq > 0 && Math.Abs(b.Freq - mhz) < 0.01) ? "Carrier" : null);   // mission carrier
 
@@ -471,7 +474,8 @@ static partial class Program
     {
         if (c.To != null) lock (TowerLock) p = Pilots.Values.FirstOrDefault(x => x.Ops == c.To) ?? p;   // call to another player (tanker: the next one) goes to that player's group
         return new(c.Text, c.Role, c.Station, c.All ? 0 : p.Gid, Freqs: c.Freq > 0 ? new[] { c.Freq }
-                   : c.Role == "Tanker" && p.TankFq > 0 ? new[] { Cfg.Frequencies.GetValueOrDefault("Tanker", 255.5), p.TankFq } : null,   // R304: also on the tanker frequency tuned by DCS
+                   : c.Role == "Tanker" && new[] { p.TankFq, Ops.TankerFreqOf(p.Ops.TankerGroup) }.Where(f => f > 0).ToArray() is { Length: > 0 } tf
+                     ? tf.Prepend(Cfg.Frequencies.GetValueOrDefault("Tanker", 255.5)).Distinct().ToArray() : null,   // R304: also on the tanker frequency tuned by DCS; TP7: and on the mission frequency of the tanker
                    MaxAge: c.Station == "Paddles" ? (Regex.IsMatch(c.Text, "^(?:Wave off|Bolter)") ? 4 : Regex.IsMatch(c.Text, "ball|Clara") ? 6 : 2) : c.Role == "AWACS" && AwacsRow(c.Text) is { Fresh: true } ? 12 : 0, Side: p.Coalition,
                    Live: c.Lead == 0 ? null : () => { lock (TowerLock) return p.Tel is { } tel && TrafficFor(p).FirstOrDefault(a => a.Id == c.Lead) is { } a ? Ops.Rebraa(c.Text, tel, a) : null; });   // LD4: BRAA at transmit time   // A19: LSO call later than 2 s is wrong ("Power." after correcting), "Roger ball."/"call the ball" not (waits behind the own ball call from the wheel, ~3 s); A133: AWACS/tanker/range of own side; A114: threat/merged with stale BRAA better as text only; 12 s: an urgent call before it (threat ~7 s + ReplyPause) is still spoken
     }
@@ -705,11 +709,11 @@ static partial class Program
             if (opsRole != null && Off(opsRole.ToLowerInvariant(), text)) return;
             if (opsRole != null)
             {
-                var calls = p.Ops.OnTranscript(opsRole, text, MeOf(p), TrafficFor(p), Fields, Now(), conf < MinConf, Cfg.Frequencies.GetValueOrDefault("AWACS", 251.5), FieldWxOf);
+                var calls = p.Ops.OnTranscript(opsRole, text, MeOf(p) with { Freq = src == "SRS" ? p.CalledOn : 0 }, TrafficFor(p), Fields, Now(), conf < MinConf, Cfg.Frequencies.GetValueOrDefault("AWACS", 251.5), FieldWxOf);
                 if (p.Ops.Menu is { } mn && Cfg.CommsKey != 0 && MissionData && p == Host())   // basket/boom only via the DCS menu: "Intent to refuel" (mission looks it up in the list) or "Ready pre-contact"
                 {
                     if (mn.Step == "precontact") { Wheel.PressDcs((ushort)Cfg.CommsKey, 0x3B); p.TankMenuAt = Now(); }
-                    else AiCmd($"MENU;{p.Unit};tanker;{mn.Group};s");   // R304: s = DCS tanker stays mute, our controller speaks (without s: audible 15 s like the airfields)
+                    else AiCmd($"MENU;{p.Unit};tanker;{mn.Group};s{(Srs?.TunedFreqs(p.Id) is { } fq && Ops.TankerFreqOf(mn.Group) is > 0 and var mf && !fq.Any(m => Math.Abs(m - mf) < 0.005) ? "u" : "")}");   // R304: s = DCS tanker stays mute, our controller speaks (without s: audible 15 s like the airfields); TP7 u: mission frequency not tuned (matters only without Easy Communication)
                 }
                 p.Ops.Menu = null;
                 foreach (var cm in p.Ops.Cmds.ToList()) AiCmd(cm);   // J4/J6: MARK / LASE / LASEOFF
@@ -894,6 +898,7 @@ static partial class Program
                                                || (!known && f.Key is "Ground" or "Tower" or "Approach")).Select(f => f.Value)
                         .Concat(Carrier.Boats.Where(b => b.Freq > 0 && On("carrier")).Select(b => b.Freq))
                         .Concat(pilots.Where(p => p.TankFq > 0 && RoleOn("Tanker")).Select(p => p.TankFq))   // R387: tanker frequency tuned by DCS
+                        .Concat(Ops.TankerFreq.Values.Where(_ => RoleOn("Tanker")))   // TP7: mission tanker
                         .Concat(Ops.Leaders.Where(l => l.Freq > 0 && RoleOn("JTAC")).Select(l => l.Freq));   // J5: mission JTAC / FAC(A)
         // A22: order active airfields of all players, then taxiing, then neighboring airfields (SrsListener takes at most Max, duplicates count once)
         static IEnumerable<double> Fq(IEnumerable<Airfield> fs) => fs.SelectMany(f => f.FreqsOf("*") ?? Array.Empty<double>());   // UHF, VHF or own per controller
@@ -1260,7 +1265,7 @@ static partial class Program
     static DateTime airfieldStamp;
     /// Test modes (--selftest, --anflugtest, --mptest, --asr-test, --srs-test): only the repo airfields.txt. Otherwise a test read the airfield data of the
     /// running mission (Persian Gulf instead of Caucasus, different results depending on the last mission) and thereby overwrote the checked-in airfields.txt.
-    static bool TestRun;
+    internal static bool TestRun;
     static bool MissionFields => !TestRun && File.Exists(AirfieldFile);
 
     static void LoadFields()
@@ -1545,11 +1550,11 @@ static partial class Program
     record PilotSave(double X, double Z, string? Pinned, string? OnBoat, DateTime? Airborne, string? Field, Tower.State? Tower, Carrier.State Boat, Ops.State Ops);
     static string SessionFile = Path.Combine(Path.GetTempPath(), "DcsAtc-Session.json");
     static Dictionary<string, PilotSave>? saved;   // loaded at the first player, applied once per unit
-    static double savedAt = -99;
+    static double savedAt = -99, savedAge;   // savedAge: s between the last save and the restart
 
     static void SaveSession()
     {
-        if (SimSec >= 0 || Now() - savedAt < 5) return;
+        if (SimSec >= 0 || saved == null || Now() - savedAt < 5) return;   // not before the first player read the old state: the empty start would overwrite it
         savedAt = Now();
         var d = Pilots.Values.Where(p => p.Tel != null).ToDictionary(p => p.Unit, p => new PilotSave(p.Tel!.X, p.Tel.Z, p.Pinned?.F.Name, p.OnBoat, p.Airborne,
                     p.Active?.F.Name, p.Active?.Save(), p.Boat.Save(), p.Ops.Save()));
@@ -1562,10 +1567,10 @@ static partial class Program
         if (saved == null)
         {
             saved = new();
-            try { if (Clock - File.GetLastWriteTime(SessionFile) < TimeSpan.FromMinutes(10)) saved = JsonSerializer.Deserialize<Dictionary<string, PilotSave>>(File.ReadAllText(SessionFile)) ?? new(); }
+            try { if ((savedAge = (Clock - File.GetLastWriteTime(SessionFile)).TotalSeconds) < 600) saved = JsonSerializer.Deserialize<Dictionary<string, PilotSave>>(File.ReadAllText(SessionFile)) ?? new(); }
             catch (Exception e) when (e is IOException or JsonException) { Trace("FEHLER", $"Sitzung laden: {e.GetType().Name}: {e.Message}"); }
         }
-        if (p.Tel is not { } t || !saved.Remove(p.Unit, out var s) || Dist(t.X, t.Z, s.X, s.Z) > 3 * NM) return;
+        if (p.Tel is not { } t || !saved.Remove(p.Unit, out var s) || Dist(t.X, t.Z, s.X, s.Z) > (3 + savedAge * 0.2) * NM) return;   // 0.2 NM/s (720 kt): a jet flies on during the restart
         Airfield? F(string? name) => Fields.FirstOrDefault(f => f.Name == name && Served(p.Coalition, f));   // N1: do not take over hostile (captured)
         if (s.Tower != null && F(s.Field) is { } af) { p.Active = TowerFor(p, af); p.Active.Load(s.Tower, t, Now()); }
         p.Pinned = F(s.Pinned) is { } pf ? TowerFor(p, pf) : null;
@@ -1659,7 +1664,7 @@ static partial class Program
                         Ops.Beacons[p[1]] = p[2];
                         if (p.Length > 3 && p[3] != "") Ops.Tracks[p[1]] = p[3];
                         break;
-                    case "F" when p.Length >= 3: Ops.AwacsFreq[p[1]] = D(2); break;            // AWACS radio frequency (mission)
+                    case "F" when p.Length >= 3: (p.Length > 3 && p[3] == "t" ? Ops.TankerFreq : Ops.AwacsFreq)[p[1]] = D(2); break;   // AWACS radio frequency (mission), "t": tanker (TP7)
                     case "C" when p.Length >= 12:   // C;unit;group;type;x;z;hdg;speed;side;freq;tacan;icls;wx;wz;pa;noTurn (carrier)
                         boats.Add(new(p[1], p[2], p[3], D(4), D(5), D(6), D(7), int.Parse(p[8]), D(9), p[10], p[11], p.Length > 13 ? D(12) : 0, p.Length > 13 ? D(13) : 0, p.Length > 14 ? D(14) : 0, p.Length > 15 && p[15] == "1"));
                         break;
@@ -2046,7 +2051,7 @@ static partial class Program
                 }
                 else if (fuel < MinFuel && fuelTold.Add(g.Key))
                     Chat("Approach", $"{fld.StationOf("Approach")}, {cs}, minimum fuel.",
-                         $"{cs}, roger minimum fuel, you are number {pos + 1}.", $"Number {pos + 1}, {cs}.");
+                         $"{cs}, {OneOf("roger", "copy")} minimum fuel, you are number {pos + 1}.", $"Number {pos + 1}, {cs}.");
             }
             if (flag == "dep" && !rwyBusy && !contra && !arrNear && (Clock - lastAiStart.GetValueOrDefault(fld.Name)).TotalSeconds > 120 && Once("START;" + g.Key))
             {
@@ -2069,7 +2074,7 @@ static partial class Program
             else if (flag == "dep-go" && a.InAir && stage is "taxi" or "ready" && Dist(a.X, a.Z, fld.X, fld.Z) > 5000)
             {
                 aiStage[g.Key] = "gone";
-                Chat("Tower", "", $"{cs}, contact departure, good day.", $"Good day, {cs}.");
+                Chat("Tower", "", $"{cs}, contact departure, good day.", OneOf($"Good day, {cs}.", $"Contact departure, {cs}."));
             }
             else if (flag == "arr" && wait && (stage == "" || emergency || contra && !aiSent.ContainsKey("RESUME;" + g.Key)) && a.InAir && Dist(a.X, a.Z, fld.X, fld.Z) > 8 * NM && Once("WAIT;" + g.Key))   // cleared: not into holding again
             {
@@ -2866,7 +2871,7 @@ static partial class Program
     static readonly Dictionary<string, (string Mp3, double Sec)> SynthCache = new();   // Text|voice -> finished mp3
     /// "two four zero" -> "two-four-zero": Piper otherwise stresses each digit individually and speaks numbers slowly
     static readonly Regex DigitRun = new($@"\b(?:{string.Join("|", Tower.DigitWords)})(?: (?:{string.Join("|", Tower.DigitWords)})\b)+");
-    internal static string ForPiper(string text) => DigitRun.Replace(text.Replace("Kutaisi", "Koo-tie-see"), m => m.Value.Replace(' ', '-'));   // Pronunciation
+    internal static string ForPiper(string text, bool slow = false) => DigitRun.Replace(text.Replace("Kutaisi", "Koo-tie-see"), slow ? m => m.Value : m => m.Value.Replace(" ", "-"));   // Pronunciation; slow (9-line): digits as single words for writing down, otherwise bound (brisk as on the radio)
 
     /// Equalize the natural pace per Piper voice: the same radio call takes 10.0 s (ryan) to 14.1 s (bryce) at length_scale 1.
     /// Factor = 11.5 s / measured duration, so that SpeechRate sounds equally fast for every voice (0.85 -> about 9.8 s); unknown voice 1.
@@ -2877,7 +2882,7 @@ static partial class Program
     };
 
     /// LK2: the AWACS speaks tersely and briskly as in combat (length_scale × 0.93; 0.85 sounded too fast in game, smaller = faster), without the overdriven combat voice; target ≤ 5 s per follow-up report.
-    internal static double PaceOf(Tx tx) => tx.Role == "AWACS" && !tx.Pilot && !tx.Stress ? 0.93 : 1;
+    internal static double PaceOf(Tx tx) => tx.Pilot || tx.Stress ? 1 : tx.Role == "AWACS" ? 0.93 : 1;
 
     static double Synth(string text, string voice, string mp3, bool pilot = false, bool stress = false, double pace = 1)
     {
@@ -2888,10 +2893,11 @@ static partial class Program
         var wav = Path.ChangeExtension(mp3, ".wav");
         var parts = voice.Split('@');
         double pitch = parts.Length > 1 ? double.Parse(parts[1], CultureInfo.InvariantCulture) : 1;
-        string say = ForPiper(text), model = Path.Combine(Root, "models", parts[0] + ".onnx"),   // Pronunciation; digits bound: brisk as on the radio
+        bool nine = Regex.IsMatch(text, @"\b[Ll]ine \d,");   // 9-line: natural pace, digits single, longer pause after each line (the pilot writes it down)
+        string sil = nine ? "0.7" : "0.2", say = ForPiper(text, nine), model = Path.Combine(Root, "models", parts[0] + ".onnx"),   // Pronunciation; digits bound: brisk as on the radio
                scale = ((pilot ? 0.95 : Cfg.SpeechRate) * VoicePace.GetValueOrDefault(parts[0], 1) * (stress ? 0.85 : 1) * pace).ToString("0.###", CultureInfo.InvariantCulture);   // Combat: faster
-        if (!PiperWarm(model, scale, say, wav))
-            Run(Path.Combine(Root, "tools", "piper", "piper.exe"), say, "--model", model, "--length_scale", scale, "--output_file", wav);
+        if (!PiperWarm(model, scale, sil, say, wav))
+            Run(Path.Combine(Root, "tools", "piper", "piper.exe"), say, "--model", model, "--length_scale", scale, "--sentence_silence", sil, "--output_file", wav);
         double sec = 0;
         for (int i = 0; ; i++)   // warm Piper reports the file before it closes it: otherwise 0.2 s transmission, call lost
             try { using var r = new WaveFileReader(wav); sec = r.TotalTime.TotalSeconds; break; }
@@ -2927,9 +2933,9 @@ static partial class Program
     /// Piper warm (V7): one process per voice and pace, model stays loaded (215 instead of 470 ms per call, ~100 MB per process,
     /// at most 4, the longest unused one goes). If one jams -> false, then individually as before.
     static readonly Dictionary<string, (Process P, DateTime Used)> Pipers = new();
-    static bool PiperWarm(string model, string scale, string text, string wav)
+    static bool PiperWarm(string model, string scale, string sil, string text, string wav)
     {
-        var key = model + "|" + scale;
+        var key = model + "|" + scale + "|" + sil;
         lock (Pipers)   // ponytail: one lock for all voices (synth runs in the SpeakLoop, ATIS rarely), one lock per voice if needed
         {
             try
@@ -2942,7 +2948,7 @@ static partial class Program
                         UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true,
                         RedirectStandardError = true, StandardInputEncoding = new System.Text.UTF8Encoding(false),
                     };
-                    foreach (var a in new[] { "--model", model, "--length_scale", scale, "--json-input", "-q" }) psi.ArgumentList.Add(a);
+                    foreach (var a in new[] { "--model", model, "--length_scale", scale, "--sentence_silence", sil, "--json-input", "-q" }) psi.ArgumentList.Add(a);
                     e.P = Process.Start(psi)!;
                     try { e.P.PriorityClass = ProcessPriorityClass.BelowNormal; } catch (Exception) { }   // onnxruntime takes all cores: DCS frames first
                     e.P.ErrorDataReceived += (_, _) => { };
@@ -3493,7 +3499,7 @@ static partial class Program
         if (!File.Exists(model)) { Console.WriteLine("--   Piper: Stimme fehlt"); return; }
         var wav = Path.Combine(Path.GetTempPath(), "DcsAtc-piper.wav");
         var sw = Stopwatch.StartNew();
-        bool ok = PiperWarm(model, "1", "radio check", wav) && PiperWarm(model, "1", "Enfield one one, Kutaisi Tower, cleared for takeoff.", wav);
+        bool ok = PiperWarm(model, "1", "0.2", "radio check", wav) && PiperWarm(model, "1", "0.2", "Enfield one one, Kutaisi Tower, cleared for takeoff.", wav);
         if (!ok || new FileInfo(wav).Length < 20000 || Pipers.Count != 1) throw new Exception("Piper warm");
         Console.WriteLine($"OK   Piper warm: 2 Sprüche, ein Prozess, {sw.ElapsedMilliseconds} ms");
         // Synth cache: the same short phrase (LSO) the second time without Piper/ffmpeg
@@ -4054,7 +4060,7 @@ static partial class Program
         sp.Active.Load(new Tower.State(Phase.Inbound, "25", null, false, true, 4000, new[] { 1.0, 2.0 }, "CRP", false, true, false, false, null, 0, 0, null, true, false, null, null, 1, true), sp.Tel, 0);
         sp.Boat.Load(new Carrier.State(1, 1, 3, 500, "CVX", "Ford five one", 0, false, false));
         sp.Ops.Debrief.Add("Träger LSO: (OK) 3-wire");
-        Pilots["U1"] = sp; savedAt = -99; SaveSession(); Pilots.Remove("U1"); sp.Boat.Leave(); saved = null;
+        Pilots["U1"] = sp; (savedAt, saved) = (-99, new()); SaveSession(); Pilots.Remove("U1"); sp.Boat.Leave(); saved = null;
         var (rp, far) = (new Pilot { Unit = "U1", Callsign = "Ford 5-1", Tel = sp.Tel with { X = 1500 } }, new Pilot { Unit = "U1", Tel = sp.Tel with { X = 5 * NM } });
         RestoreSession(far); saved = null;
         RestoreSession(rp); saved = null;
@@ -4213,6 +4219,12 @@ static partial class Program
         Request(pr, "Tanker: Texaco, Enfield 1-1, complete", "RAD", true);
         if (r387 != "Tanker -" || !r387l || pr.TankFq != 0 || ListenFreqs(new() { pr }).Contains(263.0)) throw new Exception($"R387 Tanker-Missionsfrequenz: {r387} / hört {r387l} / nach complete {pr.TankFq}");
         Console.WriteLine("OK   R387: vom DCS eingestellte Tankerfrequenz wird abgehört und dem Tanker des Senders zugeordnet, nach 'complete' zurückgesetzt");
+        // TP7: tanker frequency from the mission (F line with "t") is monitored, belongs to the Tanker role, the tanker answers there too (also "Name#002" spawned from the template)
+        Ops.TankerFreq["Aerial-1"] = 225.0; pr.Ops.TankerGroup = "Aerial-1#002";
+        var tp7 = $"{SrsRole(null, 225.0)} {ListenFreqs(new() { pr }).Contains(225.0)} {Program.Fq(OpsTx(pr, new("Tanker", "Bloodhound", "x")).Freqs)}";
+        Ops.TankerFreq.Clear(); pr.Ops.TankerGroup = "";
+        if (tp7 != "Tanker True 255.5/225.0") throw new Exception("TP7 Tanker-Missionsfrequenz: " + tp7);
+        Console.WriteLine("OK   TP7: Tankerfrequenz aus der Mission wird abgehört, dem Tanker zugeordnet, Antwort auch dort");
         // R393: "say again" without a station goes to the controller who spoke last (ops role within 5 minutes), otherwise to the airfield (which clears it)
         pr.LastOps = ("Tanker", Now());
         Request(pr, "Enfield 1-1, say again", "RAD", false);
@@ -4499,4 +4511,6 @@ static class Ui
 {
     public static bool En;
     public static string L(string de, string en) => En ? en : de;
+    /// Radio wording variants with the same content; tests always get the first (canonical) one.
+    public static string OneOf(params string[] a) => Program.TestRun ? a[0] : a[Random.Shared.Next(a.Length)];
 }

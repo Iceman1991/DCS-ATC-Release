@@ -65,6 +65,7 @@ public partial class Tower
     string? exitDir, entry;
     public static IReadOnlyList<Airfield> All = new List<Airfield>();   // all airfields (Program): destination of the en-route clearance
     Airfield? dest; bool depClr; double depFt;   // V14: route clearance (Clearance Delivery) -> departure vector
+    string? climbOut; double climbFt;   // requested departure: "free" (unrestricted climb) / "tactical" (spiral climb overhead), climbFt = requested altitude, 0 = none
     public string? Squawk;   // A90: transponder code, assigned once per flight (en-route clearance, VFR taxi clearance, flight following), moves along on airfield change (Program)
     double cruiseFt;         // A102: cruise altitude of the en-route clearance (semicircular rule), 0 = not yet calculated
     Ramp? home;
@@ -257,10 +258,10 @@ public partial class Tower
     public record State(Phase Phase, string Runway, string? Option, bool StayPattern, bool Holding, double HoldFt, double[]? Nav, string NavName,
                         bool Emergency, bool Following, bool Separate, bool DepClr, string? Dest, double DepFt, int ParkNum, double[]? Spot,
                         bool Airborne, bool HandedOff, string? ExitDir, string? Entry, int Laps, bool WasAir, bool Vectoring = false, bool Straight = false, bool VecFinal = false,
-                        string? Squawk = null, bool Visual = false, bool? Mayday = null);
+                        string? Squawk = null, bool Visual = false, bool? Mayday = null, string? ClimbOut = null, double ClimbFt = 0);
     public State Save() => new(Phase, Runway, option, stayPattern, holding, holdFt, nav is { } n ? new[] { n.X, n.Z } : null, navName,
                                Emergency, Following, Separate, depClr, dest?.Name, depFt, parkNum, spot is { } s ? new[] { s.X, s.Z } : null,
-                               airborne, handedOff, exitDir, entry, Laps, wasAir, Vectoring, wantStraight, vecFinal, Squawk, wantVisual, mayday);
+                               airborne, handedOff, exitDir, entry, Laps, wasAir, Vectoring, wantStraight, vecFinal, Squawk, wantVisual, mayday, climbOut, climbFt);
     public bool Vectoring => vec != null;   // radar vectoring running
     public void Load(State s, Telemetry t, double now)
     {
@@ -270,7 +271,7 @@ public partial class Tower
         (Emergency, Following, Separate, depClr, depFt, parkNum) = (s.Emergency, s.Following, s.Separate, s.DepClr, s.DepFt, s.ParkNum);
         mayday = s.Mayday ?? Emergency;   // R362: type saved; older session files: treated like MAYDAY
         dest = All.FirstOrDefault(f => f.Name == s.Dest);
-        Squawk = s.Squawk;
+        (Squawk, climbOut, climbFt) = (s.Squawk, s.ClimbOut, s.ClimbFt);
         (airborne, handedOff, exitDir, entry, Laps, wasAir) = (s.Airborne, s.HandedOff, s.ExitDir, s.Entry, s.Laps, s.WasAir);
         (lastTel, lastSeen, wantStraight, wantVisual) = (t, now, s.Straight, s.Visual);   // otherwise the next tick resets everything (gap > 10 s)
         if (s.Vectoring && Phase == Phase.Inbound && !holding) StartVectors(t, s.VecFinal, now);   // re-plan radar vectoring, continue with headings from here

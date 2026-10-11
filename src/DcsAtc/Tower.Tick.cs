@@ -142,7 +142,7 @@ public partial class Tower
             {
                 idAt = -1;
                 var pdf = popDf; popDf = null;
-                return Say($"{c}, {(idFf ? FfRc(t) : pdf != null ? $"radar contact, {Where(t)}. {Cap(PopClr(t, pdf))}" : AirRc(t))}", "Approach");
+                return Say($"{c}, {(idFf ? FfRc(t) : pdf != null ? $"{Rc}, {Where(t)}. {Cap(PopClr(t, pdf))}" : AirRc(t))}", "Approach");
             }
         }
 
@@ -197,7 +197,7 @@ public partial class Tower
                 if (!Following)   // with Flight Following no release (A51), radar service continues
                 {
                     var by = handedOff ? "Approach" : "Tower";
-                    var bye = Say($"{c}, leaving control zone, " + (AwacsContact is { } aw ? $"contact {aw}." : SquawkVfr() + "frequency change approved. Good day."), by);
+                    var bye = Say($"{c}, leaving control zone, " + (AwacsContact is { } aw ? $"contact {aw}." : SquawkVfr() + OneOf("frequency change approved. Good day.", "frequency change approved, good day.", "frequency change approved. Goodbye.")), by);
                     handedOff = false; Released = true;   // released: no second release at 15 NM, pin released (R47); only after Say (Dep)
                     return bye;
                 }
@@ -730,7 +730,7 @@ public partial class Tower
             (Phase is Phase.TaxiOut or Phase.HoldShort || (Phase == Phase.TaxiIn && now - landedAt > 45)))
         {
             lastTaxiWarn = now;
-            return Say($"{c}, reduce taxi speed.");
+            return Say($"{c}, {OneOf("reduce taxi speed.", "reduce your taxi speed.")}");
         }
 
         // Taxi-in: Ground guides to own parking position (direction + distance; DCS-ATC does not know the taxiway network).
@@ -785,20 +785,21 @@ public partial class Tower
         var cl = ceil >= 1000 ? "" : $"{(vis == "" ? " Ceiling" : ", ceiling")} {Alt(Math.Max(0, Math.Round(ceil / 100) * 100))}";
         return $"{vis}{cl}.{(visM < 550 || ceil < 200 ? " Say intentions." : "")}";
     }
-    void Park() { wxTold = false; special = null; Phase = Phase.Parked; exitDir = null; entry = null; Separate = false; depClr = false; dest = null; Following = false; lowTold = lowAck = false; Squawk = null; cruiseFt = 0; }
+    void Park() { wxTold = false; special = null; Phase = Phase.Parked; exitDir = null; entry = null; Separate = false; depClr = false; dest = null; Following = false; lowTold = lowAck = false; Squawk = null; cruiseFt = 0; climbOut = null; }
 
     /// R128: identification by code (FAA JO 7110.65 5-3-3): "radar contact" only once the code is observed; idAt = time, idFf = flight following instead of departure report.
     double idAt = -1; bool idFf;
     Airfield? popDf;   // R219: target of the pop-up IFR clearance that follows identification
     string PopClr(Telemetry t, Airfield df) { var dn = df.Name.Replace('-', ' '); return $"cleared to {dn} via radar vectors, {Steer(t, (df.X, df.Z), dn)}, {AltTo(t, cruiseFt)}."; }
-    string FfRc(Telemetry? t) => $"radar contact{(t != null ? $", {Where(t)}" : "")}, {Qnh(t)}. Flight following, report leaving frequency.";
+    string FfRc(Telemetry? t) => $"{Rc}{(t != null ? $", {Where(t)}" : "")}, {Qnh(t)}. Flight following, report leaving frequency.";
     string AirRc(Telemetry? t)
     {
-        if (zoneReport && t != null) return $"radar contact, {Where(t)}. Continue as cleared, report leaving the control zone.";   // R7: VFR still in the zone
+        if (climbOut != null) return $"{Rc}{(t != null ? $", {Where(t)}" : "")}. {(climbOut == "tactical" ? "Continue spiral climb as cleared, then resume" : "Unrestricted climb approved, resume")} own navigation.";
+        if (zoneReport && t != null) return $"{Rc}, {Where(t)}. Continue as cleared, report leaving the control zone.";   // R7: VFR still in the zone
         if (depClr && t != null && (dest != null ? (dest.X, dest.Z) : exitDir != null && Crp.TryGetValue(exitDir, out var xp) ? xp : ((double, double)?)null) is { } dg)
-            return $"radar contact, {Where(t)}. {Cap(Steer(t, dg, dest?.Name.Replace('-', ' ') ?? $"C R P {exitDir}"))}, climb and maintain {Alt(Cruise)}.";
-        return depClr ? $"radar contact{(t != null ? $", {Where(t)}" : "")}. Climb and maintain {Alt(Cruise)}, resume own navigation."
-                      : $"radar contact{(t != null ? $", {Where(t)}" : "")}. Resume own navigation, maintain VFR.";   // Visual: do not prescribe an altitude
+            return $"{Rc}, {Where(t)}. {Cap(Steer(t, dg, dest?.Name.Replace('-', ' ') ?? $"C R P {exitDir}"))}, climb and maintain {Alt(Cruise)}.";
+        return depClr ? $"{Rc}{(t != null ? $", {Where(t)}" : "")}. Climb and maintain {Alt(Cruise)}, resume own navigation."
+                      : $"{Rc}{(t != null ? $", {Where(t)}" : "")}. Resume own navigation, maintain VFR.";   // Visual: do not prescribe an altitude
     }
 
     /// A90: code once per flight (digits 0-7, not 1200/7500/7600/7700), unchanged afterwards.
@@ -957,7 +958,7 @@ public partial class Tower
         var move = a.Speed < 5 ? "" : $", {Dir8(a.Hdg * 180 / Math.PI)}bound";
         var cross = a.Speed < 5 ? "" : rel is > 45 and < 135 ? $", crossing {(Phase == Phase.ClearedLand ? "final " : "")}left to right" : rel is > 225 and < 315 ? $", crossing {(Phase == Phase.ClearedLand ? "final " : "")}right to left" : "";
         int mi = Miles(Dist(t.X, t.Z, a.X, a.Z));
-        return Say($"{Cs()}, traffic {(clock == 0 ? 12 : clock)} o'clock, {mi} mile{(mi == 1 ? "" : "s")}{move}, {Ops.TypeSay(a.Type)}, {Math.Round(a.AltMsl / Ft / 100) * 100:0} feet{cross}, no contact with Tower.");
+        return Say($"{Cs()}, {OneOf("traffic", "traffic information,")} {(clock == 0 ? 12 : clock)} o'clock, {mi} mile{(mi == 1 ? "" : "s")}{move}, {Ops.TypeSay(a.Type)}, {Math.Round(a.AltMsl / Ft / 100) * 100:0} feet{cross}, no contact with Tower.");
     }
     /// A52: radar traffic advisories (warning, flight following, approach) only for own and neutral traffic in the air, the AWACS reports enemies;
     /// runway, final, traffic pattern and sequence know all traffic (hence do not filter in Program.TrafficFor).
@@ -1057,7 +1058,7 @@ public partial class Tower
                        .MinBy(a => Dist(t.X, t.Z, a.X, a.Z));
         if (a == null) return null;
         advised[a.Id] = new Advice { At = now };
-        return Say($"{Cs()}, traffic, {TrafficLine(t, a)}.", "Approach");
+        return Say($"{Cs()}, {OneOf("traffic", "traffic information")}, {TrafficLine(t, a)}.", "Approach");
     }
     string TrafficLine(Telemetry t, Traffic a)
     {

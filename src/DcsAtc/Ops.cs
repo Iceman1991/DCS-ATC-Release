@@ -10,7 +10,7 @@ partial class Ops
     const double NM = 1852, Ft = 0.3048, Kt = 0.514444;
     public record Call(string Role, string Station, string Text, double Freq = 0, Ops? To = null, bool All = false, int Lead = 0);   // Freq: own frequency (mission AWACS), 0 = from the config; To: call to this other player (tanker: the next one); All: to everyone (Gid 0, tanker turn A121)
     /// The player from the controllers' point of view.
-    public record Me(string Callsign, Telemetry? Tel, string Type, int Coalition, int Flight = 1, double Fuel = -1);   // Flight: aircraft in the flight (player + AI wingmen); Fuel: tank 0–1, -1 unknown
+    public record Me(string Callsign, Telemetry? Tel, string Type, int Coalition, int Flight = 1, double Fuel = -1, double Freq = 0);   // Flight: aircraft in the flight (player + AI wingmen); Fuel: tank 0–1, -1 unknown; Freq: SRS frequency of the call (MHz), 0 = menu/unknown
 
     // ------------------------------------------------------------ World (Program sets it from DcsAtc-State.txt)
     public static (double X, double Z, double R)? Range;              // Range Alpha (TrainingRange_build.lua)
@@ -18,6 +18,7 @@ partial class Ops
     public static Dictionary<string, string> Beacons = new();          // tanker group -> TACAN "51X"
     public static Dictionary<string, string> Tracks = new();           // tanker group -> track "Alpha" (mission)
     public static Dictionary<string, double> AwacsFreq = new();        // AWACS group -> radio frequency MHz (mission)
+    public static Dictionary<string, double> TankerFreq = new();       // tanker group -> radio frequency MHz (mission, TP7)
     public static IReadOnlyDictionary<string, string> Callsigns = new Dictionary<string, string>();   // AI group -> callsign "Magic11" (Program)
     public static double MagVar = 6;
     public static bool AwacsBullseye = true;                            // LK4: picture and updates to everyone as bullseye (config AwacsBullseye, Program); false = all BRAA
@@ -58,6 +59,7 @@ partial class Ops
     double rgAway = double.NaN;   // A119: since when over 3 NM with heading away (NaN = not away)
     // Tanker: 0 nothing, 1 approach, 2 observation, 3 pre-contact, 4 contact
     string tanker = "";   // Tanker's group (R119: not the call name, two Texaco are two tankers)
+    public string TankerGroup { get => tanker; internal set => tanker = value; }
     int tank;
     double contactAt, offload;                // offload: amount received until departure in lb ("total offload")
     public (string Step, string Group)? Menu;  // due DCS radio menu action: "intent" / "precontact"
@@ -154,7 +156,7 @@ partial class Ops
         if (Has(n, "off"))
         {
             if (hung != null) return new() { R($"{c}, {Ended(post: ", ")}copy {hung}, check switches safe, no further hot passes, report checking out.") };   // R290 (AFI 11-214)
-            if (!isHot) { Cold(); return new() { R($"{c}, roger, range is cold.") }; }   // Cold: no longer waits for "cleared hot" (R236); also end of an "in dry"
+            if (!isHot) { Cold(); return new() { R($"{c}, {OneOf("roger", "copy")}, range is cold.") }; }   // Cold: no longer waits for "cleared hot" (R236); also end of an "in dry"
             return new() { R($"{c}, {EndPass()}. Report in hot or checking out.") };
         }
         if (Has(n, "dry"))   // N36: "in dry" = dry pass without weapons; R285: checked like "in hot", occupies the range until "off", without scoring
@@ -228,10 +230,10 @@ partial class Ops
     /// Player gone (crash, left slot): range free again.
     public void Leave() { RangeReset(); checkedIn = false; OffLine(); if (cas > 0) CasEnd(); }
 
-    /// Save session (app crash/restart): AWACS check-in and debriefing; range/tanker must be checked in again.
-    public record State(bool AwacsIn, bool RadarContact, List<string> Debrief);
-    public State Save() => new(awacsIn, radarContact, Debrief.ToList());
-    public void Load(State s) { (awacsIn, radarContact) = (s.AwacsIn, s.RadarContact); Debrief.AddRange(s.Debrief); }
+    /// Save session (app crash/restart): AWACS check-in, debriefing and JTAC contact; range/tanker must be checked in again.
+    public record State(bool AwacsIn, bool RadarContact, List<string> Debrief, CasState? Jtac = null);
+    public State Save() => new(awacsIn, radarContact, Debrief.ToList(), cas > 0 ? CasSave() : null);
+    public void Load(State s) { (awacsIn, radarContact) = (s.AwacsIn, s.RadarContact); Debrief.AddRange(s.Debrief); if (s.Jtac != null) CasLoad(s.Jtac); }
 
     string PassRow() => L($"Range Alpha Anflug {passes}: {PassText()}", $"Range Alpha pass {passes}: {PassText()}");
     string PassText()
@@ -320,7 +322,7 @@ partial class Ops
     {
         if (!Cleared(now) || killTold || target >= 0 && target != 3 - me.Coalition) return new();   // R369: only the opposing side counts (target: coalition of the destroyed object, -1 = older mission)
         killTold = true;
-        return new() { R($"{Cs(me)}, good hits, target destroyed.") };
+        return new() { R($"{Cs(me)}, {OneOf("good hits", "good effects")}, target destroyed.") };
     }
 
     // ======================================================================= AWACS
@@ -342,8 +344,13 @@ partial class Ops
         a != null && CsWord(a) is { } s ? s : a != null && Callsigns.TryGetValue(a.Group, out var cs) && Regex.IsMatch(cs, @"^\d+$") ? Digits(cs) : "Overlord";   // plain number: "two four seven" (A117)
     /// Letter call name of the group's DCS callsign ("Texaco11" / "Texaco 1-1" -> Texaco), null = none.
     static string? CsWord(Traffic a) => Callsigns.TryGetValue(a.Group, out var cs) && Regex.Match(cs, "^[A-Za-z]{3,}").Value is { Length: > 0 } s ? Cap(s.ToLowerInvariant()) : null;
-    internal static double AwacsFreqOf(Traffic? a) => a == null ? 0 : AwacsFreq.TryGetValue(a.Group, out var f) ? f
-        : AwacsFreq.GetValueOrDefault(Regex.Replace(a.Group, @"\s*#\d+$", ""));   // spawned later (MOOSE "Name#001", MIST "Name #1"): frequency of the template
+    internal static double AwacsFreqOf(Traffic? a) => a == null ? 0 : GroupFreq(AwacsFreq, a.Group);
+    static double GroupFreq(Dictionary<string, double> d, string g) => d.TryGetValue(g, out var f) ? f
+        : d.GetValueOrDefault(Regex.Replace(g, @"\s*#\d+$", ""));   // spawned later (MOOSE "Name#001", MIST "Name #1"): frequency of the template
+    /// TP7: radio frequency of the tanker group from the mission editor, 0 = none (config "Tanker").
+    public static double TankerFreqOf(string group) => GroupFreq(TankerFreq, group);
+    /// Mission frequency of the own tanker (radio wheel display, handoff), otherwise of the nearest matching one; 0 = config.
+    public double TankerFreqFor(IReadOnlyList<Traffic> air, Me me) => TankerFreqOf(tanker != "" ? tanker : Tankers(air, me).FirstOrDefault()?.A.Group ?? "");
     /// Frequency of the own AWACS (radio wheel display, Program), 0 = config.
     public static double AwacsFreqFor(IReadOnlyList<Traffic> air, Me me) => AwacsFreqOf(AwacsOf(air, me));
     /// Handover after departure: "Overlord two five one decimal zero" (own AWACS or GCI), null = none in the air.
@@ -540,7 +547,7 @@ partial class Ops
         if (Has(n, "check out", "checking out"))
         {
             awacsIn = onStation = false; Abm.Release(side, Flight(me));   // no more calls by itself; LK9: no longer planned
-            return new() { A($"{c}, {awName}, copy checking out, good day.") };
+            return new() { A($"{c}, {awName}, copy checking out, {OneOf("good day", "good luck")}.") };
         }
         if (t != null && OnGround(t)) { awacsIn = wasIn; return new() { A($"{c}, {awName}, check in airborne.") }; }   // R51: no radar contact on the ground (parked deletes the check-in via TickLive anyway)
         if (Has(n, "unable"))   // LD14 (ATP 1-02.1 UNABLE): tasking declined -> Abm gives the group to the next flight; winchester/bingo: no longer planned
@@ -554,7 +561,7 @@ partial class Ops
         if (Has(n, "support", "assist") && (groups.FirstOrDefault(g => Said(g, groups, n)) ?? groups.FirstOrDefault(Own) ?? groups.FirstOrDefault()) is { } sg2)
         {
             Abm.Assist(side, sg2.Ids!);
-            return new() { A($"{c}, {awName}, copy, {Nm(sg2)}.") };
+            return new() { A($"{c}, {awName}, {OneOf("copy", "roger")}, {Nm(sg2)}.") };
         }
         if (Has(n, "on station")) onStation = true;   // LK5: CAP tasking (DCA): only then does the AWACS give "commit"
         if (Has(n, "rtb", "off station", "bingo", "winchester")) { onStation = false; Abm.Release(side, Flight(me)); }   // LD16: winchester releases
@@ -612,7 +619,7 @@ partial class Ops
             var tk = Tankers(air, me).FirstOrDefault();
             if (tk == null || t == null) return new() { A($"{c}, {awName}, {(tk == null && Tankers(air, me, true).Count > 0 ? "negative, no compatible tanker" : "no tanker")} airborne.") };   // A125: tanker there, but none suitable
             var anchor = Tracks.TryGetValue(tk.A.Group, out var trk) ? $", anchor {trk}" : "";
-            var contact = $", contact {tk.Name}, {FreqSay(Freqs.GetValueOrDefault("Tanker", 255.5))}";   // R304: our tanker also for DCS tankers of the mission
+            var contact = $", contact {tk.Name}, {FreqSay(TankerFreqOf(tk.A.Group) is > 0 and var tf ? tf : Freqs.GetValueOrDefault("Tanker", 255.5))}";   // R304: our tanker also for DCS tankers of the mission; TP7: on their mission frequency
             return new() { A($"{c}, {awName}, nearest tanker {tk.Name}{anchor}, bearing {Brg(Bearing(t.X, t.Z, tk.A.X, tk.A.Z))}, " +
                              $"{MilesTxt(Dist(t.X, t.Z, tk.A.X, tk.A.Z))}, {Angels(tk.A.AltMsl)}{TacanSay(tk.A)}{contact}.") };
         }
@@ -1091,20 +1098,20 @@ partial class Ops
             tank = 0; OffLine();
             var total = offload > 0 ? $"total offload {offload / 1000:0.0}, " : "";   // thousand lb; without known internal tank size no amount
             offload = 0;
-            var dep = T($"{c}, {tk.Name}, {total}cleared to depart, " + (AwacsContact(air, me, Freqs.GetValueOrDefault("AWACS", 251.0)) is { } aw ? $"contact {aw}." : "frequency change approved."));
+            var dep = T($"{c}, {tk.Name}, {total}cleared to depart, " + (AwacsContact(air, me, Freqs.GetValueOrDefault("AWACS", 251.0)) is { } aw ? $"contact {aw}." : OneOf("frequency change approved.", "frequency change approved, good day.")));
             if (first && l.FirstOrDefault(o => o.tank >= 2) is { } nx) dep.Add(new("Tanker", tk.Name, $"{nx.cs}, {tk.Name}, cleared pre-contact.", To: nx));
             return dep;
         }
         if (Has(n, "disconnect"))   // disconnected, not yet finished: to the right wing, no departure clearance (A67)
         {
-            var dc = T($"{c}, {tk.Name}, copy disconnect, move to the right wing.");
+            var dc = T($"{c}, {tk.Name}, {OneOf("copy disconnect", "roger disconnect")}, move to the right wing.");
             if (tank != 3) return dc;
             tank = 2; OffLine();   // without DCS event (OnRefuel) only the report frees the spot, the next gets it as in OnRefuel (A65)
             if (l.FirstOrDefault(o => o.tank >= 2) is { } nx) dc.Add(new("Tanker", tk.Name, $"{nx.cs}, {tk.Name}, cleared pre-contact.", To: nx));
             return dc;
         }
         if (Has(n, "right wing"))   // back on the right wing: no clearance, continue with "pre contact" or "complete"
-            return T($"{c}, {tk.Name}, roger, report complete or request more.");
+            return T($"{c}, {tk.Name}, {OneOf("roger", "copy")}, report complete or request more.");
         // R56: confirm join/pre-contact only if the receiver is close enough to the tanker (ATP-56(C)), otherwise state the situation
         List<Call> Far() => T($"{c}, {tk.Name}, negative, {brg}report visual.");
         bool far = dTk > 2 * NM;
@@ -1131,7 +1138,7 @@ partial class Ops
             tank = 3;
             return T($"{c}, cleared contact, {(Boom(tk.A) ? "boom" : "basket")} ready.");
         }
-        if (tank < 2 && Has(n, "judy", "radar contact")) { vecEnd = true; return T($"{c}, {tk.Name}, roger, report visual."); }   // TP3: radar contact ends the vectors, the join needs "visual"
+        if (tank < 2 && Has(n, "judy", "radar contact")) { vecEnd = true; return T($"{c}, {tk.Name}, {OneOf("roger", "copy")}, report visual."); }   // TP3: radar contact ends the vectors, the join needs "visual"
         if (tank < 2 && Has(n, "visual", "tally", "in sight"))
             return dTk > 8 * NM ? T($"{c}, {tk.Name}, continue, {MilesTxt(dTk)}, report visual.") : Join("");   // R117: "visual" releases the join (2-5 NM as in TankVec), only not beyond 8 NM (TickLive discards over 10 NM); R286: continue with "visual", the tanker understands that
         if (Has(n, "observation", "left wing", "visual", "tally", "in sight", "joined"))
@@ -1256,6 +1263,7 @@ partial class Ops
             {
                 radarContact = awacsIn = hadContacts = onStation = false;
                 groupsTold.Clear(); committed.Clear(); threatTold.Clear(); mergeTold.Clear(); judy.Clear(); members.Clear(); seenAt.Clear(); heard.Clear(); mine.Clear(); lastPos.Clear(); watching = false;   // LK3: group names belong to the side, not the flight
+                if (cas > 0) CasEnd();   // R418: landed and stopped or gone: the JTAC is free for the next flight
                 RangeReset(); checkedIn = false;   // R131: landing/shutdown ends the range visit (debrief and rgPasses stay), touch-and-go stays checked in; the new flight starts with check-in again
             }
             return new();
@@ -2276,6 +2284,10 @@ partial class Ops
         check(n19 is [{ Text: "Enfield one one, Texaco one one, you are not cleared contact, disconnect, return to left observation." }] && n19b.Count == 0 && n19c.Count == 0
               && c19.Debrief.Count(d => d.StartsWith("Verstoß: Kontakt an Texaco one one")) == 1 && c19.Debrief.Count == 1 && ok19.Contains("cleared contact") && ct19 is [{ Text: "Contact." }]
               && aw240.Contains("nearest tanker Texaco one one, anchor Alpha") && aw240.EndsWith("contact Texaco one one, two five five decimal five."), $"#19/R240: Kontakt ohne Freigabe -> {n19.FirstOrDefault()?.Text} | {ok19} | {aw240}");
+        TankerFreq[Tankers(air, me)[0].A.Group] = 225.0;   // TP7: mission frequency of the tanker in the AWACS handoff and the radio wheel
+        var awTp7 = new Ops().OnTranscript("AWACS", "Overlord, Enfield 1-1, vector to tanker", me, air, f, 0)[0].Text;
+        check(awTp7.EndsWith("contact Texaco one one, two two five decimal zero.") && new Ops().TankerFreqFor(air, me) == 225.0, "Tanker TP7: Missionsfrequenz bei Übergabe -> " + awTp7);
+        TankerFreq.Clear();
         line.Clear();
         // A65: 1-1 asks first, 1-2 arrives first -> 1-2 is number 1, 1-1 number 2 and waits
         var (b1, b2) = (new Ops(), new Ops());
