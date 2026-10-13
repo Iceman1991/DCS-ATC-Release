@@ -116,9 +116,9 @@ public partial class Tower
             var (a, l) = AL(t.X, t.Z, r);
             double s0 = Math.Abs(l) > 0.5 * NM ? Math.Sign(l) : HandSign(rw) * (r == rw ? 1 : -1), bestCost = double.MaxValue;
             (string, double, bool, List<(double X, double Z)>)? pick = null;
-            foreach (var g in final && !over ? new[] { 10 * NM, 8 * NM, 6 * NM, 4 * NM } : new[] { InitialDist + 4 * NM })
+            foreach (var g in final && !over ? new[] { 10 * NM, 8 * NM, 6 * NM, 4 * NM } : new[] { Ini(rw) + 4 * NM })
             {
-                double gmin = final && !over ? g : Math.Min(g, InitialDist + NM);
+                double gmin = final && !over ? g : Math.Min(g, Ini(rw) + NM);
                 var cands = (from s in new[] { s0, -s0 } from e in AheadR >= 0 ? new[] { 6 * NM, 3 * NM, 10 * NM } : new[] { 6 * NM, 3 * NM }   // R46: behind the preceding traffic also a longer downwind
                              from diag in new[] { false, true } select Legs(t.X, t.Z, r, g, s, e, w, tr, diag)).ToList();
                 if (a - Math.Abs(l) * 1.73 > gmin) cands.Add(new());   // already outside on the line (e.g. from holding): turn in before initial
@@ -192,7 +192,7 @@ public partial class Tower
         double rest = 0, ex = double.MinValue;
         for (int i = 1; i < pts.Count; i++) rest += Dist(pts[i - 1].X, pts[i - 1].Z, pts[i].X, pts[i].Z);
         // Visual: minimum altitude at the gate up to 600 ft above the pattern (it descends leisurely over the 4 NM to initial) – otherwise no initial at hill airfields (360° overhead)
-        double Prof(double r) => Math.Max(Math.Max(final ? 0 : PatternFt, FieldElev / Ft + r / NM * 265), final || Ifr ? 0 : PatternFt + (r - InitialDist) / NM * 150);
+        double Prof(double r) => Math.Max(Math.Max(final ? 0 : PatternFt, FieldElev / Ft + r / NM * 265), final || Ifr ? 0 : PatternFt + (r - Ini(rw)) / NM * 150);
         for (int i = 1; i < pts.Count; i++)
         {
             var (x1, z1) = pts[i - 1];
@@ -203,7 +203,7 @@ public partial class Tower
                 ex = Math.Max(ex, F.MvaFt(x1 + (x2 - x1) * j / k, z1 + (z2 - z1) * j / k) - Prof(g + rest - d * j / k));
             rest -= d;
         }
-        for (double a = final ? 2 * NM : InitialDist; a <= g; a += NM / 2)
+        for (double a = final ? 2 * NM : Ini(rw); a <= g; a += NM / 2)
         {
             var p = Pt(rw, a, 0);
             ex = Math.Max(ex, F.TerrainFt(p.X, p.Z, 0.25) + (final ? 250 - (FieldElev / Ft + 50 + a / NM * 265) : 500 - PatternFt));
@@ -282,7 +282,7 @@ public partial class Tower
         var (a1, l1) = AL(t.X + NM * Math.Cos(h * Math.PI / 180), t.Z + NM * Math.Sin(h * Math.PI / 180), vrw);
         return Math.Abs(l1) < Math.Abs(l) && a + l / (l - l1) * (a1 - a) > IcptMin - NM;   // approaching; intersection at l / (l - l1) NM
     }
-    double IcptMin => vecFinal ? gate : Math.Min(gate, InitialDist + NM);
+    double IcptMin => vecFinal ? gate : Math.Min(gate, Ini(vrw) + NM);
 
     /// Last stated altitude/speed/leg of radar vectoring (applies per waypoint list: new planning = first contact, everything complete).
     List<(double X, double Z)>? vecMemList;
@@ -323,7 +323,7 @@ public partial class Tower
         double turn = Turn(t, brg);
         int mag = (int)Math.Round(((brg - MagVar) % 360 + 360) % 360 / 5) * 5;
         var hdg = $"heading {Digits((mag == 0 ? 360 : mag).ToString("000"))}";
-        var to = vecFinal ? Thr(rw) : vecOver ? Ovh : OnCenterline(rw, InitialDist);
+        var to = vecFinal ? Thr(rw) : vecOver ? Ovh : OnCenterline(rw, Ini(rw));
         var range = $"{MilesTxt(Dist(t.X, t.Z, to.X, to.Z))} from {(vecFinal ? "touchdown" : vecOver ? "the field" : "initial")}";
         // Heading always; distance at first contact and with the last vector; altitude/speed only on change (or far off); leg only on change
         var head = Math.Abs(turn) < 10 ? $"fly {hdg}" : $"turn {(turn > 0 ? "right" : "left")} {hdg}";
@@ -465,7 +465,7 @@ public partial class Tower
     /// Approach vectors to the gate/FAF (FAA JO 7110.65 5-9-1/5-9-4, AIM 5-4-3); a: distance before the threshold.
     bool HandoffOk(Telemetry t, double a) => a < gate || a < gate + 2 * NM && IndFt(t) <= GateFt + 1000;
 
-    static double SegDist(double x, double z, (double X, double Z) a, (double X, double Z) b)
+    internal static double SegDist(double x, double z, (double X, double Z) a, (double X, double Z) b)
     {
         double dx = b.X - a.X, dz = b.Z - a.Z, u = Math.Clamp(((x - a.X) * dx + (z - a.Z) * dz) / Math.Max(dx * dx + dz * dz, 1), 0, 1);
         return Dist(x, z, a.X + u * dx, a.Z + u * dz);
@@ -581,7 +581,7 @@ public partial class Tower
             }
             if ((late || Math.Abs(l) > 10 * NM) && now - lastVecSaid > 30)   // or too far away: replan
                 // Visual to initial as number 1, not far across: rather direct (up to 60° bend at initial) than a full circle
-                return late && !vecFinal && !vecOver && QueueAhead <= 0 && a - InitialDist > NM && Math.Abs(l) < Math.Min((a - InitialDist) * 1.73, 10 * NM) ? Established(t, true)
+                return late && !vecFinal && !vecOver && QueueAhead <= 0 && a - Ini(vrw) > NM && Math.Abs(l) < Math.Min((a - Ini(vrw)) * 1.73, 10 * NM) ? Established(t, true)
                      : Say($"{c}, {Replan(t, now, late && vecFinal ? "vectors across final for re-sequencing" : null)}", "Approach");
         }
         bool joining = vec.Count == 0 && Math.Abs(AL(t.X, t.Z, rw).L) < NM && HdgDiff(hdg, LandHdg(rw)) < 35;   // is just turning in
@@ -785,7 +785,7 @@ public partial class Tower
                        $"{Qnh(t)}, contact {Contact("Tower")}.", "Approach");   // R314: "report four mile final" is given by the tower (first call), not Approach
         }
         // Visual: to initial or overhead (reciprocal), never lower than 500 ft above terrain on the rest of the path
-        var to = vecOver ? Ovh : OnCenterline(rw, InitialDist);
+        var to = vecOver ? Ovh : OnCenterline(rw, Ini(rw));
         nav = to; navName = vecOver ? "overhead" : "initial";
         double d = Dist(t.X, t.Z, to.X, to.Z), ft = PatternFt;
         for (double f = 0; f <= 1; f += NM / 2 / Math.Max(d, NM)) ft = Math.Max(ft, Math.Ceiling((F.TerrainFt(t.X + (to.X - t.X) * f, t.Z + (to.Z - t.Z) * f, 0.5) + 500) / 100) * 100);

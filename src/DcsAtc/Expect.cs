@@ -81,6 +81,7 @@ static partial class Program
             "JTAC: checking out" => h.Ops.Cas > 0,
             "AWACS: checking in" => air && !h.Ops.AwacsIn,
             "AWACS: checking out" => h.Ops.AwacsIn,
+            "Center: checking in" => air && a?.Center != true && ph is null or Phase.Away or Phase.Departing,   // en route, not in the landing flow
             "Tanker: request rejoin" => air && tk == 0,
             "Tanker: visual" => tk == 1,
             "Tanker: say position" => air,
@@ -88,8 +89,11 @@ static partial class Program
             "Tanker: pre contact" or "Tanker: refuel complete" => tk >= 2,   // after the join
             "Carrier: Marshal, checking in" => air && h.Boat.Stage == 0,
             "Carrier: pigeons" => air,
+            "Carrier: Strike, checking in" or "Carrier: Strike, checking out" => air && h.Boat.Stage == 0,   // optional, outside the recovery
+            "Carrier: Red Crown, checking in" or "Carrier: Red Crown, checking out" => air && h.Boat.Stage == 0 && Carrier.RadarShips.Any(s => s.Coalition == h.Coalition),   // only with an own cruiser in the mission
             _ when x.StartsWith("Ground: ") => gnd,   // Progressive taxi, Hot brakes
             _ when x.StartsWith("Tower: ") || x.StartsWith("AWACS: ") => air,   // Initial … Going around, Closed/SFO; Picture, Bogey dope …
+            _ when x.StartsWith("Center: ") => a?.Center == true,   // altitude, direct, leaving frequency: while the Center is running
             _ when x.StartsWith("Range: ") => h.Ops.RangeIn,   // IP inbound, In hot, Off, Check out
             _ when x.StartsWith("Carrier: ") => h.Boat.Stage >= 1,   // after the Marshal check-in
             _ => true,
@@ -313,12 +317,12 @@ static partial class Program
         string[] Sub(params string[] path)
         {
             var xs = Wheel.All;
-            foreach (var s in path) xs = Wheel.Vis(xs, WheelFits(p)).First(i => i.Label == s).Sub!;
+            foreach (var s in path) xs = Wheel.Vis(xs, WheelFits(p), ReferenceEquals(xs, Wheel.All) ? 2 : 0).First(i => i.Label == s).Sub!;
             var v = Wheel.Vis(xs, WheelFits(p));
             if (v.Length > 9) throw new Exception($"R307 Funkrad {string.Join("/", path)}: {v.Length} Einträge");
             return v.Select(i => i.Text ?? i.Label).ToArray();
         }
-        string[] Top() => Wheel.Vis(Wheel.All, WheelFits(p)).Select(i => i.Label).ToArray();
+        string[] Top() => Wheel.Vis(Wheel.All, WheelFits(p), 2).Select(i => i.Label).ToArray();
         var err = new List<string>();
         void Want(bool ok, string what, IEnumerable<string> got) { if (!ok) err.Add($"{what}: {string.Join(",", got)}"); }
         // parked: startup/taxi/ready, no Vacated, no Airborne, no speed report, no AWACS/tanker in the air
@@ -345,6 +349,26 @@ static partial class Program
         Want(Sub(L("Allgemein", "General")) is var zt2 && zt2.Contains("Approach: request zone transit"), "Away mit zone transit", zt2);
         Heard(new Tx("Colt three two, radar contact, 1 mile east of the field. Continue as cleared, report leaving the control zone.", "Approach", "", 9));   // R7: report due -> entry visible
         Want(Sub("Approach") is var lz && lz.Contains("Approach: leaving the control zone"), "Away nach report leaving the control zone", lz);
+        Want(Sub("Center") is var cn1 && cn1.SequenceEqual(new[] { "Center: checking in" }), "Away Center: nur Check-in", cn1);   // Center: check-in in the air outside the landing flow, the rest only while it runs
+        p.Active.OnTranscript("Tbilisi Control, Colt 3-2, checking in", air, new List<Traffic>(), Now());
+        Want(Sub("Center") is var cn2 && p.Active.Center && cn2.SequenceEqual(new[] { "Center: request higher", "Center: request direct", "Center: leaving frequency" }), "Center läuft: Anfragen statt Check-in", cn2);
+        p.Active.OnTranscript("Tbilisi Control, Colt 3-2, leaving frequency", air, new List<Traffic>(), Now());
+        // Strike / Red Crown: Strike while out of the recovery, Red Crown only with an own radar ship in the mission
+            string[] CarSub() => Wheel.Vis(Wheel.All.First(i => i.Label == "Carrier").Sub!, WheelFits(p)).Select(i => i.Text ?? i.Label).ToArray();   // top level is cut at 9 without state filters (Sub), so the Carrier level directly
+        {
+            var (bsW, rsW, coW) = (Carrier.Boats, Carrier.RadarShips, p.Coalition);
+            Carrier.Boats = new() { new("CVN-73", "CVN", "CVN_73", 0, 0, 0, 10, 2, 127.5, "73X", "11") };
+            (Carrier.RadarShips, p.Coalition) = (new(), 2);
+            var w0 = CarSub();
+            Carrier.RadarShips = new() { new("CG-52", "CG", "TICONDEROG", 0, 0, 2, 0) };
+            var w1 = CarSub();
+            Carrier.RadarShips = new() { new("CG-52", "CG", "TICONDEROG", 0, 0, 1, 0) };
+            var w2 = CarSub();
+            (Carrier.Boats, Carrier.RadarShips, p.Coalition) = (bsW, rsW, coW);
+            Want(w0.Contains("Carrier: Strike, checking in") && w0.Contains("Carrier: Strike, checking out") && !w0.Any(x => x.Contains("Red Crown")), "Strike ohne Kreuzer, kein Red Crown", w0);
+            Want(w1.Contains("Carrier: Red Crown, checking in") && w1.Contains("Carrier: Red Crown, checking out"), "Red Crown mit eigenem Kreuzer", w1);
+            Want(!w2.Any(x => x.Contains("Red Crown")), "Red Crown nicht mit fremdem Kreuzer", w2);
+        }
         Ph(Phase.Parked, gnd);
         Want(Sub(L("Allgemein", "General")) is var zt3 && !zt3.Contains("Approach: request zone transit"), "geparkt ohne zone transit", zt3);
         Ph(Phase.Inbound, air);
@@ -422,6 +446,10 @@ static partial class Program
         LoadModules("core,atc,tanker");
         Want(!Top().Contains("AWACS") && Top().Contains("Tanker") && !ListenFreqs(new()).Contains(aw) && ListenFreqs(new()).Contains(tk), "awacs aus: Funkrad/Frequenz " + Top());
         Want(!RoleOn("AWACS") && !RoleOn("Flight") && RoleOn("Tower") && !On("crew"), "awacs aus: Rollen");
+        LoadModules("core,atc,m3");   // list that knows center, without it: Center off (wheel entries, role, calls)
+        Want(!Top().Contains("Center") && !RoleOn("Center") && Said("Center: checking in") == 0, "center aus: " + Top());
+        LoadModules("core,atc,center,m3");
+        Want(Top().Contains("Center") && RoleOn("Center") && Sub("Center").Contains("Center: request direct"), "center an: " + Top());
         LoadModules("awacs");
         Want(Top() == "AWACS,Allgemein" || Top() == "AWACS,General", "nur awacs: Oberebene " + Top());
         Want(Sub("AWACS") is var a && a.Contains("AWACS: request picture") && !a.Contains("AWACS: vector to tanker"), "nur awacs: kein nearest tanker " + Sub("AWACS"));

@@ -230,7 +230,7 @@ static class Settings
             try
             {
                 var dcs = Path.Combine(Program.SavedGamesDcs(), "Scripts", "DcsAtc");
-                var ml = string.Join(",", mods.Where(m => m.Box.Checked).Select(m => m.Id).Append("m2"));   // before config.jsonc: its reload reads modules.txt; m2 = list knows jtac (installer update)
+                var ml = string.Join(",", mods.Where(m => m.Box.Checked).Select(m => m.Id).Append("m2").Append("m3"));   // before config.jsonc: its reload reads modules.txt; m2 = list knows jtac, m3 = center (installer update)
                 File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "modules.txt"), ml);
                 if (Directory.Exists(dcs)) File.WriteAllText(Path.Combine(dcs, "DcsAtcModules.txt"), ml);
                 if (!active.Checked && Directory.Exists(dcs)) File.WriteAllText(offFile, "DCS-ATC aus / off: DCS-ATC Einstellungen / settings -> DCS-ATC aktiv / active\n");

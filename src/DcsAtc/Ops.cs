@@ -354,8 +354,9 @@ partial class Ops
     /// Frequency of the own AWACS (radio wheel display, Program), 0 = config.
     public static double AwacsFreqFor(IReadOnlyList<Traffic> air, Me me) => AwacsFreqOf(AwacsOf(air, me));
     /// Handover after departure: "Overlord two five one decimal zero" (own AWACS or GCI), null = none in the air.
-    public static string? AwacsContact(IReadOnlyList<Traffic> air, Me me, double cfgFreq) =>
-        AwacsUp(air, me) && AwacsOf(air, me) is var a ? $"{AwacsName(a, me)} {Tower.FreqSay(AwacsFreqOf(a) is > 0 and var f ? f : cfgFreq)}" : null;
+    /// maxNm > 0: an AWACS farther away than that is no contact (Center takes over); GCI has no position and stays.
+    public static string? AwacsContact(IReadOnlyList<Traffic> air, Me me, double cfgFreq, double maxNm = 0) =>
+        AwacsUp(air, me) && AwacsOf(air, me) is var a && (maxNm <= 0 || a == null || me.Tel == null || Dist(me.Tel.X, me.Tel.Z, a.X, a.Z) < maxNm * NM) ? $"{AwacsName(a, me)} {Tower.FreqSay(AwacsFreqOf(a) is > 0 and var f ? f : cfgFreq)}" : null;
     void SetAwacs(IReadOnlyList<Traffic> air, Me me) { var a = AwacsOf(air, me); awName = AwacsName(a, me); awFreq = AwacsFreqOf(a); side = me.Coalition; flight = Flight(me); }
 
     // LK3: group names per side, not per player: all players and AI flights of a side hear the same AWACS and talk about the same group
@@ -547,6 +548,9 @@ partial class Ops
         if (Has(n, "check out", "checking out"))
         {
             awacsIn = onStation = false; Abm.Release(side, Flight(me));   // no more calls by itself; LK9: no longer planned
+            var home = t == null ? null : fields.Where(f => f.Side == 0 || f.Side == me.Coalition).MinBy(f => Dist(t.X, t.Z, f.X, f.Z));
+            if (home != null && Dist(t!.X, t.Z, home.X, home.Z) > 60 * NM && CenterFor(me.Coalition, t.X, t.Z) is { } cn)   // A6: home farther than 60 NM -> the Center takes over
+                return new() { A($"{c}, {awName}, copy checking out, contact {cn.Name} {FreqSay(cn.Freq)}.") };
             return new() { A($"{c}, {awName}, copy checking out, {OneOf("good day", "good luck")}.") };
         }
         if (t != null && OnGround(t)) { awacsIn = wasIn; return new() { A($"{c}, {awName}, check in airborne.") }; }   // R51: no radar contact on the ground (parked deletes the check-in via TickLive anyway)
@@ -2227,6 +2231,16 @@ partial class Ops
         check(TypeSay("FA-18C_hornet") == "Hornet" && TypeSay("F-16C_50") == "Viper" && TypeSay("F-15ESE") == "Strike Eagle" && TypeSay("F-15C") == "Eagle" && TypeSay("F-14B") == "Tomcat" && TypeSay("A-10C_2") == "Warthog" && TypeSay("MiG-21Bis") == "MiG 21Bis" && TypeSay("C-130") == "C 130", "TypeSay: Sprechnamen");
         var co = od2.OnTranscript("AWACS", "Overlord, Enfield 1-1, checking out", me, air, f, 0)[0].Text;
         check(co.Contains("checking out") && !od2.awacsIn && od2.Tick(me, air, 1).Count == 0, "AWACS: check out -> " + co);
+        // A6: home farther than 60 NM -> "contact Tbilisi Control …" (Center), close to home the usual farewell
+        var (thA6, kA6) = (Airfield.Theatre, f[0]);
+        Airfield.Theatre = "Caucasus";
+        var a6 = new[] { 80, 30 }.Select(nm => new Ops().OnTranscript("AWACS", "Overlord, Enfield 1-1, checking out, RTB", me with { Tel = me.Tel! with { X = kA6.X + nm * NM, Z = kA6.Z } }, air, f, 0)[0].Text).ToArray();
+        Airfield.Theatre = thA6;
+        check(a6[0].EndsWith("copy checking out, contact Tbilisi Control two six eight decimal five.") && !a6[1].Contains("contact"), "A6: AWACS check out weit weg -> Center: " + string.Join(" | ", a6));
+        // A2/E4: own AWACS farther than 100 NM is no contact (Center instead), closer it is; without maxNm as before
+        var awA2 = air.First(a => a.Type == "E-3A");
+        string? AwNm(double nm) => AwacsContact(air, me with { Tel = me.Tel! with { X = awA2.X + nm * NM, Z = awA2.Z } }, 251.5, Tower.CenterAwacsNm);
+        check(AwNm(150) == null && AwNm(90) != null && AwNm(50) != null && AwacsContact(air, me with { Tel = me.Tel! with { X = awA2.X + 150 * NM, Z = awA2.Z } }, 251.5) != null, $"A2 AWACS 150 NM -> Center, 90/50 NM -> AWACS: {AwNm(150)} | {AwNm(90)} | {AwNm(50)}");
         // V11: two players at the tanker -> rendezvous, order, offload in pounds
         line.Clear();
         var me2 = me with { Callsign = "Enfield 1-2" };

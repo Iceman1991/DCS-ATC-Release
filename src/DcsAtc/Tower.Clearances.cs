@@ -47,7 +47,7 @@ public partial class Tower
     string TakeoffClearance(Telemetry? t, IReadOnlyList<Traffic> traffic, Traffic? fin = null)   // fin: approach 2.5-6 NM -> "immediate" with traffic (A10)
     {
         Phase = Phase.ClearedTakeoff; handedOff = zoneReport = false; wxTold = false;   // A145: new flight, next approach states the weather again
-        lineUp = rejecting = false; popM = 0;
+        lineUp = rejecting = backtrack = false; popM = 0;
         var c = (Cs() + ", " + Wake(t, traffic, Runway)).TrimEnd(',', ' ');   // R205: wake turbulence ahead
         // A95: departure part before the clearance ("after departure exit via …, runway …, wind …, cleared for takeoff")
         var clr = $"{(IsHeli ? "" : $"runway {RwSay(Runway)}, ")}{Wind(t)}, cleared for {(fin != null ? "immediate " : "")}takeoff{(IsHeli ? " from present position" : "")}{(fin != null ? $", traffic {Describe(fin, Runway)}" : "")}";   // R347: helicopter without runway (FAA JO 7110.65 3-11-2)
@@ -91,7 +91,8 @@ public partial class Tower
         }
         nav = Crp[exitDir];
         navName = $"C R P {exitDir}";
-        return $"{c}, after departure exit via C R P {exitDir}, not above {Alt(MaxFt)} until leaving the control zone, {clr}";
+        var xn = F.ExitNote.TryGetValue((Runway, exitDir), out var note) ? ", " + SayChart(note) : "";   // K24: hint of the chart ("then 354 to the C R P")
+        return $"{c}, after departure exit via C R P {exitDir}{xn}, not above {Alt(MaxFt)} until leaving the control zone, {clr}";
     }
 
     /// Takeoff clearance, otherwise wait: emergency / landing traffic up to 4 NM -> hold short, runway occupied -> line up and wait (only behind a rolling aircraft with no approach traffic within 6 NM, A10),
@@ -106,6 +107,11 @@ public partial class Tower
         var head = FinalTraffic(traffic, opp, 4 * NM).FirstOrDefault();   // Landing aircraft on the opposite direction (runway request A41, AI lands per DCS wind)
         var on = RwyTraffic(traffic);
         int ahead = RunwayClaimed + HoldAhead;   // R341: takeoff clearances plus players holding short who reported earlier
+        if (F.Backtrack.Contains(rw) && !backtrack && !IsHeli && t != null && !OnRunwayPos(t.X, t.Z) && !(EmgWithin(15) || near || head != null || on != null || ahead > 0) && now - heavyDepAt >= 120)
+        {   // K30/K31: the holding point only leads into the middle of the runway: taxi along the runway to its end, takeoff clearance only after the next "ready"
+            (Phase, lineUp, holdSince, backtrack) = (Phase.HoldShort, true, -1, true);
+            return $"{c}, backtrack approved, line up runway {RwSay(rw)}, report ready for departure.";
+        }
         if (EmgWithin(15) || near || head != null || on != null || ahead > 0)
         {
             if (!(Phase == Phase.HoldShort && holdSince >= 0)) holdSince = now;   // R341: a repeated "ready" keeps the place in the departure order
@@ -238,21 +244,24 @@ public partial class Tower
         return Runway;
     }
 
-    /// Approach hands over to the Tower at the CRP.
+    /// Pilot reports the CRP: Approach hands over to the Tower at the point, or (K22 handover 2 min before) the Tower leads on to initial/overhead, via the knee point (K21) if the chart has one.
     List<Msg> AtCrp(string at, string pre = "")
     {
         var c = Cs();
         var rw = Runway;
+        bool tw = Phase == Phase.Entering && role == "Tower";   // K22: already handed over, the point is reported to the Tower
         Phase = Phase.Entering; lastAltFt = PatternFt;   // R256: Approach states the altitude, the Tower does not repeat it
-        handoffAt = lastSeen; towerDue = true; towerNag = false;   // R32: no "check altitude" for 60 s after this handover either
+        handoffAt = lastSeen; towerDue = !tw; towerNag = false;   // R32: no "check altitude" for 60 s after this handover either
         entry = at;
-        if (F.Entry[rw].Contains((at, "overhead")))
-        {
-            nav = Ovh; navName = "overhead";
-            return Say($"{c}, {pre}proceed overhead, {Alt(PatternFt)}, contact {Contact("Tower")}, report overhead.", "Approach");
-        }
-        nav = OnCenterline(rw, InitialDist); navName = "initial";
-        return Say($"{c}, {pre}proceed to initial runway {RwSay(rw)}, {Alt(PatternFt)}, contact {Contact("Tower")}, report initial for overhead break.", "Approach");
+        var en = F.Entry[rw].FirstOrDefault(e => e.Crp == at);
+        bool ovh = en.Via == "overhead";
+        var (goal, name) = ovh ? (Ovh, "overhead") : (OnCenterline(rw, Ini(rw)), "initial");
+        (nav, navName, kneeTo, kneeName) = (goal, name, null, "");
+        if (en.Wp is { } wp) (nav, navName, kneeTo, kneeName) = (wp, "the turning point", goal, name);
+        var via = en.Wp != null ? " via the turning point" : "";
+        var go = tw ? "" : $"contact {Contact("Tower")}, ";
+        return Say(ovh ? $"{c}, {pre}proceed overhead{via}, {Alt(PatternFt)}, {go}report overhead."
+                       : $"{c}, {pre}proceed to initial runway {RwSay(rw)}{via}, {Alt(PatternFt)}, {go}report initial for overhead break.", tw ? "Tower" : "Approach");
     }
 
     // Holding if the pattern is full (>= 2 aircraft) or another emergency is running
@@ -314,7 +323,7 @@ public partial class Tower
                    $", report base.{TrafficNote(traffic, Runway)}", "Tower");
     }
 
-    void PatternReset() { nav = null; lastAltFt = -1; if (navName == "circle") navName = "";   // Review R212: no old "circle" (otherwise a later first call at the Tower becomes circling)
+    void PatternReset() { nav = null; kneeTo = null; lastAltFt = -1; if (navName == "circle") navName = "";   // Review R212: no old "circle" (otherwise a later first call at the Tower becomes circling)
         baseCalled = extended = s360 = wrongRwyTold = finalLowTold = iniAsked = iniWaved = ovhAsked = ovhWaved = crpAsked = crpWaved = landCall = finAsked = gearDown = sfo = towerDue = towerNag = false; }
     double vecLim;   // R315: lead for the next waypoint turn
     bool intentsAsked;   // R318: "say intentions" already said within the gate
@@ -322,6 +331,7 @@ public partial class Tower
     bool s360;   // R330: full circle on base already instructed
     bool iniAsked, iniWaved;   // at the initial without a call "report initial" said once; afterwards into the break without a call: once "no break clearance"
     bool ovhAsked, ovhWaved, crpAsked, crpWaved;   // Reporting duty overhead/C R P: at the point without a call once "report …", afterwards continuing without a call once "no clearance to join" or "say position"
+    (double X, double Z)? kneeTo; string kneeName = "";   // K21: knee point (Wp) of the entry first, then this target ("initial"/"overhead")
     double keepAt = 1e9, keepRef; bool keepTold;   // Review l1: time of the guidance "remain outside …", distance C R P – airfield, violation already announced
     bool landCall, finAsked, gearDown;   // Reporting duty landing: landing report (base/final) made for this approach / "report final" said without a report / R201 "gear down" reported
     bool towerDue, towerNag;   // Reporting duty: handed over to the tower ("contact Tower"), no call there yet / "contact Tower now" already said

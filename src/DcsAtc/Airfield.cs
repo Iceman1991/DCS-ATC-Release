@@ -13,8 +13,10 @@ public record RwyEnd(string Name, double ThrX, double ThrZ, double Hdg, double L
     public (double X, double Z) At(double a, double l) => (ThrX - a * Dx + l * Dz, ThrZ - a * Dz - l * Dx);
 }
 
-/// Apron point from the chart data (charts/caucasus.jsonc): per runway taxiway to it (To), vacate instruction after landing (Vacate), taxiway back (In, "*" = any runway).
-public record Ramp(string Name, double X, double Z, Dictionary<string, string> To, Dictionary<string, string> Hold, Dictionary<string, string> Vacate, Dictionary<string, string> In);
+/// Apron point from the chart data (charts/caucasus.jsonc): per runway taxiway to it (To), named holding point (Hold), vacate instruction after landing (Vacate), taxiway back (In, "*" = any runway),
+/// hints spoken with the taxi clearance out (Note) and to the apron (InNote): crossing a runway, stop bars, last chance ("*" = any runway).
+public record Ramp(string Name, double X, double Z, Dictionary<string, string> To, Dictionary<string, string> Hold, Dictionary<string, string> Vacate, Dictionary<string, string> In,
+                   Dictionary<string, string> Note, Dictionary<string, string> InNote);
 
 public class Airfield
 {
@@ -56,17 +58,33 @@ public class Airfield
     public List<RwyEnd> Ends = new();
     public Dictionary<string, (double X, double Z)> Crp = new();   // Compulsory reporting points (map only)
     public Ramp[] Ramps = Array.Empty<Ramp>();
+    public Rollnetz? Net;                     // DCS taxi network (Rollnetz.LoadAll, from the user's DCS installation), null = none
     public Dictionary<string, (double X, double Z, string[] Rwy)> Holds = new();   // Named holding points (map)
     public Dictionary<string, string> HandOf = new();                          // Runway -> "right hand"/"left hand" (map)
-    public Dictionary<string, List<(string Crp, string Via)>> Entry = new();   // Runway -> entry CRPs (last = default without position), via "overhead"/"initial"
+    public Dictionary<string, List<(string Crp, string Via, (double X, double Z)? Wp)>> Entry = new();   // Runway -> entry CRPs (last = default without position), via "overhead"/"initial", Wp = knee point on the way to the initial
     public Dictionary<string, List<string>> Exit = new();                      // Runway -> exit CRPs (first = default)
+    public HashSet<string> ExitOnly = new();                                   // CRPs for departures only: never offered or accepted as entry
+    public Dictionary<(string Rw, string Crp), string> ExitNote = new();       // Hint for a departure via this CRP ("then 354 to the CRP")
+    public Dictionary<string, string> SideOf = new();                          // Runway -> side of the pattern ("south", "southwest")
+    public Dictionary<string, double> InitialNm = new();                       // Runway -> initial point before the threshold in NM
+    public HashSet<string> Backtrack = new();                                  // Runways whose holding point leads only to the middle: backtrack on the runway
+    public List<string> Notes = new();                                         // Airfield notes (English) from the chart
+    public Dictionary<string, string> StandChart = new();                      // DCS stand (Term_Index) -> stand name on the chart, only where unambiguous
+    double? ctrTopFt;
     public List<(double X, double Z, int Num, int Type)> Spots = new();   // Parking positions from DCS (Airbase:getParking): Term_Index, Term_Type (16 runway, 40 helicopter)
     public bool Charted => Crp.Count > 0;     // procedures per DCS kneeboard chart (charts/caucasus.jsonc)
     /// A100: control zone (ICAO Annex 11): with map, farthest CRP + 0.5 NM (Kutaisi about 9 NM), otherwise 5 NM; up to 3000 ft above the airfield.
     public double CtrNm => Charted ? Crp.Values.Max(p => Math.Sqrt((p.X - X) * (p.X - X) + (p.Z - Z) * (p.Z - Z))) / 1852 + 0.5 : 5;
-    public double CtrTopFt => Elev / Ft + 3000;
+    public double CtrTopFt => ctrTopFt ?? Elev / Ft + 3000;
 
     public RwyEnd End(string name) => Ends.First(e => e.Name == name);
+    /// Apron point of the chart data nearest to the position (Tower and AI radio).
+    public bool OnRunway(double x, double z, double halfWidth = 30, double beyond = 50) => Ends.Any(e =>
+    {
+        double along = (x - e.CX) * e.Dx + (z - e.CZ) * e.Dz, lat = Math.Abs((x - e.CX) * e.Dz - (z - e.CZ) * e.Dx);
+        return Math.Abs(along) < e.Len / 2 + beyond && lat < halfWidth;
+    });
+    public Ramp? RampAt(double x, double z) => Ramps.OrderBy(r => (r.X - x) * (r.X - x) + (r.Z - z) * (r.Z - z)).FirstOrDefault();
     public Dictionary<int, string> Stands = new();   // DCS stand name by Term_Index ("F125" as in the ME/kneeboard), from the hook
     /// DcsAtc-Stands.txt (DcsAtcHook.lua): "M;theatre", then "S;airdrome id;Term_Index;name". Other map = stale file, ignored.
     public static void LoadStands(IEnumerable<Airfield> fields, string file)
@@ -196,26 +214,36 @@ public class Airfield
 
     // ------------------------------------------------------------------ Kneeboard chart data (charts/caucasus.jsonc, PLATZVERFAHREN-PLAN.md)
     static JsonDocument? chart;
-    internal static JsonElement Chart => (chart ??= JsonDocument.Parse(typeof(Airfield).Assembly.GetManifestResourceStream("caucasus.jsonc")!,
+    internal static string? ChartFile;   // --charttest <file>
+    internal static JsonElement Chart => (chart ??= JsonDocument.Parse(ChartFile != null ? File.OpenRead(ChartFile) : typeof(Airfield).Assembly.GetManifestResourceStream("caucasus.jsonc")!,
         new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true })).RootElement;
 
     /// Procedures from the chart data if the airfield is in there; without entry everything stays as before (E5).
-    /// Until Etappe 3/4 arm them, only Kutaisi is applied; ChartAll (ChartTest) loads all entries.
-    public static bool ChartAll;
     public Airfield ApplyChart()
     {
-        if (Name != "Kutaisi" && !ChartAll || !Chart.TryGetProperty(Name, out var a)) return this;
+        if (!Chart.TryGetProperty(Name, out var a)) return this;
         static Dictionary<string, string> Strs(JsonElement e, string key) =>
             e.TryGetProperty(key, out var v) ? v.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString()!) : new();
         if (a.TryGetProperty("pattern_ft", out var p)) PatternFt = p.GetDouble();
         if (a.TryGetProperty("arrdep_max_ft", out var m)) MaxFt = m.GetDouble();
+        if (a.TryGetProperty("ctr_top_ft", out var ct)) ctrTopFt = ct.GetDouble();
         if (a.TryGetProperty("crp", out var crp)) foreach (var c in crp.EnumerateObject()) Crp[c.Name] = Pos(c.Value);
+        if (a.TryGetProperty("exit_only", out var eo)) ExitOnly = eo.EnumerateArray().Select(v => v.GetString()!).ToHashSet();
+        if (a.TryGetProperty("notes", out var nt)) Notes = nt.EnumerateArray().Select(v => v.GetString()!).ToList();
         if (a.TryGetProperty("rwy", out var rwy))
             foreach (var r in rwy.EnumerateObject())
             {
                 if (r.Value.TryGetProperty("hand", out var h)) HandOf[r.Name] = h.GetString() + " hand";
-                if (r.Value.TryGetProperty("entry", out var en)) Entry[r.Name] = en.EnumerateObject().Select(e => (e.Name, e.Value.GetProperty("via").GetString()!)).ToList();
-                if (r.Value.TryGetProperty("exit", out var ex)) Exit[r.Name] = ex.EnumerateObject().Select(e => e.Name).ToList();
+                if (r.Value.TryGetProperty("side", out var sd)) SideOf[r.Name] = sd.GetString()!;
+                if (r.Value.TryGetProperty("initial_nm", out var ini)) InitialNm[r.Name] = ini.GetDouble();
+                if (r.Value.TryGetProperty("backtrack", out var bt) && bt.GetBoolean()) Backtrack.Add(r.Name);
+                if (r.Value.TryGetProperty("entry", out var en))
+                    Entry[r.Name] = en.EnumerateObject().Select(e => (e.Name, e.Value.GetProperty("via").GetString()!, e.Value.TryGetProperty("wp", out var wp) ? Pos(wp) : ((double X, double Z)?)null)).ToList();
+                if (r.Value.TryGetProperty("exit", out var ex))
+                {
+                    Exit[r.Name] = ex.EnumerateObject().Select(e => e.Name).ToList();
+                    foreach (var e in ex.EnumerateObject()) if (e.Value.TryGetProperty("note", out var nn)) ExitNote[(r.Name, e.Name)] = nn.GetString()!;
+                }
             }
         if (a.TryGetProperty("ground", out var g) && g.TryGetProperty("holds", out var holds))
             foreach (var h in holds.EnumerateObject()) { var (x, z) = Pos(h.Value.GetProperty("pos")); Holds[h.Name] = (x, z, h.Value.GetProperty("rwy").EnumerateArray().Select(v => v.GetString()!).ToArray()); }
@@ -223,8 +251,13 @@ public class Airfield
             Ramps = ramps.EnumerateObject().SelectMany(r =>
             {
                 var (to, hold, vac, inb) = (Strs(r.Value, "to"), Strs(r.Value, "hold"), Strs(r.Value, "vacate"), Strs(r.Value, "in"));
-                return r.Value.GetProperty("pts").EnumerateArray().Select(q => { var (x, z) = Pos(q); return new Ramp(r.Name, x, z, to, hold, vac, inb); });
+                var (note, inNote) = (Strs(r.Value, "note"), Strs(r.Value, "in_note"));
+                return r.Value.GetProperty("pts").EnumerateArray().Select(q => { var (x, z) = Pos(q); return new Ramp(r.Name, x, z, to, hold, vac, inb, note, inNote); });
             }).ToArray();
+        // K32: chart stand name only for a single DCS stand (a range "23-43" = "1-21" does not give the order)
+        if (a.TryGetProperty("ground", out g) && g.TryGetProperty("stands", out var stands))
+            foreach (var s in stands.EnumerateArray())
+                if (s.GetProperty("dcs").GetString() is { } dn && s.GetProperty("chart").GetString() is { } cn && dn.All(char.IsAsciiDigit) && !cn.Contains('-')) StandChart[dn] = cn;
         return this;
     }
 

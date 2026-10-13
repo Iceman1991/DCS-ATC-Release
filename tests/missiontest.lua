@@ -142,6 +142,10 @@ env.mission.coalition.blue.country[1].plane.group[3] = { name = "Viper", frequen
 local cv = unit("CVN-73", 1000, 2000); cv.v = vec(10, 0); cv.air = false
 function cv:getTypeName() return "CVN_73" end
 groups["CVN"] = { cat = 3, getUnits = function() return { cv } end, getUnit = function() return cv end, getName = function() return "CVN" end, getController = function() return { getDetectedTargets = function() return {} end, setTask = function(_, k) cvTask = k end } end }
+table.insert(env.mission.coalition.blue.country[1].ship.group, { name = "CG", units = { { type = "TICONDEROG", frequency = 252500000, unitId = 502 } } })   -- Red Crown: cruiser with air search radar (R line); the carrier gets none
+local cg = unit("CG-52", 3000, 4000); cg.v = vec(5, 0); cg.air = false
+function cg:getTypeName() return "TICONDEROG" end
+groups["CG"] = { cat = 3, getUnits = function() return { cg } end, getUnit = function() return cg end, getName = function() return "CG" end, getController = function() return { getDetectedTargets = function() return {} end } end }
 
 local function run(to)   -- Advance time, run due functions (return value = next due time)
   while true do
@@ -213,6 +217,11 @@ local huey = coalition.addGroup(2, Group.Category.HELICOPTER, { name = "Huey", u
 run(T + 3); assert(("\n" .. stateFile()):find("\nT;Huey;Huey;[^\n]*;h;%d+;[^;\n]*\n") and stateFile():find("T;Hornet CV;[^\n]*;a;%d+;[^;\n]*\n"), "Kategorie fehlt in der T-Zeile: " .. stateFile())
 huey:destroy()
 assert(stateFile():find("C;CVN-73;CVN;CVN_73;1000.0;2000.0;0.0000;10.0;2;127.500;73X;11;1.0;1.0;101325;0", 1, true), "Träger-Zeile fehlt: " .. stateFile())
+do   -- Red Crown (plan E9): R line only for the cruiser (R;unit;group;type;x;z;side;freq), none for the carrier; the GCI line R;side stays a separate shape
+  local s = "\n" .. stateFile()
+  assert(s:find("\nR;CG-52;CG;TICONDEROG;3000.0;4000.0;2;252.500\n", 1, true), "R-Zeile für den Kreuzer fehlt: " .. s)
+  assert(not s:find("\nR;CVN", 1, true) and not s:find("\nR;[^\n]*CVN_73"), "R-Zeile für den Träger: " .. s)
+end
 assert(stateFile():find("T;Hornet CV;Hornet CV;FA%-18C_hornet;[^\n]*;cv;"), "KI mit Landung auf dem Träger ohne Flag cv")
 files["9-7.cmd"] = "CVTURN;CVN;0.5000;20"; run(T + 1)
 local cp = cvTask and cvTask.params.route.points
@@ -367,7 +376,7 @@ do local tr = false for _, m in ipairs(MENU) do if m.name == "Request zone trans
 do local g, tx = {}, {}   -- R390: F10 like the radio wheel – groups, wheel name for "Base, touch and go", answer entries, at most 9 per level
   for _, x in ipairs(GROUPS) do g[x.name] = true; assert(x.n <= 9, "F10 Ebene mit mehr als 9 Einträgen: " .. x.name .. " " .. x.n) end
   for _, m in ipairs(MENU) do if type(m.arg) == "table" and m.arg.text then tx[m.arg.text] = m.name end end
-  assert(g["Closed / SFO"] and g["AWACS / Tanker"] and g["AWACS"] and g["Tanker"] and g["Verkehr"] and g["Gefecht"] and g["Mehr"] and g["Range"] and g["Carrier"],
+  assert(g["Closed / SFO"] and g["AWACS / Tanker / Center"] and g["AWACS"] and g["Center"] and g["Tanker"] and g["Verkehr"] and g["Gefecht"] and g["Mehr"] and g["Range"] and g["Carrier"],
     "F10 Untergruppen (R390)")
   assert(tx["Tower: base, gear down, touch and go"] == "Base, touch and go" and not tx["Tower: final, gear down, touch and go"]
     and tx["Approach: traffic in sight"] and tx["Approach: report airspeed"] and tx["Tanker: visual"] and tx["Tanker: refuel complete"]
@@ -488,6 +497,25 @@ local near, far = rate(1000, 3000), rate(1000, 2000 + 5 * 1852)
 p1.air = false; local deck = rate(1000, 2100)
 io.open = ro
 assert(near >= 7 and far <= 4 and deck <= 4, "Zustand am Träger (R27): nah " .. near .. ", weit " .. far .. ", Deck " .. deck)
+do   -- Strike / Red Crown: F10 group in Carrier; Red Crown entries only with a cruiser / destroyer in the mission
+  local blue, ship0 = env.mission.coalition.blue.country[1], env.mission.coalition.blue.country[1].ship
+  local function menu(sh)
+    blue.ship = sh
+    for i = #queue, 1, -1 do queue[i] = nil end
+    for i = #handlers, 1, -1 do handlers[i] = nil end
+    DCSATC, DCSATC_SPAWNTEST, DCSATC_OPTIONS, MENU, GROUPS = nil, nil, { crew = true }, {}, {}
+    dofile(arg[1])
+    run(T + 3)
+    local n = {} for _, m in ipairs(MENU) do n[#n + 1] = type(m.arg) == "table" and m.arg.text or "" end
+    for _, x in ipairs(GROUPS) do assert(x.n <= 9, "F10 Ebene mit mehr als 9 Einträgen: " .. x.name .. " " .. x.n) end
+    return "|" .. table.concat(n, "|") .. "|"
+  end
+  local both, cvOnly = menu(ship0), menu({ group = { ship0.group[1] } })
+  assert(both:find("|Carrier: Strike, checking in|", 1, true) and both:find("|Carrier: Strike, checking out|", 1, true) and both:find("|Carrier: Red Crown, checking in|", 1, true)
+         and both:find("|Carrier: Red Crown, checking out|", 1, true), "F10 Strike / Red Crown mit Kreuzer: " .. both)
+  assert(cvOnly:find("|Carrier: Strike, checking in|", 1, true) and not cvOnly:find("Red Crown", 1, true), "F10 Red Crown ohne Kreuzer: " .. cvOnly)
+  blue.ship = ship0
+end
 do   -- R390: trigger zone "Range…" in the mission -> F10 group Range (like the radio wheel), without carrier no group Carrier
   local blue, zones = env.mission.coalition.blue.country[1], env.mission.triggers
   env.mission.triggers, blue.ship = nil, nil
@@ -516,6 +544,26 @@ do
   local s = "|" .. table.concat(n, "|") .. "|"
   assert(s:find("|Request taxi|", 1, true) and s:find("|Radio check|", 1, true) and s:find("|Spritmangel|", 1, true) and not s:find("AWACS", 1, true)
          and not s:find("Tanker", 1, true) and not s:find("|Picture|", 1, true) and not s:find("|Visual|", 1, true) and not s:find("Bodenpersonal", 1, true) and DCSATC.opt.crew == false, "Module F10: " .. s)
+end
+-- Center: F10 group "Center" (module center; not on Normandy / The Channel): there by default, gone without the module and on Normandy
+do
+  local function menu(mods, theatre)
+    local io0, th = io.open, env.mission.theatre
+    io.open = function(p, m) if p:find("DcsAtcModules%.txt$") then return mods and { read = function() return mods end, close = function() end } or nil end return io0(p, m) end
+    env.mission.theatre, lfs.writedir = theatre, function() return tmp .. "\\" end
+    for i = #queue, 1, -1 do queue[i] = nil end
+    for i = #handlers, 1, -1 do handlers[i] = nil end
+    DCSATC, DCSATC_SPAWNTEST, DCSATC_OPTIONS, MENU = nil, nil, { crew = true }, {}
+    dofile(arg[1])
+    run(T + 3)
+    io.open, lfs.writedir, env.mission.theatre = io0, nil, th
+    local n = {} for _, m in ipairs(MENU) do n[#n + 1] = m.name end
+    return "|" .. table.concat(n, "|") .. "|"
+  end
+  local on, off, nrm = menu(nil, "Caucasus"), menu("core,atc,m3", "Caucasus"), menu(nil, "Normandy")
+  assert(on:find("|Request altitude|", 1, true) and on:find("|Leaving frequency|", 1, true) and not off:find("|Leaving frequency|", 1, true) and not nrm:find("|Leaving frequency|", 1, true),
+         "Center F10: an=" .. on .. " aus=" .. off .. " Normandy=" .. nrm)
+  assert(menu("core,atc,center,m3", "Caucasus"):find("|Leaving frequency|", 1, true), "Center F10: Modul center mit m3")
 end
 do   -- fog off in the ME (fog2.mode 1 / older missions without enable_fog): leftover fog values do not count; TP7: tanker radio as F line with "t"
   local pl, w = env.mission.coalition.blue.country[1].plane.group, env.mission.weather

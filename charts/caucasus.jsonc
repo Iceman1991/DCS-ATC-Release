@@ -4,7 +4,8 @@
 // ground.ramps.<Vorfeld>.in: "*" = für jede Landebahn.
 {
   "Kutaisi": {
-    "pattern_ft": 2000, "arrdep_max_ft": 2200,
+    "icao": "UGKO",
+    "pattern_ft": 2000, "arrdep_max_ft": 2200, "ctr_top_ft": 2700,
     "crp": {
       "north": "42°15.924'N 042°30.086'E",
       "south": "42°06.277'N 042°31.824'E",
@@ -13,12 +14,16 @@
     },
     "rwy": {
       "07": {
-        "hand": "right",
+        "chart": "07", "hand": "right", "side": "south",
+        "initial_nm": 2.3,   // gemessen: INITIAL 07 bis Schwelle 4.3 km (VAD P2, 50.8 px/km); ±0.1 (VAD verzerrt)
+        // north überfliegt das Feld (178, via overhead); west nur Einflug für 07, east nur Ausflug
         "entry": { "north": { "crs": 178, "via": "overhead" }, "south": { "crs": 272, "via": "initial" }, "west": { "crs": 54, "via": "initial" } },
         "exit": { "east": { "crs": 64 }, "north": { "crs": 336 }, "south": { "crs": 166 } }
       },
       "25": {
-        "hand": "left",
+        "chart": "25", "hand": "left", "side": "south",
+        "initial_nm": 2.3,   // gemessen: INITIAL 25 bis Schwelle 4.3 km, siehe 07
+        // east nur Einflug für 25, west nur Ausflug
         "entry": { "north": { "crs": 178, "via": "overhead" }, "south": { "crs": 26, "via": "initial" }, "east": { "crs": 244, "via": "initial" } },
         "exit": { "west": { "crs": 234 }, "north": { "crs": 20 }, "south": { "crs": 116 } }
       }
@@ -30,31 +35,56 @@
       },
       "ramps": {
         "Ramp North": {
-          "pts": [[-284246.6, 683966.5], [-284870.8, 682749.8]],
+          "pts": [[-284246.6, 683966.5], [-284870.8, 682749.8], [-284068.8, 685092.7]],   // gemessen: DCS-Stände 14-20, 23-34, 41-50 / 8-13, 35-40 / 4-7, 21, 22, 51, 52
           "to": { "07": "November, Alpha", "25": "November, Delta" },
           "vacate": { "07": "left via Charlie or Delta", "25": "right via Alpha or Bravo" },
           "in": { "*": "November" }
         },
         "Ramp West": {
-          "pts": [[-284527.8, 682377.9]],
-          "to": { "07": "Alpha", "25": "November, Delta" },
+          "pts": [[-284527.8, 682377.9]],   // gemessen: DCS-Stände 0-3
+          "to": { "07": "Alpha", "25": "Alpha, November, Delta" },
           "vacate": { "07": "left via Charlie or Delta", "25": "right via Alpha or Bravo" },
-          "in": { "*": "November" }
+          "in": { "07": "November, Alpha", "25": "Alpha" }
         },
         "Ramp South": {
-          "pts": [[-285894.4, 683024.9]],
+          "pts": [[-285894.4, 683024.9]],   // gemessen: DCS-Stände 55-59 (W17-W21 an Whiskey südlich des gedruckten Vorfelds)
           "to": { "07": "Whiskey", "25": "Whiskey, Sierra, Echo" },
           "vacate": { "07": "right via Echo", "25": "left via Whiskey" },
-          "in": { "07": "Sierra" }
+          "in": { "07": "Sierra", "25": "Whiskey" }
         },
-        "Ramp East": {
+        "Ramp East": {   // keine DCS-Stände
           "pts": [[-284727.6, 685163.4]],
-          "to": { "07": "Echo, Sierra, Whiskey", "25": "Echo" },
+          "to": { "07": "Sierra, Whiskey", "25": "Echo" },
           "vacate": { "07": "right via Echo", "25": "left via Whiskey" },
-          "in": { "25": "Sierra" }
+          "in": { "07": "Echo", "25": "Sierra" }
         }
-      }
-    }
+      },
+      "stands": [
+        { "dcs": "8", "chart": "N22" }, { "dcs": "35", "chart": "N23" }, { "dcs": "9", "chart": "N24" }, { "dcs": "36", "chart": "N25" },
+        { "dcs": "10", "chart": "N26" }, { "dcs": "37", "chart": "N27" }, { "dcs": "11", "chart": "N28" }, { "dcs": "38", "chart": "N29" },
+        { "dcs": "12", "chart": "N30" }, { "dcs": "39", "chart": "N31" }, { "dcs": "13", "chart": "N32" }, { "dcs": "40", "chart": "N33" },
+        { "dcs": "41", "chart": "N34" }, { "dcs": "42", "chart": "N35" }, { "dcs": "43", "chart": "N36" }, { "dcs": "14", "chart": "N37" },
+        { "dcs": "44", "chart": "N38" }, { "dcs": "15", "chart": "N39" }, { "dcs": "45", "chart": "N40" }, { "dcs": "16", "chart": "N41" },
+        { "dcs": "46", "chart": "N42" }, { "dcs": "17", "chart": "N43" }, { "dcs": "47", "chart": "N44" }, { "dcs": "18", "chart": "N45" },
+        { "dcs": "48", "chart": "N46" }, { "dcs": "19", "chart": "N47" }, { "dcs": "49", "chart": "N48" }, { "dcs": "20", "chart": "N49" },
+        { "dcs": "50", "chart": "N50" }, { "dcs": "21", "chart": "N51" }, { "dcs": "51", "chart": "N52" }, { "dcs": "22", "chart": "N53" },
+        { "dcs": "52", "chart": "N54" }, { "dcs": "5", "chart": "N55" }, { "dcs": "6", "chart": "N56" }, { "dcs": "4", "chart": "N57" },
+        { "dcs": "7", "chart": "N58" },
+        { "dcs": "57", "chart": "W17" }, { "dcs": "58", "chart": "W18" }, { "dcs": "55", "chart": "W19" }, { "dcs": "56", "chart": "W20" },
+        { "dcs": "59", "chart": "W21" },
+        { "dcs": "23-34", "chart": "1-12" },   // unsicher: Karte druckt am Vorfeld Ramp North nur den Bereich 1-12, Reihenfolge nicht erkennbar
+        { "dcs": "0-3", "chart": "13-16" }   // unsicher: Karte druckt am Vorfeld Ramp West nur den Bereich 13-16, Reihenfolge nicht erkennbar
+      ]
+    },
+    "notes": [
+      "No holding position at the runway ends: taxiways A and D pass the runway 07 and 25 ends, B is about 540 m from the runway 07 end, C about 560 m from the runway 25 end",
+      "Taxiway W passes the runway 07 end and continues south to the W stands, S runs south of the runway, E passes the runway 25 end",
+      "Closed (X): taxiway spurs near the Fire Station, the Tower, stands N49-N51 and N56-N58, and south of S towards the Cargo Store and the Fuel Depot",
+      "Maintenance Area (R, Fire Station, Tower, Cargo Store, Fuel Depot) has no DCS parking; RAMP EAST has no DCS stands",
+      "DCS stands 53 and 54 are the runway-end start positions and have no chart label",
+      "Landing instructions at least 2 minutes before the ENTRY CRP; avoid overflying densely populated areas",
+      "DCS runway is 2419 m, the chart shows 2500 m"
+    ]
   },
   "Batumi": {
     "icao": "UGSB",
@@ -67,7 +97,7 @@
     "rwy": {
       "13": {
         "chart": "12", "hand": "right", "side": "southwest",
-        "initial_nm": 2.3,   // gemessen: INITIAL 12 bis INITIAL 30 5.95 NM, Bahn 1.32 NM; Aufteilung unsicher ±0.1 (VAD verzerrt)
+        "initial_nm": 2.4,   // 2.3 gemessen ab gedruckter Schwelle, DCS-Schwelle 148 m weiter innen: +0.08; INITIAL 12 bis INITIAL 30 5.95 NM, Bahn 1.32 NM; Aufteilung unsicher ±0.1 (VAD verzerrt)
         // unsicher: Standard north (238 dreht insgesamt weniger auf 119 ein als 325); east nur Einflug für 30
         "entry": { "south": { "crs": 325, "via": "initial" }, "north": { "crs": 238, "via": "initial" } },
         "exit": { "east": { "crs": 112 }, "south": { "crs": 236 }, "north": { "crs": 60, "note": "then 354 to the CRP" } },
@@ -75,7 +105,7 @@
       },
       "31": {
         "chart": "30", "hand": "left", "side": "southwest",
-        "initial_nm": 2.3,   // gemessen, siehe 13
+        "initial_nm": 2.4,   // 2.3 gemessen ab gedruckter Schwelle, DCS-Schwelle 230 m weiter innen: +0.12 (siehe 13)
         "entry": { "north": { "crs": 174, "via": "initial" }, "south": { "crs": 77, "via": "initial" }, "east": { "crs": 292, "via": "initial" } },
         "exit": { "north": { "crs": 41 }, "south": { "crs": 171 } }   // kein Ausflug east gedruckt; Anschluss der 171 an die Bahn nicht gezeichnet
       }
@@ -91,7 +121,9 @@
           "to": { "31": "Delta", "13": "Whiskey, Alpha" },   // Alpha = nächster Zugang zum NW-Ende, dann backtrack
           "hold": { "31": "Delta" },
           "vacate": { "31": "right via Bravo or Alpha", "13": "left via Bravo or Alpha" },   // nach Lage gewählt, nicht gedruckt
-          "in": { "*": "Whiskey" }
+          "in": { "*": "Whiskey" },
+          "note": { "13": "Stop bars W1 and W2 on Whiskey, hold at the stop bar until cleared to cross." },   // K35: Hinweis, keine Querungslogik
+          "in_note": { "*": "Stop bars W1 and W2 on Whiskey, hold at the stop bar until cleared to cross." }
         }
       },
       "stands": [{ "dcs": "2-11", "chart": "1-10" }]   // unsicher: Karte druckt nur den Bereich P 1-10
@@ -179,6 +211,1265 @@
       "Closed (X): taxiway E northeast of the runway 25 end, access from APRON SOUTH to the Fuel Depot, spur to the building at stand N40",
       "Maintenance Area (taxiway P, Fire Station, Cargo Store) has no DCS parking",
       "DCS runway is 2258 m, the chart shows 2400 m"
+    ]
+  },
+  "Senaki-Kolkhi": {
+    "icao": "UGKS",
+    "pattern_ft": 1600, "arrdep_max_ft": 2100, "ctr_top_ft": 2600,
+    "crp": {
+      "zeni":       "42°18.904'N 041°54.707'E",
+      "nosiri":     "42°16.986'N 042°08.669'E",
+      "ketilari":   "42°09.853'N 042°10.212'E",   // Karte: Kasten nennt "River Ketilari", Kartenbeschriftung "Ketilari"
+      "river west": "42°11.486'N 041°55.316'E"
+    },
+    "rwy": {
+      "09": {
+        "chart": "09", "hand": "right", "side": "south",
+        "initial_nm": 1.7,   // gemessen: INITIAL 09 bis INITIAL 27 4.72 NM (166.7 px bei 35.3 px/NM), Bahn 1.26 NM (PSN THR); ±0.1 (VAD verzerrt)
+        // Standard zeni (127 dreht 39° auf 088, river west 022 dreht 66°)
+        "entry": { "river west": { "crs": 22, "via": "initial" }, "zeni": { "crs": 127, "via": "initial" } },
+        "exit": { "ketilari": { "crs": 123 }, "nosiri": { "crs": 16 } }
+      },
+      "27": {
+        "chart": "27", "hand": "left", "side": "south",
+        "initial_nm": 1.7,   // gemessen, siehe 09
+        // Standard ketilari (316 dreht 48° auf 268, nosiri 196 dreht 72°)
+        "entry": { "nosiri": { "crs": 196, "via": "initial" }, "ketilari": { "crs": 316, "via": "initial" } },
+        "exit": { "zeni": { "crs": 307 }, "river west": { "crs": 202 } }
+      }
+    },
+    "ground": {
+      "holds": {
+        "Charlie": { "pos": "42°14.453'N 042°03.088'E", "rwy": ["27"] },   // P1, 830 m vom Ostende (Zwischenstart)
+        "Delta": { "pos": "42°14.404'N 042°03.419'E", "rwy": ["27"] }   // P2, 380 m vom Ostende (Zwischenstart)
+      },
+      "ramps": {
+        "RAMP 1": {   // Stände 1-5 (gepunktete Linie), 14-30 an TWY B; Kartenstände 1-5 nur als Bereich
+          "pts": [[-281518.3, 646459.5], [-281211.8, 646783.6], [-281342.7, 646889.4]],   // gemessen: DCS-Stände 2-6 und 14, 7-13, 22-30
+          "to": { "09": "November, Alpha", "27": "November, Charlie" },
+          "hold": { "27": "Charlie" },
+          "vacate": { "09": "left via Charlie or Delta", "27": "right via Charlie or Bravo" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "09": "Charlie, November", "27": "Bravo" }
+        },
+        "West Stands": {   // Name nicht gedruckt (Dispersal an TWY F, F1, G; Kartenstände 7-13)
+          "pts": [[-281283.6, 646230.6]],   // gemessen: DCS-Stände 15-21
+          "to": { "09": "Alpha", "27": "November, Charlie" },   // F/F1/G im Dispersal nicht im Einzelnen gelesen
+          "hold": { "27": "Charlie" },
+          "vacate": { "09": "left via Charlie or Delta", "27": "right via Charlie or Bravo" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "09": "Charlie, November", "27": "Bravo, November" }
+        },
+        "Center Stands": {   // Name nicht gedruckt (Stände 31-47 an TWY C)
+          "pts": [[-281187.7, 647201.2], [-281354.0, 647408.8]],   // gemessen: DCS-Stände 31-39 und 40-49
+          "to": { "09": "November, Alpha", "27": "November, Charlie" },
+          "hold": { "27": "Charlie" },
+          "vacate": { "09": "left via Charlie or Delta", "27": "right via Charlie or Bravo" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Charlie" }
+        },
+        "East Stands": {   // Name nicht gedruckt (Stände 48-56 an TWY N zwischen C und D)
+          "pts": [[-281536.8, 647771.0]],   // gemessen: DCS-Stände 50-58
+          "to": { "09": "November, Alpha", "27": "November, Delta" },
+          "hold": { "27": "Delta" },
+          "vacate": { "09": "left via Charlie or Delta", "27": "right via Charlie or Bravo" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "November" }
+        },
+        "RAMP 2": {   // Kartenstände 58-61; DCS-Stände 60-66 ohne Kartengegenstück
+          "pts": [[-281589.5, 648107.8]],   // gemessen: DCS-Stände 59-69
+          "to": { "09": "November, Alpha", "27": "Delta" },
+          "hold": { "27": "Delta" },
+          "vacate": { "09": "left via Charlie or Delta", "27": "right via Charlie or Bravo" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "09": "Delta", "27": "Charlie, November" }
+        }
+      },
+      // gemessen: DCS-Stände mit Ähnlichkeitsabbildung (58 Paare) auf die Parkkarte projiziert, Abstand zum Kartenstand unter 5 px (25 m); Kartennummern laufen gegen die DCS-Nummern
+      // weggelassen: DCS 2-6 (Karte 1-5, Reihenfolge entlang der Linie nicht lesbar), 8/9/11/42 und 60-66 (kein Kartenstand gelesen), 13 und 47 (Karte druckt "21" zweimal, kein "37")
+      "stands": [
+        { "dcs": "7", "chart": "14" }, { "dcs": "10", "chart": "18" }, { "dcs": "12", "chart": "20" }, { "dcs": "14", "chart": "6" },
+        { "dcs": "15", "chart": "7" }, { "dcs": "16", "chart": "8" }, { "dcs": "17", "chart": "9" }, { "dcs": "18", "chart": "10" },
+        { "dcs": "19", "chart": "11" }, { "dcs": "20", "chart": "12" }, { "dcs": "21", "chart": "13" }, { "dcs": "22", "chart": "16" },
+        { "dcs": "23", "chart": "29" }, { "dcs": "24", "chart": "30" }, { "dcs": "25", "chart": "28" }, { "dcs": "26", "chart": "27" },
+        { "dcs": "27", "chart": "26" }, { "dcs": "28", "chart": "25" }, { "dcs": "29", "chart": "24" }, { "dcs": "30", "chart": "23" },
+        { "dcs": "31", "chart": "22" }, { "dcs": "32", "chart": "44" }, { "dcs": "33", "chart": "43" }, { "dcs": "34", "chart": "45" },
+        { "dcs": "35", "chart": "46" }, { "dcs": "36", "chart": "47" }, { "dcs": "37", "chart": "41" }, { "dcs": "38", "chart": "42" },
+        { "dcs": "39", "chart": "40" }, { "dcs": "40", "chart": "39" }, { "dcs": "41", "chart": "34" }, { "dcs": "43", "chart": "32" },
+        { "dcs": "44", "chart": "31" }, { "dcs": "45", "chart": "33" }, { "dcs": "46", "chart": "38" }, { "dcs": "48", "chart": "36" },
+        { "dcs": "49", "chart": "35" }, { "dcs": "50", "chart": "48" }, { "dcs": "51", "chart": "49" }, { "dcs": "52", "chart": "50" },
+        { "dcs": "53", "chart": "51" }, { "dcs": "54", "chart": "54" }, { "dcs": "55", "chart": "52" }, { "dcs": "56", "chart": "55" },
+        { "dcs": "57", "chart": "53" }, { "dcs": "58", "chart": "56" }, { "dcs": "59", "chart": "58" }, { "dcs": "67", "chart": "59" },
+        { "dcs": "68", "chart": "60" }, { "dcs": "69", "chart": "61" }
+      ]
+    },
+    "notes": [
+      "No holding position at the runway ends: runway 27 is entered at the end via N, runway 09 at the threshold via A; C and D are intersection holds about 830 m and 380 m from the runway 27 end",
+      "Taxiway A links the runway 09 threshold with the west dispersal and the tower; taxiway N starts at the A/F junction and runs along the north side to the runway 27 end",
+      "Departures runway 09 from the central and east aprons taxi the whole of N and A (no other taxiway reaches the 09 threshold)",
+      "Closed (X): sections of taxiway A northeast of the dispersal and the connector between A and the dispersal north of Ramp 1",
+      "Intersection B/N (P3, 42°14.674'N 042°02.464'E) is not a holding position and lies about 490 m from the runway",
+      "Parking numbers on the chart run against the DCS numbers; chart stand 57 is only an outline, DCS stands 60-66 have no chart stand",
+      "DCS runway is 2212 m, the chart shows 2375 m"
+    ]
+  },
+  "Sukhumi-Babushara": {
+    "icao": "UGSS",
+    "pattern_ft": 1500, "arrdep_max_ft": 2000, "ctr_top_ft": 2500,   // CTR D(HX) 2500/GND, laut Legende nicht ständig aktiv
+    "crp": {
+      "sukhumi": "42°58.838'N 040°58.141'E",
+      "north":   "42°55.361'N 041°10.726'E",
+      "east":    "42°48.158'N 041°16.693'E",
+      "south":   "42°47.184'N 041°09.761'E"
+    },
+    "rwy": {
+      "12": {
+        "chart": "11", "hand": "right", "side": "south",
+        "initial_nm": 2.5,   // gemessen: INITIAL 11 bis Schwelle 11 2.48 NM (VAD 1:200000, affine Anpassung an die 4 CRPs, Restfehler unter 100 m), über die gezeichnete Bahn 2.45; ±0.1
+        // Standard sukhumi (131 dreht nur 21° auf 110); north 200 kreuzt die Bahn und gabelt bei Babushara, Gegenanflug südlich westwärts
+        "entry": { "north": { "crs": 200, "via": "overhead" }, "sukhumi": { "crs": 131, "via": "initial" } },
+        // unsicher: 169 south beginnt südlich des Ostendes, Zuordnung zur Bahn aus der Lage
+        "exit": { "east": { "crs": 102 }, "north": { "crs": 348 }, "south": { "crs": 169 } }
+      },
+      "30": {
+        "chart": "29", "hand": "left", "side": "south",
+        "initial_nm": 2.4,   // gemessen, siehe 12 (INITIAL 29 bis Schwelle 29 2.41 NM, über die gezeichnete Bahn 2.43)
+        // Standard east (282 dreht nur 8° auf 290); south 059 läuft als großer Linksbogen, wp = gemessener Scheitel des Bogens (±0.1 NM)
+        "entry": {
+          "north": { "crs": 200, "via": "overhead" },
+          "south": { "crs": 59, "via": "initial", "wp": "42°48.457'N 041°12.358'E" },
+          "east": { "crs": 282, "via": "initial" }
+        },
+        // unsicher: 129 south beginnt am westlichen Platzrundenbogen südwestlich der Schwelle 11, Zuordnung zur Bahn aus der Lage
+        "exit": { "sukhumi": { "crs": 311, "note": "290 until INITIAL 11, then 311" }, "north": { "crs": 55 }, "south": { "crs": 129 } }
+      }
+    },
+    "ground": {
+      "holds": {
+        "Alpha": { "pos": "42°52.230'N 041°06.358'E", "rwy": ["12"] },
+        "Charlie": { "pos": "42°51.655'N 041°07.600'E", "rwy": ["12", "30"] },   // Zwischenstart
+        "Delta": { "pos": "42°51.494'N 041°07.957'E", "rwy": ["12", "30"] }   // Zwischenstart
+      },
+      "ramps": {
+        "APRON 3": {
+          "pts": [[-219907.3, 563577.2]],   // gemessen: DCS-Stände 2-4
+          "to": { "12": "November, Alpha", "30": "November" },
+          "hold": { "12": "Alpha" },
+          "vacate": { "12": "left via Charlie or Delta", "30": "right via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "November" }
+        },
+        "APRON 1": {
+          "pts": [[-219735.7, 563807.9], [-219774.4, 564068.9]],   // gemessen: DCS-Stände 5-8 und 9-13, 19 (Grenze zu APRON 2 nicht gedruckt)
+          "to": { "12": "November, Alpha", "30": "November" },
+          "hold": { "12": "Alpha" },
+          "vacate": { "12": "left via Charlie or Delta", "30": "right via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "November" }
+        },
+        "APRON 2": {
+          "pts": [[-219730.2, 564241.0], [-219807.2, 564249.4]],   // gemessen: DCS-Stände 14-18 und 20-24
+          "to": { "12": "November, Alpha", "30": "November" },
+          "hold": { "12": "Alpha" },
+          "vacate": { "12": "left via Charlie or Delta", "30": "right via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "November" }
+        }
+      }
+    },
+    "notes": [
+      "Taxiway N runs north of the runway from A at the runway 11 end past APRON 3, 1 and 2 to the runway 29 end; B, C and D join the runway from N",
+      "Taxiway A leads to the runway 11 threshold (holding position A), N to the runway 29 threshold: no backtrack needed; C and D are intersection departures",
+      "Holding positions printed: A, C, D (P1, P3, P4); P2 is only the intersection N/B, B has no holding position at the runway",
+      "X (closed) on the access road north of APRON 1 and on taxiway N where a road joins it near the runway 29 end: the legend does not say what is closed",
+      "RAMP 1 (via Y, long ramp north of the runway) and the grass areas have no DCS parking",
+      "DCS runway is 3419 m, the chart shows 3540 m; only one frequency is printed (Tower 129.000), no Ground, ATIS or Approach"
+    ]
+  },
+  "Gudauta": {
+    "icao": "UG23",
+    "pattern_ft": 1600, "arrdep_max_ft": 2100,   // unsicher: Kästchen 1600 unbeschriftet, als Platzrundenhöhe gedeutet
+    "ctr_top_ft": 2600,   // Kasten "D (HX) 2600 / GND", CTR nicht dauernd aktiv
+    "crp": {
+      "west":  "43°08.758'N 040°20.657'E",
+      "north": "43°12.483'N 040°30.255'E",
+      "east":  "43°06.168'N 040°41.538'E"
+    },
+    "rwy": {
+      "15": {
+        "chart": "15", "hand": "left", "side": "northeast",   // Platzrunde auf der Landseite NE (Gegenanflug 325)
+        "initial_nm": 2.6,   // gemessen: INITIAL 15 bis gezeichnete Schwelle 2.64 NM (Maßstab aus Bahnlänge 2500 m); ±0.1 (VAD verzerrt)
+        // Standard north (135 dreht nur 10° auf INITIAL 15 ein); east (304) läuft in einer 180°-Schleife nördlich der Bahn ein; kein Knickpunkt gedruckt
+        "entry": { "east": { "crs": 304, "via": "initial" }, "west": { "crs": 64, "via": "initial" }, "north": { "crs": 135, "via": "initial" } },
+        "exit": { "east": { "crs": 35, "note": "straight 145 past INITIAL 33, then left" }, "west": { "crs": 285 } }   // kein Ausflug north gedruckt
+      },
+      "33": {
+        "chart": "33", "hand": "right", "side": "northeast",   // Rechtsplatzrunde bestätigt: Gegenanflug 145 auf der Landseite NE, nicht über dem Meer
+        "initial_nm": 2.0,   // gemessen: INITIAL 33 bis gezeichnete Schwelle 1.95 NM; ±0.1 (VAD verzerrt)
+        // Standard east (215 Rechtsbogen); kein Einflug north gedruckt
+        "entry": { "west": { "crs": 113, "via": "initial" }, "east": { "crs": 215, "via": "initial" } },
+        "exit": { "north": { "crs": 315, "note": "straight 325 past INITIAL 15, then left" }, "west": { "crs": 262 }, "east": { "crs": 111 } }
+      }
+    },
+    "ground": {
+      "holds": {
+        "Delta": { "pos": "43°07.181'N 040°34.031'E", "rwy": ["15"] },   // 564 m vom NW-Ende (Zwischenstart), Ostrand der Bahn an C/D, nur über C erreichbar
+        "Echo": { "pos": "43°06.250'N 040°34.509'E", "rwy": ["33"] }   // an der Schwelle 33
+      },
+      "ramps": {
+        "APRON 1": {
+          "pts": [[-197710.6, 516349.0], [-197838.5, 516620.3]],   // gemessen: DCS-Stände 21-24,32 und 25-29
+          "to": { "33": "Alpha, Echo", "15": "Alpha" },   // Alpha reicht bis zur Schwelle 15, kein Rollhalt dort gedruckt
+          "hold": { "33": "Echo" },
+          "vacate": { "15": "right via Charlie or Echo", "33": "left via Charlie or Bravo" },   // nach Lage gewählt, nicht gedruckt; B und C liegen in den ersten 600 m ab Schwelle 15, nur E am Ende 33
+          "in": { "*": "Alpha" }
+        },
+        "Shelters": {   // Name aus dem Inset "Parking Positions Shelters next TWY X"
+          "pts": [[-196533.8, 515563.0], [-196685.8, 515716.2], [-196483.3, 515798.1]],   // gemessen: DCS-Stände 0-5, 12-17 und 6-11,18-20
+          "to": { "33": "X-ray, Alpha, Echo", "15": "X-ray, Alpha" },
+          "hold": { "33": "Echo" },
+          "vacate": { "15": "right via Charlie or Echo", "33": "left via Charlie or Bravo" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Alpha, X-ray" }
+        }
+      }
+    },
+    "notes": [
+      "Taxiway A runs west of the runway from the runway 15 threshold past X (shelters) to APRON 1 and on to E at the runway 33 threshold; W is a second parallel taxiway from C to E",
+      "Only B and C/D (within about 600 m of the runway 15 end) and E at the runway 33 end join the runway: landings on 15 roll out to E",
+      "Taxiway C crosses the runway to D and APRON 2 on the east side (no DCS parking); holding position D is at the east runway edge",
+      "No printed holding position at the runway 15 threshold: taxiway A leads to it. Closed: west end of taxiway X and the access at the tower; Z is a road",
+      "Landing instructions shall be requested at the latest 2 minutes before the entry CRP; avoid overflying densely populated areas",
+      "No ILS or TACAN: PAR DA 269 ft, SRA MDA 419 ft; DCS runway is 2390 m, the chart shows 2500 m"
+    ]
+  },
+  "Sochi-Adler": {
+    "icao": "URSS",
+    "pattern_ft": 1600, "arrdep_max_ft": 2100, "ctr_top_ft": 2600,
+    "crp": {
+      "west":  "43°29.704'N 039°52.924'E",
+      "north": "43°31.527'N 039°59.757'E",
+      "east":  "43°23.262'N 040°00.405'E"
+    },
+    // Karte 02/20 hat kein DCS-Gegenstück (airfields.txt nur 06/24): weggelassen, ebenso die zugehörigen VAD-Einflüge/-Ausflüge (VAD 2/2)
+    "rwy": {
+      "06": {
+        "chart": "06", "hand": "right", "side": "southeast",
+        "initial_nm": 1.7,   // gemessen: INITIAL-Dreieck bis gezeichnete Schwelle 1.6-1.8 NM (Maßstab aus den drei CRP-Dreiecken, 51 m/px); ±0.2 (VAD verzerrt, gezeichnete Bahn liegt ca. 0.3 NM versetzt zum CRP-Netz)
+        // Standard west (189 mündet ohne Knick in INITIAL); east 261 läuft westwärts und dreht in einem Bogen nach NNO ein
+        "entry": { "east": { "crs": 261, "via": "initial", "wp": "43°23.642'N 039°52.553'E" }, "west": { "crs": 189, "via": "initial" } },   // wp gemessen: Bogenmitte des Einflugs East, ±0.3 NM
+        "exit": { "west": { "crs": 274 }, "east": { "crs": 156, "note": "not for HIRTA sensitive aircraft" } }   // Ausflug north ohne Kursangabe gedruckt: weggelassen
+      },
+      "24": {
+        "chart": "24", "hand": "left", "side": "southeast",
+        "initial_nm": 1.8,   // gemessen: INITIAL-Dreieck bis gezeichnete Schwelle 1.78-1.79 NM, siehe 06; ±0.2
+        // Standard north (147 mündet ohne Knick in INITIAL); east 003 nicht für HIRTA-empfindliche Luftfahrzeuge (Kartenhinweis 3), läuft nordwärts und dreht in einem Bogen nach W ein
+        "entry": { "east": { "crs": 3, "via": "initial", "wp": "43°27.640'N 040°01.642'E" }, "north": { "crs": 147, "via": "initial" } },   // wp gemessen: Bogenmitte des Einflugs East, ±0.3 NM
+        "exit": { "west": { "crs": 339 } }   // Ausflug east entlang der Küste ohne Kursangabe gedruckt: weggelassen
+      }
+    },
+    "ground": {
+      "holds": {
+        "Bravo": { "pos": "43°26.427'N 039°55.624'E", "rwy": ["06"] },   // P1, ca. 290 m hinter der Schwelle 06 (Zwischenstart)
+        "Delta": { "pos": "43°26.610'N 039°56.207'E", "rwy": ["06"] },   // P2, ca. 1150 m hinter der Schwelle 06 (Zwischenstart)
+        "India": { "pos": "43°26.926'N 039°57.216'E", "rwy": ["24"] },   // P3, ca. 460 m vor dem Ende 24 (Zwischenstart)
+        "Juliet": { "pos": "43°26.849'N 039°57.503'E", "rwy": ["24"] }   // P4 "Shelters TWY J", Seite der Shelter, ca. 220 m südöstlich der Bahn, ca. 170 m vor dem Ende 24
+      },
+      "ramps": {
+        "APRON 2": {
+          "pts": [[-164974.8, 460872.9], [-164918.2, 460979.9], [-164862.2, 461086.0]],   // gemessen: DCS-Stände 15-20, 21-26, 27-32 (Karte: Stände 1-18)
+          "to": { "06": "Mike, Alpha", "24": "Mike, India" },
+          "hold": { "24": "India" },
+          "vacate": { "06": "left via Charlie or Delta", "24": "right via Golf or Foxtrot" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Mike" }
+        },
+        "APRON 1": {
+          "pts": [[-164410.8, 461894.5], [-164168.2, 462349.3], [-163956.2, 462746.4]],   // gemessen: DCS-Stände 33-37 und 46-48, 38-42 und 49-51, 43-45 und 52-55 (Karte: Stände 19-41)
+          "to": { "06": "Mike, Alpha", "24": "Mike, India" },
+          "hold": { "24": "India" },
+          "vacate": { "06": "left via Charlie or Delta", "24": "right via Golf or Foxtrot" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Mike" }
+        },
+        "SHELTERS": {
+          "pts": [[-164678.6, 463116.1], [-164388.7, 463286.2], [-164099.3, 463455.9]],   // gemessen: DCS-Stände 3,6-7,9-13,57 / 0-2,4-5,8,59-60,64 / 58,61-63,65-69 (Karte: Stände 42-68), südöstlich der Bahn
+          "to": { "06": "Juliet, cross the runway, Mike, Alpha", "24": "Juliet" },   // Shelter nur über J erreichbar: nach 06 muss die Bahn 06/24 an J gekreuzt werden
+          "hold": { "24": "Juliet" },
+          "vacate": { "06": "left via Charlie or Delta", "24": "right via Golf or Foxtrot" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Mike, Juliet, cross the runway" },
+          "note": { "06": "Hold short of the runway at Juliet, cross only when cleared." },   // Shelter nur ueber J, Querung der Bahn 06/24
+          "in_note": { "*": "Hold short of the runway at Juliet, cross only when cleared." }
+        }
+      }
+      // stands nicht erfasst: Karte druckt je Vorfeld nur den Bereich (1-18, 19-41, 42-68), Reihenfolge nicht erkennbar; Zahl passt (DCS 15-32, 33-55, 57-69 und 0-13)
+    },
+    "notes": [
+      "Shelters (chart stands 42-68) lie southeast of runway 06/24 and are reached only via taxiway J: the runway must be crossed at J near the runway 24 end, holding position P4 (Juliet) is on the shelter side",
+      "Runway 02/20 exists on the chart only (not in DCS): taxiway J crosses it near its north end, taxiway G ends at its edge",
+      "Taxiway M runs parallel to the runway along Apron 2, the terminal and Apron 1; A to I link it to the runway, taxiway A meets the runway 06 threshold",
+      "No taxiway reaches the runway 24 threshold: taxiway I joins about 460 m before the end",
+      "Closed (X): west end of Apron 2, terminal access, access to the TWR, Fire Station 1 / Maintenance Area, south end of the shelter row",
+      "Maintenance Area (northeast of Apron 1) has no DCS parking",
+      "ENTRY EAST RWY 24 and EXIT EAST RWY 06 are not usable for HIRTA sensitive aircraft",
+      "Avoid overflying of densely populated areas",
+      "DCS runway is 2952 m, the chart shows 3100 m"
+    ]
+  },
+  "Anapa-Vityazevo": {
+    "icao": "URKA",
+    "pattern_ft": 1700, "arrdep_max_ft": 3000,   // unsicher: Einheit nicht gedruckt, ft wie bei den Nachbarplätzen
+    "ctr_top_ft": 3500,   // unsicher: nur Kasten "D (HX) 3500 / GND", CTR nicht dauernd aktiv
+    "crp": {
+      "west":        "45°00.732'N 037°13.342'E",
+      "north":       "45°06.493'N 037°23.746'E",
+      "east":        "45°02.567'N 037°29.585'E",
+      "exit south":  "44°54.839'N 037°24.090'E",   // zwei Punkte "south" gedruckt (Entry und Exit): Einflug heisst "south", Ausflug "exit south"
+      "south":       "44°53.682'N 037°17.431'E"
+    },
+    "exit_only": ["exit south"],
+    "rwy": {
+      "04": {
+        "chart": "04", "hand": "right", "side": "southeast",
+        "initial_nm": 2.3,   // gemessen: INITIAL 04 2.30 NM, INITIAL 22 2.28 NM vor der Schwelle (VAD, Anpassung an die CRP-Koordinaten); ±0.1 (VAD verzerrt)
+        // Standard south (Einflug) (349 dreht 47° auf 036, west 155 dreht über einen Bogen um rund 120°)
+        "entry": {
+          "west": { "crs": 155, "via": "initial", "wp": "44°57.151'N 037°14.999'E" },   // gemessen: Tangentenpunkt des Linksbogens, ±0.1 NM
+          "south": { "crs": 349, "via": "initial" }
+        },
+        "exit": { "east": { "crs": 66 }, "north": { "crs": 357 }, "exit south": { "crs": 170 } }
+      },
+      "22": {
+        "chart": "22", "hand": "left", "side": "southeast",
+        "initial_nm": 2.3,   // gemessen, siehe 04
+        // unsicher: Standard east (266 dreht 50° auf 216, north 159 dreht 57°), fast gleich
+        "entry": { "north": { "crs": 159, "via": "initial" }, "east": { "crs": 266, "via": "initial" } },
+        "exit": { "west": { "crs": 264, "note": "then 303 to the CRP" }, "exit south": { "crs": 117 } }
+      }
+    },
+    "ground": {
+      "ramps": {   // keine Rollhalte gedruckt: nur Rollroute bis zur Bahn; Wahl von to/vacate nach Lage, nicht gedruckt
+        "APRON 2": {
+          "pts": [[-5290.4, 242741.2], [-5409.5, 242634.4], [-5528.9, 242527.4]],   // gemessen: DCS-Stände 22-29, 14-21, 6-13
+          "to": { "04": "Mike, Alpha", "22": "Mike, Delta" },
+          "vacate": { "04": "left via Charlie or Delta", "22": "right via Charlie or Bravo" },
+          "in": { "*": "Mike" }
+        },
+        "APRON 1": {
+          "pts": [[-4763.6, 243214.5], [-4944.2, 243053.9]],   // gemessen: DCS-Stände 3, 30-32 und 33-36
+          "to": { "04": "Mike, Alpha", "22": "Mike, Delta" },
+          "vacate": { "04": "left via Charlie or Delta", "22": "right via Charlie or Bravo" },
+          "in": { "*": "Mike" }
+        },
+        "APRON EAST": {
+          "pts": [[-4771.1, 244553.6], [-4615.8, 244370.6]],   // gemessen: DCS-Stände 1, 37-39 und 40-43
+          "to": { "04": "Echo, Delta, Mike, Alpha", "22": "Echo" },   // 04: Bahn kreuzen
+          "vacate": { "04": "right via Echo", "22": "right via Charlie or Bravo" },
+          "in": { "04": "Echo", "22": "Mike, Delta, Echo" }
+        },
+        "West Shelters": {   // Name nicht gedruckt (Rollwege W, W1-W3)
+          "pts": [[-5766.6, 242056.7], [-5423.4, 241637.6], [-5817.1, 241768.6]],   // gemessen: DCS-Stände 59-65, 4, 5, 44-50 und 51-58
+          "to": { "04": "Whiskey, Mike, Alpha", "22": "Whiskey, Mike, Delta" },
+          "vacate": { "04": "left via Charlie or Delta", "22": "right via Charlie or Bravo" },
+          "in": { "*": "Mike, Whiskey" }
+        },
+        "East Shelters": {   // Name nicht gedruckt (Rollwege E, E1, E2)
+          "pts": [[-5231.2, 244666.0], [-4898.3, 244848.0], [-4884.6, 244271.2]],   // gemessen: DCS-Stände 2, 66-68, 87-92 / 69, 70, 80-86 / 71-79; Stand 80 liegt näher an APRON EAST
+          "to": { "04": "Echo, Delta, Mike, Alpha", "22": "Echo" },   // 04: Bahn kreuzen
+          "vacate": { "04": "right via Echo", "22": "right via Charlie or Bravo" },
+          "in": { "04": "Echo", "22": "Mike, Delta, Echo" }
+        }
+      },
+      "stands": [{ "dcs": "6-29", "chart": "1-24" }]   // unsicher: Karte druckt nur den Bereich 1-24, Reihenfolge nicht erkennbar
+    },
+    "notes": [
+      "No holding position symbols or names are printed on the chart",
+      "Taxiway M is the parallel taxiway northwest of the runway; A meets the runway 04 threshold, B and C join the runway, D crosses the runway close to the runway 22 end and continues as E to APRON EAST and the east shelters",
+      "APRON EAST and the east shelters lie southeast of the runway and reach runway 04 only by crossing the runway near the 22 end",
+      "Closed (X): two sections at the tower, a branch of N near the Maintenance Area and the south end of W2",
+      "Landing instructions shall be requested at the latest 2 minutes before the ENTRY CRP; avoid overflying densely populated areas",
+      "Not to be overflown unless cleared by the tower: Anapa town and coast strip (INITIAL 04 at its edge), Anapskaya area, Gostagaevskaya (just south of CRP east), Natuhaevskaya",
+      "DCS runway is 2629 m, the chart shows 2900 m"
+    ]
+  },
+  "Gelendzhik": {
+    "icao": "URKG",
+    "pattern_ft": 1600, "arrdep_max_ft": 2300, "ctr_top_ft": 2800,
+    "crp": {
+      "west": "44°37.652'N 037°56.277'E",
+      "east": "44°32.109'N 038°06.589'E"
+    },
+    "rwy": {
+      "01": {
+        "chart": "04", "hand": "right", "side": "southeast",
+        "initial_nm": 2.1,   // gemessen: 2.0-2.2 NM aus mehreren Anpassungen der VAD an Bahn (1800 m) und CRPs; ±0.15 (VAD nicht winkeltreu)
+        // unsicher: Standard west nach Lage gewählt (kürzerer Weg auf INITIAL), beide Einflüge gedruckt
+        "entry": { "east": { "crs": 240, "via": "initial" }, "west": { "crs": 183, "via": "initial" } },
+        "exit": { "west": { "crs": 283 }, "east": { "crs": 94, "note": "then 166 to the CRP" } }
+      },
+      "19": {
+        "chart": "22", "hand": "left", "side": "southeast",
+        "initial_nm": 2.1,   // gemessen, siehe 01
+        // unsicher: Standard west nach Lage gewählt, beide Einflüge gedruckt
+        "entry": { "east": { "crs": 346, "via": "initial" }, "west": { "crs": 71, "via": "initial" } },
+        "exit": { "west": { "crs": 334 }, "east": { "crs": 84 } }
+      }
+    },
+    "ground": {
+      "ramps": {
+        "APRON SOUTH": {
+          "pts": [[-50505.2, 298063.3]],   // gemessen: DCS-Stände 0-9 (Karte 1-10)
+          "to": { "01": "Mike", "19": "Mike" },
+          "vacate": { "01": "left at the end via Mike", "19": "right at the end via Mike" },   // nach Lage gewählt, nicht gedruckt: M schließt nur an den Bahnenden an
+          "in": { "*": "Mike" }
+        },
+        "APRON NORTH": {
+          "pts": [[-50058.9, 298428.6]],   // gemessen: DCS-Stände 10-12 (Karte 11-13)
+          "to": { "01": "Mike", "19": "Mike" },
+          "vacate": { "01": "left at the end via Mike", "19": "right at the end via Mike" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Mike" }
+        }
+      },
+      "stands": [{ "dcs": "0-9", "chart": "1-10" }, { "dcs": "10-12", "chart": "11-13" }]   // unsicher: Zuordnung nach Anzahl (10 und 3), Reihenfolge innerhalb der Vorfelder nicht geprüft
+    },
+    "notes": [
+      "No holding positions are printed: taxiway M runs parallel on the northwest side and joins the runway only at the two ends by a curve",
+      "No intersection departures: vacate and line up at the runway ends via Mike, no backtrack",
+      "Taxiway W links M to the Maintenance Area (no DCS parking) between APRON SOUTH and APRON NORTH",
+      "Closed (X): the narrow taxiway behind the aprons near the TWR and near Fire Station North",
+      "Landing instructions to be requested 2 minutes before the entry CRP; stay clear of CTR Novorossiysk (URKN) west of CRP WEST",
+      "Power line crosses final 22 at INITIAL 22 and the departure 094; no missed approach procedure printed",
+      "DCS runway is 1662 m, the chart shows 1800 m"
+    ]
+  },
+  "Novorossiysk": {
+    "icao": "URKN",
+    "pattern_ft": 1700, "arrdep_max_ft": 2200, "ctr_top_ft": 2700,
+    "crp": {
+      "west":  "44°40.282'N 037°37.743'E",
+      "north": "44°46.286'N 037°43.574'E",
+      "east":  "44°38.093'N 037°54.008'E"
+    },
+    "rwy": {
+      "04": {
+        "chart": "04", "hand": "right", "side": "southeast",
+        "initial_nm": 2.3,   // gemessen: Dreieckszentren INITIAL 04 2.26-2.33 NM vor der Schwelle (affine Georeferenz über die 3 CRP, Gegenprobe Balkenmaßstab 35.2 px/NM); ±0.1 (VAD verzerrt)
+        // Standard west (117 dreht 81° links auf 036, east 241 dreht 155° rechts); Bogen von east in INITIAL 04 nicht als wp erfasst
+        "entry": { "east": { "crs": 241, "via": "initial" }, "west": { "crs": 117, "via": "initial" } },
+        "exit": { "east": { "crs": 119 }, "north": { "crs": 280, "note": "continue 036 to the northeast shore of the bay, then left turn" } }
+      },
+      "22": {
+        "chart": "22", "hand": "left", "side": "southeast",
+        "initial_nm": 2.7,   // gemessen: INITIAL 22 2.66-2.75 NM vor der Schwelle (Methode wie 04); ±0.1 (VAD verzerrt)
+        // unsicher: Standard north (100 dreht 116° rechts auf 216), east 343 dreht 127° links; fast gleich, Bogen nicht als wp erfasst
+        "entry": { "east": { "crs": 343, "via": "initial" }, "north": { "crs": 100, "via": "initial" } },
+        "exit": { "west": { "crs": 278, "note": "right turn along the coast" }, "east": { "crs": 82 } }
+      }
+    },
+    "ground": {
+      "holds": {
+        "Bravo": { "pos": "44°40.379'N 037°47.052'E", "rwy": ["22"] }   // P3, 140-180 m vor dem NE-Ende; Alpha führt bis zur Schwelle 22, Charlie bis zur Schwelle 04 (kein Rollhalt gedruckt)
+      },
+      "ramps": {
+        "APRON SOUTH": {
+          "pts": [[-41342.9, 278622.8], [-41146.2, 278763.0]],   // gemessen: DCS-Stände 10-11,16-17 und 12-15
+          "to": { "04": "Tango, Charlie", "22": "Tango, Bravo" },
+          "hold": { "22": "Bravo" },
+          "vacate": { "04": "left via Bravo or Alpha", "22": "right via Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Tango" }
+        },
+        "APRON NORTH": {
+          "pts": [[-40103.7, 279645.7]],   // gemessen: DCS-Stände 2-9
+          "to": { "04": "Tango, Charlie", "22": "Tango, Bravo" },
+          "hold": { "22": "Bravo" },
+          "vacate": { "04": "left via Bravo or Alpha", "22": "right via Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Tango" }
+        },
+        "Shelters N1": {   // Name nicht gedruckt (Shelter an Rollweg N1); Aufteilung N1/N2 nach Lage der Rollwege gewählt
+          "pts": [[-40855.4, 278867.6], [-40668.8, 278936.1]],   // gemessen: DCS-Stände 18-19,23-24,31 und 22,25,30,32,36-37
+          "to": { "04": "November 1, Tango, Charlie", "22": "November 1, Tango, Bravo" },
+          "hold": { "22": "Bravo" },
+          "vacate": { "04": "left via Bravo or Alpha", "22": "right via Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Tango, November 1" }
+        },
+        "Shelters N2": {   // Name nicht gedruckt (Shelter an Rollweg N2); Aufteilung N1/N2 nach Lage der Rollwege gewählt
+          "pts": [[-40570.6, 279071.9], [-40383.7, 279140.1]],   // gemessen: DCS-Stände 20-21,26-27,33 und 28-29,34-35,38-39
+          "to": { "04": "November 2, Tango, Charlie", "22": "November 2, Tango, Bravo" },
+          "hold": { "22": "Bravo" },
+          "vacate": { "04": "left via Bravo or Alpha", "22": "right via Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Tango, November 2" }
+        }
+      }
+      // stands weggelassen: Karte druckt Apron South 1-8, Apron North 9-16, Shelter 17-38; Reihenfolge je Gruppe gegenüber den DCS-Ständen nicht eindeutig
+    },
+    "notes": [
+      "Taxiway T runs along APRON SOUTH and APRON NORTH; C curves into the runway 04 threshold, A runs from APRON NORTH to the runway 22 threshold",
+      "Holding position B is the only printed holding position, 140-180 m short of the runway 22 end: departures runway 22 hold at Bravo",
+      "Shelters 17-38 (22 stands) lie off taxiways N1 and N2; the chart does not say which group belongs to N1 or N2",
+      "Closed (X): west of C at the southwest end of APRON SOUTH, east of APRON NORTH at Fire Station North and beside the tower",
+      "Maintenance Area (taxiway M), Fuel Depot and Cargo Store have no DCS parking",
+      "Pattern lies over the sea southeast of the runway for both directions: do not overfly the densely populated area of Novorossiysk, avoid the Gelendzhik CTR (URKG)",
+      "Request landing instructions at the latest 2 minutes before the entry CRP",
+      "DCS runway is 1719 m, the chart shows 1800 m"
+    ]
+  },
+  "Krymsk": {
+    "icao": "URKW",
+    "pattern_ft": 1600, "arrdep_max_ft": 2100, "ctr_top_ft": 2600,
+    "crp": {
+      "west":   "44°56.508'N 037°48.080'E",
+      "north":  "45°06.459'N 038°01.450'E",
+      "east":   "45°01.998'N 038°12.509'E",
+      "abinsk": "44°56.803'N 038°06.503'E",
+      "south":  "44°50.086'N 037°54.256'E"
+    },
+    "exit_only": ["abinsk"],
+    "rwy": {
+      "04": {
+        "chart": "03", "hand": "left", "side": "northwest",
+        "initial_nm": 3.75,   // 3.6 gemessen ab gedruckter Schwelle, DCS-Schwelle 279 m weiter innen: +0.15; INITIAL 03 bis INITIAL 21 8.7 NM, Bahn 1.4 NM (2600 m); Aufteilung 3.6/3.7 ±0.1 (VAD verzerrt)
+        // unsicher: Standard south (360 dreht 33° auf 033, west 111 dreht 78°); beide nur Einflug für 04
+        "entry": { "west": { "crs": 111, "via": "initial" }, "south": { "crs": 360, "via": "initial" } },
+        // east zuerst (kleinste Kursänderung); north durch HIRTA-Gebiet, Verzweigung der 352 nicht sichtbar an die 033 angeschlossen
+        "exit": { "east": { "crs": 66 }, "north": { "crs": 352, "note": "not for HIRTA sensitive aircraft" }, "abinsk": { "crs": 155 } }
+      },
+      "22": {
+        "chart": "21", "hand": "right", "side": "northwest",
+        "initial_nm": 3.8,    // 3.7 gemessen ab gedruckter Schwelle, DCS-Schwelle 262 m weiter innen: +0.14 (siehe 04)
+        // unsicher: Standard east (261 dreht 48° auf 213, north 139 dreht 74°); Abstand beider CRPs zur Achse ähnlich
+        "entry": { "north": { "crs": 139, "via": "initial" }, "east": { "crs": 261, "via": "initial" } },
+        "exit": { "south": { "crs": 190 }, "west": { "crs": 267 }, "abinsk": { "crs": 190, "note": "then 045, stay exactly on track, restricted area UR-R152" } }
+      }
+    },
+    "ground": {
+      "holds": {
+        "Alpha": { "pos": "44°57.648'N 037°59.190'E", "rwy": ["04"] },
+        "Delta": { "pos": "44°58.469'N 038°00.272'E", "rwy": ["22"] }
+      },
+      "ramps": {
+        "APRON 1": {
+          "pts": [[-7527.9, 293794.6], [-7645.7, 293922.6]],   // gemessen: DCS-Stände 29-36 und 37, 41, 42, 56-58
+          "to": { "04": "Alpha", "22": "Alpha, Delta" },
+          "hold": { "04": "Alpha", "22": "Delta" },
+          "vacate": { "04": "right via Charlie or Delta", "22": "left via Bravo or Alpha" },   // nach Lage gewählt, nicht gedruckt (B etwa 600 m, C etwa 1500 m hinter der DCS-Schwelle 04)
+          "in": { "*": "Alpha" }
+        },
+        "APRON 2": {
+          "pts": [[-5810.9, 295174.5]],   // gemessen: DCS-Stände 24-28
+          "to": { "04": "Delta, Alpha", "22": "Delta" },
+          "hold": { "04": "Alpha", "22": "Delta" },
+          "vacate": { "04": "right via Charlie or Delta", "22": "left via Bravo or Alpha" },
+          "in": { "*": "Delta" }
+        },
+        "Southwest Shelters": {   // Name nicht gedruckt (Shelter am SW-Ende, Stände 14-26 der Karte)
+          "pts": [[-8022.6, 294020.3], [-7817.2, 294361.6]],   // gemessen: DCS-Stände 21-23, 38-40 und 15-20, 43
+          "to": { "04": "Charlie, Alpha", "22": "Charlie, Delta" },
+          "hold": { "04": "Alpha", "22": "Delta" },
+          "vacate": { "04": "right via Charlie or Delta", "22": "left via Bravo or Alpha" },
+          "in": { "*": "Charlie" }
+        },
+        "Shelters TWY C": {   // Name nicht gedruckt (Shelter am zweiten Parallelrollweg C bis zum Tower)
+          "pts": [[-7549.0, 294335.2], [-7100.0, 294766.9], [-6590.8, 295076.9]],   // gemessen: DCS-Stände 44, 45, 50, 51 und 54, 55, 12-14 und 6-11
+          "to": { "04": "Charlie, Alpha", "22": "Charlie, Delta" },
+          "hold": { "04": "Alpha", "22": "Delta" },
+          "vacate": { "04": "right via Charlie or Delta", "22": "left via Bravo or Alpha" },
+          "in": { "*": "Charlie" }
+        },
+        "Shelters TWY D": {   // Name nicht gedruckt (Shelter an Stichen von D, dazu Stände an F bei der Maintenance Area)
+          "pts": [[-7438.3, 294184.5], [-7118.1, 294483.0], [-6225.1, 295172.5]],   // gemessen: DCS-Stände 46-49 und 52, 53 und 0-5
+          "to": { "04": "Delta, Alpha", "22": "Delta" },
+          "hold": { "04": "Alpha", "22": "Delta" },
+          "vacate": { "04": "right via Charlie or Delta", "22": "left via Bravo or Alpha" },
+          "in": { "*": "Delta" }
+        }
+      },
+      "stands": [
+        { "dcs": "29-36", "chart": "1-8" },   // unsicher: Reihenfolge innerhalb der Reihe nicht erkennbar
+        { "dcs": "24-27", "chart": "54-57" }   // unsicher: Karte druckt nur den Bereich 54-57
+      ]
+    },
+    "notes": [
+      "Taxiways B and C join the runway between holding positions A and D: no holding position printed there",
+      "Taxiway A links holding position A (runway 04 end) along Apron 1 to C; D runs southeast of the runway to Apron 2 and holding position D (runway 22 end)",
+      "Exit north runway 04 is not for HIRTA sensitive aircraft (TV tower Novotroitskiy 904 ft); exit Abinsk runway 22: stay exactly on track, restricted area UR-R152 5000 MSL/GND H24",
+      "Avoid overflying densely populated areas (Krymsk, Kievskoe, Troitskaya, Abinsk: only with tower clearance); landing instructions at the latest 2 min before the entry CRP",
+      "Closed (X): southwest end of taxiway C, spur at the tower, northeast edge of Apron 2; Maintenance Area, Fire Stations and Cargo Store have no DCS parking",
+      "DCS runway is 2052 m, the chart shows 2600 x 60 m; chart runway 03/21 is 04/22 in DCS; chart stand 22 does not exist"
+    ]
+  },
+  "Krasnodar-Center": {
+    "icao": "URKL",
+    "pattern_ft": 1600, "arrdep_max_ft": 2100,
+    "ctr_top_ft": 2600,   // unsicher: Kasten "D (HX) 2600 / GND", laut Legende CTR nicht dauernd aktiv
+    "crp": {
+      "west":   "45°04.837'N 038°45.489'E",
+      "north":  "45°11.037'N 038°57.118'E",
+      "bridge": "44°59.832'N 038°57.293'E",
+      "lake":   "45°00.522'N 038°51.475'E"
+    },
+    "rwy": {
+      "09": {
+        "chart": "08", "hand": "left", "side": "north",
+        "initial_nm": 3.0,   // gemessen: INITIAL 08 bis INITIAL 26 7.42 NM, Bahn (Schwelle-Schwelle) 1.34 NM; INITIAL 08 zur Schwelle 2.9-3.1; +-0.1 (VAD verzerrt)
+        // Standard west (073 dreht 8° auf 081, lake 321 dreht 120° rechts, north 224 dreht 143° links)
+        "entry": { "north": { "crs": 224, "via": "initial" }, "lake": { "crs": 321, "via": "initial" }, "west": { "crs": 73, "via": "initial" } },
+        "exit": { "north": { "crs": 334, "note": "not for HIRTA sensitive aircraft" }, "bridge": { "crs": 216, "note": "not for HIRTA sensitive aircraft" } }
+      },
+      "27": {
+        "chart": "26", "hand": "right", "side": "north",
+        "initial_nm": 2.9,   // gemessen: INITIAL 26 zur Schwelle 2.8-3.0, Gesamtmessung siehe 09; +-0.1
+        // unsicher: Standard north (123 dreht 138° rechts, bridge 036 dreht 135° links, beide gleich weit); beide Einflüge nicht für HIRTA-empfindliche Luftfahrzeuge
+        "entry": { "bridge": { "crs": 36, "via": "initial" }, "north": { "crs": 123, "via": "initial" } },
+        // west 253 läuft über INITIAL 08
+        "exit": { "west": { "crs": 253 }, "lake": { "crs": 191 }, "north": { "crs": 16 } }
+      }
+    },
+    "ground": {
+      "holds": {
+        "Bravo": { "pos": "45°05.201'N 038°55.753'E", "rwy": ["09"] },   // P1, 370 m hinter Schwelle 08 (Zwischenstart); Alpha erreicht die Schwelle
+        "Charlie": { "pos": "45°05.180'N 038°57.059'E", "rwy": ["27"] }   // P4, 400 m vor der Schwelle 26 (Zwischenstart); Delta erreicht das Bahnende; P5 (Foxtrot, 45°05.172'N 038°57.715'E, Stoppwegende) weggelassen: ca. 540 m hinter dem DCS-Bahnende
+      },
+      "ramps": {
+        "RAMP 1": {
+          "pts": [[11226.3, 367209.8], [11234.8, 367379.6]],   // gemessen: DCS-Stände 33-41 und 42-49
+          "to": { "09": "Alpha", "27": "Alpha, Delta" },
+          "vacate": { "09": "right via Charlie or Delta", "27": "left via Bravo or Alpha" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Alpha" }
+        },
+        "RAMP 2": {
+          "pts": [[11275.0, 368423.6]],   // gemessen: DCS-Stände 50-55
+          "to": { "09": "Alpha", "27": "Alpha, Delta" },
+          "vacate": { "09": "right via Charlie or Delta", "27": "left via Bravo or Alpha" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Alpha" }
+        },
+        "Shelters Southwest": {   // Name nicht gedruckt (Nebenkarte "Shelters next TWY E & F", Stände 42-56)
+          "pts": [[10878.0, 368550.0], [10997.0, 368771.0], [11096.3, 368970.3]],   // gemessen: DCS-Stände 0-4, 5-9, 10-14
+          "to": { "09": "Foxtrot, Alpha", "27": "Foxtrot, Delta" },   // über die Südspitze (Foxtrot/Delta)
+          "vacate": { "09": "right via Charlie or Delta", "27": "left via Bravo or Alpha" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "09": "Delta, Foxtrot", "27": "Alpha, Foxtrot" }
+        },
+        "Shelters Northeast": {   // Name nicht gedruckt (Nebenkarte "Shelters next TWY E & F", Stände 24-41)
+          "pts": [[11252.6, 369092.1], [11464.5, 369299.4], [11572.1, 369544.7]],   // gemessen: DCS-Stände 15-17, 18-26, 27-32
+          "to": { "09": "Echo, Alpha", "27": "Echo" },
+          "vacate": { "09": "right via Charlie or Delta", "27": "left via Bravo or Alpha" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "09": "Echo", "27": "Alpha, Echo" }
+        }
+      },
+      "stands": [{ "dcs": "33-49", "chart": "1-17" }, { "dcs": "50-55", "chart": "18-23" }]   // unsicher: Reihenfolge nach Lage; Shelter (DCS 0-14, 15-32 gegen Karte 42-56, 24-41) nicht zugeordnet, Reihenfolge nicht erkennbar
+    },
+    "notes": [
+      "Taxiway A runs from the runway 08 threshold along the south side to TWY E; holding position B is an intersection about 370 m from the threshold, so departures runway 09 taxi on A to the threshold",
+      "Taxiways D and E join the runway at the runway 26 end, C (holding position C) about 400 m before it; TWY F is the stopway east of runway 26 (420 m), departures via F have TORA 2920 m",
+      "Landing instructions at least 2 minutes before reaching the entry CRP",
+      "Entry north and entry bridge runway 26, exit north and exit bridge runway 08: not for HIRTA sensitive aircraft",
+      "Do not overfly densely populated areas without TWR clearance; stay clear of the Krasnodar-Pashkovsky CTR (URKK) to the southeast",
+      "Non-standard approach lights runway 26: lights end 3300 ft east of the touchdown zone",
+      "Closed (X): link north of the runway 26 end",
+      "RAMP 3 (halls at TWY D) has no DCS parking; DCS stands 56 and 57 are the runway ends, not parking",
+      "DCS runway is 2335 m, the chart shows 2500 m"
+    ]
+  },
+  "Krasnodar-Pashkovsky": {
+    "icao": "URKK",
+    "pattern_ft": 1600, "arrdep_max_ft": 2100, "ctr_top_ft": 2600,
+    // Karte 04L/22R (2265 m, ENTRY/EXIT WEST und NORTH) hat kein DCS-Gegenstück und fehlt hier; DCS 05/23 = Karte 04R/22L (Schwellen 70 m und 47 m neben den gedruckten)
+    "crp": {
+      "south": "44°54.829'N 039°04.920'E",
+      "east":  "45°04.360'N 039°22.494'E"
+    },
+    "rwy": {
+      "05": {
+        "chart": "04R", "hand": "right", "side": "southeast",
+        "initial_nm": 3.3,   // gemessen: INITIAL 04 SOUTH 3.3-3.35 NM vor Schwelle 04R (affine Anpassung CRP South/East und Bahnenden, Restfehler 80 m); ±0.15 (VAD verzerrt)
+        "entry": { "south": { "crs": 4, "via": "initial" } },   // dann 041 zur Bahn; ENTRY SOUTH nur für 04R
+        "exit": { "east": { "crs": 41, "note": "then 090 from INITIAL 22 SOUTH" } }
+      },
+      "23": {
+        "chart": "22L", "hand": "left", "side": "southeast",
+        "initial_nm": 3.0,   // gemessen: INITIAL 22 SOUTH 2.9-3.0 NM vor Schwelle 22L, siehe 05
+        "entry": { "east": { "crs": 270, "via": "initial" } },   // dann 221 zur Bahn; ENTRY EAST nur für 22L
+        "exit": { "south": { "crs": 221, "note": "then 184 from INITIAL 04 SOUTH" } }
+      }
+    },
+    "ground": {
+      "holds": {   // keine Rollhalte gedruckt: Namen = Anschlussrollwege an die Bahn, Lage am Anschluss an Rollweg N
+        "Echo": { "pos": [6750.5, 386732.5], "rwy": ["05"] },   // gemessen: Stich vom SW-Rand APRON 3 zur Schwelle 04R; Bezeichnung E unsicher (Beschriftung nur mit Leitlinie zu APRON 3)
+        "Foxtrot": { "pos": "45°02.027'N 039°10.663'E", "rwy": ["05", "23"] },   // P3 gedruckt: Kreuzung F/N, 550 m von Schwelle 05
+        "Hotel": { "pos": "45°02.352'N 039°11.238'E", "rwy": ["05", "23"] },   // P4 gedruckt: Kreuzung H/N bei APRON 2, Mitte der Bahn
+        "India": { "pos": [8120.1, 388075.3], "rwy": ["05", "23"] },   // gemessen: Kreuzung I/N am NE-Ende APRON 2, 1900 m von Schwelle 05
+        "Juliet": { "pos": [8793.5, 388948.4], "rwy": ["23"] }   // gemessen: Stich vom NE-Ende APRON 1 zur Schwelle 22L
+      },
+      "ramps": {
+        "APRON 3": {
+          "pts": [[6975.3, 386769.8]],   // gemessen: DCS-Stände 13-18 (Karte 1-6)
+          "to": { "05": "Echo", "23": "November, Juliet" },   // nach Lage gewählt, nicht gedruckt: voller Abflug von beiden Enden
+          "hold": { "05": "Echo", "23": "Juliet" },
+          "vacate": { "05": "left via Hotel or India", "23": "right via India or Hotel" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "November" }
+        },
+        "APRON 2": {
+          "pts": [[8035.4, 387903.1]],   // gemessen: DCS-Stände 6-12 (Karte 7-13)
+          "to": { "05": "November, Echo", "23": "November, Juliet" },
+          "hold": { "05": "Echo", "23": "Juliet" },
+          "vacate": { "05": "left via Hotel or India", "23": "right via India or Hotel" },
+          "in": { "*": "November" }
+        },
+        "APRON 1": {
+          "pts": [[8750.2, 388669.3]],   // gemessen: DCS-Stände 0-5 (Karte 14-19)
+          "to": { "05": "November, Echo", "23": "Juliet" },
+          "hold": { "05": "Echo", "23": "Juliet" },
+          "vacate": { "05": "left via Hotel or India", "23": "right via India or Hotel" },
+          "in": { "*": "November" }
+        }
+      },
+      "stands": [
+        { "dcs": "13-18", "chart": "1-6" }, { "dcs": "6-12", "chart": "7-13" }, { "dcs": "0-5", "chart": "14-19" }   // unsicher: Karte druckt nur die Bereiche je Vorfeld; DCS 19 und 20 sind Bahnspawnpunkte (Typ 16), keine Stände
+      ]
+    },
+    "notes": [
+      "Taxiway N runs parallel on the northwest side of the runway from APRON 3 over APRON 2 to APRON 1; runway links E (southwest end), F, H, I and J (northeast end)",
+      "No holding positions are printed: holds are named after the taxiway link to the runway; F and H are intersection departure points",
+      "Taxiway D joins N at F next to the tower; closed (X): spur to the tower, the road at Fire Station 3 southwest of APRON 3",
+      "Chart runway 04L/22R (2265 m) with APRON A, APRON WEST and the Terminal has no DCS counterpart",
+      "DCS runway is 2968 m, the chart shows 3100 m",
+      "Request landing instructions at least 2 minutes before the entry CRP; avoid overflying densely populated areas; stay clear of CTR Krasnodar Center (URKL) to the northwest"
+    ]
+  },
+  "Maykop-Khanskaya": {
+    "icao": "URKH",
+    "pattern_ft": 2100, "arrdep_max_ft": 2600, "ctr_top_ft": 3100,
+    "crp": {
+      "west":         "44°39.745'N 039°50.071'E",
+      "belorechensk": "44°45.876'N 039°58.775'E",
+      "north":        "44°48.517'N 040°06.192'E",
+      "east":         "44°39.631'N 040°13.127'E",
+      "south":        "44°33.203'N 039°59.772'E"
+    },
+    "rwy": {
+      "04": {
+        "chart": "04", "hand": "left", "side": "northwest",
+        "initial_nm": 2.4,   // gemessen: INITIAL 04 2.32 NM (Maßstabsbalken) bis 2.40 NM (Anpassung auf die 5 CRP-Symbole) vor der Schwelle; ±0.1 (VAD verzerrt, Restfehler bis 160 m)
+        // unsicher: Standard south (west 099 und south 331 drehen etwa gleich stark auf 033), Reihenfolge nach Lage
+        "entry": { "west": { "crs": 99, "via": "initial" }, "south": { "crs": 331, "via": "initial" } },
+        "exit": { "east": { "crs": 100 }, "belorechensk": { "crs": 301 }, "north": { "crs": 346, "note": "not for HIRTA sensitive aircraft" } }
+      },
+      "22": {
+        "chart": "22", "hand": "right", "side": "northwest",
+        "initial_nm": 2.4,   // gemessen, siehe 04
+        // Standard east: einziger Einflug ohne Knick und ohne HIRTA-Hinweis; belorechensk fliegt 080 bis zum Knick, dann 166 im Rechtsbogen auf INITIAL
+        "entry": {
+          "belorechensk": { "crs": 80, "via": "initial", "wp": "44°45.737'N 040°06.309'E" },   // wp gemessen: Schnitt des 080-Schenkels mit dem 166-Schenkel, ±0.2 NM
+          "north": { "crs": 166, "via": "initial", "note": "not for HIRTA sensitive aircraft" },
+          "east": { "crs": 304, "via": "initial" }
+        },
+        "exit": { "south": { "crs": 174 }, "west": { "crs": 260 } }
+      }
+    },
+    "ground": {
+      "holds": {
+        "Bravo": { "pos": "44°40.493'N 040°01.646'E", "rwy": ["04"] },     // 610 m vom SW-Ende (Zwischenstart)
+        "Charlie": { "pos": "44°41.012'N 040°02.350'E", "rwy": ["04", "22"] },   // 1160 m vom NE-Ende, 1950 m vom SW-Ende
+        "Delta": { "pos": "44°41.265'N 040°02.694'E", "rwy": ["22"] }      // 500 m vom NE-Ende (Zwischenstart)
+      },
+      "ramps": {
+        "APRON 1": {
+          "pts": [[-27936.5, 457552.2]],   // gemessen: DCS-Stände 52-56
+          "to": { "04": "Alpha", "22": "Victor, Echo" },
+          "vacate": { "04": "right via Charlie or Delta", "22": "left via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Victor" }
+        },
+        "APRON 2": {
+          "pts": [[-27552.3, 457640.3], [-27539.0, 457796.6], [-27433.3, 457846.8]],   // gemessen: DCS-Stand 14 (V6), Stände 42-46, 47-51
+          "to": { "04": "Victor, Alpha", "22": "Victor, Echo" },
+          "vacate": { "04": "right via Charlie or Delta", "22": "left via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Victor" }
+        },
+        "Stands V17-V25": {   // Name nicht gedruckt (Einzelstände V17-V25 an Victor)
+          "pts": [[-26868.6, 458380.5], [-27231.4, 458094.5]],   // gemessen: DCS-Stände 5-8, 9-13
+          "to": { "04": "Victor, Alpha", "22": "Victor, Echo" },
+          "vacate": { "04": "right via Charlie or Delta", "22": "left via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Victor" }
+        },
+        "APRON 3": {
+          "pts": [[-26623.7, 458446.0], [-26487.5, 458508.6]],   // gemessen: DCS-Stände 33-38, 27-32 und 39-41
+          "to": { "04": "Victor, Alpha", "22": "Victor, Echo" },
+          "vacate": { "04": "right via Charlie or Delta", "22": "left via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Victor" }
+        },
+        "APRON 4": {
+          "pts": [[-26404.2, 458704.8], [-26361.5, 458817.0]],   // gemessen: DCS-Stände 15-20, 21-26
+          "to": { "04": "Victor, Alpha", "22": "Victor, Echo" },
+          "vacate": { "04": "right via Charlie or Delta", "22": "left via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Victor" }
+        },
+        "Stands V53-V57": {   // Name nicht gedruckt (Einzelstände V53-V57 nördlich an Victor)
+          "pts": [[-26104.6, 458982.7]],   // gemessen: DCS-Stände 0-4
+          "to": { "04": "Victor, Alpha", "22": "Victor, Echo" },
+          "vacate": { "04": "right via Charlie or Delta", "22": "left via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Victor" }
+        }
+      },
+      // Einzelstände nach Überlagerung der DCS-Positionen auf die Karte; die Vorfelder (DCS 52-56 = 1-5, 42-51 = 7-16, 27-41 = 26-40, 15-26 = 41-52) nur als Gruppen, Reihenfolge innerhalb nicht erkennbar
+      "stands": [
+        { "dcs": "0", "chart": "V53" }, { "dcs": "1", "chart": "V55" }, { "dcs": "2", "chart": "V54" }, { "dcs": "3", "chart": "V57" }, { "dcs": "4", "chart": "V56" },
+        { "dcs": "5", "chart": "V24" }, { "dcs": "6", "chart": "V23" }, { "dcs": "7", "chart": "V25" }, { "dcs": "8", "chart": "V22" },
+        { "dcs": "9", "chart": "V21" }, { "dcs": "10", "chart": "V19" }, { "dcs": "11", "chart": "V17" }, { "dcs": "12", "chart": "V18" },
+        { "dcs": "13", "chart": "V20" }, { "dcs": "14", "chart": "V6" }
+      ]
+    },
+    "notes": [
+      "No holding positions at the runway ends: Alpha meets the runway 04 end and Echo the runway 22 end; Bravo, Charlie and Delta are intersection positions about 600 m, 1950 m and 2600 m from the runway 04 end",
+      "Victor is the parallel taxiway southeast of the runway from APRON 1 past APRON 2, 3 and 4 and north to Delta and Echo; Echo curves from the runway 22 end back to Delta and Victor",
+      "Closed (X): link from APRON 1 to the Terminal, access to the Tower building, east exit of APRON 4 to the road",
+      "Maintenance Area (taxiway Mike) has no DCS parking; single stands V17-V25 and V53-V57 branch off Victor",
+      "ENTRY NORTH RWY 22 and EXIT NORTH RWY 04 are not for HIRTA sensitive aircraft; request landing instructions at least 2 minutes before the entry CRP",
+      "Cross-hatched towns (Khanskaya, Kelermesskaya, Maykop, Krasnooktyabr'skiy, Tul'skiy) may be overflown only with TWR clearance; avoid densely populated areas",
+      "DCS runway is 3108 m, the chart shows 3200 m; CTR is class D (HX), not permanently active"
+    ]
+  },
+  "Mineralnye Vody": {
+    "icao": "URMM",
+    "pattern_ft": 2600, "arrdep_max_ft": 3100, "ctr_top_ft": 3600,
+    "crp": {
+      "west":      "44°18.141'N 042°56.205'E",
+      "north":     "44°16.753'N 043°09.967'E",
+      "east":      "44°09.202'N 043°14.801'E",
+      "south":     "44°07.209'N 043°06.497'E",
+      "bykogorka": "44°11.121'N 042°56.458'E"
+    },
+    "rwy": {
+      "12": {
+        "chart": "11", "hand": "left", "side": "north",
+        "initial_nm": 2.4,   // 2.3 gemessen ab Kartenschwelle, DCS-Schwelle 156 m weiter innen: +0.08; INITIAL 11 bis INITIAL 29 6.82 NM, Bahn 2.19 NM (Kartenschwellen); ±0.1 (VAD verzerrt, Fehler bis 125 m)
+        // Standard west (115 dreht am wenigsten auf 119 ein); north und bykogorka nur Einflug fuer 12 gedruckt, Knick der Bogen nicht gedruckt
+        "entry": { "north": { "crs": 267, "via": "initial" }, "bykogorka": { "crs": 360, "via": "initial" }, "west": { "crs": 115, "via": "initial" } },
+        "exit": { "east": { "crs": 108 }, "south": { "crs": 171 }, "north": { "crs": 324 } }
+      },
+      "30": {
+        "chart": "29", "hand": "right", "side": "north",
+        "initial_nm": 2.4,   // 2.3 gemessen ab Kartenschwelle, DCS-Schwelle 151 m weiter innen: +0.08 (siehe 12)
+        // Standard east (288 dreht am wenigsten auf 299 ein)
+        "entry": { "north": { "crs": 144, "via": "initial" }, "south": { "crs": 22, "via": "initial" }, "east": { "crs": 288, "via": "initial" } },
+        "exit": { "west": { "crs": 295 }, "bykogorka": { "crs": 201 }, "north": { "crs": 65, "note": "transition from 289 not drawn" } }
+      }
+    },
+    "ground": {
+      "holds": {
+        "Charlie": { "pos": "44°13.609'N 043°04.937'E", "rwy": ["12", "30"] },   // Kreuzungshalt, ca. 2.0 km von Schwelle 12
+        "Delta": { "pos": "44°13.420'N 043°05.351'E", "rwy": ["12", "30"] },   // Kreuzungshalt, ca. 2.7 km von Schwelle 12
+        "November": { "pos": "44°13.139'N 043°06.107'E", "rwy": ["30"] }   // Nordseite nahe Schwelle 30
+      },
+      "ramps": {
+        "APRON 1": {
+          "pts": [[-51642.4, 705647.5], [-51792.4, 705961.4], [-52029.9, 706459.7]],   // gemessen: DCS-Stände 15-23, 24-27 und 9-14, 0-8
+          "to": { "12": "Alpha", "30": "Alpha, Echo" },
+          "vacate": { "12": "right via Charlie or Delta", "30": "left via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Alpha" }
+        }
+      }
+    },
+    "notes": [
+      "Taxiway A is the only parallel taxiway, along the north edge of APRON 1; no named holding position at the runway 12 threshold (A) or the runway 30 end (E)",
+      "C and D are intersection holds about 2.0 and 2.7 km from the runway 12 threshold: departures there are intersection departures",
+      "Holding position N is on the north side at the runway 30 threshold, reachable only by crossing the runway",
+      "Taxiway B joins the runway about 1.1 km from the runway 12 threshold",
+      "X marks on thin road lines are closed (not taxiways); Maintenance Area, Terminal, TWR and Fire Station have no DCS parking",
+      "DCS runway is 3754 m, the chart shows 4070 m: the DCS thresholds lie about 155 m inside the printed ones",
+      "Request landing instructions 2 min before the ENTRY CRP; avoid densely populated areas; restricted overflight areas Inozemtsevo and Pyatigorsk; CTR D (HX) 3600 ft, GND not permanently active"
+    ]
+  },
+  "Nalchik": {
+    "icao": "URMN",
+    "pattern_ft": 2900, "arrdep_max_ft": 3400, "ctr_top_ft": 3900,   // D (HX) 3900 / GND, nicht dauernd aktiv
+    "crp": {
+      "west":  "43°32.285'N 043°29.964'E",
+      "north": "43°36.736'N 043°39.750'E",
+      "east":  "43°32.497'N 043°47.417'E",
+      "south": "43°26.246'N 043°32.586'E"
+    },
+    // Karte 05/23 (2300 m) = DCS 06/24 (2048 m); Zuordnung über die Schwellenlage
+    "rwy": {
+      "06": {
+        "chart": "05", "hand": "right", "side": "southeast",
+        "initial_nm": 2.2,   // gemessen: INITIAL 05 bis INITIAL 23 5.70 NM (Georeferenz über die 4 CRP, Restfehler 75 m), Bahn laut PSN THR 1.24 NM; je Seite 2.23 ±0.1
+        // unsicher: Standard west nach Lage gewählt (126 läuft über flaches Land und dreht auf etwa 095 ein, 007 aus dem Süden über Gelände über Platzrundenhöhe); west und south nur Einflug für 06
+        // wp west: gebogen gezeichnet (126, dann nach Ost); wp = Schnittpunkt der gedruckten 126-Linie mit der Endrichtung auf INITIAL, gemessen
+        "entry": { "south": { "crs": 7, "via": "initial" }, "west": { "crs": 126, "via": "initial", "wp": "43°29.688'N 043°33.696'E" } },
+        // Ausflug 06: Bahnkurs bis INITIAL 23, dort rechts 074 (east) oder links 318 (north); Standard east nach Lage gewählt, nicht gedruckt
+        "exit": { "east": { "crs": 74, "note": "via runway 24 initial, then 074" }, "north": { "crs": 318, "note": "via runway 24 initial, then 318" } }
+      },
+      "24": {
+        "chart": "23", "hand": "left", "side": "southeast",
+        "initial_nm": 2.2,   // gemessen, siehe 06
+        // unsicher: Standard east (254 dreht nur 25° auf 229; north 138 dreht mit Bogen etwa 40°); north und east nur Einflug für 24
+        // wp north: gebogen gezeichnet (138, dann nach Süd); wp = Schnittpunkt der gedruckten 138-Linie mit der Endrichtung auf INITIAL, gemessen
+        "entry": { "north": { "crs": 138, "via": "initial", "wp": "43°33.659'N 043°42.465'E" }, "east": { "crs": 254, "via": "initial" } },
+        // Ausflug 24: west zweigt vor INITIAL 05 ab, south läuft über INITIAL 05; Standard west nach Lage gewählt, nicht gedruckt
+        "exit": { "west": { "crs": 280, "note": "turn right before runway 06 initial, about 1.2 NM past the runway end" }, "south": { "crs": 187, "note": "via runway 06 initial, then 187" } },
+        "backtrack": true   // kein Rollweg erreicht das Ende 24 (Verbindung Apron 2 zum NO-Ende gesperrt), Einstieg über Bravo
+      }
+    },
+    "ground": {
+      "holds": {
+        "Alpha": { "pos": "43°30.538'N 043°37.547'E", "rwy": ["06"] },   // P1, Schwelle 05 der Karte (DCS-Ende 06 8 m daneben, 105 m seitlich)
+        "Bravo": { "pos": "43°30.677'N 043°37.840'E", "rwy": ["06", "24"] }   // P2, 465 m vom DCS-Ende 06, Zwischenstart; für 24 Einstieg zum Backtrack
+      },
+      "ramps": {
+        "APRON 1": {
+          "pts": [[-125425.9, 760436.4], [-125264.9, 760676.8]],   // gemessen: DCS-Stände 1-8 und 9-15
+          "to": { "06": "Alpha", "24": "Alpha, Bravo" },   // Alpha = Vorfeldgasse und Bogen zum Ende 05; Bravo vom Vorfeld zur Bahn, dann Backtrack
+          "hold": { "06": "Alpha", "24": "Bravo" },
+          "vacate": { "06": "right via Bravo", "24": "left via Bravo or Alpha" },   // nach Lage gewählt, nicht gedruckt; 06: Bravo ist die einzige Abrollmöglichkeit, danach Backtrack
+          "in": { "*": "Bravo, Alpha" }
+        }
+      },
+      "stands": [{ "dcs": "1-15", "chart": "1-15" }]   // unsicher: Karte druckt am Vorfeld nur den Bereich 1-15, Reihenfolge nicht erkennbar
+    },
+    "notes": [
+      "No taxiway reaches the runway 24 end: departures runway 24 taxi to Bravo and backtrack (link from Apron 2 to the northeast end is closed)",
+      "Landing runway 06: Bravo is the only exit, 465 m from the threshold; rollout beyond it needs a backtrack. Alpha joins at the 06 end",
+      "Alpha runs along Apron 1 and around to the runway 06 end; Bravo joins the runway in the western third",
+      "Closed (X): Apron 2 link to the northeast end, two spurs at the southwest end of Apron 1 near the Terminal, road from TWR to the runway",
+      "Apron 2 (Fire Station) and the Maintenance Area (taxiway E) have no DCS parking",
+      "Entry only: west and south for runway 06, north and east for runway 24; request landing instructions at least 2 minutes before the entry CRP",
+      "Avoid overflying densely populated areas: Nalchik, Shalushka, Nartan, Baksan, Nartkala are not to be overflown unless cleared by TWR or military authority",
+      "Terrain rises south and southwest of the field above pattern altitude (4062 ft, 4325 ft); obstacle group 2466 ft at CRP south",
+      "DCS runway is 2048 m, the chart shows 2300 m; chart names 05/23 = DCS 06/24"
+    ]
+  },
+  "Beslan": {
+    "icao": "URMO",
+    "pattern_ft": 3300, "arrdep_max_ft": 3800, "ctr_top_ft": 4300,
+    "crp": {
+      "west":  "43°14.425'N 044°28.041'E",
+      "north": "43°16.700'N 044°37.752'E",
+      "east":  "43°11.447'N 044°45.007'E",
+      "south": "43°08.839'N 044°34.864'E"
+    },
+    "rwy": {
+      "10": {
+        "chart": "09", "hand": "left", "side": "north",
+        "initial_nm": 2.2,   // gemessen: INITIAL 09 bis INITIAL 27 5.97 NM (Anpassung über die 4 CRP, Rest 2 px), Bahn 1.63 NM; je Seite 2.17 NM, Aufteilung ±0.1 (VAD verzerrt)
+        // Standard west (101 dreht nur 14° auf 087 ein); west nur Einflug für 09; south überfliegt die Bahnmitte mit 002 und bricht links ab
+        "entry": { "south": { "crs": 2, "via": "overhead" }, "north": { "crs": 234, "via": "initial" }, "west": { "crs": 101, "via": "initial" } },
+        "exit": { "east": { "crs": 83 }, "north": { "crs": 314 }, "south": { "crs": 218 } },   // north: Linkskurve, south: Rechtskurve, dann der gedruckte Kurs zum CRP
+        "backtrack": true   // beide Rollwege münden mittig in die Bahn, keiner erreicht die Schwelle
+      },
+      "28": {
+        "chart": "27", "hand": "right", "side": "north",
+        "initial_nm": 2.2,   // gemessen, siehe 10
+        // Standard east (261 dreht nur 6° auf 267 ein); east nur Einflug für 27; south überfliegt die Bahnmitte mit 002 und bricht rechts ab
+        "entry": { "south": { "crs": 2, "via": "overhead" }, "north": { "crs": 121, "via": "initial" }, "east": { "crs": 261, "via": "initial" } },
+        "exit": { "west": { "crs": 267, "note": "then 281 to the CRP" }, "north": { "crs": 357, "note": "then 034 to the CRP" }, "south": { "crs": 144 } },   // south: Linkskurve, dann 144 zum CRP
+        "backtrack": true   // siehe 10
+      }
+    },
+    "ground": {
+      "holds": {
+        "Whiskey": { "pos": "43°12.323'N 044°36.262'E", "rwy": ["10", "28"] },   // P1, 1.3 km vom Ende 10 (Zwischenstart für 28)
+        "Echo": { "pos": "43°12.255'N 044°36.712'E", "rwy": ["10", "28"] }   // P2, 0.9 km vom Ende 28 (Zwischenstart für 10)
+      },
+      "ramps": {
+        "APRON SOUTH": {
+          "pts": [[-148848.6, 843564.5], [-148860.7, 843865.9], [-148873.3, 844068.5]],   // gemessen: DCS-Stände 10-14, 3-9 und 0-2
+          "to": { "10": "Whiskey", "28": "Echo" },   // nächster Rollweg zur Schwelle der Startrichtung, dann backtrack
+          "hold": { "10": "Whiskey", "28": "Echo" },
+          "vacate": { "10": "right via Whiskey or Echo", "28": "left via Echo or Whiskey" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "10": "Whiskey", "28": "Echo" }
+        }
+      },
+      "stands": [{ "dcs": "0-14", "chart": "1-15" }]   // unsicher: Karte druckt am Vorfeld nur den Bereich 1-15, Reihenfolge nicht erkennbar; DCS 15 und 16 sind Bahnendplätze
+    },
+    "notes": [
+      "No parallel taxiway: taxiways W and E join the middle of the runway, no taxiway reaches either runway end, so every departure from the runway end needs a backtrack",
+      "Holding position W is about 1.3 km from the runway 10 end, E about 0.9 km from the runway 28 end",
+      "Closed (X): the two accesses from APRON SOUTH to the Fire Station",
+      "Cross-hatched built-up areas (Dalakova and Kantyshevo north of the runway, Nazran east, Vladikavkaz south) shall not be overflown unless cleared by TWR; avoid overflying densely populated areas",
+      "Many power lines east and north-east, across the entry East track, INITIAL 27 and the 121 track",
+      "Terminal, TWR and Maintenance Area have no DCS parking; DCS runway is 2843 m, the chart shows 3015 m"
+    ]
+  },
+  "Mozdok": {
+    "icao": "XRMF",
+    "pattern_ft": 2000, "arrdep_max_ft": 2500, "ctr_top_ft": 3000,
+    "crp": {
+      "west":  "43°49.176'N 044°25.282'E",
+      "north": "43°51.867'N 044°45.042'E",
+      "east":  "43°44.628'N 044°46.325'E",
+      "south": "43°42.744'N 044°29.795'E"
+    },
+    "rwy": {
+      "08": {
+        "chart": "08", "hand": "left", "side": "north",
+        "initial_nm": 3.0,   // gemessen: INITIAL 08 bis INITIAL 26 7.03 NM, Kartenbahn 1.69 NM, je 2.67 NM vor den Kartenschwellen; DCS-Schwelle 08 liegt 673 m (0.36 NM) weiter ostwärts; ±0.15 (VAD verzerrt)
+        // Standard west (102 dreht 26° auf 076, south 342 dreht 94°); west und south nur Einflug für 08
+        "entry": { "south": { "crs": 342, "via": "initial" }, "west": { "crs": 102, "via": "initial" } },
+        "exit": { "east": { "crs": 101 }, "north": { "crs": 34 } }
+      },
+      "26": {
+        "chart": "26", "hand": "right", "side": "north",
+        "initial_nm": 2.7,   // gemessen, siehe 08; DCS-Schwelle 26 liegt 80 m (0.04 NM) innerhalb des Kartenendes
+        // Standard east (296 dreht 40° auf 256, north 194 dreht 62°); north und east nur Einflug für 26
+        "entry": { "north": { "crs": 194, "via": "initial" }, "east": { "crs": 296, "via": "initial" } },
+        "exit": { "west": { "crs": 271 }, "south": { "crs": 192 } }
+      }
+    },
+    "ground": {
+      "holds": {
+        "Bravo": { "pos": "43°47.464'N 044°35.476'E", "rwy": ["08"] }   // P2, 88 m vom DCS-Ende 08; einzige benannte Rollhalteposition
+      },
+      "ramps": {
+        "Ramp 2": {
+          "pts": [[-84002.5, 834322.8], [-83940.4, 834806.3], [-83895.4, 835155.8]],   // gemessen: DCS-Stände 0,17-22,30-32, 23-25,33,34 und 26-29,35-37
+          "to": { "08": "Echo, Bravo", "26": "Echo" },
+          "hold": { "08": "Bravo" },
+          "vacate": { "08": "right via Charlie or Delta", "26": "left via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Echo" },
+          "note": { "08": "Last chance check on taxiway Alpha.", "26": "Last chance check on taxiway Echo." }   // Last Chance: A vor 08, E vor 26 (Karte)
+        },
+        "West Stands": {   // Name nicht gedruckt (Stände 26-31 an Alpha und Bravo)
+          "pts": [[-83970.8, 833214.2]],   // gemessen: DCS-Stände 11-16
+          "to": { "08": "Alpha, Bravo", "26": "Alpha, Echo" },
+          "hold": { "08": "Bravo" },
+          "vacate": { "08": "right via Charlie or Delta", "26": "left via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Alpha" },
+          "note": { "08": "Last chance check on taxiway Alpha.", "26": "Last chance check on taxiway Echo." }   // Last Chance: A vor 08, E vor 26 (Karte)
+        },
+        "East Stands": {   // Name nicht gedruckt (Stände 23-25 an Echo bei P5)
+          "pts": [[-83765.0, 835046.7], [-83738.8, 835440.1]],   // gemessen: DCS-Stand 38 und 39, 40
+          "to": { "08": "Echo, Bravo", "26": "Echo" },
+          "hold": { "08": "Bravo" },
+          "vacate": { "08": "right via Charlie or Delta", "26": "left via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Echo" },
+          "note": { "08": "Last chance check on taxiway Alpha.", "26": "Last chance check on taxiway Echo." }   // Last Chance: A vor 08, E vor 26 (Karte)
+        },
+        "Ramp South": {
+          "pts": [[-85170.6, 832029.1]],   // gemessen: DCS-Stände 3-10
+          "to": { "08": "Sierra, Alpha, Bravo", "26": "Sierra, Alpha, Echo" },
+          "hold": { "08": "Bravo" },
+          "vacate": { "08": "right via Charlie or Delta", "26": "left via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Alpha, Sierra" },
+          "note": { "08": "Last chance check on taxiway Alpha.", "26": "Last chance check on taxiway Echo." }   // Last Chance: A vor 08, E vor 26 (Karte)
+        }
+      },
+      "stands": [
+        { "dcs": "11", "chart": "31" }, { "dcs": "12", "chart": "30" }, { "dcs": "13", "chart": "29" },
+        { "dcs": "14", "chart": "28" }, { "dcs": "15", "chart": "27" }, { "dcs": "16", "chart": "26" },
+        { "dcs": "38", "chart": "23" }, { "dcs": "39", "chart": "24" }, { "dcs": "40", "chart": "25" },
+        { "dcs": "3", "chart": "32" }, { "dcs": "4", "chart": "33" }, { "dcs": "5", "chart": "34" }, { "dcs": "6", "chart": "36" },
+        { "dcs": "7", "chart": "38" }, { "dcs": "8", "chart": "39" }, { "dcs": "9", "chart": "37" }, { "dcs": "10", "chart": "35" }
+        // Ramp 2: DCS 0 und 17-37 in einer Reihe, Karte druckt dort keine einzelnen Standnummern (1-22 nur als Bereich), Zuordnung offen
+      ]
+    },
+    "notes": [
+      "Last Chance on taxiway A just east of P1 (before takeoff 08 from the charted threshold) and on the sloped taxiway E south of the A junction (before takeoff 26)",
+      "DCS runway is 2357 m, the chart shows 3120 m: DCS threshold 08 lies 673 m east of the charted threshold, level with Holding Position B (P2); threshold 26 is 80 m inside the charted end",
+      "Holding Position B (P2) is the only named hold; P1, P3, P4 and P5 are coordinate points at the junctions A/S, A/C, A/D and E at Ramp 2 East",
+      "Taxiway B joins the runway at the DCS threshold 08; taxiway E (old runway 1-22) runs along Ramp 2 and curves into the runway 26 end, so no backtrack is needed",
+      "Closed (X): five marks on Ramp South (access to stand 32, Fuel Station 2, stand 34, ends at stand 33) and one at the edge of taxiway E north of the tower",
+      "Ramp 1 (south of E via taxiway G) and the Maintenance Area (taxiway M) have no DCS parking",
+      "Cross-hatched areas (Mozdok town, Pavlodolskaya) shall not be overflown unless cleared by TWR or authorized by military authority"
+    ]
+  },
+  "Vaziani": {
+    "icao": "UG27",
+    "pattern_ft": 3000, "arrdep_max_ft": 3500,
+    "ctr_top_ft": 3500,   // unsicher: nur Kasten "D (HX) 3500 / GND", kein CTR
+    "crp": {
+      "foxtrott": "41°40.620'N 045°08.898'E"
+    },
+    "rwy": {
+      "13": {
+        "chart": "13", "hand": "left", "side": "northeast",
+        "initial_nm": 2.3,   // gemessen: INITIAL 13 liegt 2.30 NM hinter der Schwelle 13 entlang der Achse (VAD 35.2 px/NM, Bahn 45 px = 1.29 NM); ±0.1
+        // einziger CRP: Foxtrott 271 geradeaus nach W, dann Linksbogen in INITIAL 13, dann 129; kein Knickpunkt gedruckt
+        "entry": { "foxtrott": { "crs": 271, "via": "initial" } },
+        "exit": { "foxtrott": { "crs": 28 } }   // 028 ab SE-Ende der Platzrunde (Start 13, Linkskurve)
+      },
+      "31": {
+        "chart": "31", "hand": "right", "side": "northeast",
+        "initial_nm": 3.1,   // gemessen: 3.06 NM entlang der Achse hinter der Schwelle 31, 3.12 NM direkt; INITIAL 31 liegt 0.6 NM NE der Achse; ±0.1
+        // Foxtrott 172 geradeaus nach S, dann Rechtsbogen in INITIAL 31, dann 301; kein Knickpunkt gedruckt
+        "entry": { "foxtrott": { "crs": 172, "via": "initial" } },
+        "exit": { "foxtrott": { "crs": 68 } }   // 068 ab NW-Ende der Platzrunde (Start 31, Rechtskurve)
+      }
+    },
+    "ground": {
+      // keine Rollhalte gedruckt: P1-P4 sind Rollwegkreuzungen, keine Halte
+      "ramps": {
+        "RAMP 1": {
+          "pts": [[-318107.1, 902533.8]],   // gemessen: DCS-Stände 89-92
+          "to": { "13": "Sierra, Alpha", "31": "Sierra, Echo" },
+          "vacate": { "13": "left via Charlie or Delta", "31": "right via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Sierra" }
+        },
+        "North Stands": {   // Name nicht gedruckt (Stände 10-30 an November, L1-L4)
+          "pts": [[-317955.4, 902652.0], [-317788.4, 902857.9], [-317691.5, 903219.2]],   // gemessen: DCS-Stände 0-4, 5-12, 13-20
+          "to": { "13": "November, Bravo, Sierra, Alpha", "31": "November, Bravo, Sierra, Echo" },
+          "vacate": { "13": "left via Charlie or Delta", "31": "right via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "November" }
+        },
+        "Central Stands": {   // Name nicht gedruckt (Stände 31-56 an November, K, J)
+          "pts": [[-318260.2, 902842.3], [-318524.3, 903222.2], [-318686.0, 903566.7]],   // gemessen: DCS-Stände 21-27, 28-38 und 78, 39-44 und 46
+          "to": { "13": "November, Charlie, Sierra, Alpha", "31": "November, Delta, Sierra, Echo" },
+          "vacate": { "13": "left via Charlie or Delta", "31": "right via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "November" }
+        },
+        "East Stands": {   // Name nicht gedruckt (Stände 57-68, 80, 87-91 an November, G, I; RAMP 4 selbst ohne Standnummern)
+          "pts": [[-318854.4, 903751.3], [-319073.7, 903814.0], [-319068.9, 904181.0]],   // gemessen: DCS-Stände 45 und 47-49 und 77, 50-56, 57 und 61-65
+          "to": { "13": "November, Delta, Sierra, Alpha", "31": "November, Echo" },
+          "vacate": { "13": "left via Charlie or Delta", "31": "right via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "November" }
+        },
+        "Southeast Stands": {   // Name nicht gedruckt (Stände 69-77, 81-86 und 92 an November)
+          "pts": [[-319204.6, 904088.8], [-319350.1, 903925.3], [-319505.0, 904111.3]],   // gemessen: DCS-Stände 58-60 und 66-68, 69-73 und 79-80, 74-76
+          "to": { "13": "November, Delta, Sierra, Alpha", "31": "November, Echo" },
+          "vacate": { "13": "left via Charlie or Delta", "31": "right via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "November" }
+        },
+        "RAMP 2": {
+          "pts": [[-319609.3, 904231.8]],   // gemessen: DCS-Stände 88, 93 (Tower)
+          "to": { "13": "Sierra, Alpha", "31": "Echo" },
+          "vacate": { "13": "left via Charlie or Delta", "31": "right via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "November" }
+        },
+        "RAMP 3": {
+          "pts": [[-319810.3, 904213.2]],   // gemessen: DCS-Stände 83-87
+          "to": { "13": "Sierra, Alpha", "31": "Echo" },
+          "vacate": { "13": "left via Charlie or Delta", "31": "right via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Sierra" }
+        }
+      },
+      "stands": [
+        { "dcs": "89-92", "chart": "1-4" },   // unsicher: Karte druckt nur den Bereich "1-2-3-4", Reihenfolge nicht erkennbar
+        { "dcs": "83-87", "chart": "5-9" },   // unsicher: nur Bereichsbeschriftung "5-6-7-8-9"
+        { "dcs": "88, 93", "chart": "78-79" },   // unsicher: nur Bereichsbeschriftung "78-79"
+        // Stände 10-92 per Lage zugeordnet (Kartennummer neben dem Standsymbol, DCS-Stand im Pixelfit); hell gezeichnete Stände (Kartennr. 35, 37, 57, 61, 65, 66, 69, 71, 72, 74, 76, 77, 90) über das Textetikett, daher unsicher
+        { "dcs": "0-1", "chart": "10-11" }, { "dcs": "2", "chart": "13" }, { "dcs": "3", "chart": "12" }, { "dcs": "4-5", "chart": "14-15" },
+        { "dcs": "6", "chart": "18" }, { "dcs": "7", "chart": "17" }, { "dcs": "8", "chart": "16" }, { "dcs": "9", "chart": "19" },
+        { "dcs": "10", "chart": "22" }, { "dcs": "11-12", "chart": "20-21" }, { "dcs": "13-14", "chart": "23-24" }, { "dcs": "15", "chart": "26" },
+        { "dcs": "16", "chart": "25" }, { "dcs": "17", "chart": "27" }, { "dcs": "18", "chart": "30" }, { "dcs": "19", "chart": "29" },
+        { "dcs": "20", "chart": "28" }, { "dcs": "21", "chart": "31" }, { "dcs": "22", "chart": "33" }, { "dcs": "23", "chart": "32" },
+        { "dcs": "24", "chart": "35" }, { "dcs": "25", "chart": "34" }, { "dcs": "26-29", "chart": "36-39" }, { "dcs": "30", "chart": "41" },
+        { "dcs": "31", "chart": "40" }, { "dcs": "32", "chart": "42" }, { "dcs": "33", "chart": "45" }, { "dcs": "34", "chart": "44" },
+        { "dcs": "35-36", "chart": "46-47" }, { "dcs": "37", "chart": "49" }, { "dcs": "38", "chart": "48" }, { "dcs": "39-40", "chart": "50-51" },
+        { "dcs": "41-45", "chart": "53-57" }, { "dcs": "46", "chart": "52" }, { "dcs": "47-49", "chart": "58-60" }, { "dcs": "50-53", "chart": "62-65" },
+        { "dcs": "54", "chart": "67" }, { "dcs": "55", "chart": "66" }, { "dcs": "56", "chart": "68" }, { "dcs": "57-60", "chart": "80-83" },
+        { "dcs": "61-65", "chart": "87-91" }, { "dcs": "66", "chart": "86" }, { "dcs": "67", "chart": "85" }, { "dcs": "68", "chart": "84" },
+        { "dcs": "69-72", "chart": "70-73" }, { "dcs": "73", "chart": "75" }, { "dcs": "74", "chart": "74" }, { "dcs": "75", "chart": "77" },
+        { "dcs": "76", "chart": "76" }, { "dcs": "77", "chart": "61" }, { "dcs": "78", "chart": "43" }, { "dcs": "79", "chart": "69" },
+        { "dcs": "80", "chart": "92" }
+      ]
+    },
+    "notes": [
+      "No holding positions are printed: the points P1 to P4 on the ground chart are taxiway intersections",
+      "Taxiway A reaches the runway 13 end and E the runway 31 end; B, C and D link the runway with the parallel taxiway S and continue to N, so no backtrack is needed",
+      "Closed (X): several taxiways northeast of N (including the triangle crossing northeast of RAMP 4) and short branches off N and G",
+      "RAMP 4 (H1/H2 hangars) and the Maintenance Area have no DCS parking; RAMP 2 at the tower holds stands 78 and 79 (DCS 88, 93)",
+      "Request landing instructions 2 minutes before ENTRY CRP Foxtrott, avoid densely populated areas, simultaneous Lochini traffic: do not overshoot the routes",
+      "DCS runway is 2391 m, the chart shows 2485 m"
+    ]
+  },
+  "Soganlug": {
+    "icao": "UG24",
+    "pattern_ft": 2500, "arrdep_max_ft": 3000, "ctr_top_ft": 3000,
+    "crp": {
+      "north": "41°42.169'N 044°48.495'E",
+      "south": "41°31.860'N 044°59.451'E",
+      "lake":  "41°35.642'N 044°51.724'E"
+    },
+    "exit_only": ["lake"],
+    "rwy": {
+      "14": {
+        "chart": "13", "hand": "right", "side": "southwest",
+        "initial_nm": 2.3,   // gemessen: INITIAL 13 vor der Schwelle, drei Schätzungen (Affin auf die 3 CRP 2.5, lokaler Maßstab ~2.2, erster Durchgang 2.1-2.2); ±0.3 (VAD verzerrt)
+        "entry": { "north": { "crs": 82, "via": "initial" } },   // nur North gedruckt; nicht für HIRTA-empfindliche Lfz
+        "exit": { "south": { "crs": 126, "note": "then 184 to the CRP" }, "lake": { "crs": 237 } }   // Zuordnung zu 14 aus der Lage (SO-Ende); South zuerst: Weiterflug auf Bahnkurs
+      },
+      "32": {
+        "chart": "31", "hand": "left", "side": "southwest",
+        "initial_nm": 2.8,   // gemessen: INITIAL 31, Affin 2.7, erster Durchgang 2.8; ±0.3 (VAD verzerrt)
+        // abgeleitet: Strecke 004 vom CRP South kurvt nach NW auf die Mittellinie, der Knick ist nicht gedruckt; wp = Schnitt der 004-Geraden mit der verlängerten Mittellinie (4.8 NM SO der Schwelle)
+        "entry": { "south": { "crs": 4, "via": "initial", "wp": "41°34.777'N 045°00.715'E" } },
+        "exit": { "north": { "crs": 280, "note": "not for HIRTA sensitive aircraft" }, "lake": { "crs": 186 } }   // Zuordnung zu 32 aus Hinweis 3 (EXIT NORTH RWY 31) und Lage (NW-Ende)
+      }
+    },
+    "ground": {
+      "holds": {
+        // kein Rollhalt gedruckt (die Kreis-Punkt-Symbole sind PSN THR/ASR); alle drei gemessen an den Stichen zur Bahn
+        "Alpha 1": { "pos": "41°39.445'N 044°55.705'E", "rwy": ["14"] },   // gemessen: Stich A1 am NW-Ende, 108 m SW der Bahnmitte
+        "Bravo": { "pos": "41°39.162'N 044°56.020'E", "rwy": ["14"] },   // gemessen: Stich B, 90 m SW der Bahnmitte, 680 m vom NW-Ende (Zwischenstart); P1 = Kreuzung B/E
+        "Echo": { "pos": "41°38.476'N 044°56.768'E", "rwy": ["32"] }   // gemessen: E kurz vor dem SO-Ende, 61 m SW der Bahnmitte
+      },
+      "ramps": {
+        "APRON 1": {
+          "pts": [[-317122.8, 894202.6], [-317021.3, 894519.2]],   // gemessen: DCS-Stand 5 und Bahnendstand 6 (NW)
+          "to": { "14": "Alpha 1", "32": "Alpha, Echo" },   // unsicher: E zwischen A und B mit X (gesperrt) gezeichnet
+          "hold": { "14": "Alpha 1", "32": "Echo" },
+          "vacate": { "14": "right via Bravo or Charlie", "32": "left via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Echo, Alpha" }   // unsicher: E zwischen A und B gesperrt
+        },
+        "APRON 2": {
+          "pts": [[-318024.3, 895394.0]],   // gemessen: DCS-Stände 0, 1, 4 (Kartenstreifen 2-3-4)
+          "to": { "14": "Echo, Bravo", "32": "Echo" },   // 14: E zwischen A und B gesperrt, daher Zwischenstart ab Bravo
+          "hold": { "14": "Bravo", "32": "Echo" },
+          "vacate": { "14": "right via Bravo or Charlie", "32": "left via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Echo" }
+        },
+        "APRON 3": {
+          "pts": [[-318524.4, 895803.6], [-318634.8, 896295.1]],   // gemessen: DCS-Stand 3 und Bahnendstand 2 (SO); Fläche der Karte nicht abgegrenzt
+          "to": { "14": "Echo, Bravo", "32": "Echo" },   // unsicher: X bei Apron 3/E (liegt neben einem Gebäude, ob E selbst gesperrt ist, unklar)
+          "hold": { "14": "Bravo", "32": "Echo" },
+          "vacate": { "14": "right via Bravo or Charlie", "32": "left via Delta or Charlie" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Echo" }
+        }
+      },
+      "stands": [{ "dcs": "5", "chart": "5" }, { "dcs": "3", "chart": "1" }]   // DCS 0, 1, 4 = Kartenstände 2-4, Reihenfolge nicht erkennbar; DCS 6 und 2 sind Bahnendstände ohne Kartenstand
+    },
+    "notes": [
+      "Taxiway E runs southwest of the runway over its full length and joins the runway at the 32 threshold; B, C and D are stubs to the runway (P1 = B/E, P2 = D/E), A, A1 and A2 serve Apron 1 at the 14 end",
+      "Closed (X): taxiway A at Apron 1, E between A and B, sections at C/Apron 2, two sections south of Apron 2 near the ASR, one at Apron 3/E",
+      "No holding position printed: Alpha 1, Bravo and Echo are measured, B is an intersection departure for runway 14 (about 1700 m left)",
+      "Entry North runway 14 and Exit North runway 32: procedures not usable for HIRTA sensitive aircraft; Lake is an exit only",
+      "Simultaneous departures and arrivals at Tbilisi-Lochini: do not overshoot the routes; request landing instructions 2 minutes before the entry CRP",
+      "DCS runway is 2399 m, the chart shows 2475 m; stands 6 and 2 lie on the runway ends"
+    ]
+  },
+  "Tbilisi-Lochini": {
+    "icao": "UGTB",   // VAD zeigt nur Luftraum und Hindernisse, keine Platzrunde, keine Meldepunkte: daher nur ground und notes
+    "ground": {   // keine Rollhalte gedruckt (GND und Parkkarten), daher kein holds/hold; Bahn 13/31 = Karte 12R/30L
+      "ramps": {
+        "APRON 1": {
+          "pts": [[-314831.5, 896609.9], [-315000.3, 896843.3], [-315161.3, 897087.6]],   // gemessen: DCS-Stände 24-28,34-41, 14-23,29-33 und 0-13
+          "to": { "13": "Charlie, Bravo", "31": "Charlie, Echo" },   // nach Lage gewählt, nicht gedruckt
+          "vacate": { "13": "left via Alpha or Echo", "31": "right via Alpha or Bravo" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Alpha, Charlie" }
+        },
+        "APRON 3": {
+          "pts": [[-314974.2, 896480.9]],   // gemessen: DCS-Stände 42-47, 75
+          "to": { "13": "Foxtrot, November, Bravo", "31": "Foxtrot, November, Echo" },   // nach Lage gewählt, nicht gedruckt
+          "vacate": { "13": "left via Alpha or Echo", "31": "right via Alpha or Bravo" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Alpha, November, Foxtrot" }
+        },
+        "Helipad North": {
+          "pts": [[-314451.7, 895790.7], [-314321.4, 895815.4], [-314314.6, 895961.1]],   // gemessen: DCS-Stände 57-58, 53-55 und 59-61, 48-52 und 56
+          "to": { "13": "Delta, Bravo", "31": "Delta, Charlie, Echo" },   // nach Lage gewählt, nicht gedruckt
+          "vacate": { "13": "left via Alpha or Echo", "31": "right via Alpha or Bravo" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Alpha, Charlie, Delta" }
+        },
+        "APRON 5": {
+          "pts": [[-314352.8, 895561.8]],   // gemessen: DCS-Stände 66-72
+          "to": { "13": "Delta, Bravo", "31": "Delta, Charlie, Echo" },   // nach Lage gewählt, nicht gedruckt
+          "vacate": { "13": "left via Alpha or Echo", "31": "right via Alpha or Bravo" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Alpha, Charlie, Delta" }
+        },
+        "Helipads": {   // Name nicht gedruckt (4 Hubschrauberplätze H zwischen APRON 5 und Bahn)
+          "pts": [[-314507.6, 895734.7]],   // gemessen: DCS-Stände 62-65
+          "to": { "13": "Delta, Bravo", "31": "Delta, Charlie, Echo" },   // nach Lage gewählt, nicht gedruckt
+          "vacate": { "13": "left via Alpha or Echo", "31": "right via Alpha or Bravo" },   // nach Lage gewählt, nicht gedruckt
+          "in": { "*": "Alpha, Charlie, Delta" }
+        }
+      }
+      // stands fehlen: Kartennummern 01-39, 49-51 (APRON 1), 42-48 (APRON 3), 52-58, 70-74, 77-78 (Helipad North), 63-69 (APRON 5) gedruckt,
+      // Gruppengrößen passen zu den DCS-Ständen, die Reihenfolge innerhalb der Reihen ist nicht eindeutig
+    },
+    "notes": [
+      "No holding positions are printed on the ground or parking charts",
+      "DCS runway 13/31 is 2345 m, the chart shows 12R/30L with 2920 m: DCS 13 starts at the junction of taxiway B, about 470 m beyond the chart threshold; the chart runway extends about 90 m beyond the DCS 31 start",
+      "Alpha is the only taxiway joining the middle of the runway; N is a parallel taxiway; the extension northwest of B is closed",
+      "Taxiway C is narrow with unpaved shoulders: wingspan up to 51 m taxi on the inboard engines only, larger aircraft taxi on the runway, Follow-me mandatory",
+      "Aircraft with a nosewheel turn radius over 15 m turn on the runway thresholds only; Follow-me mandatory in winter",
+      "Apron 2 (Tower) and Apron 4 (Terminal 3) have no DCS parking; four helicopter pads (H) lie between APRON 5 and the runway; Helipad North has lanes X1-X3",
+      "CTR Tbilisi-Lochini D 4500 ft/GND permanently active; neighbouring CTRs Soganlug D(HX) 3000 ft and Vaziani D(HX) 3500 ft; the approach sheet shows no traffic pattern and no reporting points"
     ]
   }
 }

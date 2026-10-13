@@ -34,15 +34,19 @@ public partial class Tower
 {
     // ======================================================================= Airfield
     const double NM = 1852, Kt = 0.514444, Ft = 0.3048;
-    public const double InitialDist = 4000;                         // Initial point before the threshold (Kutaisi chart ~2 NM)
+    public const double InitialDist = 4000;                         // Initial point before the threshold without chart data (Kutaisi chart ~2 NM)
+    /// Initial point before the threshold: chart initial_nm per runway, otherwise InitialDist.
+    public static double Initial(Airfield f, string rw) => f.InitialNm.TryGetValue(rw, out var n) ? n * NM : InitialDist;
+    double Ini(string rw) => Initial(F, rw);
     const double InitialLat = 0.5 * NM;                       // "initial" only up to this lateral distance from the runway centerline (call and tick)
     public readonly Airfield F;
     /// Controller frequencies (MHz AM), same for all airfields. Program sets them from config.jsonc.
-    public static Dictionary<string, double> Freqs = new() { ["Ground"] = 264.5, ["Tower"] = 265.0, ["Approach"] = 266.5, ["ATIS"] = 263.5 };
+    public static Dictionary<string, double> Freqs = new() { ["Ground"] = 264.5, ["Tower"] = 265.0, ["Approach"] = 266.5, ["ATIS"] = 263.5, ["Center"] = 268.5 };
     string role = "Tower";                                    // who is currently replying
-    string Station => F.StationOf(Dep(role));
+    string Station => StationOf(Dep(role));
     /// Forum request: after the handoff on departure, Approach speaks as Departure if the airfield has its own departure frequency (AirfieldFrequencies); otherwise Approach as before.
-    internal string Dep(string r) => r == "Approach" && handedOff && Phase is Phase.Departing or Phase.Away && lastIntent is not ("inbound" or "initial" or "overhead" or "straightin" or "crp")
+    internal string Dep(string r) => r == "Approach" && Center && lastIntent is not ("inbound" or "initial" or "overhead" or "straightin" or "crp") ? "Center"   // Center service: flight following under the Center name
+                                     : r == "Approach" && handedOff && Phase is Phase.Departing or Phase.Away && lastIntent is not ("inbound" or "initial" or "overhead" or "straightin" or "crp")
                                      && F.Own.ContainsKey("Departure") ? "Departure" : r;   // back to landing (call and then inbound): Approach again
     double FieldElev => F.Elev;
     double MagVar => F.MagVar;
@@ -77,6 +81,10 @@ public partial class Tower
     double lastParkCall = -999;
     bool progressive, progNear;          // N26: on request Ground guides with direction/distance to the holding point or parking position; progNear: final announcement spoken
     double progLast, progMin, growSince; // distance at the last announcement, smallest since then, since when it has been growing (A36: deviation)
+    (double X, double Z) netGoal; double[]? netDg;   // taxi guidance on the DCS network: goal and its distance field (Rollnetz.Spread, once per goal)
+    double backSince = -1;   // since when the way lies behind him (wrong way)
+    string? taxiSaid;   // route of the last taxi clearance ("taxi to APRON 2 via November, parking spot two zero"): "say again taxi" and wrong way repeat it
+    double stuckSince = -1; bool stuckAsked;   // stopped on the taxiway: since when; asked once (again after moving)
     bool airborne, rwyBusyTold, handedOff;   // handedOff: handed over to Approach (Departure) after takeoff
     double handedAt = -1;                    // when (tower handoff in Tick), -1 = unknown (FF check-in, restored session)
     bool zoneReport;                         // R7: VFR departure identified in the zone ("report leaving the control zone"), sign-off at the zone boundary
@@ -89,7 +97,7 @@ public partial class Tower
     (double X, double Z)? nav;          // target for headings (CRP, initial, airfield, final, departure CRP)
     string navName = "";
     double handoffAt = -999, lastVector = -999, lastGuide = -999, lastLow = -999, lastIncursion = -999, lastAbort = -999, lastPatternWarn = -999, lastGa = -999;   // lastGa: go-around from the tower (A11)
-    bool baseCalled, extended, wrongRwyTold, lineUp, gearTold, finalLowTold, rejecting, clrAsked;   // rejecting: rejected takeoff (R100) above 40 kt, the deceleration is not a takeoff roll
+    bool baseCalled, extended, wrongRwyTold, lineUp, backtrack, gearTold, finalLowTold, rejecting, clrAsked;   // rejecting: rejected takeoff (R100) above 40 kt, the deceleration is not a takeoff roll
     bool needWx;                        // R126: initial rejection was the first contact, wind and QNH only come with the break clearance
     public bool LineUp => lineUp;       // "line up and wait" (Program: AI waits, A9/A10)
     public int RunwayClaimed;           // A9: others with takeoff clearance or LUAW before the takeoff roll (player) or AI with takeoff clearance on the ground (Program)
@@ -130,7 +138,8 @@ public partial class Tower
     double holdFt;                      // assigned altitude in the holding
     double holdFree = -1;               // since when it has been pending (clearance waits for a suitable heading in the circle)
     /// Holding stack: position 3 of the sequence is the lowest level, each position 1000 ft higher.
-    public static double StackFt(Airfield f, int pos) => Math.Ceiling(f.MaxFt / 1000) * 1000 + Math.Max(0, pos - 2) * 1000;
+    /// Charted: lowest level at least 500 ft above the ARR/DEP maximum (Batumi 3000 -> 4000 ft, Kutaisi 2200 -> 3000 ft).
+    public static double StackFt(Airfield f, int pos) => Math.Ceiling((f.MaxFt + (f.Charted ? 500 : 0)) / 1000) * 1000 + Math.Max(0, pos - 2) * 1000;
     /// Altitude in the holding: stack by sequence, lowest level above the terrain from the holding fix to the airfield and on the approach path from there (R272, do not climb when leaving).
     /// Then the next free level across all airfields (FreeLevel, Program): no two holding aircraft at the same altitude close to each other.
     double HoldFtAt((double X, double Z)? fix)
@@ -204,6 +213,11 @@ public partial class Tower
     internal (double X, double Z)? Spot => spot;
     int? taxiFollow;                    // taxi traffic: "follow the X ahead" said (its Id); no stop, so no "continue taxi" either
     double lastRollWarn = -999;         // taxiing without clearance: last announcement
+    Rollnetz.Route? taxiRoute;          // Etappe 6: corridor of the DCS taxi network from the start to the holding point (null: no network/no named holding point/no way)
+    bool taxiRouteSet, taxiHoldSaid;    // ... computed for this taxi clearance / "hold position" already said for it (once per clearance)
+    (double X, double Z) taxiStart;     // ... position at the first tick after the clearance
+    string? taxiRouteRw;                // ... runway the corridor was computed for
+    double taxiOffSince = -1;           // ... since when more than TaxiOff m away from the corridor
     readonly List<(double Dev, double Lat)> glide = new();
     double lastVs;
 

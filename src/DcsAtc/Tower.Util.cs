@@ -27,11 +27,7 @@ public partial class Tower
     /// DCS runway spawn point (getParking Term_Type 16, slot "From Runway") within 60 m: on the runway even if the getRunways geometry is off
     bool OnRwySpot(Telemetry t) => F.Spots.Any(s => s.Type == 16 && Dist(t.X, t.Z, s.X, s.Z) < 60);
 
-    public bool OnRunwayPos(double x, double z, double halfWidth = 30, double beyond = 50) => F.Ends.Any(e =>
-    {
-        double along = (x - e.CX) * e.Dx + (z - e.CZ) * e.Dz, lat = Math.Abs((x - e.CX) * e.Dz - (z - e.CZ) * e.Dx);
-        return Math.Abs(along) < e.Len / 2 + beyond && lat < halfWidth;
-    });
+    public bool OnRunwayPos(double x, double z, double halfWidth = 30, double beyond = 50) => F.OnRunway(x, z, halfWidth, beyond);
 
     /// The occupied runway (name of the landing direction) or null: the active one if occupied, otherwise the direction by heading (A38).
     string? RunwayAt(double x, double z, double hdgDeg, string active)
@@ -251,8 +247,9 @@ public partial class Tower
 
     internal static string Digits(string s) => string.Join(" ", s.Where(char.IsDigit).Select(ch => DigitWords[ch - '0']));
     /// Forum 0.13: stand as DCS shows it (ME/kneeboard "F125" -> "Foxtrot one two five"), the Term_Index ("38") is another spot there; without a name the index
-    string StandName(int n) => F.Stands.TryGetValue(n, out var s) && s.Any(char.IsAsciiLetterOrDigit)
-        ? string.Join(" ", s.Where(char.IsAsciiLetterOrDigit).Select(ch => char.IsAsciiDigit(ch) ? DigitWords[ch - '0'] : Phonetic(ch.ToString())))
+    /// K32: without hook name the unambiguous kneeboard name of the chart (ground.stands "dcs" -> "chart")
+    string StandName(int n) => (F.Stands.TryGetValue(n, out var s) && s.Any(char.IsAsciiLetterOrDigit) ? s : F.StandChart.GetValueOrDefault(n.ToString())) is { } nm
+        ? string.Join(" ", nm.Where(char.IsAsciiLetterOrDigit).Select(ch => char.IsAsciiDigit(ch) ? DigitWords[ch - '0'] : Phonetic(ch.ToString())))
         : Digits(n.ToString());
 
     /// "Enfield 1-1" -> "Enfield one one"
@@ -283,8 +280,19 @@ public partial class Tower
         return null;
     }
 
-    static string? Direction(string n) =>
-        new[] { "north", "south", "east", "west" }.FirstOrDefault(d => Regex.IsMatch(n, $@"\b{d}\b"));
+    /// K20: CRP name in the transmission (n normalised, hyphen = space): from the chart incl. several words ("black sea", "north east", longest first), without map the four compass points.
+    /// After "C R P" every name counts; elsewhere not a name word of the airfield itself (CRP "sukhumi" at Sukhumi-Babushara would otherwise be found in the station name of every call).
+    string? Direction(string n)
+    {
+        var keys = (F.Crp.Count > 0 ? F.Crp.Keys.ToArray() : new[] { "north", "south", "east", "west" }).OrderByDescending(k => k.Length).ToArray();
+        string Rx(string k) => Regex.Escape(k.Replace('-', ' ')).Replace("\\ ", " ?");
+        var own = Normalize(F.Name).Split(' ').ToHashSet();
+        return keys.FirstOrDefault(k => Regex.IsMatch(n, $@"\bc ?r ?p {Rx(k)}\b"))
+            ?? keys.Where(k => !own.Contains(k)).FirstOrDefault(k => Regex.IsMatch(n, $@"\b{Rx(k)}\b"));
+    }
+
+    /// Chart text (English) as speech: digit strings spelled out, "CRP" as letters.
+    static string SayChart(string s) => Regex.Replace(Regex.Replace(s.Replace("CRP", "C R P"), @"(?<=[A-Za-z])(?=\d)", " "), @"\d+", m => Digits(m.Value));   // "W1" -> "W one"
 
     internal static bool Has(string n, params string[] keys) => keys.Any(k => Regex.IsMatch(n, $@"\b{k}"));
 

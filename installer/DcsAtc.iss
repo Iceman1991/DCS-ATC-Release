@@ -1,5 +1,5 @@
 ﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe
-#define AppVer "0.14.0-alpha"
+#define AppVer "0.15.0-alpha"
 #define Src ".."
 
 [Setup]
@@ -78,6 +78,8 @@ de.CompCrew=Bodenpersonal (Crew Chief, Tankwagen, Munition, Feuerwehr)
 en.CompCrew=Ground crew (crew chief, fuel and ammo trucks, fire service)
 de.CompJtac=JTAC / FAC(A) (9-Liner, Zielmarkierung, Laser, BDA)
 en.CompJtac=JTAC / FAC(A) (9-line, target marking, laser, BDA)
+de.CompCenter=Center (Streckenkontrolle: Radar contact, Hoehenfreigaben, Uebergabe an Approach)
+en.CompCenter=Center (en-route control: radar contact, altitude clearances, handoff to approach)
 
 [Types]
 Name: "full"; Description: "{cm:TypeFull}"
@@ -94,6 +96,7 @@ Name: "carrier"; Description: "{cm:CompCarrier}"; Types: full custom
 Name: "ai"; Description: "{cm:CompAi}"; Types: full custom
 Name: "crew"; Description: "{cm:CompCrew}"; Types: full custom
 Name: "jtac"; Description: "{cm:CompJtac}"; Types: full custom
+Name: "center"; Description: "{cm:CompCenter}"; Types: full custom
 
 [Files]
 Source: "{#Src}\tmp\sc\DcsAtc.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -241,6 +244,7 @@ begin
       S := ',' + Lowercase(Trim(S)) + ',';
       Untick(S, 'atc'); Untick(S, 'range'); Untick(S, 'awacs'); Untick(S, 'tanker'); Untick(S, 'carrier'); Untick(S, 'ai'); Untick(S, 'crew');
       if Pos(',m2,', S) > 0 then Untick(S, 'jtac');   { m2: list written by 0.12.1+, knows jtac (an older list lacks it because it did not exist) }
+      if Pos(',m3,', S) > 0 then Untick(S, 'center');   { m3: list written with Center }
     end;
   end;
   if (CurPageID = wpSelectTasks) and not TaskSet then begin
@@ -307,7 +311,7 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var Mods: String;
 begin
   if CurStep = ssPostInstall then begin
-    Mods := WizardSelectedComponents(False) + ',m2';   { m2 = this list knows jtac (see CurPageChanged) }
+    Mods := WizardSelectedComponents(False) + ',m2,m3';   { m2 = list knows jtac, m3 = list knows center (see CurPageChanged) }
     if HasClient() then begin
       ForceDirectories(SavedGames('') + '\Scripts\DcsAtc');
       SaveStringToFile(SavedGames('') + '\Scripts\DcsAtc\DcsAtcPath.txt', ExpandConstant('{app}\DcsAtc.exe'), False);

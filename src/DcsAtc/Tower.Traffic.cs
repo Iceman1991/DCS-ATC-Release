@@ -6,7 +6,7 @@ namespace DcsAtc;
 public partial class Tower
 {
     // ======================================================================= Procedures
-    /// Traffic pattern always south of the runway: 07 right-hand pattern, 25 left-hand pattern.
+    /// Pattern direction per runway: from the chart (hand), otherwise from the terrain. Side of the runway: Airfield.SideOf.
     string Hand(string rw) => F.Hand(rw);
 
     /// Entry points of the runway from the map (Kutaisi: North/South always, West only for 07, East only for 25). Otherwise the nearest.
@@ -20,18 +20,37 @@ public partial class Tower
         return allowed.OrderBy(k => Dist(t.X, t.Z, Crp[k].X, Crp[k].Z)).First();
     }
 
-    string Route(string rw) => home != null && home.To.TryGetValue(rw, out var r) ? " via " + r : "";
+    /// K29/K36: "holding point Charlie, runway two five" (named holding point only where the chart assigns one to the apron), else "holding point runway two five".
+    internal static string HoldTxt(Ramp? r, string rw, string say) => $"holding point {(r != null && r.Hold.TryGetValue(rw, out var h) ? h + ", " : "")}runway {say}";
+
+    /// Taxi clearance to the holding point from the apron data: "taxi to holding point Charlie, runway two five, via November, Alpha" (without a named holding point
+    /// "taxi to holding point runway two five via November, Delta"); shared by Ground and the AI radio (K36). Helicopter: air taxi, route in front.
+    internal static string TaxiOut(Ramp? r, string rw, string say, bool heli = false)
+    {
+        string? h = null, v = null;
+        r?.Hold.TryGetValue(rw, out h);
+        r?.To.TryGetValue(rw, out v);
+        var via = v == null || v == h ? "" : (h != null ? ", via " : " via ") + v;   // route = holding point name (Batumi 31 Delta): no repetition
+        return heli ? $"air taxi{(v != null ? " via " + v : "")} to {HoldTxt(r, rw, say)}" : $"taxi to {HoldTxt(r, rw, say)}{via}";
+    }
+
+    /// K35/K38: hint of the apron data (crossing a runway, stop bars, last chance) at the end of the taxi clearance, "" without one. inbound = to the apron.
+    internal static string TaxiNote(Ramp? r, string rw, bool inbound = false) =>
+        r != null && (inbound ? r.InNote : r.Note) is var d && (d.TryGetValue(rw, out var n) || d.TryGetValue("*", out n)) ? " " + SayChart(n) + (n.EndsWith('.') ? "" : ".") : "";
+
+    /// Route to the apron after landing runway rw (by the specific runway, otherwise "*"), "" without data.
+    internal static string ParkVia(Ramp? r, string rw) => r != null && (r.In.TryGetValue(rw, out var v) || r.In.TryGetValue("*", out v)) ? " via " + v : "";
 
     /// Tower after landing: vacate runway (map: taxiway towards the apron side).
     string Vacate(string rw)
     {
         landedRw = rw;
-        return F.Charted && home != null && home.Vacate.TryGetValue(rw, out var v) ? $"Vacate {v}." : OneOf("Vacate runway when able.", "Vacate the runway when able.");
+        return home != null && home.Vacate.TryGetValue(rw, out var v) ? $"Vacate {v}." : OneOf("Vacate runway when able.", "Vacate the runway when able.");
     }
     string landedRw = "";
 
     /// Ground: taxiway to the apron after vacating the runway.
-    string ParkRoute() => home != null && (home.In.TryGetValue(landedRw, out var r) || home.In.TryGetValue("*", out r)) ? " via " + r : "";
+    string ParkRoute() => ParkVia(home, landedRw);
 
     /// Landing evaluation at touchdown: glidepath and centreline on final (0.3–3 NM), touchdown point, sink rate.
     string Grade(Telemetry t)
@@ -55,7 +74,7 @@ public partial class Tower
     }
 
     Ramp? NearestRamp(Telemetry? t) =>
-        t == null ? F.Ramps.FirstOrDefault() : F.Ramps.OrderBy(r => Dist(t.X, t.Z, r.X, r.Z)).FirstOrDefault();
+        t == null ? F.Ramps.FirstOrDefault() : F.RampAt(t.X, t.Z);
 
     // ======================================================================= Traffic
     /// Runway occupied: traffic on the active runway (A8) or another takeoff clearance before the takeoff roll (A9).

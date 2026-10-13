@@ -82,13 +82,13 @@ local function start()
   local function L(de, en) return LANG == "en" and en or de end
   -- Modules picked in the installer or settings window (DcsAtcModules.txt: "atc,awacs,…"); missing file = all on
   local MODS
-  pcall(function() local h = io.open(lfs.writedir() .. "Scripts\\DcsAtc\\DcsAtcModules.txt", "r") if h then MODS = {} for w in (h:read("*a") or ""):lower():gmatch("%a+") do MODS[w] = true end h:close() end end)
+  pcall(function() local h = io.open(lfs.writedir() .. "Scripts\\DcsAtc\\DcsAtcModules.txt", "r") if h then MODS = {} for w in (h:read("*a") or ""):lower():gmatch("%w+") do MODS[w] = true end h:close() end end)
   local function on(m) return not MODS or MODS[m] == true end
   if not on("crew") then OPT.crew = false end
   local function textOn(t)   -- like Program.TextOn (radio wheel): prefix = module, unprefixed = ATC; radio check, say again, debrief always
     local p = t:match("^(%a+):")
     if p == "Range" then return on("range") elseif p == "AWACS" then return on("awacs") and (not t:find("tanker") or on("tanker"))
-    elseif p == "Tanker" then return on("tanker") elseif p == "Carrier" then return on("carrier") elseif p == "JTAC" then return on("jtac") end
+    elseif p == "Tanker" then return on("tanker") elseif p == "Carrier" then return on("carrier") elseif p == "JTAC" then return on("jtac") elseif p == "Center" then return on("center") end
     return t == "radio check" or t == "say again" or t == "debrief" or on("atc")
   end
   local onOpt = {}   -- [name] = function() – apply immediately
@@ -185,11 +185,12 @@ local function start()
   -- ifr = true: airfield list instead of a fixed command (R8). F10 allows 9 entries per level (R390): longer lists go into subgroups.
   -- Deliberately not here: "Select airfield" and "Settings" of the wheel (own windows of the app; F10 has "Settings" below ATC).
   local HAS = {}   -- range zone / carrier in the mission (set below): the groups only appear then, like in the wheel
+  HAS.center = (function() local th = tostring(env.mission and env.mission.theatre or "") return not (th == "Normandy" or th == "TheChannel" or th:find("WWII")) end)()   -- Center: not on Normandy / The Channel / WWII maps (like Tower.CenterName)
   local MENU = {
     { "Ground", nil, {
       { "Request startup", "Ground: request startup" }, { "IFR clearance", "Ground: request IFR clearance", ifr = true },
       { "Request taxi", "Ground: request taxi" }, { "Vacated, taxi to parking", "Ground: runway vacated, request taxi to parking" },
-      { "Progressive taxi", "Ground: request progressive taxi" }, { "Hot brakes", "Ground: hot brakes" } } },   -- R251/R297
+      { "Progressive taxi", "Ground: request progressive taxi" }, { "Say again taxi", "Ground: say again taxi route" }, { "Hot brakes", "Ground: hot brakes" } } },   -- R251/R297
     { "Tower", nil, {
       { "Ready for departure", "Tower: ready for departure" }, { "Ready, closed pattern", "Tower: ready for departure, closed pattern" },
       { "Initial", "Tower: initial" }, { "Overhead", "Tower: overhead" }, { "Base, gear down", "Tower: base, gear down" },
@@ -221,7 +222,7 @@ local function start()
         { "White smoke", "JTAC: request white smoke" }, { "Orange smoke", "JTAC: request orange smoke" }, { "Blue smoke", "JTAC: request blue smoke" },
         { "Illumination", "JTAC: request illum" }, { "Sparkle (IR)", "JTAC: request sparkle" }, { "Laser on", "JTAC: laser on" } } },
       { "Tally", "JTAC: tally target" }, { "In", "JTAC: in" }, { "Off", "JTAC: off" }, { "Check out", "JTAC: checking out" } }, need = "jtac" },
-    { "AWACS / Tanker", nil, {
+    { "AWACS / Tanker / Center", nil, {   -- F10 allows 9 entries per level: Center (wheel: own group) sits here
       { "AWACS", nil, {
         { "Check in", "AWACS: checking in" }, { "Picture", "AWACS: request picture" }, { "Bogey dope", "AWACS: bogey dope" }, { "Sort", "AWACS: request sort" },
         { L("Nächster Tanker", "Nearest tanker"), "AWACS: vector to tanker" }, { L("Vektor nächster Platz", "Vector nearest airfield"), "AWACS: vector to nearest airfield" },
@@ -232,11 +233,17 @@ local function start()
           { "Winchester", "AWACS: winchester" }, { "Bingo, RTB", "AWACS: bingo, RTB" }, { "Say again", "AWACS: say again" } } } } },
       { "Tanker", nil, {
         { "Request rejoin", "Tanker: request rejoin" }, { "Visual", "Tanker: visual" }, { "Observation", "Tanker: observation" },
-        { "Pre-contact", "Tanker: pre contact" }, { "Refuel complete", "Tanker: refuel complete" }, { "Say position", "Tanker: say position" } } } } },
+        { "Pre-contact", "Tanker: pre contact" }, { "Refuel complete", "Tanker: refuel complete" }, { "Say position", "Tanker: say position" } } },
+      { "Center", nil, {   -- en-route controller (module center), like the radio wheel group Center
+        { "Check in", "Center: checking in" }, { "Request altitude", "Center: request higher" }, { "Request direct", "Center: request direct", ifr = true },
+        { "Leaving frequency", "Center: leaving frequency" } }, need = "center" } } },
     { "Carrier", nil, {
       { "Marshal check in", "Carrier: Marshal, checking in" }, { "See you at", "Carrier: see you at angels" },
       { "Initial", "Carrier: initial" }, { "Commencing", "Carrier: commencing" }, { "Platform", "Carrier: platform" },
-      { "Ball", "Carrier: ball" }, { "Clara", "Carrier: Clara" }, { "Pigeons", "Carrier: pigeons" } }, need = "carrier" },
+      { "Ball", "Carrier: ball" }, { "Clara", "Carrier: Clara" }, { "Pigeons", "Carrier: pigeons" },
+      { "Strike / Red Crown", nil, {   -- F10 allows 9 entries per level; Red Crown only with a cruiser / destroyer in the mission
+        { "Strike check in", "Carrier: Strike, checking in" }, { "Strike check out", "Carrier: Strike, checking out" },
+        { "Red Crown check in", "Carrier: Red Crown, checking in", need = "redcrown" }, { "Red Crown check out", "Carrier: Red Crown, checking out", need = "redcrown" } } } }, need = "carrier" },
     { L("Notfall", "Emergency"), nil, {
       { "MAYDAY", "mayday mayday mayday", nil, "immediate" }, { "PAN PAN", "pan pan, pan pan, pan pan", nil, "priority" },
       { L("Spritmangel", "Minimum fuel"), "minimum fuel" },   -- R297 like the radio wheel (Wheel.cs): R245 minimum fuel, R251 hung ordnance, R296 Flameout
@@ -371,6 +378,8 @@ local function start()
   -- Carrier (M5): radio, TACAN, ICLS from the mission editor; position comes as a C line with the state
   local boats, boatRoute, cvUnits, cvBound, gfreq, cvNoTurn = {}, {}, {}, {}, {}, {}   -- cvNoTurn: CVTURN rejected because of land ahead (C line, Marshal then states the real BRC); cvBound: AI group with landing waypoint on a carrier (flag "cv"); gfreq: group -> radio MHz
   local function isCarrier(t) return t:find("CVN") or t:find("Stennis") or t:find("Forrestal") or t:find("KUZNECOW") or t:find("CV_1143") or t:find("LHA_Tarawa") end
+  local function isRadar(t) return t:find("TICONDEROG") or t:find("Arleigh_Burke") or t:find("PERRY") end   -- Red Crown (plan E9): cruiser / destroyer with air search radar; R line only for these
+  local radar = {}   -- group -> radio MHz from the editor (0 = none: app takes Frequencies.RedCrown)
   local function findTask(t, id)
     for _, v in pairs(t) do
       if type(v) == "table" then
@@ -390,12 +399,14 @@ local function start()
           for _, u in ipairs(g.units) do if u.unitId then cvUnits[u.unitId] = true end end
           boats[g.name] = string.format("%.3f;%s;%s", (u1.frequency or 0) / 1e6,
             tb and tb.channel and (tb.channel .. (tb.modeChannel or "X")) or "", ic and ic.channel or "")
+        elseif u1 and isRadar(u1.type or "") then radar[g.name] = (u1.frequency or 0) / 1e6
         end
       end
     end
   end
   local gtask = {}   -- group -> editor task (R376: only CAP/sweep/escort/intercept flights check in and commit)
   HAS.carrier = next(boats) ~= nil   -- R390: F10 shows Carrier only then
+  HAS.redcrown = next(radar) ~= nil   -- F10 Red Crown entries only with such a ship in the mission
   for _, coa in pairs(env.mission.coalition or {}) do
     for _, ctry in pairs(coa.country or {}) do
       for _, cat in ipairs({ "plane", "helicopter" }) do
@@ -509,6 +520,10 @@ local function start()
     for side = 1, 2 do
       for _, g in ipairs(coalition.getGroups(side, Group.Category.SHIP) or {}) do
         for _, u in ipairs(g:getUnits() or {}) do
+          if radar[g:getName()] and u:isExist() and isRadar(u:getTypeName()) then   -- Red Crown ship: R;unit;group;type;x;z;side;freq (the GCI line is R;side)
+            local p = u:getPoint()
+            l[#l + 1] = string.format("R;%s;%s;%s;%.1f;%.1f;%d;%.3f", clean(u:getName()), clean(g:getName()), clean(u:getTypeName()), p.x, p.z, side, radar[g:getName()])
+          end
           if u:isExist() and isCarrier(u:getTypeName()) then
             local p, pos, v = u:getPoint(), u:getPosition(), u:getVelocity()
             cvPts[#cvPts + 1] = p

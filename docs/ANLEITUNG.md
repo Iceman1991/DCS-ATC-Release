@@ -15,7 +15,7 @@ Funk ist Englisch: Alle Funksprüche, die du sagst oder hörst, stehen in diesem
 2. [Wege zu funken](#wege-zu-funken)
    - [Sprechen über SRS](#sprechen-über-srs) · [Grundlegende Phrasen](#grundlegende-phrasen) · [Funkrad](#funkrad) · [Funkrad in VR](#funkrad-als-text-im-spiel-vr) · [F10-Menü](#f10-menü) · [Chat](#tippen-im-chat-multiplayer) · [Text im Spiel](#text-im-spiel) · [Stimmen](#stimmen-funkklang-und-sprechtempo) · [Höhenmesser-Einheit](#höhenmesser-einstellung-hpa-oder-inhg) · [Bahnbefeuerung](#bahnbefeuerung)
 3. [Flugplatz-ATC](#flugplatz-atc)
-   - [Plätze, Rufnamen und Frequenzen](#plätze-rufnamen-und-frequenzen) · [ATIS](#atis) · [Bahnwahl](#bahnwahl) · [Wetter: VFR und IFR](#wetter-vfr-und-ifr) · [Ground](#ground) · [Tower: Abflug](#tower-abflug) · [Tower: Ankunft](#tower-ankunft) · [Approach](#approach) · [Luftraum](#luftraum) · [Notfälle](#notfälle) · [Landebewertung und Debriefing](#landebewertung-und-debriefing) · [Meldepflicht](#meldepflicht) · [Phrasentabelle](#phrasentabelle)
+   - [Plätze, Rufnamen und Frequenzen](#plätze-rufnamen-und-frequenzen) · [ATIS](#atis) · [Bahnwahl](#bahnwahl) · [Wetter: VFR und IFR](#wetter-vfr-und-ifr) · [Ground](#ground) · [Tower: Abflug](#tower-abflug) · [Tower: Ankunft](#tower-ankunft) · [Approach](#approach) · [Center](#center) · [Luftraum](#luftraum) · [Notfälle](#notfälle) · [Landebewertung und Debriefing](#landebewertung-und-debriefing) · [Meldepflicht](#meldepflicht) · [Phrasentabelle](#phrasentabelle)
 4. [Carrier-Betrieb](#carrier-betrieb)
 5. [AWACS, Tanker und Range](#awacs-tanker-und-range)
    - [AWACS](#awacs) · [Tanker](#tanker) · [Range](#range) · [JTAC und FAC(A)](#jtac-und-faca) · [KI-Flüge im Funk](#ki-flüge-im-funk) · [Bodenpersonal und Crew Chief](#bodenpersonal-und-crew-chief)
@@ -68,6 +68,7 @@ Setup fragt, welche Teile von DCS-ATC du willst. **Vollständig** hakt alles an,
 | Modul | Umfang |
 |---|---|
 | Flugsicherung | Ground, Tower, Approach/Departure, ATIS, Luftraumüberwachung, Notfallmenü |
+| Center | Streckenlotse nach dem Abflug: Flight Following, Direktrouten, Übergabe ans Ziel |
 | Schießplatz | Range-Controller |
 | AWACS | Lagebild, Bogey Dope, Luftkampf, Führung der KI-Jäger |
 | Tanker | Rejoin, Pre-Contact, Hilfe beim Tanken |
@@ -168,7 +169,7 @@ Ground: Enfield one one, Kutaisi Ground, taxi to holding point runway two five v
 ```
 
 - **Erkannte Formulierungen.** „request taxi“, „ready to taxi“ und „request startup and taxi“ gehen alle. Letzteres gibt Anlassen und Rollen zusammen frei.
-- **Progressive Taxi.** Während du rollst, bringt dich „request progressive taxi“ mit Richtungsangaben zum Ziel.
+- **Progressive Taxi.** Während du rollst, wiederholt „request progressive taxi“ die Rollroute. „Say again taxi“ macht dasselbe.
 
 **5. Start (Tower).** Am Rollhalt:
 
@@ -482,6 +483,7 @@ Jede Ebene zeigt höchstens 9 Einträge.
 | Request taxi | `request taxi` | Am Boden vor dem Rollhalt |
 | Vacated, taxi to parking | `runway vacated, request taxi to parking` | Am Boden nach der Landung |
 | Progressive taxi | `request progressive taxi` | Am Boden |
+| Say again taxi | `say again taxi route` | Beim Rollen |
 | Hot brakes | `hot brakes` | Am Boden |
 
 Die IFR-Liste zeigt nahe Plätze; Träger und dein aktueller Platz stehen nicht darin.
@@ -603,12 +605,12 @@ In jeder Mission mit DCS-ATC bekommt jede Spielergruppe **F10 Andere → ATC**. 
 
 | Untermenü | Einträge |
 |---|---|
-| Ground | Request startup · Request taxi · Runway vacated, taxi to parking · Progressive taxi · Hot brakes · IFR clearance → *Nächster in Abflugrichtung* / bis zu 8 eigene oder neutrale Plätze, nächster zuerst |
+| Ground | Request startup · Request taxi · Runway vacated, taxi to parking · Progressive taxi · Say again taxi · Hot brakes · IFR clearance → *Nächster in Abflugrichtung* / bis zu 8 eigene oder neutrale Plätze, nächster zuerst |
 | Tower | Ready for departure · Ready, closed pattern · Initial · Overhead · Base, gear down · Final, gear down, full stop · Base, touch and go · Going around · Closed / SFO → Request closed · Request SFO · High key · Low key, gear down · Ready, practice approach · Ready, unrestricted climb · Ready, tactical departure |
 | Approach | Airborne (nach Start) · Inbound for landing · Inbound, pattern work · Request ILS / straight in · Flight following · Abmelden (cancel approach) · Verkehr → Traffic in sight / Negative contact · C R P · Mehr → Fahrt melden / Say again / Request higher |
 | Range (nur wenn die Mission eine Range hat) | Check in · IP inbound · In hot · Off safe · Check out · Check out, hung ordnance |
-| AWACS / Tanker | AWACS → Check in · Picture · Bogey dope · Sort · Nächster Tanker · Vektor nächster Platz · Check out · Gefecht → Committing / Fox three / Splash / Defending / Request support / Unable / Winchester / Bingo, RTB / Say again. Tanker → Request rejoin · Visual · Observation · Pre-contact · Refuel complete · Say position |
-| Carrier (nur wenn die Mission einen Träger hat) | Marshal check in · See you at · Initial · Commencing · Platform · Ball · Clara · Pigeons |
+| AWACS / Tanker / Center | AWACS → Check in · Picture · Bogey dope · Sort · Nächster Tanker · Vektor nächster Platz · Check out · Gefecht → Committing / Fox three / Splash / Defending / Request support / Unable / Winchester / Bingo, RTB / Say again. Tanker → Request rejoin · Visual · Observation · Pre-contact · Refuel complete · Say position · Center → Check in · Request altitude · Request direct · Leaving frequency |
+| Carrier (nur wenn die Mission einen Träger hat) | Marshal check in · See you at · Initial · Commencing · Platform · Ball · Clara · Pigeons · Strike check in/out · Red Crown check in/out (nur mit eigenem Kreuzer) |
 | Notfall | MAYDAY → Art · PAN PAN → Art · Spritmangel · Hung ordnance · Flameout, high key · Notfall beenden (Arten: Triebwerksausfall, Treibstoff (nur MAYDAY), Hydraulik, Gefechtsschaden, Medizinisch, Vogelschlag) |
 | Allgemein | Radio check · Say again · QNH / weather · ATIS hören · Request zone transit · Debriefing |
 | Einstellungen | Bodenpersonal an/aus · Anzeigen |
@@ -730,7 +732,7 @@ DCS-ATC stellt an jedem Platz der Karte ATIS, Ground, Tower, Approach und Depart
 
 **Welche Plätze ATC haben**
 
-- **Jede Karte, jeder Platz mit Bahn.** Bahnen, Platzhöhe und Parkplätze kommen live aus DCS. Kutaisi nutzt zusätzlich die DCS-Kneeboard-Karten: CRPs, Rollwegnamen, Vorfelder und eine Platzrunde, die immer südlich der Bahn liegt. Alle anderen Plätze nutzen ein generisches Verfahren aus dem Gelände.
+- **Jede Karte, jeder Platz mit Bahn.** Bahnen, Platzhöhe und Parkplätze kommen live aus DCS. Auf der Karte Kaukasus nutzen alle Plätze zusätzlich die DCS-Kneeboard-Karten: CRPs, Rollwege, benannte Warteplätze, Vorfelder, Seite und Höhe der Platzrunde und INITIAL je Bahn (nur Tbilisi-Lochini hat dort bloß Rollwege). Das Kneeboard hat dafür die Seite „ATC-3b-Platzrunden“. Andere Karten nutzen ein generisches Verfahren aus dem Gelände.
 - **Nur eigene und neutrale Plätze antworten.** Ein feindlicher Platz schweigt. Stattdessen kommt ein Texthinweis mit dem nächsten eigenen Platz als missweisende Peilung und Entfernung, etwa `Senaki-Kolkhi 270/35 NM`. Wird ein Platz während deines Anflugs erobert, schickt Approach dich zum nächsten eigenen Platz („Kutaisi is closed, divert Senaki …“).
 - **Stationsnamen** kommen aus den Funkdaten der Karte. Senaki-Kolkhi ist zum Beispiel „Kolkhi Tower“, Kutaisi „Kutaisi Tower“. Bindestriche in Platznamen werden als Leerzeichen gesprochen.
 
@@ -814,7 +816,7 @@ Die ATIS sendet dauerhaft für jeden Platz mit einem Spieler im Umkreis von 40 N
   - Mehr Rückenwind: „Unable runway zero seven, tailwind one two knots, runway two five in use.“
   - Eine Bahnanfrage für den Abflug gilt nicht für die Landung.
 - **Platzrundenrichtung:**
-  - Kutaisi: immer südlich der Bahn, also Bahn 07 Rechts-, Bahn 25 Linksplatzrunde.
+  - Kaukasus (Plätze mit Karte): Seite und Richtung laut DCS-Karte, etwa Kutaisi südlich der Bahn (Bahn 07 rechts, Bahn 25 links). Alle Plätze stehen im Kneeboard auf „ATC-3b-Platzrunden“.
   - Sonst: links, außer das Gelände links ist mehr als 300 ft höher als rechts.
   - Lässt das Gelände gar keine Platzrunde zu (etwa Khasab), gibt es nur Geradeaus-Anflüge.
 
@@ -873,13 +875,14 @@ Als Anlassanfrage zählen: „request startup“, „start up“, „request eng
 - **QNH:** nur beim ersten Anruf und nur ohne ATIS-Buchstaben. „request startup and taxi“ beantwortet beides auf einmal.
 - **Squawk:** ein VFR-Squawk kommt mit der Rollfreigabe. Mit IFR-Freigabe hast du schon einen.
 - **Eigene Tower-Frequenz:** „Hold short runway two five, contact Kutaisi Tower … when ready for departure.“
-- **Progressive Taxi:** beim Rollen gibt „request progressive taxi“ Richtungsangaben zum Rollhalt, etwa „holding point runway two five at your 2 o'clock, 450 meters“. Sie werden jedes Mal erneuert, wenn sich die Entfernung halbiert, und enden mit „…, hold short of runway two five“.
+- **Progressive Taxi:** beim Rollen wiederholt „request progressive taxi“ die Rollroute. Hat DCS für den Platz ein Rollnetz (alle Kaukasus-Plätze), gibt Ground keine Uhrzeit-Richtungen, sondern meldet nur „wrong way, turn around“ mit der Route, wenn du dich vom Ziel wegbewegst, und fragt nach 90 Sekunden Stillstand auf dem Rollweg „say intentions, do you require assistance?“. Ohne Rollnetz kommen Richtungsangaben wie „holding point runway two five at your 2 o'clock, 450 meters“, erneuert bei jeder Halbierung der Entfernung, zum Schluss „…, hold short of runway two five“.
 
 **Warnungen am Boden**
 
 | Lage | Ground bzw. Tower sagt |
 |---|---|
 | Losrollen vom Parkplatz ohne Rollfreigabe (schneller als 5 kt, mehr als 100 m) | „hold position, say intentions.“ |
+| Du verlässt den Rollweg zum Warteplatz deutlich (mehr als 75 m für 10 s) oder rollst über den Warteplatz auf die Bahn zu (nur mit DCS-Rollnetz und benanntem Warteplatz) | „hold position, say intentions.“ (einmal je Rollfreigabe) |
 | Schneller als 30 kt auf dem Rollweg | „reduce taxi speed.“ |
 | Kreuzender oder entgegenkommender Verkehr mit Vorfahrt (rechts vor links; der KI lässt du immer den Vortritt) | „hold position, give way to the Hornet on your right.“ … später: „continue taxi.“ |
 | Verkehr voraus in gleicher Richtung | „follow the Viper ahead.“ |
@@ -913,7 +916,7 @@ Du kannst „ready“, „ready for departure“, „holding short“ oder „ho
 
 | Dein Plan | Teil nach dem Start |
 |---|---|
-| VFR, Kutaisi | „exit via C R P west, not above 2200 feet until leaving the control zone“. Der CRP ist die Richtung, die du genannt hast; ohne Angabe Bahn 25 → West, 07 → Ost |
+| VFR, Platz mit Karte | „exit via C R P west, not above 2200 feet until leaving the control zone“. Der CRP ist der, den du genannt hast; ohne Angabe nimmt der Tower den Standard-CRP der Bahn (Kutaisi: Bahn 25 → West, 07 → Ost). Hinweise der Karte kommen dazu, etwa „stay exactly on track, restricted area UR-R one five two“ beim Ausflug Abinsk in Krymsk |
 | VFR mit Richtung, andere Plätze („request taxi, departure north“) | „leave the control zone northbound, not above …“ |
 | VFR ohne Richtung, andere Plätze | „own navigation, not above … until leaving the control zone“ |
 | IFR-Freigabe | „fly runway heading, climb and maintain 3000 feet“ |
@@ -1071,7 +1074,7 @@ Approach führt dich zum **Initial**: etwa 2 NM (4000 m) vor der Schwelle auf de
 - **Gelände:** der Plan nutzt die Geländekarte und sinkt dich nie unter die Mindestführungshöhe: Gelände plus 1000 ft, im Gebirge plus 2000 ft. Blockiert Gelände die aktive Bahn, kann der Plan die Gegenbahn (bis 10 kt Rückenwind) oder ein Circling nehmen: „Due to terrain, expect …“.
 - **Wann Approach spricht:** jeder Spruch gibt einen Kurs. Entfernung, Höhe, Fahrt und Abschnitt nur, wenn sie sich ändern. Sinkflüge kommen stufenweise entlang eines 2,5°-Profils. Ändert sich die Reihenfolge, sagt Approach „No traffic ahead, you are number one“ oder „You are number 2, 1 aircraft ahead“.
 - **Übergabe an Tower:** erst kurz vor dem Gate (bis 2 NM davor, höchstens 1000 ft über der Gate-Höhe) bzw. spätestens am Gate. Bist du schon weiter draußen auf der Mittellinie, behält dich Approach, gibt den Sinkflug weiter nach Profil („descend and maintain 4000 feet“, die Gate-Höhe erst, wenn das Profil an deiner Position dort ist) und übergibt nahe am Gate. Auf der Mittellinie bekommt VFR-Verkehr „on course, 6 miles from initial, maintain 2000 feet, contact Kutaisi Tower, report initial for overhead break.“ IFR-Verkehr bekommt die Anflugfreigabe (unten).
-- **CRPs in Kutaisi:** North und South gehen immer, West nur für Bahn 07, East nur für Bahn 25. Fliegst du selbst einen an, melde ihn („C R P south“). Approach schickt dich dann zum Initial oder Overhead und übergibt an Tower. Ein nicht erlaubter CRP bekommt „negative, C R P east is not available for runway zero seven. Enter via C R P …“. Andere Plätze haben keine CRPs: „negative, no reporting points at Senaki Kolkhi“, dann Führung.
+- **CRPs:** Welche CRPs je Bahn gelten, steht in der Karte des Platzes (Kneeboard „ATC-3b-Platzrunden“). In Kutaisi gehen North und South immer, West nur für Bahn 07, East nur für Bahn 25. Fliegst du selbst einen an, melde ihn („C R P south“, auch mehrere Wörter wie „C R P black sea“). Approach schickt dich dann zum Initial oder Overhead und übergibt an Tower, etwa zwei Minuten vor dem CRP. Ein nicht erlaubter CRP bekommt „negative, C R P east is not available for runway zero seven. Enter via C R P …“. CRPs, die nur für den Ausflug gelten (etwa Abinsk bei Krymsk), werden beim Einflug nicht angenommen. In Anapa heißt der Einflug-CRP im Süden „south“, der Ausflug „exit south“. Plätze ohne Karte und andere Karten haben keine CRPs: „negative, no reporting points at Senaki Kolkhi“, dann Führung.
 
 #### Höhen- und Fahrtanweisungen
 
@@ -1195,6 +1198,52 @@ Im IFR- oder Geradeaus-Anflug wird ein Durchstarten in zwei Schritten zum Fehlan
 - **Du:** „cancel approach“, „abort approach“, „cancel landing“, „leaving the pattern“.
 - **Approach:** „roger, approach cancelled, resume own navigation, QNH …. Call me when ready for another approach.“
 - **Ohne Meldung weg:** fliegst du aus einem Anflug weg, kommt zuerst „I show you leaving the control zone, say intentions.“ 3 NM später: „approach cancelled, frequency change approved.“
+
+### Center
+
+Nach dem Abflug fehlt oft eine Funkstelle für die Strecke. Das Center schließt die Lücke: Es führt dich unter eigenem Namen und eigener Frequenz (Standard 268,5), meldet Verkehr, gibt Direktrouten und übergibt dich 40 NM vor dem Ziel an dessen Approach. Es ist dasselbe Verfahren wie Flight Following, nur nicht mehr unter dem Namen des Platzes.
+
+**Namen je Karte** (blau / rot):
+
+| Karte | Blau | Rot |
+|---|---|---|
+| Kaukasus | Tbilisi Control | Rostov Control |
+| Persischer Golf | Emirates Control | Tehran Control |
+| Syrien | Nicosia Control | Damascus Control |
+| Sinai | Tel Aviv Control | Cairo Control |
+| Kola | Bodo Control | Murmansk Control |
+| Deutschland Kalter Krieg | Langen Radar | Berlin Control |
+| Falklands | Mount Pleasant Control | Comodoro Control |
+| Nevada | Los Angeles Center | wie blau |
+| Marianen | Guam Center | wie blau |
+| Afghanistan | Kabul Center | wie blau |
+| Irak | Baghdad Control | wie blau |
+
+Auf Normandie, Ärmelkanal und den Weltkrieg-II-Karten gibt es kein Center, auf einer unbekannten Karte heißt es „Center“. Eigene Namen setzt `CenterNames` in der `config.jsonc`.
+
+**Wann du zum Center kommst**
+
+- **IFR:** Bei 15 NM übergibt Departure an das Center, wenn dein Ziel weiter als 50 NM entfernt ist oder fehlt. Liegt das Ziel näher, geht es wie bisher an dessen Approach.
+- **Flight Following vom Platz:** Verlässt du den Anflugbereich (20 NM), übergibt der Platz: „contact Tbilisi Control two six eight decimal five for further flight following.“
+- **VFR ohne Flight Following:** unverändert, Departure entlässt dich bei 15 NM.
+- **Eigener AWACS:** Ist ein AWACS deiner Seite näher als 100 NM, hat er Vorrang: „contact Magic two five one decimal five.“
+
+**Anfragen** (Funkrad „Center“, F10 `AWACS / Tanker / Center`, oder per Sprache):
+
+- **Check in:** „Tbilisi Control, Enfield 1-1, checking in, flight level 250.“ Antwort: „radar contact“, danach meldet das Center Verkehr.
+- **Request altitude:** „request higher“, „request lower“, „request flight level 280“.
+- **Request direct:** „request direct Batumi“. Antwort: „cleared direct Batumi“.
+- **Leaving frequency:** „Tbilisi Control, Enfield 1-1, leaving frequency.“ Antwort: „radar service terminated, frequency change approved.“
+
+**Ende des Centers**
+
+- **40 NM vor dem Ziel:** Sinkflug, Höhenmesser und „contact Batumi Approach“.
+- **Sektorwechsel:** Gibt es mehrere Sektoren, kommt „contact Nellis Control two seven zero decimal zero“, sobald du in einen anderen fliegst.
+- **Eigener AWACS in Reichweite:** siehe oben.
+
+**Mehrere Sektoren** (`CenterSectors`): Jeder Eintrag hat Name, Frequenz, Mittelpunkt (`Lat`/`Lon`, nur Kaukasus, sonst `X`/`Z` in Metern), `RadiusNm` und optional `Side` („blue“ oder „red“). Der nächste Mittelpunkt, in dessen Radius du liegst, gilt. Ohne passenden Sektor gilt das Center der Karte.
+
+Das Center ist ein eigenes Modul („Center“ im Setup und im Einstellungsfenster, Standard an). Abgewählt schweigt es und fehlt im Funkrad und im F10-Menü; Departure übergibt dann wie früher.
 
 ### Luftraum
 
@@ -1354,6 +1403,7 @@ Schlüsselwörter werden überall im Spruch erkannt. Beginne mit „<Platz> <Lot
 | „request taxi“ (+ „departure north“, + „runway 07“) | Ground | Rollen zum Rollhalt, Squawk, hold short |
 | „request startup and taxi“ | Ground | Beides auf einmal |
 | „request progressive taxi“ | Ground, beim Rollen | Richtungsangaben zum Rollhalt bzw. Parkplatz |
+| „say again taxi route“ | Ground, beim Rollen | Wiederholt die Rollroute |
 | „request IFR clearance (to Batumi)“, „clearance“, „IFR to“ | Ground (in der Luft: Approach) | IFR-Freigabe mit Squawk; Code zurücklesen → „readback correct“ |
 | „ready“, „ready for departure“, „holding short“ (+ „closed pattern“) | Tower | Startfreigabe, line up and wait oder hold short |
 | „abort“, „rejecting“, „stopping“, „cancel takeoff“ | Tower, mit Freigabe oder aufgerollt | Freigabe aufgehoben, „vacate …, report ready for departure“ |
@@ -1458,6 +1508,8 @@ Solange ein Spieler in der Recovery ist oder startet oder Missions-KI auf dem Sc
 | Ball | `Enfield 1 1, Hornet ball, 5.2.` (Typ und Sprit werden eingesetzt) |
 | Clara | `Enfield 1 1, Hornet Clara, 5.2.` |
 | Pigeons | `Enfield 1 1, pigeons.` |
+| Strike check in / check out | `Strike, Enfield 1 1, checking in.` / `checking out.` (in der Luft, vor dem Marshal-Check-in) |
+| Red Crown check in / check out | `Red Crown, Enfield 1 1, checking in.` / `checking out.` (nur mit eigenem Kreuzer in der Mission) |
 
 **ENTER** (oder **0**) am offenen Rad sendet den Spruch, der zur Lage passt. Hat dich ein Lotse gerade etwas gefragt, sendet ENTER die Antwort:
 
@@ -1623,6 +1675,24 @@ Nach Bolter oder Wave-off:
 - **Case I:** kein Funk. Steigen, wieder in die Landerunde und neu anfliegen. „Call the ball“ kommt wieder.
 - **Case II/III:** Departure: "Enfield one one, Departure, radar contact, turn left heading 165, maintain 1200, downwind." Etwa 5 NM achteraus Approach: "Enfield one one, Approach, turn left heading 345, intercept final." ACLS und Meilen-Ansagen beginnen dann von vorn.
 
+### Strike und Red Crown
+
+Beide sind freiwillig. Du kannst weiter direkt „Marshal, checking in“ rufen und ohne Meldung starten.
+
+**Strike** (CATCC) sitzt auf der Schiffsfrequenz, wie Marshal und Departure. Er führt Pakete beim Ab- und Rückflug:
+
+- **Abflug:** „Strike, Enfield 1-1, checking out“ (Case I gleich nach dem Start, Case II/III nach der Übergabe von Departure). Antwort: „radar contact“ und die Übergabe an Red Crown, wenn die Mission einen eigenen Kreuzer hat, sonst an den AWACS in der Nähe, das Center der Karte oder „frequency change approved“.
+- **Rückflug:** „Strike, Enfield 1-1, checking in“. Antwort: „Enfield one one, Strike, radar contact, switch Marshal.“ Danach rufst du wie bisher Marshal.
+
+**Red Crown** ist der Luftraumüberwacher eines eigenen Kreuzers oder Zerstörers in der Mission (Ticonderoga, Arleigh Burke, Perry). Er hat eine eigene Frequenz: die des Schiffs im Missionseditor, sonst `"RedCrown"` in `"Frequencies"` (Standard 252,5). Ohne solches Schiff in der Mission gibt es keinen Red Crown, die Einträge im Funkrad fehlen dann.
+
+- **Check in:** „Red Crown, Enfield 1-1, checking in.“ Antwort: „Enfield one one, Red Crown, radar contact, identified, switch Strike one two seven decimal five.“
+- **Check out:** „Red Crown, Enfield 1-1, checking out.“ Antwort: „roger“ oder „copy“ und die Übergabe an AWACS oder Center, sonst „frequency change approved“.
+
+Red Crown macht nur Check-in, Identifizierung und Übergabe, keine Luftlage.
+
+Funkrad: Seite **Carrier** (Strike check in / check out, Red Crown check in / check out), F10: `ATC → Carrier → Strike / Red Crown`. Die Einträge erscheinen in der Luft, solange du noch nicht bei Marshal eingecheckt bist. Die Frequenz steht auf dem Kniebrett. Strike und Red Crown gehören zum Modul „Carrier“.
+
 ### Bingo und Ausweichen
 
 Du bekommst ein Signal zum Ausweichen, und deine Recovery endet, wenn:
@@ -1634,7 +1704,7 @@ Bingo wird gegen deine Tankanzeige oder den gemeldeten State geprüft. Es ist et
 
 > **Tower/Approach:** "Enfield one one, your signal is bingo, pigeons Kobuleti 084, 44 miles." / "…, your signal is divert, pigeons …"
 
-Die Recovery endet auch, wenn du mehr als 50 NM vom Schiff wegfliegst (bzw. 10 NM über deinen nächsten Punkt hinaus, wenn du von weiter draußen eingecheckt hast) oder an Land landest. Mit eigenem AWACS in der Luft übergibt Marshal: "Enfield one one, Marshal, switch Overlord 251.5."
+Die Recovery endet auch, wenn du mehr als 50 NM vom Schiff wegfliegst (bzw. 10 NM über deinen nächsten Punkt hinaus, wenn du von weiter draußen eingecheckt hast) oder an Land landest. Mit eigenem AWACS in der Luft übergibt Marshal: "Enfield one one, Marshal, switch Overlord 251.5.", sonst "Enfield one one, Marshal, switch Strike."
 
 ### Benotung
 
@@ -1678,7 +1748,7 @@ Auf dem Deck gibt es **keinen Funk**. Jeder Spruch auf dem Deck zeigt nur einen 
 
 Das Abflugradial ist bei DCS-ATC immer BRC + 30°, damit der Bogen nicht zu dem Radial führt, auf dem du nach dem Start ohnehin schon bist.
 > **Du:** "Enfield 1-1, on top, angels 8."
-> **Departure:** "Enfield one one, Departure, switch Overlord 251.5." (ohne AWACS: „Enfield one one, Departure, cleared to switch.“)
+> **Departure:** "Enfield one one, Departure, switch Overlord 251.5." (ohne AWACS: „Enfield one one, Departure, switch Strike.“, siehe [Strike und Red Crown](#strike-und-red-crown))
 
 Andere Abflugmeldungen unterwegs („passing 2.5“, „arcing“, „established outbound“, „Kilo“) quittiert Departure mit „Enfield one one, roger.“ Meldest du kein „on top“, kommt die Übergabe bei 20 NM automatisch. Nach einem Trägerstart erreicht auch der Approach-Eintrag **Airborne (nach Start)** im Rad Departure.
 
@@ -1709,7 +1779,7 @@ Andere Abflugmeldungen unterwegs („passing 2.5“, „arcing“, „establishe
 | Groove | "Clara" (*Clara / Clarence*) | Paddles: "roger Clara, keep it coming." |
 | Start II/III | "airborne" | Departure: "radar contact, departure radial …" |
 | Start II/III | "passing 2.5" / "arcing" / "established outbound" / "Kilo" | Departure: "roger" |
-| Start II/III | "on top, angels 8" | Departure: "switch Overlord 251.5" (ohne AWACS: "cleared to switch") |
+| Start II/III | "on top, angels 8" | Departure: "switch Overlord 251.5" (ohne AWACS: "switch Strike") |
 | Unklarer Spruch | – | Marshal: "Enfield one one, say again." (im Groove: keine Antwort, außer bei einem undeutlichen Ball-Call, der zählt) |
 
 ### Beispiel: Case-I-Recovery
@@ -1782,7 +1852,7 @@ Du erreichst eine Station auf drei Wegen:
 
 - **SRS (Stimme):** Frequenz der Station rasten und senden. DCS-ATC leitet jeden Spruch nach deiner Frequenz.
 - **Stationsname im Spruch:** auf einer Platzfrequenz oder mit Sprechtaste ohne SRS erreicht ein Spruch mit Stationsnamen sie trotzdem: *Overlord / AWACS / Magic / Moscow / Darkstar / Wizard / Focus*, *Texaco / Shell / Arco / Tanker* (auch *refuel*), *Range Alpha / Range control*, *JTAC / FAC A / forward air controller* oder das Rufzeichen des Lotsen (*Axeman one one*). Manche Wörter gehen direkt ans AWACS: *picture*, *bogey dope*, *declare*, *spike*, *request sort*.
-- **Funkrad** oder F10-Menü **ATC → AWACS / Tanker**. Ist die Pilotenstimme an (`"PilotVoice"`), wird deine Anfrage zuerst vorgesprochen, etwa *„Overlord, Enfield 1-1, request picture.“*
+- **Funkrad** oder F10-Menü **ATC → AWACS / Tanker / Center**. Ist die Pilotenstimme an (`"PilotVoice"`), wird deine Anfrage zuerst vorgesprochen, etwa *„Overlord, Enfield 1-1, request picture.“*
 
 Funkrad-Einträge:
 
@@ -2304,7 +2374,7 @@ Spieler müssen DCS-ATC gar nicht installieren. Läuft es beim Host (oder auf de
 
 - **Sprechen über SRS.** Mit dem SRS-Server des Hosts verbinden, Lotsenfrequenz rasten und auf Englisch sprechen. Beispiel:
   > "Kutaisi Ground, Enfield 1-2, request startup"
-- **F10-Menü.** `F10 -> ATC` hat dieselben Anfragen wie das Funkrad (Ground, Tower, Approach, AWACS / Tanker, Allgemein, Notfall …). Jeder Spieler bekommt sein eigenes `ATC`-Menü. Teilen sich mehrere Spieler eine Gruppe, hat das `ATC`-Menü je Spieler ein Untermenü mit seinem Rufzeichen.
+- **F10-Menü.** `F10 -> ATC` hat dieselben Anfragen wie das Funkrad (Ground, Tower, Approach, AWACS / Tanker / Center, Allgemein, Notfall …). Jeder Spieler bekommt sein eigenes `ATC`-Menü. Teilen sich mehrere Spieler eine Gruppe, hat das `ATC`-Menü je Spieler ein Untermenü mit seinem Rufzeichen.
 - **Lotsentext** erscheint im Spiel für deine Gruppe, die Stimme kommt über SRS.
 
 Funkrad und ENTER-Vorschlag bekommen sie nicht. Ihre F10-Anfragen spricht trotzdem die Pilotenstimme, wie bei allen anderen.
@@ -2459,7 +2529,7 @@ Die erzeugten Zeilen in `frequencies.jsonc` enthalten die Platznamen schon. Sons
 #### Einschränkungen auf anderen Karten
 
 - **Nur Kaukasus ist getestet.** Jede andere Karte sollte gehen, aber rechne mit Ecken und Kanten und melde sie bitte.
-- **Detaillierte Verfahren gibt es nur für Kutaisi.** Meldepunkte, Rollwege mit Namen („taxi to holding point runway two five via November, Delta“) sowie An- und Abflugwege aus der Karte. Jeder andere Platz auf jeder Karte ist generisch:
+- **Detaillierte Verfahren gibt es nur auf der Karte Kaukasus, dort für alle Plätze (Tbilisi-Lochini nur Rollwege).** Meldepunkte, Rollwege mit Namen und benannte Warteplätze („taxi to holding point Delta, runway three one“), Backtrack auf einer Bahn ohne Rollweg bis zum Ende sowie An- und Abflugwege aus der Karte. Jeder Platz auf einer anderen Karte ist generisch:
   - Rollfreigaben nennen die Bahn, aber keine Rollwege, etwa „taxi to holding point runway one three“.
   - Die Kontrollzone ist 5 NM um den Platz, bis 3000 ft darüber.
   - Die Platzrunde liegt links, außer das Gelände erzwingt rechts.
@@ -2539,8 +2609,10 @@ Die Datei liegt im Installationsordner: `%LOCALAPPDATA%\Programs\DCS-ATC\config.
 
 | Schlüssel | Standard | Bedeutung |
 |---|---|---|
-| `Frequencies` | `{ "ATIS": 263.5, "Ground": 264.5, "Tower": 265.0, "Approach": 266.5, "Range": 267.5, "AWACS": 251.5, "Tanker": 255.5, "Carrier": 127.5, "JTAC": 133.5 }` | Stationsfrequenzen in MHz. **ATIS** ist die gemeinsame ATIS-Frequenz. **Range** ist der Range-Lotse. **JTAC** ist die Frequenz eines JTAC oder FAC(A), der in der Mission keine eigene hat. **Tanker** ist der Tankerfunk von DCS-ATC. **AWACS** und **Carrier** gelten nur, wenn die Missionseinheit keine eigene Frequenz hat. **Ground / Tower / Approach** sind Ersatz für Plätze ohne DCS-Frequenzdaten; normalerweise nutzt jeder Platz seine Kartenfrequenz. DCS-ATC warnt im Fenster, wenn eine Stationsfrequenz gleich einer Platzfrequenz ist. |
+| `Frequencies` | `{ "ATIS": 263.5, "Ground": 264.5, "Tower": 265.0, "Approach": 266.5, "Range": 267.5, "Center": 268.5, "RedCrown": 252.5, "AWACS": 251.5, "Tanker": 255.5, "Carrier": 127.5, "JTAC": 133.5 }` | Stationsfrequenzen in MHz. **ATIS** ist die gemeinsame ATIS-Frequenz. **Range** ist der Range-Lotse. **JTAC** ist die Frequenz eines JTAC oder FAC(A), der in der Mission keine eigene hat. **Tanker** ist der Tankerfunk von DCS-ATC. **AWACS**, **Carrier** und **RedCrown** gelten nur, wenn die Missionseinheit keine eigene Frequenz hat. **Ground / Tower / Approach** sind Ersatz für Plätze ohne DCS-Frequenzdaten; normalerweise nutzt jeder Platz seine Kartenfrequenz. DCS-ATC warnt im Fenster, wenn eine Stationsfrequenz gleich einer Platzfrequenz ist. |
 | `AtisFreqs` | `{}` | Eigene ATIS-Frequenz je Platz, etwa `{ "Kutaisi": 262.0 }`. Nicht genannte Plätze nutzen `Frequencies.ATIS`. Gilt nach Neustart. |
+| `CenterNames` | `{}` | Center-Name je Karte, z. B. `{ "Nevada": "Seattle Center", "Caucasus:red": "Rostov Control" }`. Leer = eingebaute Namen (siehe [Center](#center)). |
+| `CenterSectors` | `[]` | Mehrere Center-Sektoren je Karte, z. B. `[{ "Name": "Rostov Control", "Freq": 269.0, "Lat": 47.2, "Lon": 39.7, "RadiusNm": 120, "Side": "red" }]`. `Lat`/`Lon` nur Kaukasus, sonst `X`/`Z` in Metern. Der nächste Mittelpunkt, in dessen Radius du liegst, gilt. |
 | `Modulation` | `"AM"` | Modulation aller DCS-ATC-Sendungen. |
 | `Coalition` | `2` | SRS-Seite (1 rot, 2 blau) für Stationen ohne eigene Seite. Plätze, AWACS, Tanker und KI nutzen ihre eigene Seite. |
 | `SrsPath` | `"C:\\Program Files\\DCS-SimpleRadio-Standalone"` | SRS-Ordner. Stimmt er nicht, nimmt DCS-ATC den Registry-Eintrag oder das laufende SRS. |

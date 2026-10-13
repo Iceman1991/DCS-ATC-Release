@@ -30,9 +30,11 @@
 
   // Lotsen-Frequenzen (MHz) – alle gleich setzen = alles auf einer Frequenz
   "Frequencies": { "ATIS": 263.5, "Ground": 264.5, "Tower": 265.0, "Approach": 266.5,
-                   "Range": 267.5, "AWACS": 251.5, "Tanker": 255.5, "JTAC": 133.5 },
+                   "Range": 267.5, "Center": 268.5, "RedCrown": 252.5, "AWACS": 251.5, "Tanker": 255.5, "JTAC": 133.5 },
   "AwacsBullseye": true,     // AWACS-Picture und Lage-Updates an alle als Bullseye (Mission mit Bullseye); false = alles BRAA vom Spieler
   "AwacsNewGroupNm": 200,    // AWACS meldet neue Gruppen von selbst bis zu dieser Entfernung (40-200 NM), auch Umkreis für "picture clean"
+  "CenterNames": {},      // Center-Name je Karte, z. B. { "Nevada": "Seattle Center", "Caucasus:red": "Rostov Control" }; leer = eingebaute Namen (Caucasus: Tbilisi Control)
+  "CenterSectors": [],    // mehrere Sektoren je Karte, z. B. [{ "Name": "Rostov Control", "Freq": 269.0, "Lat": 47.2, "Lon": 39.7, "RadiusNm": 120, "Side": "red" }]; Lat/Lon nur Caucasus, sonst "X"/"Z" in Metern; nächster Mittelpunkt im Radius gewinnt, Side blue/red/leer
   "Modulation": "AM",
   "Coalition": 2,            // SRS-Seite nur für Stationen ohne eigene Seite (Plätze, AWACS, Tanker, KI senden mit ihrer Seite; 1 rot, 2 blau)
 

@@ -70,7 +70,7 @@ static class Kneeboard
             "  CRP South  immer   -> initial",
             "  CRP West   nur Bahn 07",
             "  CRP East   nur Bahn 25",
-            $"  Initial: ca. {Tower.InitialDist / 1852:0.0} NM vor der Schwelle",
+            $"  Initial: ca. {Tower.Initial(k, "07") / 1852:0.0} NM vor der Schwelle",
             "",
             "ROLLWEGE",
         }).Concat(RampLines(k)).Concat(new[]
@@ -98,6 +98,7 @@ static class Kneeboard
         rows.Add("Rufname \"<Platz> Tower\" usw." + (kurz.Count > 0 ? ", kurz:" : ""));
         rows.AddRange(kurz);
         Page(Path.Combine(dir, "ATC-3-Plaetze.png"), "FLUGPLÄTZE KAUKASUS", rows.ToArray(), mono: true);
+        if (fields.Any(x => x.Charted)) Page(Path.Combine(dir, "ATC-3b-Platzrunden.png"), "PLATZRUNDEN UND CRP", PatternLines(fields), mono: true);   // PLATZVERFAHREN-PLAN Etappe 5
         // Navaids from Beacons.lua: one line per ILS; Russian airfields PRMG/RSBN instead of ILS/TACAN
         var nav = new List<string> { "PLATZ              ILS              TACAN    VOR" };
         foreach (var x in fields.OrderBy(x => x.Name).Where(x => x.Ils.Count > 0 || x.Tacan + x.Prmg + x.Rsbn > 0 || x.Vor > 0))
@@ -138,6 +139,8 @@ static class Kneeboard
         "FREQUENZEN (AM)",
         FormattableString.Invariant($"  AWACS   {cfg.Frequencies.GetValueOrDefault("AWACS", 251.5):0.0}   Rufname aus Mission, sonst Overlord"),
         "                  (GCI: Magic blau, Moscow rot)",
+        FormattableString.Invariant($"  Center  {cfg.Frequencies.GetValueOrDefault("Center", 268.5):0.0}   Streckenkontrolle (Name je Karte)"),
+        FormattableString.Invariant($"  Red Crown {cfg.Frequencies.GetValueOrDefault("RedCrown", 252.5):0.0}   Kreuzer der Gruppe (Frequenz aus Mission); Strike = Bordfrequenz"),
         FormattableString.Invariant($"  Tanker  {cfg.Frequencies.GetValueOrDefault("Tanker", 255.5):0.0}   Rufname aus der Mission (z. B. Texaco)"),
         "  Hat der AWACS in der Mission eine eigene",
         "  Frequenz, gilt diese (Funkrad zeigt sie an).",
@@ -199,13 +202,30 @@ static class Kneeboard
     };
 
     /// Selftest (Programm.RadioTest): taxiways from Airfield.Ramps, NDB in NavText, AWACS page with the config frequency, all pages are written.
+    /// Etappe 5: per charted airfield two lines, pattern altitude and side per runway (R/L), then the CRPs ("-" = departures only).
+    internal static string[] PatternLines(IEnumerable<Airfield> fields)
+    {
+        string Short(string c) => c.Split('-', ' ').Length > 0 && c.Split('-', ' ').All(w => w is "north" or "south" or "east" or "west") ? string.Concat(c.Split('-', ' ').Select(w => char.ToUpperInvariant(w[0]))) : c;
+        var rows = new List<string> { "PLATZ              RUNDE  BAHN (R/L = Rechts/Links)", "                   CRP (- = nur Ausflug)" };
+        foreach (var x in fields.Where(x => x.Charted).OrderBy(x => x.Name))
+        {
+            var rw = string.Join(" ", x.Ends.Where(e => x.HandOf.ContainsKey(e.Name)).Select(e => e.Name + (x.HandOf[e.Name] == "right hand" ? "R" : "L")));
+            rows.Add(Trim($"{Trim(x.Name, 18),-18} {x.PatternFt,5:0}  {rw}", 56));
+            rows.Add(Trim("    " + string.Join(" ", x.Crp.Keys.Select(c => (x.ExitOnly.Contains(c) ? "-" : "") + Short(c))), 56));
+        }
+        return rows.ToArray();
+    }
+
     internal static void SelfTest()
     {
         var kut = Airfield.Kutaisi();
         var taxi = string.Join("|", RampLines(kut));
-        if (!taxi.Contains("Ramp West  -> 07: Alpha|") || !taxi.Contains("-> 25: November, Delta|") || !taxi.Contains("Ramp East  -> 07: Echo, Sierra, Whiskey") ||
+        if (!taxi.Contains("Ramp West  -> 07: Alpha|") || !taxi.Contains("-> 25: November, Delta|") || !taxi.Contains("Ramp East  -> 07: Sierra, Whiskey") ||
             taxi.Split("Ramp North").Length != 2)
             throw new Exception("Kneeboard: Rollwege aus Airfield.Ramps: " + taxi);
+        var pl = PatternLines(new[] { kut });
+        if (pl.Length != 4 || !pl[2].StartsWith("Kutaisi") || !pl[2].Contains("07") || kut.Crp.Keys.Any(c => !pl[3].Contains(c.Split('-', ' ')[0][..1].ToUpperInvariant()) && !pl[3].Contains(c)) || pl.Any(l => l.Length > 56))
+            throw new Exception("Kneeboard: Platzrunden-Seite: " + string.Join("|", pl));
         var ndb = new Airfield { Ndb = { ("AP", 443), ("P", 215) } };
         if (ndb.NavText() != "NDB AP 443 / P 215") throw new Exception($"Kneeboard: NDB \"{ndb.NavText()}\"");
         var cfg = new Config(); cfg.Frequencies["AWACS"] = 252.5; cfg.Frequencies["Tanker"] = 256.5;
@@ -222,6 +242,7 @@ static class Kneeboard
             var tw = Console.Out;
             Console.SetOut(TextWriter.Null);   // Write reports the folder
             try { Write(tmp, new() { kut, ndb }, cfg); } finally { Console.SetOut(tw); }
+            if (!File.Exists(Path.Combine(tmp, "ATC-3b-Platzrunden.png"))) throw new Exception("Kneeboard: ATC-3b-Platzrunden.png fehlt");
             if (!File.Exists(Path.Combine(tmp, "ATC-6-Hinweise.png"))) throw new Exception("Kneeboard: ATC-6-Hinweise.png fehlt");
             if (!File.Exists(Path.Combine(tmp, "ATC-5-AWACS.png")) || new FileInfo(Path.Combine(tmp, "ATC-5-AWACS.png")).Length < 1000)
                 throw new Exception("Kneeboard: ATC-5-AWACS.png fehlt");

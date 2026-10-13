@@ -164,7 +164,7 @@ class SimPilot
             }
         }
         var o = outbox.FirstOrDefault(m => m.At <= now);
-        if (o.Text == null && iniDue && Mode == "loc" && !Glide && Rw != "" && AL(F.End(Rw)) is var (ia, il) && ia > 0 && ia < Tower.InitialDist + NM && Math.Abs(il) < 0.5 * NM)
+        if (o.Text == null && iniDue && Mode == "loc" && !Glide && Rw != "" && AL(F.End(Rw)) is var (ia, il) && ia > 0 && ia < Tower.Initial(F, Rw) + NM && Math.Abs(il) < 0.5 * NM)
         {
             iniDue = false; iniCalled = true;
             return $"{F.StationOf("Tower")}, {Cs}, initial";

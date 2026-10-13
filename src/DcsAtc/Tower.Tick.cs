@@ -10,7 +10,8 @@ public partial class Tower
     /// Also on the radio call: an airfield he calls anew or again after a while is known afterwards (otherwise the next tick resets it).
     void Seen(Telemetry t, double now)
     {
-        if (now - lastSeen > 10 && (lastTel == null || Dist(t.X, t.Z, lastTel.X, lastTel.Z) > 3000 || OnGround(t) != OnGround(lastTel))) Reset(t, now);
+        bool flying = lastTel != null && !OnGround(t) && !OnGround(lastTel);   // not ticked while another airfield was active: distance flown in the gap is no respawn
+        if (now - lastSeen > 10 && (lastTel == null || Dist(t.X, t.Z, lastTel.X, lastTel.Z) > 3000 + (flying ? (now - lastSeen) * 350 : 0) || OnGround(t) != OnGround(lastTel))) Reset(t, now);
         lastTel = t;
         lastSeen = now;
     }
@@ -20,6 +21,7 @@ public partial class Tower
         if (t == null) return new();
         near = traffic; callAt = now; WatchSaid = false;
         Seen(t, now);
+        if (Phase != Phase.Away) cenName = null;   // Center service only en route
 
         var c = Cs();
         bool ground = OnGround(t);
@@ -102,7 +104,7 @@ public partial class Tower
         else (clrStill, clrAsked) = (-1, false);
 
         // A12: taxied back from the holding point (30 s over 700 m from the threshold, not on the runway): clearance lapses, back to Ground
-        if (ground && Phase is Phase.HoldShort or Phase.ClearedTakeoff && !OnRunwayPos(t.X, t.Z) && Dist(t.X, t.Z, Thr(rw).X, Thr(rw).Z) > 700)
+        if (ground && Phase is Phase.HoldShort or Phase.ClearedTakeoff && !backtrack && !OnRunwayPos(t.X, t.Z) && Dist(t.X, t.Z, Thr(rw).X, Thr(rw).Z) > 700)
         {
             if (rollBack < 0) rollBack = now;
             else if (now - rollBack > 30)
@@ -229,6 +231,13 @@ public partial class Tower
         if (!ground && Phase is Phase.Initial or Phase.Pattern or Phase.ClearedLand && PatternTraffic(t, traffic) is { } pt) return pt;   // A99: crossing traffic in the pattern
         if (!ground && Phase == Phase.Away && Following && idAt <= 0 && FollowTick(t, traffic, now) is { } fm) return fm;
         if (!ground && idAt <= 0 && (Phase == Phase.Inbound || Phase is Phase.Departing or Phase.Away && (handedOff || Following)) && TerrainAlert(t, now) is { } lm) return lm;   // R114: also radar vectoring, holding, handed-over departure; R128: only after identification
+        if (!ground && Phase == Phase.Away && Center && idAt <= 0 && CenterTick(t, now) is { } cm) return cm;   // Center: AWACS, next sector, destination
+        if (!ground && Phase == Phase.Away && Following && !Center && ffIn && idAt <= 0 && AwacsContact == null && Dist(t.X, t.Z, CX, CZ) > CenterFfNm * NM && CenterContact(t, " for further flight following") is { } fh)
+        {
+            var fb = Say($"{c}, {fh}", "Approach");   // flight following from the field leaves the approach area: Center takes over
+            CenterEnd();
+            return fb;
+        }
         if (!ground && (Phase is Phase.Inbound or Phase.Entering || radarDep) && now < alertUntil) return new();   // let it give way, no interjecting
 
         // R115: airfield not reported in sight up to 4 NM before the threshold: no visual approach, procedure or straight-in approach as requested
@@ -371,7 +380,7 @@ public partial class Tower
             bool ifr = depClr && nav != null;
             var end = AwacsContact is { } aw ? $"contact {aw}." : depClr ? "frequency change approved." : SquawkVfr() + "frequency change approved.";
             var head = ifr ? $"proceed direct {navName}, resume own navigation. Radar service terminated" : "radar service terminated";
-            var ho = IfrHandoff();
+            var ho = IfrHandoff(t);
             var bye = Say(ho != null ? $"{c}, {ho}" : $"{c}, {head}, {end}", "Approach");   // still as Departure (Dep)
             depClr = false; nav = null; handedOff = false; Released = true;
             return bye;
@@ -381,17 +390,30 @@ public partial class Tower
         if (!ground && nav is { } goal)
         {
             double d = Dist(t.X, t.Z, goal.X, goal.Z);
+            // K21: knee point reached (Wp in the chart): now toward the initial/overhead
+            if (kneeTo is { } kn && navName == "the turning point" && Phase == Phase.Entering && d < 0.7 * NM)
+            {
+                (nav, navName, kneeTo) = (kn, kneeName, null);
+                return Say($"{c}, {Steer(t, kn, kneeName)}, {MilesTxt(Dist(t.X, t.Z, kn.X, kn.Z))} to {kneeName}.");
+            }
+            bool crpLeg = !holding && entry != null && (Phase == Phase.Inbound || Phase == Phase.Entering && navName == $"C R P {entry}");
+            // K22: Approach hands over so that the Tower is called about 2 minutes before the C R P (not yet at the point: that is the fallback below)
+            if (crpLeg && Phase == Phase.Inbound && vec == null && navName == $"C R P {entry}" && !crpAsked && d > NM && d <= Math.Max(Gs(t), 40) * 120)
+            {
+                Phase = Phase.Entering; handoffAt = now; towerDue = true; towerNag = false;
+                return Say($"{c}, contact {Contact("Tower")}, report C R P {entry}.", "Approach");
+            }
             // Reporting obligation C R P: handoff only on the call "C R P north" (case crp); at the point without call once "report C R P", 2 NM later once "say position", no handoff
-            if (!holding && Phase == Phase.Inbound && entry != null && d < NM && !crpAsked) { crpAsked = true; return Say($"{c}, report C R P {entry}.", "Approach"); }
-            if (!holding && Phase == Phase.Inbound && entry != null && crpAsked && !crpWaved && d > 2 * NM)
+            if (crpLeg && d < NM && !crpAsked) { crpAsked = true; return Say(Phase == Phase.Entering ? $"{c}, {F.StationOf("Tower")}, report C R P {entry}." : $"{c}, report C R P {entry}.", Owner()); }
+            if (crpLeg && crpAsked && !crpWaved && d > 2 * NM)
             {
                 crpWaved = true; nav = null; (keepAt, keepRef, keepTold) = (now, Dist(goal.X, goal.Z, CX, CZ), false);
-                return Say($"{c}, say position, remain outside the control zone.", "Approach");
+                return Say($"{c}, say position, remain outside the control zone.", Owner());
             }
             // Break clearance only on the call "initial" (as in reality: "report initial" -> pilot reports -> break clearance "runway 25, report base"); at Initial arrived without call ask once (R31: only on the axis)
-            if (Phase == Phase.Entering && navName == "initial" && d < NM && Approach(t.X, t.Z, rw) is var (ia, il) && ia <= InitialDist && il < InitialLat && !iniAsked) { iniAsked = true; return Say($"{c}, {F.StationOf("Tower")}, report initial."); }
+            if (Phase == Phase.Entering && navName == "initial" && d < NM && Approach(t.X, t.Z, rw) is var (ia, il) && ia <= Ini(rw) && il < InitialLat && !iniAsked) { iniAsked = true; return Say($"{c}, {F.StationOf("Tower")}, report initial."); }
             // still without call further toward the break (1 NM past the Initial): let go around once, new via the Initial (heading afterwards as usual)
-            if (Phase == Phase.Entering && navName == "initial" && iniAsked && !iniWaved && Approach(t.X, t.Z, rw).along < InitialDist - NM)
+            if (Phase == Phase.Entering && navName == "initial" && iniAsked && !iniWaved && Approach(t.X, t.Z, rw).along < Ini(rw) - NM)
             {
                 iniWaved = true; lastVector = now;
                 return Say($"{c}, no break clearance, continue straight through, re-enter initial runway {RwSay(rw)}, report initial.");
@@ -412,12 +434,12 @@ public partial class Tower
         // (3 NM, under pattern + 1000 ft) or further in the zone than the C R P: once redirect with violation (debriefing, "possible pilot deviation", FAA JO 7110.65 2-1-26) like the zone watch
         if (!ground && !keepTold && now - keepAt > 45 && Dist(t.X, t.Z, CX, CZ) is var kd &&
             (ovhWaved && Phase == Phase.Entering && navName == "overhead" && kd < 3 * NM && IndFt(t) < PatternFt + 1000 ||
-             crpWaved && !holding && Phase == Phase.Inbound && entry != null && kd < Math.Min(CtrM, keepRef - NM)))
+             crpWaved && !holding && entry != null && (Phase == Phase.Inbound || Phase == Phase.Entering && navName == $"C R P {entry}") && kd < Math.Min(CtrM, keepRef - NM)))
         {
             keepTold = true;
             return ovhWaved ? Dev($"{c}, you are not cleared to join, leave the pattern immediately, say intentions.", $"Platzrunde ohne Freigabe {F.Name}", $"pattern entry without clearance {F.Name}", "Tower")
                             : Dev($"{c}, you are inside the {F.Name.Replace('-', ' ')} control zone without clearance, leave the control zone immediately, say intentions.",
-                                  $"Kontrollzone ohne Freigabe {F.Name}", $"control zone entered without clearance {F.Name}", "Approach");
+                                  $"Kontrollzone ohne Freigabe {F.Name}", $"control zone entered without clearance {F.Name}", Owner());
         }
 
         // Pattern: side, altitude, extend downwind / base
@@ -430,8 +452,8 @@ public partial class Tower
             if (side < -900 && (Phase == Phase.Pattern || HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(rw) + 180) < 60) && now - lastPatternWarn > 60)   // Initial: only on downwind
             {
                 lastPatternWarn = now;
-                return Say(F.Charted
-                    ? $"{c}, pattern is south of the runway, {Hand(rw)} pattern runway {RwSay(rw)}."
+                return Say(F.SideOf.TryGetValue(rw, out var sd)
+                    ? $"{c}, pattern is {sd} of the runway, {Hand(rw)} pattern runway {RwSay(rw)}."
                     : $"{c}, wrong side, {Hand(rw)} pattern runway {RwSay(rw)}.");
             }
             if (downwind && Math.Abs(IndFt(t) - PatternFt) > 500 && t.Vs * Math.Sign(IndFt(t) - PatternFt) > -2.5 && now - lastAltWarn > 60)
@@ -661,6 +683,7 @@ public partial class Tower
             lastRollWarn = now;
             return Say($"{c}, hold position, say intentions.", "Ground");
         }
+        if (TaxiCheck(t, c, now, ground, gkt) is { } tcm) return tcm;
 
         // Taxi traffic: crossing/oncoming ground traffic -> stop, then resume taxiing.
         // Not on the runway (rollout: the pilot cannot stop, runway traffic is the tower's business) and not because of traffic on the runway.
@@ -745,7 +768,19 @@ public partial class Tower
             {
                 lastParkCall = -1;   // R211: once and silent – Ground does not report the stand, that is the crew chief's business (N25)
             }
-            if (d >= 20 && gkt > 2 && now - lastParkCall > 10 && ParkDir(t, tg) is { } pd)
+            var nb = d >= 20 && gkt > 2 ? NetBack(t, tg) : null;
+            if (nb is { } back && !(progressive && !inn && d < 150))   // DCS network: no clock directions, only wrong way (way behind him for 8 s) with the taxi route again; at the holding point the final call below
+            {
+                if (!back) backSince = -1;
+                else if (backSince < 0) backSince = now;
+                if (back && now - backSince >= 8 && now - lastParkCall > 10)
+                {
+                    lastParkCall = now;
+                    backSince = now + 20;   // repeat at most every 28 s
+                    return Say($"{c}, wrong way, turn around, {taxiSaid ?? ProgName(Runway)}.", "Ground");
+                }
+            }
+            else if (d >= 20 && gkt > 2 && now - lastParkCall > 10 && ParkDir(t, tg) is { } pd)
             {
                 if (d < progMin) { progMin = d; growSince = -1; }
                 else if (d <= progMin + 15) growSince = -1;
@@ -771,6 +806,15 @@ public partial class Tower
             else if (now - stoppedSince > 30 && AtSpot(t, 100)) Park();
         }
         else stoppedSince = -1;
+
+        // stopped on the taxiway (not at a stand, not near the holding point, not told to hold): after 90 s once ask, again after moving
+        if (ground && Phase is Phase.TaxiIn or Phase.TaxiOut && gkt < 1 && holdFor == null && !taxiHoldSaid && crossWait == null && !AtSpot(t, 100) && !OnRunwayPos(t.X, t.Z)
+            && !(Phase == Phase.TaxiOut && Dist(t.X, t.Z, HoldPt(Runway, t).X, HoldPt(Runway, t).Z) < 150))
+        {
+            if (stuckSince < 0) stuckSince = now;
+            else if (now - stuckSince > 90 && !stuckAsked) { stuckAsked = true; return Say($"{c}, I show you stopped on the taxiway, say intentions, do you require assistance?", "Ground"); }
+        }
+        else if (gkt >= 3) (stuckSince, stuckAsked) = (-1, false);
         return new();
     }
 
@@ -786,13 +830,14 @@ public partial class Tower
         var cl = ceil >= 1000 ? "" : $"{(vis == "" ? " Ceiling" : ", ceiling")} {Alt(Math.Max(0, Math.Round(ceil / 100) * 100))}";
         return $"{vis}{cl}.{(visM < 550 || ceil < 200 ? " Say intentions." : "")}";
     }
-    void Park() { wxTold = false; special = null; Phase = Phase.Parked; exitDir = null; entry = null; Separate = false; depClr = false; dest = null; Following = false; lowTold = lowAck = false; Squawk = null; cruiseFt = 0; climbOut = null; }
+    void Park() { wxTold = false; special = null; Phase = Phase.Parked; exitDir = null; entry = null; Separate = false; depClr = false; dest = null; Following = false; cenName = null; cenTo = null; lowTold = lowAck = false; Squawk = null; cruiseFt = 0; climbOut = null; }
 
     /// R128: identification by code (FAA JO 7110.65 5-3-3): "radar contact" only once the code is observed; idAt = time, idFf = flight following instead of departure report.
     double idAt = -1; bool idFf;
     Airfield? popDf;   // R219: target of the pop-up IFR clearance that follows identification
     string PopClr(Telemetry t, Airfield df) { var dn = df.Name.Replace('-', ' '); return $"cleared to {dn} via radar vectors, {Steer(t, (df.X, df.Z), dn)}, {AltTo(t, cruiseFt)}."; }
-    string FfRc(Telemetry? t) => $"{Rc}{(t != null ? $", {Where(t)}" : "")}, {Qnh(t)}. Flight following, report leaving frequency.";
+    string FfRc(Telemetry? t) => Center ? $"{Rc}{(t != null ? $", {Where(t, F.Name.Replace('-', ' '))}" : "")}. Report leaving frequency."
+                                        : $"{Rc}{(t != null ? $", {Where(t)}" : "")}, {Qnh(t)}. Flight following, report leaving frequency.";
     string AirRc(Telemetry? t)
     {
         if (climbOut != null) return $"{Rc}{(t != null ? $", {Where(t)}" : "")}. {(climbOut == "tactical" ? "Continue spiral climb as cleared, then resume" : "Unrestricted climb approved, resume")} own navigation.";
@@ -1081,12 +1126,63 @@ public partial class Tower
 
     /// N26: taxi aid target: TaxiIn = own parking position, TaxiOut = holding point
     (double X, double Z)? ProgTarget(Telemetry t) => Phase == Phase.TaxiIn ? spot : Phase == Phase.TaxiOut ? HoldPt(Runway, t) : null;
-    string ProgName(string rw) => Phase == Phase.TaxiIn ? "parking position" : $"holding point runway {RwSay(rw)}";
-    void ProgStart(bool on, double now) { lastParkCall = now; progressive = on; progNear = false; progLast = progMin = 1e9; growSince = -1; }   // new taxi order
+    string ProgName(string rw) => Phase == Phase.TaxiIn ? "parking position" : HoldTxt(home, rw, RwSay(rw));
+    void ProgStart(bool on, double now) { lastParkCall = now; progressive = on; progNear = false; progLast = progMin = 1e9; growSince = backSince = -1; }   // new taxi order
+
+    static string Meters(double d) => $"{Math.Round(d / (d > 300 ? 50 : 10)) * (d > 300 ? 50 : 10):0} meters";
+
+    /// Wrong way on the DCS taxi network: true = the shortest way to the goal lies behind him (no taxiway names in the network, so no turn-by-turn guidance).
+    /// null: no network, no taxiway near him or the goal, or no connection.
+    bool? NetBack(Telemetry t, (double X, double Z) goal)
+    {
+        if (F.Net is not { } net) return null;
+        bool Rwy(double x, double z) => F.OnRunway(x, z);
+        if (netDg == null || netGoal != goal) (netGoal, netDg) = (goal, net.Spread(goal, Rwy));
+        if (netDg == null || net.PathTo((t.X, t.Z), goal, netDg, Rwy) is not { } path) return null;
+        var (px, pz, s) = (t.X, t.Z, 0.0);   // point 30 m ahead along the way (the path starts at his position on the taxiway)
+        foreach (var q in path) { s += Dist(px, pz, q.X, q.Z); (px, pz) = (q.X, q.Z); if (s >= 30) break; }
+        if (s < 30) return false;   // goal right ahead
+        return Math.Abs(((Bearing(t.X, t.Z, px, pz) - t.Hdg * 180 / Math.PI) % 360 + 540) % 360 - 180) > 120;
+    }
+
+    /// Etappe 6: taxi control with the DCS taxi network (needs a named holding point of the chart and a network; otherwise silent). Once per taxi clearance "hold position, say intentions":
+    /// (a) the player has been more than TaxiOff m away from the corridor stand-holding point for 10 s while rolling (corridor = shortest way plus 20 % + 150 m, no taxiway names),
+    /// (b) he rolls over the holding point towards the runway (without line-up/takeoff clearance, not at backtrack). Conservative: better too rare than wrong; AI is not affected.
+    const double TaxiOff = 75;
+    List<Msg>? TaxiCheck(Telemetry t, string c, double now, bool ground, double gkt)
+    {
+        if (taxiHoldSaid || !ground || IsHeli || crossOk != null || crossWait != null || OnRunwayPos(t.X, t.Z)) return null;
+        if (!(Phase == Phase.TaxiOut || Phase == Phase.HoldShort && !lineUp && !backtrack) || F.Net is not { } net || NamedHold(Runway) is not { } hold) return null;
+        if (Phase == Phase.TaxiOut && (!taxiRouteSet || taxiRouteRw != Runway))
+        {
+            (taxiRouteSet, taxiRouteRw, taxiStart, taxiOffSince) = (true, Runway, (t.X, t.Z), -1);
+            taxiRoute = CrossNext(t) == null ? net.RouteTo(taxiStart, hold, (x, z) => F.OnRunway(x, z)) : null;   // parallel runway on the way: the corridor would not lead across it
+        }
+        if (gkt <= 3) { taxiOffSince = -1; return null; }
+        if (Phase == Phase.TaxiOut && taxiRoute is { } rt && Dist(t.X, t.Z, taxiStart.X, taxiStart.Z) > 80)
+        {
+            if (rt.Dist(t.X, t.Z) <= TaxiOff) taxiOffSince = -1;
+            else if (taxiOffSince < 0) taxiOffSince = now;
+            else if (now - taxiOffSince >= 10) { taxiHoldSaid = true; return Say($"{c}, hold position, say intentions.", "Ground"); }
+        }
+        // (b) the holding point lies at most 90 m from the runway axis: he is on its side, 120 m around it and more than 15 m nearer to the axis
+        var e = F.End(Runway);
+        double Lat(double x, double z) => (z - e.ThrZ) * e.Dx - (x - e.ThrX) * e.Dz;
+        double lh = Lat(hold.X, hold.Z), lt = Lat(t.X, t.Z);
+        if (Math.Abs(lh) <= 90 && Math.Sign(lt) == Math.Sign(lh) && Math.Abs(lt) < Math.Abs(lh) - 15 && Dist(t.X, t.Z, hold.X, hold.Z) < 120)
+        {
+            taxiHoldSaid = true;
+            return Say($"{c}, hold position, say intentions.", Phase == Phase.HoldShort ? "Tower" : "Ground");
+        }
+        return null;
+    }
+
+    (double X, double Z)? NamedHold(string rw) => home != null && home.Hold.TryGetValue(rw, out var hn) && F.Holds.TryGetValue(hn, out var h) ? (h.X, h.Z) : null;
 
     /// Holding point: about 150 m before the threshold, 100 m lateral on the aircraft's side (DCS-ATC does not know the taxiway network)
     (double X, double Z) HoldPt(string rw, Telemetry t)
     {
+        if (NamedHold(rw) is { } named) return named;   // K29: holding point named by the chart
         var e = F.End(rw);
         double side = Math.Sign((t.Z - e.ThrZ) * e.Dx - (t.X - e.ThrX) * e.Dz);
         if (side == 0) side = 1;
@@ -1100,7 +1196,7 @@ public partial class Tower
         if (d > 5000) return null;
         double rel = ((Bearing(t.X, t.Z, sp.X, sp.Z) - t.Hdg * 180 / Math.PI) % 360 + 360) % 360;
         int clock = (int)Math.Round(rel / 30) % 12;
-        var m = $"{Math.Round(d / (d > 300 ? 50 : 10)) * (d > 300 ? 50 : 10):0} meters";
+        var m = Meters(d);
         if (d < 80) return $"{(clock is 0 or 11 or 1 ? "ahead" : rel < 180 ? "on your right" : "on your left")}, {m}";
         return $"at your {(clock == 0 ? 12 : clock)} o'clock, {m}";
     }
@@ -1213,7 +1309,7 @@ public partial class Tower
         if (Math.Abs(side) < 100) side = Math.Cos(hdg * Math.PI / 180) * e.Dz - Math.Sin(hdg * Math.PI / 180) * e.Dx;   // on the axis: to the side he already points to
         double s = side >= 0 ? 1 : -1, off = Bearing(0, 0, s * e.Dz, -s * e.Dx);
         var how = HdgDiff(hdg, e.Hdg) is > 30 and < 150 ? "crossing" : "on";   // along (even opposite) he does not cross
-        if (lat < 1.5 * NM && al > 0 && al < CtrM && (Math.Abs(ft - (FieldElev / Ft + al / NM * 318)) < 1000 || al < InitialDist + 2 * NM && ft < PatternFt + 500))
+        if (lat < 1.5 * NM && al > 0 && al < CtrM && (Math.Abs(ft - (FieldElev / Ft + al / NM * 318)) < 1000 || al < Ini(Runway) + 2 * NM && ft < PatternFt + 500))
             return ($"{how} the final approach course runway {RwSay(Runway)}", off);
         if (lat < 1.5 * NM && dep > e.Len / 2 && dep < CtrM && ft < MaxFt + 1000) return ($"{how} the departure path runway {RwSay(Runway)}", off);
         if (d < 3 * NM && ft < PatternFt + 1000) return ("", d < 1.5 * NM && ft > PatternFt + 500 ? null : Bearing(CX, CZ, x, z));

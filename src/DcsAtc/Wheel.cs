@@ -18,7 +18,7 @@ sealed class Wheel : Form
         new("Ground", Sub: new Item[]
         {
             new("Request startup", "Ground: request startup"), new("IFR clearance", "Ground: request IFR clearance", Array.Empty<Item>()), new("Request taxi", "Ground: request taxi"),
-            new("Vacated, taxi to parking", "Ground: runway vacated, request taxi to parking"), new("Progressive taxi", "Ground: request progressive taxi"),
+            new("Vacated, taxi to parking", "Ground: runway vacated, request taxi to parking"), new("Progressive taxi", "Ground: request progressive taxi"), new("Say again taxi", "Ground: say again taxi route"),
             new("Hot brakes", "Ground: hot brakes"),   // R251
         }),
         new("Tower", Sub: new Item[]
@@ -46,6 +46,11 @@ sealed class Wheel : Form
             new("Say again", "Approach: say again"), new("Request higher", "Approach: request higher"),
             new("Leaving the zone", "Approach: leaving the control zone"),   // R7 / N3: only when due (after "report leaving the control zone" / "report clear of the zone"), last: fellow players see the first 9
             // R307: only if enough before it is hidden (fellow players: the first 9 as before)
+        }),
+        new("Center", Sub: new Item[]   // en-route controller (module center, only on a map with a Center): entries per state (WheelFits)
+        {
+            new("Check in", "Center: checking in"), new("Request altitude", "Center: request higher"), new("Request direct", "Center: request direct", Array.Empty<Item>()),
+            new("Leaving frequency", "Center: leaving frequency"),
         }),
         new("Range", Sub: new Item[]
         {
@@ -86,6 +91,8 @@ sealed class Wheel : Form
             new("Marshal check in", "Carrier: Marshal, checking in"), new("See you at", "Carrier: see you at angels"),
             new("Initial", "Carrier: initial"), new("Commencing", "Carrier: commencing"), new("Platform", "Carrier: platform"),
             new("Ball", "Carrier: ball"), new("Clara", "Carrier: Clara"), new("Pigeons", "Carrier: pigeons"),
+            new("Strike check in", "Carrier: Strike, checking in"), new("Strike check out", "Carrier: Strike, checking out"),
+            new("Red Crown check in", "Carrier: Red Crown, checking in"), new("Red Crown check out", "Carrier: Red Crown, checking out"),
         }),
         new(L("Notfall", "Emergency"), Sub: new Item[]
         {
@@ -119,13 +126,14 @@ sealed class Wheel : Form
         get
         {
             var (aw, tk) = Up();
-            var t = Vis(Mod(All.Where(i => i.Label switch { "Range" => Ops.Range != null, "Carrier" => Carrier.Boats.Count > 0, "AWACS" => aw, "Tanker" => tk, "JTAC" => Jtac(), _ => true })), Fits());
+            var t = Vis(Mod(All.Where(i => i.Label switch { "Range" => Ops.Range != null, "Carrier" => Carrier.Boats.Count > 0, "AWACS" => aw, "Tanker" => tk, "JTAC" => Jtac(), "Center" => Cen(), _ => true })), Fits(), 2);
             if (top == null || !t.SequenceEqual(top)) top = t;
             return top;
         }
     }
     public static Func<(bool Awacs, bool Tanker)> Up = () => (true, true);   // own AWACS/GCI or tanker in the air, Program sets it (fellow players, preview: both)
     public static Func<bool> Jtac = () => true;   // J11: own side has a living JTAC / FAC(A), Program sets it (fellow players, preview: yes)
+    public static Func<bool> Cen = () => true;   // the map has a Center for the own side (module on), Program sets it (fellow players, preview: yes)
     public static Func<string[]> Jtacs = Array.Empty<string>;   // callsigns of the own JTAC / FAC(A), Program sets it; with two or more "Check in" asks which one
     /// R307: does this radio call fit right now (Program.WheelFits: phase, open question, traffic advisory, Range/Tanker/Carrier)? Fellow players/preview: no state, everything.
     public static Func<Func<string, bool>> Fits = () => _ => true;
@@ -133,10 +141,11 @@ sealed class Wheel : Form
     /// Module selection (setup/settings): entries of deselected modules removed before Vis, so its fallback never shows them. Platz wählen with ATC.
     internal static Item[] Mod(IEnumerable<Item> xs) => xs.Where(ModOk).ToArray();
     static bool ModOk(Item i) => i.Text != null ? Program.TextOn(i.Text) : i.Sub is { Length: > 0 } ? i.Sub.Any(ModOk) : Program.On("atc");
-    internal static Item[] Vis(Item[] xs, Func<string, bool> f)
+    internal static Item[] Vis(Item[] xs, Func<string, bool> f, int keep = 0)
     {
         bool Ok(Item i) => i.Text != null ? f(i.Text) : i.Sub is not { Length: > 0 } || i.Sub.Any(Ok);
-        var v = xs.Where(Ok).Take(9).ToArray();
+        var o = xs.Where(Ok).ToArray();
+        var v = keep > 0 && o.Length > 9 ? o.Take(9 - keep).Concat(o.TakeLast(keep)).ToArray() : o.Take(9).ToArray();   // keep: the last entries (top level: Notfall, Allgemein) survive the cut
         return v.Length > 0 ? v : xs.Take(9).ToArray();
     }
 
@@ -144,7 +153,7 @@ sealed class Wheel : Form
     public static void SelfTest(Action<bool, string> check)
     {
         foreach (var (name, n) in All.Where(i => i.Sub != null).SelectMany(i => i.Sub!.Where(s => s.Sub != null).Select(s => ($"{i.Label}/{s.Label}", s.Sub!.Length)).Prepend((i.Label, i.Sub!.Length))).Prepend(("Top", All.Length)))
-            check(n <= 9 || name is "Approach" or "Top", $"Funkrad {name}: {n} Einträge (max. 9)");   // R307: Approach has 12, visible at most 9 (Vis); Top 10 with JTAC (only shown with a leader)
+            check(n <= 9 || name is "Approach" or "Carrier" or "Top", $"Funkrad {name}: {n} Einträge (max. 9)");   // R307: Approach has 12, visible at most 9 (Vis); Top 10 with JTAC (only shown with a leader)
         var oj = Jtacs; Jtacs = () => new[] { "Axeman 1-1", "Pontiac 1-1" };
         var jp = JtacPick(new("Check in", "JTAC: checking in"));
         check(jp?.Length == 2 && jp[1].Text == "JTAC: Pontiac 1-1, checking in" && JtacPick(new("In", "JTAC: in")) == null, "Funkrad: zwei JTAC -> Check in fragt welcher");

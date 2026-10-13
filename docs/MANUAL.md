@@ -13,7 +13,7 @@ DCS-ATC never spawns aircraft. It only provides the radio for units that are alr
 2. [Ways to talk](#ways-to-talk)
    - [Voice over SRS](#voice-over-srs) · [Phrasing that is always understood](#phrasing-that-is-always-understood) · [Radio wheel](#radio-wheel) · [Radio wheel in VR](#radio-wheel-as-text-in-the-game-vr) · [F10 menu](#f10-menu) · [Chat](#typing-in-the-chat-multiplayer) · [Text in the game](#text-in-the-game) · [Voices](#voices-radio-effect-and-speech-pace) · [Altimeter unit](#altimeter-setting-hpa-or-inhg) · [Runway lights](#runway-lights)
 3. [Airfield ATC](#airfield-atc)
-   - [Airfields, callsigns and frequencies](#airfields-callsigns-and-frequencies) · [ATIS](#atis) · [Runway selection](#runway-selection) · [Weather: VFR and IFR](#weather-vfr-and-ifr) · [Ground](#ground) · [Tower: departure](#tower-departure) · [Tower: arrival](#tower-arrival) · [Approach](#approach) · [Airspace](#airspace) · [Emergencies](#emergencies) · [Landing grade and debriefing](#landing-grade-and-debriefing) · [Mandatory reports](#mandatory-reports) · [Phrase table](#phrase-table)
+   - [Airfields, callsigns and frequencies](#airfields-callsigns-and-frequencies) · [ATIS](#atis) · [Runway selection](#runway-selection) · [Weather: VFR and IFR](#weather-vfr-and-ifr) · [Ground](#ground) · [Tower: departure](#tower-departure) · [Tower: arrival](#tower-arrival) · [Approach](#approach) · [Center](#center) · [Airspace](#airspace) · [Emergencies](#emergencies) · [Landing grade and debriefing](#landing-grade-and-debriefing) · [Mandatory reports](#mandatory-reports) · [Phrase table](#phrase-table)
 4. [Carrier operations](#carrier-operations)
 5. [AWACS, tankers and ranges](#awacs-tankers-and-ranges)
    - [AWACS](#awacs) · [Tankers](#tankers) · [Range](#range) · [JTAC and FAC(A)](#jtac-and-faca) · [AI flights on the radio](#ai-flights-on-the-radio) · [Ground crew and crew chief](#ground-crew-and-crew-chief)
@@ -66,6 +66,7 @@ Setup asks which parts of DCS-ATC you want. **Full** ticks everything. With **Cu
 | Module | What it covers |
 |---|---|
 | Air traffic control | Ground, Tower, Approach/Departure, ATIS, airspace watch, the emergency menu |
+| Center | En-route controller after takeoff: flight following, direct routes, handover to the destination |
 | Range | The range controller |
 | AWACS | Picture, bogey dope, air combat, AI fighter control |
 | Tanker | Rejoin, pre-contact, refueling help |
@@ -166,7 +167,7 @@ Ground: Enfield one one, Kutaisi Ground, taxi to holding point runway two five v
 ```
 
 - **Accepted phrasing.** "request taxi", "ready to taxi" and "request startup and taxi" all work. The last one approves start-up and taxi together.
-- **Progressive taxi.** Once you are taxiing, say "request progressive taxi" to have Ground guide you turn by turn.
+- **Progressive taxi.** Once you are taxiing, say "request progressive taxi" to hear the route again. "Say again taxi" does the same.
 
 **5. Take-off (Tower).** At the holding point:
 
@@ -480,6 +481,7 @@ Each level shows at most 9 entries.
 | Request taxi | `request taxi` | On the ground before the holding point |
 | Vacated, taxi to parking | `runway vacated, request taxi to parking` | On the ground after landing |
 | Progressive taxi | `request progressive taxi` | On the ground |
+| Say again taxi | `say again taxi route` | While taxiing |
 | Hot brakes | `hot brakes` | On the ground |
 
 The IFR clearance list shows nearby airfields; carriers and your current airfield are not listed.
@@ -601,12 +603,12 @@ In every mission with DCS-ATC, each player group gets **F10 Other → ATC**. If 
 
 | Submenu | Entries |
 |---|---|
-| Ground | Request startup · Request taxi · Runway vacated, taxi to parking · Progressive taxi · Hot brakes · IFR clearance → *Next in departure direction* / up to 8 friendly or neutral airfields, nearest first |
+| Ground | Request startup · Request taxi · Runway vacated, taxi to parking · Progressive taxi · Say again taxi · Hot brakes · IFR clearance → *Next in departure direction* / up to 8 friendly or neutral airfields, nearest first |
 | Tower | Ready for departure · Ready, closed pattern · Initial · Overhead · Base, gear down · Final, gear down, full stop · Base, touch and go · Going around · Closed / SFO → Request closed · Request SFO · High key · Low key, gear down · Ready, practice approach · Ready, unrestricted climb · Ready, tactical departure |
 | Approach | Airborne (after takeoff) · Inbound for landing · Inbound, pattern work · Request ILS / straight in · Flight following · Cancel approach · Traffic → Traffic in sight / Negative contact · C R P · More → Report airspeed / Say again / Request higher |
 | Range (only if the mission has a range) | Check in · IP inbound · In hot · Off safe · Check out · Check out, hung ordnance |
-| AWACS / Tanker | AWACS → Check in · Picture · Bogey dope · Sort · Nearest tanker · Vector nearest airfield · Check out · Combat → Committing / Fox three / Splash / Defending / Request support / Unable / Winchester / Bingo, RTB / Say again. Tanker → Request rejoin · Visual · Observation · Pre-contact · Refuel complete · Say position |
-| Carrier (only if the mission has a carrier) | Marshal check in · See you at · Initial · Commencing · Platform · Ball · Clara · Pigeons |
+| AWACS / Tanker / Center | AWACS → Check in · Picture · Bogey dope · Sort · Nearest tanker · Vector nearest airfield · Check out · Combat → Committing / Fox three / Splash / Defending / Request support / Unable / Winchester / Bingo, RTB / Say again. Tanker → Request rejoin · Visual · Observation · Pre-contact · Refuel complete · Say position · Center → Check in · Request altitude · Request direct · Leaving frequency |
+| Carrier (only if the mission has a carrier) | Marshal check in · See you at · Initial · Commencing · Platform · Ball · Clara · Pigeons · Strike check in/out · Red Crown check in/out (only with an own cruiser) |
 | Emergency | MAYDAY → kind · PAN PAN → kind · Minimum fuel · Hung ordnance · Flameout, high key · Cancel emergency (kinds: engine failure, fuel (MAYDAY only), hydraulic failure, battle damage, medical, bird strike) |
 | General | Radio check · Say again · QNH / weather · Listen to ATIS · Request zone transit · Debriefing |
 | Settings | Ground crew on/off · Show |
@@ -728,7 +730,7 @@ DCS-ATC provides ATIS, Ground, Tower, Approach and Departure at every airfield o
 
 **Which airfields have ATC**
 
-- **Every map, every airfield with a runway.** Runways, elevation and parking spots come live from DCS. Kutaisi also uses the DCS kneeboard charts: CRPs, taxiway names, ramps, and a traffic pattern that is always south of the runway. Every other airfield uses a generic procedure built from the terrain.
+- **Every map, every airfield with a runway.** Runways, elevation and parking spots come live from DCS. On the Caucasus map every airfield also uses the DCS kneeboard charts: CRPs, taxi routes, named holding points, ramps, pattern side and altitude, and the INITIAL point per runway (Tbilisi-Lochini only has taxi routes there). The kneeboard has the page "ATC-3b-Platzrunden" for this. Other maps use a generic procedure built from the terrain.
 - **Only friendly and neutral airfields answer.** An enemy airfield stays silent. Instead you get a text note with the nearest friendly airfield as magnetic bearing and distance, for example `Senaki-Kolkhi 270/35 NM`. If an airfield is captured while you are inbound, Approach sends you to the nearest friendly airfield ("Kutaisi is closed, divert Senaki …").
 - **Station names** come from the map's radio data. For example, Senaki-Kolkhi is "Kolkhi Tower" and Kutaisi is "Kutaisi Tower". Hyphens in airfield names are spoken as spaces.
 
@@ -871,13 +873,14 @@ These phrases count as a start-up request: "request startup", "start up", "reque
 - **QNH:** given only on the first call, and only if you didn't give the ATIS letter. "request startup and taxi" answers both requests at once.
 - **Squawk:** a VFR squawk comes with the taxi clearance. If you have an IFR clearance, you already have a squawk.
 - **Separate Tower frequency:** "Hold short runway two five, contact Kutaisi Tower … when ready for departure."
-- **Progressive taxi:** while taxiing, "request progressive taxi" gets directions to the holding point, such as "holding point runway two five at your 2 o'clock, 450 meters". The directions are updated each time the distance halves and end with "…, hold short of runway two five".
+- **Progressive taxi:** while taxiing, "request progressive taxi" repeats the taxi route. Where DCS has a taxi network for the airfield (all Caucasus airfields), Ground gives no clock directions and only calls "wrong way, turn around" with the route if you taxi away from your destination, and asks "say intentions, do you require assistance?" if you stop on a taxiway for 90 seconds. Without a network you get directions such as "holding point runway two five at your 2 o'clock, 450 meters", updated each time the distance halves and ending with "…, hold short of runway two five".
 
 **Ground warnings while you taxi**
 
 | Situation | Ground or Tower says |
 |---|---|
 | Rolling from your spot without a taxi clearance (faster than 5 kt, more than 100 m) | "hold position, say intentions." |
+| Leaving the taxi route to the holding point clearly (more than 75 m for 10 s) or rolling over the holding point towards the runway (needs the DCS taxi network and a named holding point) | "hold position, say intentions." (once per taxi clearance) |
 | Faster than 30 kt on a taxiway | "reduce taxi speed." |
 | Crossing or oncoming traffic you must give way to (right before left; you always give way to AI) | "hold position, give way to the Hornet on your right." … later: "continue taxi." |
 | Traffic ahead in the same direction | "follow the Viper ahead." |
@@ -911,7 +914,7 @@ You can say "ready", "ready for departure", "holding short" or "holding point". 
 
 | Your plan | After-departure part |
 |---|---|
-| VFR, Kutaisi | "exit via C R P west, not above 2200 feet until leaving the control zone". The CRP is the direction you gave; by default runway 25 → west, 07 → east |
+| VFR, airfield with a chart | "exit via C R P west, not above 2200 feet until leaving the control zone". The CRP is the one you named; without one, Tower takes the standard CRP of the runway (Kutaisi: runway 25 → west, 07 → east). Chart hints are added, for example "stay exactly on track, restricted area UR-R one five two" for the Abinsk exit at Krymsk |
 | VFR with direction, other airfields ("request taxi, departure north") | "leave the control zone northbound, not above …" |
 | VFR without direction, other airfields | "own navigation, not above … until leaving the control zone" |
 | IFR clearance | "fly runway heading, climb and maintain 3000 feet" |
@@ -1069,7 +1072,7 @@ Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the t
 - **Terrain:** the plan uses the terrain map and never descends you below the minimum vectoring altitude: terrain plus 1,000 ft, or plus 2,000 ft in mountains. If terrain blocks the active runway, the plan may use the opposite runway (up to 10 kt tailwind) or a circling approach: "Due to terrain, expect …".
 - **When Approach talks:** every call gives a heading. Distance, altitude, speed and leg are mentioned only when they change. Descents come in steps along a 2.5° profile. When the sequence changes, Approach says "No traffic ahead, you are number one" or "You are number 2, 1 aircraft ahead".
 - **Handoff to Tower:** only shortly before the gate (within 2 NM of it, at most 1,000 ft above the gate altitude) or at the gate at the latest. If you join the centreline farther out, Approach keeps you, steps you down along the profile ("descend and maintain 4000 feet", the gate altitude only once the profile at your position gets there) and hands you off near the gate. VFR traffic gets "on course, 6 miles from initial, maintain 2000 feet, contact Kutaisi Tower, report initial for overhead break." IFR traffic gets the approach clearance (below).
-- **Kutaisi CRPs:** North and South are always allowed, West only for runway 07 and East only for runway 25. If you fly to one yourself, report it ("C R P south"). Approach then sends you to initial or overhead and hands you to Tower. A CRP that isn't allowed gets "negative, C R P east is not available for runway zero seven. Enter via C R P …". Other airfields have no CRPs: "negative, no reporting points at Senaki Kolkhi", followed by vectors.
+- **CRPs:** The chart of each airfield says which CRPs apply to which runway (kneeboard page "ATC-3b-Platzrunden"). At Kutaisi, North and South are always allowed, West only for runway 07 and East only for runway 25. If you fly to one yourself, report it ("C R P south", also with several words such as "C R P black sea"). Approach then sends you to initial or overhead and hands you to Tower about two minutes before the CRP. A CRP that isn't allowed gets "negative, C R P east is not available for runway zero seven. Enter via C R P …". CRPs that are for departures only (for example Abinsk at Krymsk) are not accepted on arrival. At Anapa the southern arrival CRP is called "south" and the departure CRP "exit south". Airfields without a chart and other maps have no CRPs: "negative, no reporting points at Senaki Kolkhi", followed by vectors.
 
 #### Altitude and speed instructions
 
@@ -1193,6 +1196,52 @@ On an IFR or straight-in approach, a go-around becomes a missed approach in two 
 - **You:** "cancel approach", "abort approach", "cancel landing", "leaving the pattern".
 - **Approach:** "roger, approach cancelled, resume own navigation, QNH …. Call me when ready for another approach."
 - **Leaving without a call:** if you fly away from an approach, you first get "I show you leaving the control zone, say intentions." 3 NM later: "approach cancelled, frequency change approved."
+
+### Center
+
+After takeoff there is often no station for the en-route part. The Center closes that gap: it follows you under its own name and frequency (default 268.5), calls traffic, gives direct routes and hands you to the destination's Approach 40 NM before it. It is the flight following procedure, just no longer under the airfield's name.
+
+**Names per map** (blue / red):
+
+| Map | Blue | Red |
+|---|---|---|
+| Caucasus | Tbilisi Control | Rostov Control |
+| Persian Gulf | Emirates Control | Tehran Control |
+| Syria | Nicosia Control | Damascus Control |
+| Sinai | Tel Aviv Control | Cairo Control |
+| Kola | Bodo Control | Murmansk Control |
+| Germany Cold War | Langen Radar | Berlin Control |
+| Falklands | Mount Pleasant Control | Comodoro Control |
+| Nevada | Los Angeles Center | same as blue |
+| Mariana Islands | Guam Center | same as blue |
+| Afghanistan | Kabul Center | same as blue |
+| Iraq | Baghdad Control | same as blue |
+
+Normandy, The Channel and the WWII maps have no Center; an unknown map uses "Center". Set your own names with `CenterNames` in `config.jsonc`.
+
+**When you get to the Center**
+
+- **IFR:** at 15 NM Departure hands you to the Center if your destination is more than 50 NM away or missing. If the destination is closer, it goes to that airfield's Approach as before.
+- **Flight following from the field:** when you leave the approach area (20 NM) the field hands you over: "contact Tbilisi Control two six eight decimal five for further flight following."
+- **VFR without flight following:** unchanged, Departure releases you at 15 NM.
+- **Own AWACS:** if an AWACS of your side is closer than 100 NM it has priority: "contact Magic two five one decimal five."
+
+**Requests** (radio wheel "Center", F10 `AWACS / Tanker / Center`, or by voice):
+
+- **Check in:** "Tbilisi Control, Enfield 1-1, checking in, flight level 250." Reply: "radar contact", then the Center calls traffic.
+- **Request altitude:** "request higher", "request lower", "request flight level 280".
+- **Request direct:** "request direct Batumi". Reply: "cleared direct Batumi".
+- **Leaving frequency:** "Tbilisi Control, Enfield 1-1, leaving frequency." Reply: "radar service terminated, frequency change approved."
+
+**End of the Center service**
+
+- **40 NM before the destination:** descent, altimeter and "contact Batumi Approach".
+- **Sector change:** with several sectors you hear "contact Nellis Control two seven zero decimal zero" as soon as you fly into another one.
+- **Own AWACS in range:** see above.
+
+**Several sectors** (`CenterSectors`): each entry has a name, frequency, centre point (`Lat`/`Lon`, Caucasus only, otherwise `X`/`Z` in metres), `RadiusNm` and optionally `Side` ("blue" or "red"). The nearest centre point whose radius you are inside applies. Without a matching sector the map's Center applies.
+
+The Center is a module of its own ("Center" in setup and in the settings window, on by default). Deselected, it stays silent and is missing from the radio wheel and the F10 menu; Departure then hands you over as before.
 
 ### Airspace
 
@@ -1352,6 +1401,7 @@ Keywords are recognised anywhere in your call. Start with "<Airfield> <Controlle
 | "request taxi" (+ "departure north", + "runway 07") | Ground | Taxi to the holding point, squawk, hold short |
 | "request startup and taxi" | Ground | Both at once |
 | "request progressive taxi" | Ground, while taxiing | Directions to the holding point or to parking |
+| "say again taxi route" | Ground, while taxiing | Repeats the taxi route |
 | "request IFR clearance (to Batumi)", "clearance", "IFR to" | Ground (in the air: Approach) | IFR clearance with squawk; read back the code → "readback correct" |
 | "ready", "ready for departure", "holding short" (+ "closed pattern") | Tower | Takeoff clearance, line up and wait, or hold short |
 | "abort", "rejecting", "stopping", "cancel takeoff" | Tower, when cleared or lined up | Clearance cancelled, "vacate …, report ready for departure" |
@@ -1456,6 +1506,8 @@ While a player is in the recovery or launching, or mission AI is landing on the 
 | Ball | `Enfield 1 1, Hornet ball, 5.2.` (type and fuel are filled in) |
 | Clara | `Enfield 1 1, Hornet Clara, 5.2.` |
 | Pigeons | `Enfield 1 1, pigeons.` |
+| Strike check in / check out | `Strike, Enfield 1 1, checking in.` / `checking out.` (in the air, before the Marshal check-in) |
+| Red Crown check in / check out | `Red Crown, Enfield 1 1, checking in.` / `checking out.` (only with an own cruiser in the mission) |
 
 **ENTER** (or **0**) on the open wheel sends the call that fits the current situation. If a controller has just asked you something, ENTER sends the answer:
 
@@ -1621,6 +1673,24 @@ After a bolter or wave-off:
 - **Case I:** no radio. Climb out, re-enter the pattern and fly another pass. "Call the ball" comes again.
 - **Case II/III:** Departure: "Enfield one one, Departure, radar contact, turn left heading 165, maintain 1200, downwind." About 5 NM astern, Approach: "Enfield one one, Approach, turn left heading 345, intercept final." The ACLS and mile calls then start again.
 
+### Strike and Red Crown
+
+Both are optional. You can still call "Marshal, checking in" directly and launch without any check-in.
+
+**Strike** (CATCC) is on the ship frequency, like Marshal and Departure. It leads packages on the way out and back:
+
+- **Outbound:** "Strike, Enfield 1-1, checking out" (Case I right after launch, Case II/III after the handoff from Departure). Reply: "radar contact" and the handoff to Red Crown if the mission has an own cruiser, otherwise to a nearby AWACS, the Center of the map or "frequency change approved".
+- **Inbound:** "Strike, Enfield 1-1, checking in". Reply: "Enfield one one, Strike, radar contact, switch Marshal." After that you call Marshal as before.
+
+**Red Crown** is the air picture controller of an own cruiser or destroyer in the mission (Ticonderoga, Arleigh Burke, Perry). It has its own frequency: the ship's frequency from the mission editor, otherwise `"RedCrown"` in `"Frequencies"` (default 252.5). Without such a ship in the mission there is no Red Crown and the radio wheel entries are hidden.
+
+- **Check in:** "Red Crown, Enfield 1-1, checking in." Reply: "Enfield one one, Red Crown, radar contact, identified, switch Strike one two seven decimal five."
+- **Check out:** "Red Crown, Enfield 1-1, checking out." Reply: "roger" or "copy" and the handoff to AWACS or Center, otherwise "frequency change approved".
+
+Red Crown only does check-in, identification and handoff, no air picture.
+
+Radio wheel: page **Carrier** (Strike check in / check out, Red Crown check in / check out), F10: `ATC → Carrier → Strike / Red Crown`. The entries show in the air until you have checked in with Marshal. The frequency is on the kneeboard. Strike and Red Crown belong to the "Carrier" module.
+
 ### Bingo and divert
 
 You get a signal to divert, and your recovery ends, if:
@@ -1632,7 +1702,7 @@ Bingo is checked against your fuel gauge or the state you reported. It is roughl
 
 > **Tower/Approach:** "Enfield one one, your signal is bingo, pigeons Kobuleti 084, 44 miles." / "…, your signal is divert, pigeons …"
 
-The recovery also ends if you fly more than 50 NM from the ship (or 10 NM beyond your closest point if you checked in from farther out), or if you land ashore. With a friendly AWACS airborne, Marshal hands you over: "Enfield one one, Marshal, switch Overlord 251.5."
+The recovery also ends if you fly more than 50 NM from the ship (or 10 NM beyond your closest point if you checked in from farther out), or if you land ashore. With a friendly AWACS airborne, Marshal hands you over: "Enfield one one, Marshal, switch Overlord 251.5.", otherwise "Enfield one one, Marshal, switch Strike."
 
 ### Grading
 
@@ -1676,7 +1746,7 @@ There is **no radio on the deck**. Any call on the deck only shows the hint *No 
 
 DCS-ATC always uses BRC + 30° as the departure radial, so the arc never leads to the radial you are already on after the launch.
 > **You:** "Enfield 1-1, on top, angels 8."
-> **Departure:** "Enfield one one, Departure, switch Overlord 251.5." (without an AWACS: "Enfield one one, Departure, cleared to switch.")
+> **Departure:** "Enfield one one, Departure, switch Overlord 251.5." (without an AWACS: "Enfield one one, Departure, switch Strike.", see [Strike and Red Crown](#strike-and-red-crown))
 
 Other departure reports on the way ("passing 2.5", "arcing", "established outbound", "Kilo") get "Enfield one one, roger." from Departure. If you don't call "on top", the handover comes automatically at 20 NM. After a carrier launch, the Approach wheel entry **Airborne (after takeoff)** also reaches Departure.
 
@@ -1707,7 +1777,7 @@ Other departure reports on the way ("passing 2.5", "arcing", "established outbou
 | Groove | "Clara" (*Clara / Clarence*) | Paddles: "roger Clara, keep it coming." |
 | Launch II/III | "airborne" | Departure: "radar contact, departure radial …" |
 | Launch II/III | "passing 2.5" / "arcing" / "established outbound" / "Kilo" | Departure: "roger" |
-| Launch II/III | "on top, angels 8" | Departure: "switch Overlord 251.5" (without AWACS: "cleared to switch") |
+| Launch II/III | "on top, angels 8" | Departure: "switch Overlord 251.5" (without AWACS: "switch Strike") |
 | Unclear call | – | Marshal: "Enfield one one, say again." (in the groove: no reply, except an unclear ball call, which counts) |
 
 ### Example: Case I recovery
@@ -1780,7 +1850,7 @@ You can call a station in three ways:
 
 - **SRS (voice):** tune the station's frequency and transmit. DCS-ATC routes each call by the frequency you are on.
 - **Station name in your call:** on an airfield frequency, or with push-to-talk without SRS, a call that names the station still reaches it: *Overlord / AWACS / Magic / Moscow / Darkstar / Wizard / Focus*, *Texaco / Shell / Arco / Tanker* (also *refuel*), *Range Alpha / Range control*, *JTAC / FAC A / forward air controller* or the callsign of the controller (*Axeman one one*). Some words also go straight to AWACS: *picture*, *bogey dope*, *declare*, *spike*, *request sort*.
-- **Radio wheel** or the F10 menu **ATC → AWACS / Tanker**. If the pilot voice is on (`"PilotVoice"`), your request is read out first, in the form *"Overlord, Enfield 1-1, request picture."*
+- **Radio wheel** or the F10 menu **ATC → AWACS / Tanker / Center**. If the pilot voice is on (`"PilotVoice"`), your request is read out first, in the form *"Overlord, Enfield 1-1, request picture."*
 
 Radio wheel entries:
 
@@ -2302,7 +2372,7 @@ Players don't need to install DCS-ATC at all. If the host (or the dedicated serv
 
 - **Voice over SRS.** Connect to the host's SRS server, tune the controller frequency and talk, in English. Example:
   > "Kutaisi Ground, Enfield 1-2, request startup"
-- **F10 menu.** `F10 -> ATC` has the same requests as the radio wheel (Ground, Tower, Approach, AWACS / Tanker, General, emergency…). Every player gets their own `ATC` menu. If several players share one group, the `ATC` menu has a submenu for each player, named by callsign.
+- **F10 menu.** `F10 -> ATC` has the same requests as the radio wheel (Ground, Tower, Approach, AWACS / Tanker / Center, General, emergency…). Every player gets their own `ATC` menu. If several players share one group, the `ATC` menu has a submenu for each player, named by callsign.
 - **Controller text** appears in the game for your group, and the voice comes over SRS.
 
 They don't get the radio wheel or the ENTER suggestion. Their F10 requests are still spoken by the pilot voice, like everyone else's.
@@ -2457,7 +2527,7 @@ The generated lines in `frequencies.jsonc` already contain the airfield names. T
 #### Limitations on other maps
 
 - **Only Caucasus has been tested.** Every other map should work, but expect rough edges, and please report them.
-- **Detailed procedures exist only for Kutaisi.** They cover reporting points, taxi routes with taxiway names ("taxi to holding point runway two five via November, Delta"), and arrival and departure routes from the chart. Every other airfield, on every map, is generic:
+- **Detailed procedures exist only on the Caucasus map, where they cover every airfield (Tbilisi-Lochini taxi routes only).** They cover reporting points, taxi routes with taxiway names and named holding points ("taxi to holding point Delta, runway three one"), backtrack on a runway with no taxiway to its end, and arrival and departure routes from the chart. Every airfield on another map is generic:
   - Taxi clearances name the runway but no taxiways, for example "taxi to holding point runway one three".
   - The control zone is 5 NM around the airfield, up to 3000 ft above it.
   - The traffic pattern is on the left, unless terrain forces it to the right.
@@ -2537,8 +2607,10 @@ The file is in the installation folder: `%LOCALAPPDATA%\Programs\DCS-ATC\config.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `Frequencies` | `{ "ATIS": 263.5, "Ground": 264.5, "Tower": 265.0, "Approach": 266.5, "Range": 267.5, "AWACS": 251.5, "Tanker": 255.5, "Carrier": 127.5, "JTAC": 133.5 }` | Station frequencies in MHz. **ATIS** is the shared ATIS frequency. **Range** is the range controller. **JTAC** is the frequency of a JTAC or FAC(A) that has none of its own in the mission. **Tanker** is DCS-ATC's tanker radio. **AWACS** and **Carrier** are used only when the mission unit has no frequency of its own. **Ground / Tower / Approach** are fallbacks for airfields without DCS frequency data; normally every airfield uses its own map frequency. DCS-ATC warns in its window if a station frequency is the same as an airfield frequency. |
+| `Frequencies` | `{ "ATIS": 263.5, "Ground": 264.5, "Tower": 265.0, "Approach": 266.5, "Range": 267.5, "Center": 268.5, "RedCrown": 252.5, "AWACS": 251.5, "Tanker": 255.5, "Carrier": 127.5, "JTAC": 133.5 }` | Station frequencies in MHz. **ATIS** is the shared ATIS frequency. **Range** is the range controller. **JTAC** is the frequency of a JTAC or FAC(A) that has none of its own in the mission. **Tanker** is DCS-ATC's tanker radio. **AWACS**, **Carrier** and **RedCrown** are used only when the mission unit has no frequency of its own. **Ground / Tower / Approach** are fallbacks for airfields without DCS frequency data; normally every airfield uses its own map frequency. DCS-ATC warns in its window if a station frequency is the same as an airfield frequency. |
 | `AtisFreqs` | `{}` | Own ATIS frequency per airfield, e.g. `{ "Kutaisi": 262.0 }`. Airfields not listed use `Frequencies.ATIS`. Applies after a restart. |
+| `CenterNames` | `{}` | Center name per map, e.g. `{ "Nevada": "Seattle Center", "Caucasus:red": "Rostov Control" }`. Empty = built-in names (see [Center](#center)). |
+| `CenterSectors` | `[]` | Several Center sectors per map, e.g. `[{ "Name": "Rostov Control", "Freq": 269.0, "Lat": 47.2, "Lon": 39.7, "RadiusNm": 120, "Side": "red" }]`. `Lat`/`Lon` for Caucasus only, otherwise `X`/`Z` in metres. The nearest centre point whose radius you are inside wins. |
 | `Modulation` | `"AM"` | Modulation of all DCS-ATC transmissions. |
 | `Coalition` | `2` | SRS side (1 red, 2 blue) for stations without a side of their own. Airfields, AWACS, tankers and AI use their own side. |
 | `SrsPath` | `"C:\\Program Files\\DCS-SimpleRadio-Standalone"` | SRS folder. If it is wrong, DCS-ATC uses the registry entry or the running SRS. |

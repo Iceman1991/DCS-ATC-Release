@@ -690,6 +690,83 @@ public partial class Tower
         dpAw.Tick(At(dx, dz, 900, 215, 250), none, 25);   // Departure vector to Batumi
         r = dpAw.Tick(At(CX - 12 * NM, CZ - 11 * NM, 4000, 215, 250), none, 30);
         Check(r.Count == 1 && r[0].Contains("Radar service terminated, contact Overlord") && !r[0].Contains("Batumi Approach"), "R43 AWACS statt Platz-Übergabe: " + (r.FirstOrDefault()?.Text ?? "-"));
+        {   // Center (stage 1): IFR route without AWACS -> Center at 15 NM, check-in, traffic, direct, 40 NM before the destination, AWACS, sectors, VFR unchanged
+            var (thC, qnC, secC) = (Airfield.Theatre, QnhOf, CenterSectors);
+            (Airfield.Theatre, QnhOf) = ("Nevada", _ => 1013);
+            Tower IfrC()   // IFR to Batumi with own heading, handed over at 15 NM north (more than 50 NM from Batumi)
+            {
+                var x = Dep("Batumi");
+                x.OnTranscript("Kutaisi Approach, Enfield 11, airborne, passing 2000", At(dx, dz, 600, LandHdg("25"), 250), none, 20);
+                x.OnTranscript("Kutaisi Approach, Enfield 11, request heading 270", At(dx, dz, 900, 250, 250), none, 21);
+                x.Tick(At(CX + 16 * NM, CZ, 4000, 270, 300), none, 22);
+                return x;
+            }
+            var posC = At(CX + 60 * NM, CZ, 25000, 0, 400);
+            Tower CenC()   // handed over and checked in with the Center, radar contact
+            {
+                var x = IfrC();
+                x.OnTranscript("Los Angeles Center, Enfield 11, checking in, flight level 250", posC, none, 30);
+                x.Tick(posC, none, 40);
+                return x;
+            }
+            var dpC = Dep("Batumi");
+            dpC.OnTranscript("Kutaisi Approach, Enfield 11, airborne, passing 2000", At(dx, dz, 600, LandHdg("25"), 250), none, 20);
+            dpC.OnTranscript("Kutaisi Approach, Enfield 11, request heading 270", At(dx, dz, 900, 250, 250), none, 21);
+            var hoC = dpC.Tick(At(CX + 16 * NM, CZ, 4000, 270, 300), none, 22);
+            Check(hoC.Count == 1 && hoC[0].Text == "Enfield one one, contact Los Angeles Center two six eight decimal five." && dpC.Released && !dpC.Center, "Center A1: IFR ohne AWACS bei 15 NM: " + string.Join(" | ", hoC.Select(m => m.Text)));
+            var ciC = dpC.OnTranscript("Los Angeles Center, Enfield 11, checking in, flight level 250", posC, none, 30).Concat(dpC.Tick(posC, none, 40)).ToList();
+            Check(dpC.Center && dpC.StationOf("Center") == "Los Angeles Center" && dpC.CenFreq == 268.5 && ciC.Any(m => m.Contains("radar contact")) && ciC.All(m => m.Role == "Center"),
+                  "Center A2: Check-in -> radar contact als Center: " + string.Join(" | ", ciC.Select(m => $"{m.Role}: {m.Text}")));
+            var trC = dpC.Tick(posC, new[] { new Traffic(31, "F-16C_50", posC.X, posC.Z + 4 * NM, posC.AltMsl, 0, 200) }, 50);
+            Check(trC.Count == 1 && trC[0].Role == "Center" && trC[0].Contains("traffic, "), "Center A2: Verkehrshinweis als Center: " + string.Join(" | ", trC.Select(m => $"{m.Role}: {m.Text}")));
+            var drC = dpC.OnTranscript("Los Angeles Center, Enfield 11, request direct Senaki", posC, none, 55);
+            Check(drC.Count == 1 && drC[0].Role == "Center" && drC[0].Contains("cleared direct Senaki"), "Center A4: request direct: " + string.Join(" | ", drC.Select(m => $"{m.Role}: {m.Text}")));
+            var lvC = dpC.OnTranscript("Los Angeles Center, Enfield 11, leaving frequency", posC, none, 60);
+            Check(lvC.Count == 1 && lvC[0].Contains("radar service terminated") && lvC[0].Contains("frequency change approved") && !dpC.Center && !dpC.Following, "Center A4: leaving frequency: " + string.Join(" | ", lvC.Select(m => m.Text)));
+            var bt = All[1]; double bux = CX - bt.X, buz = CZ - bt.Z, bul = Math.Sqrt(bux * bux + buz * buz);
+            Telemetry NearBt(double nm) => At(bt.X + bux / bul * nm * NM, bt.Z + buz / bul * nm * NM, 25000, 220, 300);   // on the line Batumi -> Kutaisi
+            var cenD = CenC();
+            var farD = cenD.Tick(NearBt(45), none, 50);
+            var neD = cenD.Tick(NearBt(39), none, 55);
+            Check(farD.Count == 0 && neD.Count == 1 && neD[0].Contains("descend and maintain") && neD[0].Contains("Batumi altimeter") && neD[0].Contains("contact Batumi Approach") && !cenD.Center,
+                  "Center A3: 40 NM vor dem Ziel -> Approach mit Sinkflug und Höhenmesser: " + string.Join(" | ", farD.Concat(neD).Select(m => m.Text)));
+            var cenF = CenC();
+            cenF.AwacsContact = "Magic two five one decimal five";
+            var awC = cenF.Tick(posC, none, 50);
+            Check(awC.Count == 1 && awC[0].Text == "Enfield one one, contact Magic two five one decimal five." && !cenF.Center, "Center A2: AWACS in Reichweite -> contact Magic: " + string.Join(" | ", awC.Select(m => m.Text)));
+            // sectors: nearest center point inside the radius wins, side filter, handover into the next sector, check-in with its name and frequency
+            CenterSectors = new() { new() { Name = "Nellis Control", Freq = 270.0, X = CX + 150 * NM, Z = CZ, RadiusNm = 40, Side = "blue" }, new() { Name = "Edwards Control", Freq = 271.0, X = CX + 120 * NM, Z = CZ, RadiusNm = 40 },
+                                    new() { Name = "Rostov Control", Freq = 272.0, X = CX + 150 * NM, Z = CZ, RadiusNm = 40, Side = "red" } };
+            Check(CenterFor(2, CX + 150 * NM, CZ) is ("Nellis Control", 270.0) && CenterFor(2, CX + 130 * NM, CZ) is ("Edwards Control", 271.0) && CenterFor(1, CX + 150 * NM, CZ) is ("Rostov Control", 272.0)
+                  && CenterFor(2, CX + 60 * NM, CZ) is ("Los Angeles Center", 268.5) && CenterFor(1, CX + 60 * NM, CZ) is ("Los Angeles Center", 268.5), "Center E6: Sektoren: nächster Mittelpunkt, Seite, sonst Karten-Center");
+            var cenE = CenC();
+            var secE = cenE.Tick(At(CX + 130 * NM, CZ, 25000, 0, 400), none, 60);
+            Check(secE.Count == 1 && secE[0].Text == "Enfield one one, contact Edwards Control two seven one decimal zero." && !cenE.Center, "Center E6: Übergabe in den Sektor: " + string.Join(" | ", secE.Select(m => m.Text)));
+            var ciE = cenE.OnTranscript("Edwards Control, Enfield 11, checking in", At(CX + 130 * NM, CZ, 25000, 0, 400), none, 65);
+            Check(cenE.Center && cenE.StationOf("Center") == "Edwards Control" && cenE.CenFreq == 271.0 && ciE.Count == 1 && ciE[0].Role == "Center", "Center E6: Check-in im Sektor: " + string.Join(" | ", ciE.Select(m => $"{m.Role}: {m.Text}")));
+            CenterSectors = secC;
+            // VFR without flight following: as before (no Center); flight following from the field leaves the approach area at 20 NM to the Center
+            var dpV = Dep();
+            dpV.OnTranscript("Kutaisi Approach, Enfield 11, airborne, passing 2000", At(dx, dz, 600, LandHdg("25"), 250), none, 20);
+            var voC = dpV.OnTranscript("Kutaisi Approach, Enfield 11, leaving the control zone", At(CX + 8 * NM, CZ, 600, 270, 250), none, 28);
+            Check(voC.Count == 1 && voC[0].Contains("frequency change approved") && !voC[0].Contains("Center") && !voC[0].Contains("contact"), "Center A1: VFR ohne FF unverändert: " + string.Join(" | ", voC.Select(m => m.Text)));
+            var dpW = Dep();
+            dpW.OnTranscript("Kutaisi Approach, Enfield 11, request flight following", At(dx, dz, 600, LandHdg("25"), 250), none, 20);
+            dpW.Tick(At(CX + 10 * NM, CZ, 4000, 270, 300), none, 30);
+            var ffC = dpW.Tick(At(CX + 21 * NM, CZ, 4000, 270, 300), none, 40);
+            Check(ffC.Count == 1 && ffC[0].Contains("contact Los Angeles Center two six eight decimal five for further flight following") && !dpW.Following, "Center A2: FF vom Platz -> Center bei 20 NM: " + string.Join(" | ", ffC.Select(m => m.Text)));
+            // names: Center call is no airfield call; map table with red side and unknown map
+            Airfield.Theatre = "Caucasus";
+            Check(IsCenterCall("Tbilisi Control, Enfield 1-1, checking in") && IsCenterCall("Rostov Control, Enfield 1-1, request direct Batumi") && IsCenterCall("Center, Enfield 1-1, request higher")
+                  && !IsCenterCall("contact Tbilisi Control") && !IsCenterCall("Kutaisi Tower, Enfield 1-1, request taxi") && CenterName(2) == "Tbilisi Control" && CenterName(1) == "Rostov Control", "Center A5: Namen Caucasus");
+            Airfield.Theatre = "Normandy";
+            Check(CenterName(2) == null && CenterFor(2, CX, CZ) == null, "Center A5: Normandy ohne Center");
+            Airfield.Theatre = "Nevada";
+            Check(CenterName(2) == "Los Angeles Center" && CenterName(1) == "Los Angeles Center", "Center A5: Nevada rot fällt auf blau zurück");
+            Airfield.Theatre = "Nowhere";
+            Check(CenterName(2) == "Center", "Center A5: unbekannte Karte -> Center");
+            (Airfield.Theatre, QnhOf, CenterSectors) = (thC, qnC, secC);
+        }
         var dpG = Dep("Batumi");   // "request direct" before check-in counts as check-in, no "radar contact ... fly heading" after 60 s
         r = dpG.OnTranscript("Kutaisi Approach, Enfield 11, request direct Senaki", At(dx, dz, 900, 215, 250), none, 20);
         Check(r[0].Contains("cleared direct Senaki") && dpG.Phase == Phase.Away && dpG.Tick(At(dx, dz, 900, 215, 250), none, 75).Count == 0, "A105 nach request direct: " + dpG.Phase);
@@ -1310,8 +1387,8 @@ public partial class Tower
         twS.F.Spots.AddRange(new[] { (parked.X, parked.Z, 3, 72), (CX + 300, CZ, 9, 40), (CX + 400, CZ, 7, 72) });
         twS.spot = (parked.X, parked.Z);
         var busy = new[] { new Traffic(5, "F-16C_50", parked.X + 5, parked.Z, FieldElev, 0, 0, "Viper", "", false, 2) };
-        r = twS.OnTranscript("Kutaisi Ground, Enfield 11, runway vacated, request taxi to parking", At(CX - 400 * Uz, CZ + 400 * Ux, 0, 254, 5), busy, 20);
-        Check(r[0].Contains("parking spot seven") && !r[0].Contains("your parking position"), "Parkposition: " + r[0]);
+        r = twS.OnTranscript("Kutaisi Ground, Enfield 11, runway vacated, request taxi to parking", At(CX - 400 * Uz, CZ + 400 * Ux, 0, 254, 5), busy, 20);   // chart Kutaisi (stands): DCS 7 = N58, DCS 38 = N29, Ramp West from 25 via Alpha
+        Check(r[0].Contains("parking spot November five eight") && !r[0].Contains("your parking position"), "Parkposition: " + r[0]);
         twS.F.Stands[7] = "F-12 5";   // forum 0.13: DCS stand name (hook) instead of the Term_Index
         r = twS.OnTranscript("Kutaisi Ground, Enfield 11, runway vacated, request taxi to parking", At(CX - 400 * Uz, CZ + 400 * Ux, 0, 254, 5), busy, 25);
         twS.F.Spots.RemoveRange(twS.F.Spots.Count - 3, 3);
@@ -1333,8 +1410,8 @@ public partial class Tower
         }
         var own = Back(none);
         var taken = Back(new[] { new Traffic(5, "F-16C_50", -284566.3, 682401.0, FieldElev, 0, 0, "Viper", "", false, 2) });
-        Check(own.Contains("taxi to Ramp West via November, parking spot one, at your 1 o'clock, 750 meters") &&
-              taken.Contains("taxi to Ramp North via November, parking spot three eight,"), $"Eigener Stand: {own} | belegt: {taken}");
+        Check(own.Contains("taxi to Ramp West via Alpha, parking spot one, at your 1 o'clock, 750 meters") &&
+              taken.Contains("taxi to Ramp North via November, parking spot November two niner,"), $"Eigener Stand: {own} | belegt: {taken}");
         r = twP.Tick(At(parked.X + 10, parked.Z, 0, 0, 1), none, 25);
         Check(r.Count == 0, "R211 Parkposition erreicht: Ground schweigt: " + r.FirstOrDefault()?.Text);
         r = twP.OnTranscript("Kutaisi Ground, Enfield 11, request taxi", At(parked.X + 10, parked.Z), none, 30);
@@ -1841,7 +1918,7 @@ public partial class Tower
                   "N51b Endanflug quer: " + string.Join(" | ", r));
             r = new Tower("Enfield 1-1") { Aloft = 120 }.Tick(N(4.5, 180), new[] { new Traffic(1, "F-16C_50", CX + 2.5 * NM, CZ, 1500 * Ft, Math.PI, 120) }, 0);
             Check(r.Count == 1 && r[0].Text.EndsWith("4 miles north of the field, traffic 2 miles south, 1500 feet, turn left heading three five zero, remain clear of the control zone."), "N51b Verkehr: " + string.Join(" | ", r));
-            r = new Tower("Enfield 1-1") { Aloft = 120 }.Tick(N(1, 180, 2700), none, 0);
+            r = new Tower("Enfield 1-1") { Aloft = 120 }.Tick(N(1, 180, 2600), none, 0);   // 2600 ft (above pattern + 500, below the zone top): chart Kutaisi has zone top 2700 ft (ctr_top_ft), previously Elev+3000
             Check(r.Count == 1 && r[0].Text.EndsWith("1 mile north of the field, climb and maintain at or above 4000 feet."), "N51b über dem Platz steigen: " + string.Join(" | ", r));
         }
 
@@ -2099,11 +2176,12 @@ public partial class Tower
         var atisP = new Tower(kp, "x").AtisText("K", new Telemetry(kp.Elev + 2, 0, 0, 0, kp.X, kp.Z, 0, 0, 760), 15, true, 200, 3000);
         var twPar = new Tower(kp, "Enfield 1-1");
         r = twPar.OnTranscript("Kutaisi Approach, Enfield 11, request P A R approach", s6, none, 1);
-        var rP = twPar.Tick(At(g4x, g4z, along4 * Math.Tan(3 * Math.PI / 180) + 15 + 400 * Ft, LandHdg("25"), 70) with { Gear = 1 }, none, 30);   // cleared on final: PAR calls anyway
+        var tP = At(g4x, g4z, along4 * Math.Tan(3 * Math.PI / 180) + 15 + 400 * Ft, LandHdg("25"), 70) with { Gear = 1 };
+        var rP = twPar.Tick(tP, none, 30).Concat(twPar.Tick(tP, none, 36)).ToList();   // cleared on final: PAR calls anyway (the first tick may be "contact Tower now")
         ForceIfr = false;
         Check(atisP.Contains("expect vectors for P A R approach runway two five") && !atisP.Contains("TACAN approach") && r[0].Contains("until established, cleared P A R approach runway two five")
               && !r[0].Contains("no transmissions")   // R271: without talk-down no lost-comm instruction (R221 promised calls every 5 s on final)
-              && rP.Any(m => m.Text.Contains("well above glidepath")), $"K9 PAR Kutaisi 25: {atisP} | {r[0]} | {string.Join(" | ", rP.Select(m => m.Text))}");
+              && rP.Any(m => m.Text.Contains("well above glidepath")) && rP.Any(m => m.Text.Contains("contact Kutaisi Tower now")), $"K9 PAR Kutaisi 25 (29 s ohne Tick geflogen: kein Neuspawn): {atisP} | {r[0]} | {string.Join(" | ", rP.Select(m => m.Text))}");
         // R42: on short final (2.5 NM, on the glide path) terrain + 250 ft as lower limit, not the MVA (flat terrain 0 m: 1000 ft, above the glide path)
         var flat = Airfield.Kutaisi();
         flat.SetTerrain(new float[61, 61], flat.X - 30 * NM, flat.Z - 30 * NM, NM);

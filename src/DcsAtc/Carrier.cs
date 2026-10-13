@@ -35,6 +35,13 @@ class Carrier
     }
 
     public static List<Boat> Boats = new();
+    /// Red Crown ship (R line): cruiser / destroyer with air search radar, Freq MHz from the mission (0 = Config "RedCrown").
+    public record RadarShip(string Unit, string Group, string Type, double X, double Z, int Coalition, double Freq);
+    public static List<RadarShip> RadarShips = new();
+    public const double RedCrownDefault = 252.5;
+    /// Own Red Crown: the nearest own radar ship and its frequency; null = none in the mission (then no Red Crown).
+    public static (RadarShip Ship, double Freq)? RedCrownFor(int side, Telemetry? t) =>
+        RadarShips.Where(s => s.Coalition == side).MinBy(s => t == null ? 0 : Dist(t.X, t.Z, s.X, s.Z)) is { } r ? (r, r.Freq > 0 ? r.Freq : Freqs.GetValueOrDefault("RedCrown", RedCrownDefault)) : null;
     public static double Clock = -1;   // Mission clock in s since midnight, -1 = unknown
     public static double Skew;   // R366: mission clock minus real time at the last Y line (Program); Charlie/EAT run in mission time
     public static double Sun = double.NaN;   // Sun elevation in degrees at the carrier (Y line), NaN = unknown
@@ -158,7 +165,7 @@ class Carrier
 
     /// Radio call to the carrier? (Marshal/Paddles by name, ball call; "initial"/"see you at" only if already checked in)
     public bool Wants(string n) => Boats.Count > 0 &&
-        (Has(n, "marshal", "mother", "paddles", "ball", "clara", "carrier", "pigeons") ||
+        (Has(n, "marshal", "mother", "paddles", "ball", "clara", "carrier", "pigeons", "strike", "red crown") ||
          Stage >= 1 && Has(n, "initial", "see you at", "commencing", "charlie", "platform", "state", "needles", "up and", "down and", "on and on") ||
         launch == 2 && Has(n, "airborne", "on top", "departure", "passing", "arcing", "outbound", "kilo"));
 
@@ -194,6 +201,8 @@ class Carrier
         if (launch == 2 && Has(n, "airborne")) { radar = true; return new() { Say("Departure", $"{c}, Departure, radar contact, departure radial {Mag(depRad)}.", b) }; }   // R24: Case II/III (CV NATOPS); R283: with departure radial
         if (launch == 2 && Has(n, "on top")) return Handoff(me, b);
         if (launch == 2 && Has(n, "passing", "arcing", "outbound", "established", "kilo")) return new() { Say("Departure", OneOf($"{c}, roger.", $"{c}, copy."), b) };   // R233: mandatory reports in the Case III departure are acknowledged by Departure
+        if (Stage == 0 && Has(n, "red crown")) return RedCrown(n, me, b);   // Strike / Red Crown (AGENTUREN-PLAN stages 2/3): optional, outside the recovery
+        if (Stage == 0 && Has(n, "strike")) return Strike(n, me, b);
         if (Has(n, "clara", "clarence", "ball"))
         {
             if (me.Tel is { } gt && !InGroove(b, gt)) return new();   // A74: only in the groove, otherwise no radio and no stage (not checkable without position: as before)
@@ -366,11 +375,36 @@ class Carrier
         return Dist(t.X, t.Z, b.X, b.Z) > 20 * NM ? Handoff(me, b) : null;
     }
 
+    static bool Outbound(string n) => Has(n, "checking out", "check out", "airborne", "departing", "outbound");
+    /// Frequency of the boat stations (ME, otherwise Config "Carrier").
+    static double BoatFreq(Boat b) => b.Freq > 0 ? b.Freq : Freqs.GetValueOrDefault("Carrier", 127.5);
+    /// After Strike / Red Crown outbound: own AWACS in range, otherwise the Center of the map, otherwise frequency change (like Tower.CenterTick).
+    string Onward(Ops.Me me) =>
+        Ops.AwacsContact(Air, me, Freqs.GetValueOrDefault("AWACS", 251.5), CenterName(me.Coalition) != null ? CenterAwacsNm : 0) is { } aw ? $"switch {aw}"
+        : me.Tel is { } t && CenterFor(me.Coalition, t.X, t.Z) is { } cn ? $"switch {cn.Name} {FreqSay(cn.Freq)}" : "frequency change approved";
+
+    /// Strike (CATCC, boat frequency, E7/E8): outbound (checking out, airborne) -> Red Crown (own cruiser) / AWACS / Center; inbound (checking in, mission complete) -> Marshal. Optional, Marshal still takes a direct check-in.
+    List<Ops.Call> Strike(string n, Ops.Me me, Boat b)
+    {
+        launch = 0;   // contact with Strike ends the Case II/III departure phase
+        if (!Outbound(n)) return new() { Say("Strike", $"{cs}, Strike, radar contact, switch Marshal.", b) };
+        var next = RedCrownFor(me.Coalition, me.Tel) is { } rc ? $"switch Red Crown {FreqSay(rc.Freq)}" : Onward(me);
+        return new() { Say("Strike", $"{cs}, Strike, radar contact, {next}.", b) };
+    }
+
+    /// Red Crown (cruiser of the group, own frequency, E9/E10): check-in = identification (own air defense) -> Strike; checking out -> AWACS / Center. Without radar ship no Red Crown.
+    List<Ops.Call> RedCrown(string n, Ops.Me me, Boat b)
+    {
+        if (RedCrownFor(me.Coalition, me.Tel) is not { } rc) return new();
+        var text = Outbound(n) ? $"{cs}, Red Crown, {OneOf("roger", "copy")}, {Onward(me)}." : $"{cs}, Red Crown, radar contact, identified, switch Strike {FreqSay(BoatFreq(b))}.";
+        return new() { new("Carrier", "Red Crown", text, rc.Freq) };
+    }
+
     /// R24: Departure hands off (AWACS as A21, otherwise frequency change).
     List<Ops.Call> Handoff(Ops.Me me, Boat b)
     {
         launch = 0;
-        return new() { Say("Departure", Ops.AwacsContact(Air, me, Freqs.GetValueOrDefault("AWACS", 251.5)) is { } aw ? $"{cs}, Departure, switch {aw}." : $"{cs}, Departure, cleared to switch.", b) };   // R233: military instead of FAA civil phrase
+        return new() { Say("Departure", Ops.AwacsContact(Air, me, Freqs.GetValueOrDefault("AWACS", 251.5)) is { } aw ? $"{cs}, Departure, switch {aw}." : $"{cs}, Departure, switch Strike.", b) };   // R233: military instead of FAA civil phrase; E8: Strike (boat frequency) instead of "cleared to switch"
     }
 
     /// R27: wire from the DCS event (mission "W;Unit;Wire"), applies to the current approach.
@@ -455,7 +489,7 @@ class Carrier
         {
             Leave(); Gone = true;
             return new() { Ops.AwacsContact(Air, me, Freqs.GetValueOrDefault("AWACS", 251.5)) is { } aw ? Say("Marshal", $"{c}, Marshal, switch {aw}.", b)
-                                                                                                    : Hint(L("Recovery beendet (über 50 NM vom Schiff).", "Recovery ended (more than 50 NM from the ship).")) };
+                                                                                                    : Say("Marshal", $"{c}, Marshal, switch Strike.", b) };
         }
         inHold = dist < 10 * NM;
         if (Stage >= 3 && !waved && t.Ias < GrooveIas && Landing(b, t) is var (pd, pl) && pd is > -0.6 * NM and < -100 && Math.Abs(pl) < 0.2 * NM
@@ -889,7 +923,7 @@ class Carrier
         check(dl.StartsWith("Marshal: Enfield two one, signal Delta, expected Charlie zero one./Tower: Enfield two two, signal Charlie.") && dl.EndsWith("/") && da.Stage == 1 && db.Stage == 2,
               $"Träger A20: Charlie an den Ersten im Holding, Delta -> {dl}");
         da.Leave(); db.Leave();
-        // A21: stage 1, 60 NM away -> recovery ends (Gone for OnBoat), advisory or with AWACS "switch Overlord"; 49 NM stays; check-in from 100 NM (above) stays
+        // A21: stage 1, 60 NM away -> recovery ends (Gone for OnBoat), "switch Strike" or with AWACS "switch Overlord"; 49 NM stays; check-in from 100 NM (above) stays
         string Cca(IReadOnlyList<Traffic> air)
         {
             Air = air;
@@ -900,8 +934,31 @@ class Carrier
             return r + (cc.Stage == 0 && cc.Gone && !Stack("CVN").Contains(cc) ? " (weg)" : " (Stage " + cc.Stage + ")");
         }
         var (ccaNo, ccaAw) = (Cca(Array.Empty<Traffic>()), Cca(new[] { new Traffic(80, "E-3A", -60 * NM, 0, 9000, 0, 150, "AWACS", "", true, 2) }));
-        check(ccaNo == "//: Träger: Recovery beendet (über 50 NM vom Schiff). (weg)" && ccaAw.StartsWith("//Marshal: Enfield one one, Marshal, switch Overlord ") && ccaAw.EndsWith(" (weg)"),
+        check(ccaNo == "//Marshal: Enfield one one, Marshal, switch Strike. (weg)" && ccaAw.StartsWith("//Marshal: Enfield one one, Marshal, switch Overlord ") && ccaAw.EndsWith(" (weg)"),
               $"Träger A21: 50 NM -> {ccaNo} | {ccaAw}");
+        // Etappe 2/3: Strike (boat frequency, optional) and Red Crown (own cruiser, E7-E10)
+        {
+            var (sk, rcOld) = (new Carrier(), RadarShips);
+            var far45 = At(-45 * NM, 0, 18000);
+            var awT = new[] { new Traffic(80, "E-3A", -60 * NM, 0, 9000, 0, 150, "AWACS", "", true, 2) };
+            var sIn = S(sk, "Enfield 1-1", "Strike, Enfield 1-1, checking in", far45, 0);
+            var mAfter = S(sk, "Enfield 1-1", "Marshal, Enfield 1-1, checking in", far45, 10);
+            var sOut = S(new Carrier(), "Enfield 1-2", "Strike, Enfield 1-2, checking out", far45, 20);
+            Air = awT; var sAw = S(new Carrier(), "Enfield 1-2", "Strike, Enfield 1-2, checking out", far45, 30); Air = Array.Empty<Traffic>();
+            RadarShips = new();
+            var rcNone = S(new Carrier(), "Enfield 1-3", "Red Crown, Enfield 1-3, checking in", far45, 40);
+            RadarShips = new() { new("CG-52", "CG", "TICONDEROG", 0, 0, 2, 0), new("CG-FEIND", "CGR", "TICONDEROG", 0, 0, 1, 0) };
+            var rcIn = S(new Carrier(), "Enfield 1-3", "Red Crown, Enfield 1-3, checking in", far45, 50);
+            var rcOut = S(new Carrier(), "Enfield 1-3", "Red Crown, Enfield 1-3, checking out", far45, 60);
+            var sRc = S(new Carrier(), "Enfield 1-4", "Strike, Enfield 1-4, checking out", far45, 70);
+            var cgStage = new Carrier { Stage = 2 };
+            var rcLate = S(cgStage, "Enfield 1-5", "Red Crown, Enfield 1-5, checking in", far45, 80);
+            RadarShips = rcOld; sk.Leave(); cgStage.Leave();
+            check(sIn == "Strike: Enfield one one, Strike, radar contact, switch Marshal." && sk.Stage == 0 && mAfter.StartsWith("Marshal: ") && sOut == "Strike: Enfield one two, Strike, radar contact, switch Tbilisi Control two six eight decimal five."
+                  && sAw.StartsWith("Strike: Enfield one two, Strike, radar contact, switch Overlord ") && rcNone == "" && rcIn == "Red Crown: Enfield one three, Red Crown, radar contact, identified, switch Strike one two seven decimal five."
+                  && rcOut.StartsWith("Red Crown: Enfield one three, Red Crown, ") && rcOut.EndsWith("switch Tbilisi Control two six eight decimal five.") && sRc == "Strike: Enfield one four, Strike, radar contact, switch Red Crown two five two decimal five." && !rcLate.Contains("Red Crown"),
+                  $"Träger Strike/Red Crown: {sIn} | {mAfter} | {sOut} | {sAw} | {rcNone} | {rcIn} | {rcOut} | {sRc} | {rcLate}");
+        }
         var czl = new Carrier { Stage = 2 };   // P3-T5: "initial" by radio/wheel in Case I -> text only, no "Paddles contact"
         var zl = S(czl, "Enfield 1-1", "Carrier, Enfield 1-1, initial", At(-3 * NM, 0, 800), 600);
         check(zl.StartsWith(": Träger: Initial: zip lip") && !zl.Contains("Paddles") && czl.Stage == 3, "Träger Case I initial per Funk: " + zl);
@@ -1407,8 +1464,8 @@ class Carrier
         var up2 = Tk(l2, "Enfield 3-4", upT, 130);
         Sky = (false, 0, 80000);
         check(dk1 == "/-/CVN/: Träger: Auf dem Deck kein Funk (kein Land-Tower): Anlassen, Rollen und Katapult nach Zeichen der Deckcrew." && up1.StartsWith(": Träger: Case-I-Abflug: geradeaus parallel zum BRC") && up1.EndsWith("/False")
-              && up3.StartsWith(": Träger: Case-III-Abflug: „airborne“ melden, geradeaus steigen, bei 7 DME auf den 10-DME-Bogen zum Abflugradial 024,") && up3.EndsWith("/airborne/Departure: Enfield three two, Departure, radar contact, departure radial zero two four./on top, angels 8/Departure: Enfield three two, roger./Departure: Enfield three two, Departure, cleared to switch./False")
-              && up2.StartsWith(": Träger: Case-II-Abflug: „airborne“ melden, geradeaus parallel zum BRC 354 in Sicht bleiben, bei 7 DME auf den 10-DME-Bogen zum Abflugradial 024") && far3 == "/Departure: Enfield three three, Departure, cleared to switch./", $"Träger R24: Start vom Deck -> {dk1} | {up1} | {up3} | {up2} | {far3}");
+              && up3.StartsWith(": Träger: Case-III-Abflug: „airborne“ melden, geradeaus steigen, bei 7 DME auf den 10-DME-Bogen zum Abflugradial 024,") && up3.EndsWith("/airborne/Departure: Enfield three two, Departure, radar contact, departure radial zero two four./on top, angels 8/Departure: Enfield three two, roger./Departure: Enfield three two, Departure, switch Strike./False")
+              && up2.StartsWith(": Träger: Case-II-Abflug: „airborne“ melden, geradeaus parallel zum BRC 354 in Sicht bleiben, bei 7 DME auf den 10-DME-Bogen zum Abflugradial 024") && far3 == "/Departure: Enfield three three, Departure, switch Strike./", $"Träger R24: Start vom Deck -> {dk1} | {up1} | {up3} | {up2} | {far3}");
         // R364: parked on the deck -> ship into the wind only up to 10 min after spawn or the last taxi move; after a trap none until airborne again
         var (l364, t364) = (new Carrier(), new Carrier { Stage = 3, boat = "CVN", cs = "Enfield three six" });
         var bg364 = new List<string>();
