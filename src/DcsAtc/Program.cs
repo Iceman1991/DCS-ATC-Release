@@ -57,7 +57,7 @@ public class Config
     public bool AiChatter { get; set; } = true;        // AI flights also transmit audibly (request, reply, readback)
     public string AiFlightComms { get; set; } = "voll"; // AI flights in combat: full (Fox, Splash, Tally …), tactical (only Fox/Splash/Bingo/Defending/Guard), off
     public double AiFlightRadiusNm { get; set; } = 60; // AI radio only from flights this close to a player of the same side
-    public bool TankerVectors { get; set; } = true;    // tanker guides the receiver with join vectors until "visual" (N38)
+    public bool TankerVectors { get; set; }    // tanker itself guides the receiver with join vectors until "visual" (N38); off: AWACS vectors or "request vector" only
     public bool AiOwnWingmen { get; set; } = false;    // players' AI wingmen also transmit (DCS already speaks for them)
     public bool AiFollowAwacs { get; set; } = true;    // LD1: AI fighters fly the AWACS assignment (AttackGroup in the mission script), off = radio only
     public string Mode { get; set; } = "host";         // "client" = radio wheel only for fellow players (requests via DCS chat to the host)

@@ -26,11 +26,11 @@ public partial class Tower
         var c = Cs();
         bool ground = OnGround(t);
         double kt = t.Ias / Kt;
-        if (!ground && t.Agl > 30) { airborne = true; graded = false; }
+        if (!ground && t.Agl > 30 && kt > 30) { airborne = true; graded = false; }   // forum 0.15: not at standstill (AGL outlier in the first frames of a runway spawn)
         role = Owner();
 
         // Touchdown on a runway -> landing evaluation (text only in the game)
-        bool touchdown = wasAir && ground && !graded && OnRunwayPos(t.X, t.Z, 45, 300);
+        bool touchdown = wasAir && airborne && ground && !graded && OnRunwayPos(t.X, t.Z, 45, 300);
         if (wasAir && ground) touchAt = now;
         wasAir = !ground;
         if (!ground) lastVs = t.Vs;
@@ -148,7 +148,7 @@ public partial class Tower
             }
         }
 
-        if (!ground && t.Agl > 100)
+        if (!ground && t.Agl > 100 && kt > 30)   // forum 0.15: not at standstill (AGL outlier of a runway spawn)
         {
             if (Phase == Phase.ClearedTakeoff && stayPattern && goFt > 0) { wantRw = null; var md = Missed(t, now, "", true); missDep = true; return md; }   // R253: radar pattern, climb-out was in the takeoff clearance
             if (Phase == Phase.ClearedTakeoff)
@@ -1204,7 +1204,7 @@ public partial class Tower
     void Reset(Telemetry t, double now)
     {
         bool landing = (airborne || Phase is Phase.ClearedLand or Phase.TaxiIn) && lastTel != null && Dist(t.X, t.Z, lastTel.X, lastTel.Z) < 3000;   // came from the air without a jump (gap in approach/rollout), no respawn
-        airborne = !OnGround(t);
+        airborne = !OnGround(t) && t.Ias > 30 * Kt;   // forum 0.15: runway spawn (instant mission) shows some meters AGL at standstill in the first frame: no landing without clearance
         Phase = airborne ? Phase.Away : Phase.Parked; wantStraight = wantVisual = wantOverhead = visAsk = visSeen = false;
         if (!airborne) home = NearestRamp(t);   // in the air (return after gap): ramp and own parking position from departure remain
         if (!airborne) spot = F.Spots.Where(s => Dist(t.X, t.Z, s.X, s.Z) < 40).OrderBy(s => Dist(t.X, t.Z, s.X, s.Z)).Select(s => ((double, double)?)(s.X, s.Z)).FirstOrDefault() ?? (t.X, t.Z);

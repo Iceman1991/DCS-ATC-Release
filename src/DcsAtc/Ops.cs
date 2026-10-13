@@ -118,6 +118,7 @@ partial class Ops
     {
         var n = Normalize(text.Contains(':') ? text[(text.IndexOf(':') + 1)..] : text);
         if (role == "JTAC") { var jr = JtacCall(n, me, now, unsure); if (jr.Count > 0 && !jr.Any(c => c.Text.Contains("say again"))) lastRole[role] = jr; return jr; }   // J6
+        if (Ack(n, me.Callsign, role)) return new();   // forum 0.15: "Enfield 1-1" / "roger, Enfield 1-1" acknowledges a call without readback, no "say again"
         if (unsure || Has(n, "radio check", "how do you read"))
         {
             var st = role == "Range" ? "Range Alpha" : role == "AWACS" ? AwacsName(AwacsOf(air, me), me) : Tankers(air, me).FirstOrDefault()?.Name ?? "Tanker";
@@ -130,6 +131,14 @@ partial class Ops
         return res;
     }
     readonly Dictionary<string, List<Call>> lastRole = new();   // R393: last reply per role ("say again")
+    /// Acknowledgement only: own call sign plus roger/copy/thanks (digits of a readback allowed). With the station name in front only once in contact
+    /// (tanker after the request, range checked in); "Overlord, Enfield 1-1" stays a call-up.
+    bool Ack(string n, string own, string role)
+    {
+        var r = Regex.Replace(Blank(n, own), @"\b(?:roger|copy|copied|wilco|affirm(?:ative)?|understood|okay|ok|thanks|thank you|will do|\d+)\b", " ");
+        var bare = Regex.Replace(r, @"\b(?:texaco|shell|arco|tanker|range alpha|range)\b", " ");
+        return bare.Trim() == "" && n.Trim() != "" && (bare == r || role == "Tanker" && tank >= 1 || role == "Range" && checkedIn);
+    }
 
     // ======================================================================= Range
     static Call R(string s) => new("Range", "Range Alpha", s);
@@ -1209,7 +1218,7 @@ partial class Ops
     // N38: join vectors to the tanker (tank == 1), until "visual"/"judy", "report visual" (within 5 NM behind the 3-9 line, not on opposite course) or turning away (5 NM beyond the smallest distance against the vector);
     // lead-pursuit intercept on a point 2 NM in trail, ahead of the 3-9 line 2 NM offset to the receiver's side (TP4: no head-on into the nose), target 1000 ft below the tanker.
     // TP3: first vector 30 s after the request, then only on deviation > 30° or when crossing 10 NM, at most every 60 s (30 s in the turn behind the tanker); force: "request vector".
-    public static bool Vectors = true;   // Config TankerVectors
+    public static bool Vectors;   // Config TankerVectors: the tanker itself vectors (forum 0.15: off by default, in reality AWACS/GCI does it or the receiver on A/A TACAN and radar); AWACS vectors always
     double vecAt;
     int vecBand = 99;
     double vecMin = 1e9;   // smallest distance since the request (NM)
@@ -1220,12 +1229,13 @@ partial class Ops
         var t = me.Tel;
         if (tank != 1) { vecAt = now; vecBand = 99; vecMin = 1e9; vecEnd = vecFirst = false; return null; }
         if (force) { vecEnd = vecFirst = false; vecMin = 1e9; }
-        else if (!Vectors || vecEnd || now - vecAt < 30) return null;
+        else if (vecEnd || now - vecAt < 30) return null;
         if (t == null || OnGround(t)) return null;
         var tk = Tankers(air, me).FirstOrDefault(k => k.A.Group == tanker);
         if (tk == null) return null;
         var a = tk.A;
-        bool byAw = aw && awacsIn && AwacsUp(air, me);   // E1: checked in with the AWACS -> it gives the join vectors (as in reality), otherwise the tanker
+        bool byAw = aw && awacsIn && AwacsUp(air, me);   // E1: checked in with the AWACS -> it gives the join vectors (as in reality), otherwise none
+        if (!byAw && !force && !Vectors) return null;   // forum 0.15: the tanker itself vectors only with TankerVectors or on "request vector"
         if (byAw) SetAwacs(air, me);
         Call V(string s) => byAw ? A(s) : new("Tanker", tk.Name, s);
         double d = Dist(t.X, t.Z, a.X, a.Z), nm = d / NM, hdg = t.Hdg * 180 / Math.PI, fx = Math.Cos(a.Hdg), fz = Math.Sin(a.Hdg), along = Along(t, a);
@@ -1430,6 +1440,7 @@ partial class Ops
     public static int SelfTest(Action<bool, string> check)
     {
         Abm.Reset();
+        var vecs = Vectors; Vectors = true;   // the vector tests below need the tanker vectors
         var (idSec, awBulls, fadeSec, scanSec) = (IdSec, AwacsBullseye, FadeSec, ScanSec); (IdSec, AwacsBullseye, FadeSec, ScanSec) = (0, false, 1e9, 0);   // older tests expect "hostile" immediately (LK1), the BRAA fallback (LK4) and no "faded" (LK6); the LK tests check those
         var me = new Me("Enfield 1-1", new Telemetry(6000, 6000, 200, 0, 0, 0, 0, 0, 0), "FA-18C_hornet", 2);
         var air = new List<Traffic>
@@ -1821,6 +1832,13 @@ partial class Ops
         var obT = new Ops(); var rjT = obT.OnTranscript("Tanker", "Texaco, Enfield 1-1, request rejoin", meN, air, f, 0);   // R393: bare "say again" repeats the last tanker call
         var saT = obT.OnTranscript("Tanker", "Enfield 1-1, say again", meN, air, f, 0);
         check(saT.Count == rjT.Count && saT.Count > 0 && saT[0].Text == rjT[0].Text, "R393: say again wiederholt den letzten Tankerspruch -> " + string.Join(" | ", saT.Select(x => x.Text)));
+        // Forum 0.15: callsign alone (or with "Texaco" in contact) acknowledges, no "say again"; without contact "Texaco, Enfield 1-1" is still answered
+        var akT = new[] { "Enfield 1-1", "roger, Enfield 1-1", "Texaco, Enfield 1-1", "Enfield 1-1, okay" }.Where(s => obT.OnTranscript("Tanker", s, meN, air, f, 1).Count > 0).ToList();
+        check(akT.Count == 0 && new Ops().OnTranscript("Tanker", "Texaco, Enfield 1-1", meN, air, f, 0).Count == 1, "Tanker: Quittung mit Rufzeichen -> still: " + string.Join(", ", akT));
+        // Forum 0.15: the tanker gives no join vectors by itself (only AWACS or "request vector")
+        Vectors = false;
+        check(obT.TankVec(meN, air, 100) == null && obT.TankVec(meN, air, 200) == null, "Tanker vektoriert nicht von selbst (TankerVectors aus)");
+        Vectors = true;
         var ob287o = string.Join(" | ", ob287.OnTranscript("Tanker", "Texaco, Enfield 1-1, observation", meN, air, f, 0).Select(x => x.Text));
         check(pc287 == "Enfield one one, Texaco one one, negative, not cleared pre-contact, cleared to join, left observation, number 1." && ob287o.StartsWith("Enfield one one, Texaco one one, cleared to join, left observation, number 2.")
               && SayN("pre contact").Contains("basket ready"), $"Tanker R287: pre-contact/observation ohne Join-Freigabe -> {pc287} | {ob287o}");
@@ -2513,6 +2531,7 @@ partial class Ops
             Vectors = true;
         }
         JtacTest(check);   // J6-J12
+        Vectors = vecs;
         Bulls.Clear(); Range = null; Beacons.Clear(); Tracks.Clear(); (IdSec, AwacsBullseye, FadeSec, ScanSec) = (idSec, awBulls, fadeSec, scanSec); labels.Clear(); killed.Clear(); scope.Clear(); firstSeen.Clear(); hostileAct.Clear(); net.Clear(); Abm.Reset();
         return 0;
     }

@@ -149,6 +149,12 @@ public partial class Tower
         r = twId.OnTranscript("Kutaisi Approach, Enfield 11, airborne, passing 2000", airId, none, 20);
         var idA = twId.Tick(airId, none, 25).Count == 0 && twId.Tick(airId, none, 26) is [{ } idR] && idR.Role == "Approach" && idR.Contains("radar contact") && !idR.Contains("squawk") ? "ok" : "falsch";
         Check(r.Count == 1 && r[0].Contains("squawk") && !r[0].Contains("radar contact") && idA == "ok" && twId.Tick(airId, none, 40).Count == 0, "R128 airborne ohne Code: " + string.Join(" | ", r.Select(m => m.Text)) + " / " + idA);
+        // Forum 0.15: acknowledging a call without readback with the callsign alone (also "okay"/"thanks", with the station name right after the call) -> silent, no "say again";
+        // the station name long after the last call is a call-up again
+        var akSt = twId.OnTranscript("Kutaisi Approach, Enfield 11", airId, none, 30);
+        var akBad = new[] { "Enfield 1-1", "Enfield one one", "Enfield 11", "okay, Enfield 11", "Enfield 1 1 roger", "Enfield one-one, thanks" }.Where(ak => twId.OnTranscript(ak, airId, none, 60).Count > 0).ToList();
+        Check(akSt.Count == 0 && akBad.Count == 0 && twId.OnTranscript("Kutaisi Approach, Enfield 11", airId, none, 200).Count == 1,
+              $"Quittung nur mit Rufzeichen -> still: {string.Join(" | ", akSt.Select(m => m.Text))} / {string.Join(", ", akBad)}");
         twD.AwacsContact = "Overlord two five one decimal zero";
         // Reporting obligation #10: at the zone edge without "leaving the control zone" remind once, sign off 1 NM outside (30 s later) and into the debriefing, no second one at 15 NM
         r = twD.Tick(At(CX - 9.5 * NM, CZ, 2000, 270, 200), none, 25);
@@ -3048,6 +3054,14 @@ public partial class Tower
         tw18t.F.Spots.RemoveAt(tw18t.F.Spots.Count - 1);
         Check(tw18p.Phase == Phase.Parked && r.Count == 0 && r18t.Count == 1 && r18t[0].Contains("cleared for takeoff"),
               $"Bahnspawnpunkt neben getRunways: {tw18p.Phase} {string.Join(" | ", r)} / {r18t.FirstOrDefault()?.Text}");
+        // Forum 0.15 (instant mission, runway spawn): first frame some meters AGL at standstill -> no landing grade, no "landing without clearance", lined up for takeoff
+        foreach (var gAgl in new[] { 20.0, 200.0 })
+        {
+            var twg = new Tower("Enfield 1-1");
+            var pr = twg.Tick(At(CX, CZ, gAgl, 254, 0), none, 0).Concat(Enumerable.Range(1, 120).SelectMany(s => twg.Tick(At(CX, CZ, 0, 254, 0), none, s))).Select(m => m.Role + ": " + m.Text).ToList();
+            var rgl = twg.OnTranscript("Kutaisi Tower, Enfield 1-1, ready for departure", At(CX, CZ, 0, 254, 0), none, 121);
+            Check(pr.Count == 0 && rgl.Count == 1 && rgl[0].Contains("cleared for takeoff"), $"Bahnspawn mit AGL-Ausreisser {gAgl} ft: {twg.Phase} {string.Join(" | ", pr)} / {rgl.FirstOrDefault()?.Text}");
+        }
 
         // --- Taxi traffic: AI crosses from the right -> hold position, then continue taxi
         var tw19 = new Tower("Enfield 1-1");

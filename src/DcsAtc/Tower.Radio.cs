@@ -67,8 +67,10 @@ public partial class Tower
         // New request: anyone who calls the controller at the start of the transmission ("Kutaisi Tower, ...") or says "request/again/confirm/say" always gets a reply.
         var intent = Intent(n, ground);
         var spoken = Normalize(Regex.Replace(text, @"^\s*[A-Za-z]+:", ""));   // "Ground: " (config frequency/menu) is not a call
-        bool request = Addressed(spoken) != null || Has(n, "request", "requesting", "again", "confirm", "verify", "still", "say");
-        bool readback = intent != "fieldinsight" && (Has(n, "report", "wilco", "roger", "copy", "cleared", "will do", "affirm", "approved") || ReadsBack(n, intent) || AckOnly(spoken));   // R115: "field in sight" is a report, not a readback; forum 0.9.7: "start up approved, Enfield 1-1" or just the callsign (AIM 4-2-3) is an acknowledgement
+        // forum 0.15: "Kutaisi Departure, Enfield 1-1" right after a Departure call without readback is the acknowledgement, not a new call-up (after a handover the last call is another station's)
+        bool stAck = addressed != null && last != null && Dep(addressed) == last.Role && now - lastAt < 30 + last.Text.Split(' ').Length / 2.5 && AckOnly(spoken, true);
+        bool request = Addressed(spoken) != null && !stAck || Has(n, "request", "requesting", "again", "confirm", "verify", "still", "say");
+        bool readback = intent != "fieldinsight" && (Has(n, "report", "wilco", "roger", "copy", "cleared", "will do", "affirm", "approved") || ReadsBack(n, intent) || AckOnly(spoken) || stAck);   // R115: "field in sight" is a report, not a readback; forum 0.9.7: "start up approved, Enfield 1-1" or just the callsign (AIM 4-2-3) is an acknowledgement
         // Readback window from the end of the controller's transmission: lastAt is the call, the transmission lasts ~2.5 words/s (taxi clearance ~15 s)
         bool repeat = intent == lastIntent && now - lastAt < 30 + (last?.Text.Split(' ').Length ?? 0) / 2.5 && !Has(n, "ready") && !(intent == "fieldinsight" && visAsk);   // R115: after "negative field in sight", "field in sight" is the requested report, not a repeat
         // R8: route clearance read back with the assigned code -> "readback correct" (FAA JO 7110.65 4-2-1, ICAO Doc 4444 4.5.7.5)
@@ -870,8 +872,10 @@ public partial class Tower
     }
 
     /// Forum 0.9.7: acknowledgement without readback of a controller transmission: only the own callsign (AIM 4-2-3) and/or "approved", "starting up", "rolling", "taxiing", "lining up" …
-    bool AckOnly(string n) => last != null &&
-        Regex.Replace(NoCs(n), @"\b(?:roger|copy|copied|wilco|affirm(?:ative)?|approved|understood|starting(?: up| engines?)?|rolling|taxiing|lining up|switching(?: over)?)\b", " ").Trim() == "";
+    /// station: the station name may stand in front ("Kutaisi Departure, Enfield 1-1"); forum 0.15: "okay"/"thanks" are acknowledgements too
+    bool AckOnly(string n, bool station = false) => last != null &&
+        Regex.Replace(NoCs(n), @"\b(?:roger|copy|copied|wilco|affirm(?:ative)?|approved|understood|okay|ok|thanks|thank you|starting(?: up| engines?)?|rolling|taxiing|lining up|switching(?: over)?"
+            + (station ? "|ground|tower|approach|departure|radar|" + string.Join("|", $"{F.Name}-{F.Callsign}".ToLowerInvariant().Split('-', ' ', StringSplitOptions.RemoveEmptyEntries).Select(Regex.Escape)) : "") + @")\b", " ").Trim() == "";
     /// Transmission without the own callsign (also misheard)
     string NoCs(string n) => Regex.Replace(n, @"\b([a-z]{3,}) \d(?: ?\d)?\b", m => !NotCallsign.Contains(m.Groups[1].Value) && (SameCallsign(m.Value, callsign) || Digits(m.Value) == Digits(callsign)) ? " " : m.Value);
 
