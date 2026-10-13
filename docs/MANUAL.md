@@ -2752,7 +2752,12 @@ When you report a bug, include the time, the airfield, a short description, `atc
 **After a DCS update**
 - **Why it breaks.** DCS updates reset `Scripts\MissionScripting.lua`.
 - **Automatic fix.** DCS-ATC checks the file while running and asks once for admin rights to fix it ("A DCS update removed the DCS-ATC line from MissionScripting.lua -> admin prompt (UAC). Restart the mission afterwards.").
-- **Manual fix.** Use Start menu → DCS-ATC → **Repair after DCS update**.
+- **Manual fix.** Use Start menu → DCS-ATC → **Repair after DCS update**. The window shows which files were patched.
+- **Edit the file yourself.** Open `<DCS folder>\Scripts\MissionScripting.lua` as administrator (dedicated server: the server's install folder). Add this line directly above `local function sanitizeModule`:
+  ```lua
+  pcall(function() local f = lfs.writedir() .. 'Scripts/DcsAtc/DcsAtcMission.lua' if lfs.attributes(f) then dofile(f) end end)   -- DCS-ATC (Mod)
+  ```
+  The mission script must be in `Saved Games\<DCS folder>\Scripts\DcsAtc\DcsAtcMission.lua` (dedicated server: the server's Saved Games folder, setup option "Dedicated server").
 - **Then restart the mission.**
 
 **Radio wheel doesn't open**

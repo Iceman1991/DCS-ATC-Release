@@ -1,5 +1,5 @@
 ﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe
-#define AppVer "0.16.0-alpha"
+#define AppVer "0.16.1-alpha"
 #define Src ".."
 
 [Setup]
@@ -143,7 +143,7 @@ Name: "{group}\{cm:IconStart}"; Filename: "{app}\DcsAtc.exe"; WorkingDir: "{app}
 Name: "{group}\{cm:IconKeys}"; Filename: "{app}\DcsAtc.exe"; Parameters: "--keys"; WorkingDir: "{app}"
 Name: "{group}\{cm:IconConfig}"; Filename: "{app}\DcsAtc.exe"; Parameters: "--settings"; WorkingDir: "{app}"
 Name: "{group}\{cm:IconOptions}"; Filename: "notepad.exe"; Parameters: """{code:SavedGames}\Scripts\DcsAtc\DcsAtcOptions.lua"""
-Name: "{group}\{cm:IconRepair}"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\DcsAtc-Patch.ps1"""
+Name: "{group}\{cm:IconRepair}"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\DcsAtc-Patch.ps1"" -Pause"
 Name: "{group}\{cm:IconReadme}"; Filename: "{app}\LIESMICH.txt"; Languages: de
 Name: "{group}\{cm:IconReadme}"; Filename: "{app}\README.txt"; Languages: en
 Name: "{group}\{cm:IconUninstall}"; Filename: "{uninstallexe}"

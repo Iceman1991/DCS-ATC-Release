@@ -2754,7 +2754,12 @@ Für einen Fehlerbericht: Uhrzeit, Platz, kurze Beschreibung, `atc-log.txt` und 
 **Nach einem DCS-Update**
 - **Warum es nicht mehr geht.** DCS-Updates setzen `Scripts\MissionScripting.lua` zurück.
 - **Automatische Reparatur.** DCS-ATC prüft die Datei im Betrieb und fragt einmal nach Adminrechten („DCS-Update hat die DCS-ATC-Zeile in MissionScripting.lua entfernt -> Admin-Abfrage (UAC). Mission danach neu starten.“).
-- **Von Hand.** Startmenü → DCS-ATC → **Nach DCS-Update reparieren**.
+- **Von Hand.** Startmenü → DCS-ATC → **Nach DCS-Update reparieren**. Das Fenster zeigt, welche Dateien angepasst wurden.
+- **Datei selbst ändern.** `<DCS-Ordner>\Scripts\MissionScripting.lua` als Administrator öffnen (Dedicated Server: Installationsordner des Servers). Direkt über `local function sanitizeModule` diese Zeile einfügen:
+  ```lua
+  pcall(function() local f = lfs.writedir() .. 'Scripts/DcsAtc/DcsAtcMission.lua' if lfs.attributes(f) then dofile(f) end end)   -- DCS-ATC (Mod)
+  ```
+  Das Missionsskript muss in `Saved Games\<DCS-Ordner>\Scripts\DcsAtc\DcsAtcMission.lua` liegen (Dedicated Server: Saved-Games-Ordner des Servers, Setup-Option „Dedicated Server“).
 - **Dann die Mission neu starten.**
 
 **Funkrad öffnet nicht**

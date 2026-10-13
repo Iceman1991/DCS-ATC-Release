@@ -1,10 +1,13 @@
 ﻿# DCS-ATC: adds a line to <DCS>\Scripts\MissionScripting.lua that loads the mod's mission script (before os/io/lfs are sanitized).
 # Needs admin rights (Program Files). DCS updates reset the file -> DCS-ATC then asks again by itself.
 #   -Remove: remove the line again (uninstall)
-param([string]$Dcs, [switch]$Remove)
+#   -Pause: wait for Enter at the end (start menu shortcut, shows the result)
+#   No write access (started without admin rights): starts itself again with admin prompt (UAC).
+param([string]$Dcs, [switch]$Remove, [switch]$Pause, [switch]$Elevated)
 $ErrorActionPreference = 'Stop'
-$dirs = @($Dcs) + @('DCS World', 'DCS World OpenBeta' | ForEach-Object { (Get-ItemProperty "HKCU:\Software\Eagle Dynamics\$_" -EA 0).Path }) +
+$dirs = @($Dcs) + @('DCS World', 'DCS World OpenBeta', 'DCS World Server' | ForEach-Object { (Get-ItemProperty "HKCU:\Software\Eagle Dynamics\$_" -EA 0).Path }) +
         @((Get-ItemProperty 'HKCU:\Software\DCS-ATC' -EA 0).ServerDcs)   # dedicated server (chosen in setup)
+try {
 foreach ($d in $dirs | Where-Object { $_ } | Select-Object -Unique) {
     $f = Join-Path $d 'Scripts\MissionScripting.lua'
     if (-not (Test-Path $f)) { continue }
@@ -20,3 +23,12 @@ foreach ($d in $dirs | Where-Object { $_ } | Select-Object -Unique) {
     }
     if ($n -ne $t) { [IO.File]::WriteAllText($f, $n); "$f : angepasst / patched" }
 }
+} catch {
+    if ($Elevated) { "Fehler / error: $_" }
+    else {
+        $a = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Elevated" + $(if ($Dcs) { " -Dcs `"$Dcs`"" }) + $(if ($Remove) { ' -Remove' }) + $(if ($Pause) { ' -Pause' })
+        Start-Process powershell -Verb RunAs -Wait -ArgumentList $a
+        exit
+    }
+}
+if ($Pause) { Read-Host 'Enter' }
