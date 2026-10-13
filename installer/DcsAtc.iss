@@ -1,5 +1,5 @@
 ﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe
-#define AppVer "0.16.1-alpha"
+#define AppVer "0.16.2-alpha"
 #define Src ".."
 
 [Setup]
@@ -181,14 +181,15 @@ var Saved, ServerSave, ServerDir: String;
 { Saved Games\DCS (bzw. DCS.openbeta, falls nur das existiert): früher gewählter Ordner (HKCU\Software\DCS-ATC, liest auch die App),
   sonst der echte Ort von Saved Games (Konstante usersavedgames = Known Folder, in Windows verschiebbar) }
 function SavedGames(Param: String): String;
-var Base: String;
+var Base, Chosen: String;
 begin
-  if Saved = '' then
-    if not (RegQueryStringValue(HKCU, 'Software\DCS-ATC', 'SavedGames', Saved) and DirExists(Saved)) then begin
-      Base := ExpandConstant('{usersavedgames}');
-      if not DirExists(Base + '\DCS') and DirExists(Base + '\DCS.openbeta') then Saved := Base + '\DCS.openbeta'
-      else Saved := Base + '\DCS';
-    end;
+  { Windows Saved Games\DCS first (the folder DCS uses, also when moved), the folder chosen earlier only when that is missing }
+  if Saved = '' then begin
+    Base := ExpandConstant('{usersavedgames}');
+    if not DirExists(Base + '\DCS') and DirExists(Base + '\DCS.openbeta') then Saved := Base + '\DCS.openbeta'
+    else Saved := Base + '\DCS';
+    if not DirExists(Saved) and RegQueryStringValue(HKCU, 'Software\DCS-ATC', 'SavedGames', Chosen) and DirExists(Chosen) then Saved := Chosen;
+  end;
   Result := Saved;
 end;
 

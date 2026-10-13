@@ -1256,8 +1256,7 @@ static partial class Program
     internal static string SavedGamesDcs()
     {
         const string sf = @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\", id = "{4C5C32FF-BB9D-43b0-B5B4-2D72E54EAAA4}";
-        if (!Dedicated && Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\DCS-ATC", "SavedGames", null) is string chosen && Directory.Exists(chosen)) return chosen;
-        var sg = ShellFolder(Microsoft.Win32.Registry.GetValue(sf + "User Shell Folders", id, null) as string)
+        var sg =ShellFolder(Microsoft.Win32.Registry.GetValue(sf + "User Shell Folders", id, null) as string)
               ?? ShellFolder(Microsoft.Win32.Registry.GetValue(sf + "Shell Folders", id, null) as string)
               ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Saved Games");
         if (Dedicated)
@@ -1266,7 +1265,15 @@ static partial class Program
             try { hook = File.ReadAllText(Path.Combine(Path.GetTempPath(), "DcsAtc-WriteDir.txt")); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
             return ServerSavedGames(sg, hook, Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\DCS-ATC", "ServerSavedGames", null) as string);
         }
-        return Path.Combine(sg, !Directory.Exists(Path.Combine(sg, "DCS")) && Directory.Exists(Path.Combine(sg, "DCS.openbeta")) ? "DCS.openbeta" : "DCS");
+        return ClientSavedGames(sg, Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\DCS-ATC", "SavedGames", null) as string);
+    }
+
+    /// Forum 0.16: Saved Games\DCS (DCS.openbeta if only that is there) of the Windows Saved Games folder, the one DCS uses (also when moved);
+    /// the folder chosen in setup only when that is missing (a stale choice after moving Saved Games used to win until uninstall).
+    internal static string ClientSavedGames(string sg, string? chosen)
+    {
+        var own = Path.Combine(sg, !Directory.Exists(Path.Combine(sg, "DCS")) && Directory.Exists(Path.Combine(sg, "DCS.openbeta")) ? "DCS.openbeta" : "DCS");
+        return !Directory.Exists(own) && !string.IsNullOrWhiteSpace(chosen) && Directory.Exists(chosen) ? chosen : own;
     }
 
     /// Saved Games of the dedicated server: reported by the hook (lfs.writedir(), also valid with start parameter -w <name>), otherwise chosen in the installer,
@@ -3049,7 +3056,7 @@ static partial class Program
                     };
                     foreach (var a in new[] { "--model", model, "--length_scale", scale, "--sentence_silence", sil, "--json-input", "-q" }) psi.ArgumentList.Add(a);
                     e.P = Process.Start(psi)!;
-                    try { e.P.PriorityClass = ProcessPriorityClass.BelowNormal; } catch (Exception) { }   // onnxruntime takes all cores: DCS frames first
+                    Background(e.P);   // onnxruntime takes all cores: DCS frames first
                     e.P.ErrorDataReceived += (_, _) => { };
                     e.P.BeginErrorReadLine();
                 }
@@ -3079,6 +3086,19 @@ static partial class Program
         if (o.Contains("Could not connect")) Console.WriteLine(L("      (SRS-Server nicht erreichbar)", "      (SRS server not reachable)"));
     }
 
+    /// Forum 0.16 (VR, CPU-bound): whisper/piper/ffmpeg below normal and only on the upper half of the logical processors,
+    /// DCS keeps the lower half (Intel hybrid: E-cores are numbered last, AMD/HT: whole cores). Below 8 logical processors all of them.
+    static void Background(Process p)
+    {
+        try { p.PriorityClass = ProcessPriorityClass.BelowNormal; p.ProcessorAffinity = (nint)UpperHalf(Environment.ProcessorCount); } catch (Exception) { }
+    }
+    internal static long UpperHalf(int n)
+    {
+        n = Math.Min(n, 64);
+        ulong all = n >= 64 ? ulong.MaxValue : (1UL << n) - 1;
+        return (long)(n < 8 ? all : all & ~((1UL << n / 2) - 1));
+    }
+
     static (string stdout, int exit) Run(string exe, string? stdin, params string[] args)
     {
         var psi = new ProcessStartInfo(exe)
@@ -3090,7 +3110,8 @@ static partial class Program
         try
         {
             using var p = Process.Start(psi)!;
-            try { p.PriorityClass = exe.Contains("ExternalAudio") ? ProcessPriorityClass.High : ProcessPriorityClass.BelowNormal; } catch (Exception) { }   // ExternalAudio: steady rhythm, otherwise choppy when DCS maxes out the CPU; whisper/piper/ffmpeg: DCS frames first (stutter)
+            if (!exe.Contains("ExternalAudio")) Background(p);
+            else try { p.PriorityClass = ProcessPriorityClass.High; } catch (Exception) { }   // ExternalAudio: steady rhythm, otherwise choppy when DCS maxes out the CPU; whisper/piper/ffmpeg: DCS frames first (stutter)
             if (stdin != null) { p.StandardInput.WriteLine(stdin); p.StandardInput.Close(); }
             var err = p.StandardError.ReadToEndAsync();
             var o = p.StandardOutput.ReadToEnd();
@@ -3364,9 +3385,16 @@ static partial class Program
                 || ServerSavedGames(sv, Path.Combine(sv, "Inst1") + "\\\r\n", Path.Combine(sv, "DCS.dcs_serverrelease")) != Path.Combine(sv, "Inst1")
                 || ServerSavedGames(sv, null, Path.Combine(sv, "Inst1")) != Path.Combine(sv, "Inst1"))
                 throw new Exception("Dedicated Server: Prozess-/Ordnererkennung");
+            // client: Saved Games\DCS of Windows before a stale setup choice, the choice only when DCS is missing
+            if (ClientSavedGames(sv, Path.Combine(sv, "Inst1")) != Path.Combine(sv, "Inst1") || ClientSavedGames(sv, null) != Path.Combine(sv, "DCS")) throw new Exception("Saved Games: Setup-Wahl ohne DCS-Ordner");
+            Directory.CreateDirectory(Path.Combine(sv, "DCS.openbeta"));
+            if (ClientSavedGames(sv, Path.Combine(sv, "Inst1")) != Path.Combine(sv, "DCS.openbeta")) throw new Exception("Saved Games: nur DCS.openbeta");
+            Directory.CreateDirectory(Path.Combine(sv, "DCS"));
+            if (ClientSavedGames(sv, Path.Combine(sv, "Inst1")) != Path.Combine(sv, "DCS")) throw new Exception("Saved Games: alte Setup-Wahl gewinnt");
+            if (UpperHalf(4) != 0xF || UpperHalf(16) != 0xFF00 || UpperHalf(20) != 0xFFC00 || UpperHalf(128) != unchecked((long)0xFFFFFFFF00000000)) throw new Exception("Kernmaske whisper/piper");
         }
         finally { try { Directory.Delete(sv, true); } catch (IOException) { } }
-        Console.WriteLine("OK   Dedicated Server: nur DCS_server läuft -> Hintergrundbetrieb (mit DCS nicht), bin\\DCS_server.exe zählt als DCS-Ordner, Saved Games: Hook (-w) vor Installer vor DCS.server/DCS.dcs_serverrelease");
+        Console.WriteLine("OK   Dedicated Server: nur DCS_server läuft -> Hintergrundbetrieb (mit DCS nicht), bin\\DCS_server.exe zählt als DCS-Ordner, Saved Games: Hook (-w) vor Installer vor DCS.server/DCS.dcs_serverrelease; Client: Windows-Ordner DCS vor alter Setup-Wahl; whisper/piper auf der oberen Kernhälfte");
         string Vr(string on) => $"options = {{\n\t[\"VR\"] = {{\n\t\t[\"custom_IPD_enable\"] = true,\n\t\t[\"enable\"] = {on},\n\t\t[\"pixel_density\"] = 1,\n\t}},\n\t[\"graphics\"] = {{\n\t\t[\"enable\"] = true,\n\t}},\n}}";
         const string Cl = "2026-10-08 11:44:51.233 INFO    APP (Main): Command line: \"D:\\DCS World\\bin/DCS.exe\" ";
         if (!VrOn(Vr("true"), "") || VrOn(Vr("false"), "") || VrOn("options = { [\"VR\"] = { [\"bloom\"] = true }, [\"x\"] = { [\"enable\"] = true } }", "")

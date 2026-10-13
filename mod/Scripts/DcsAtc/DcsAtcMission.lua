@@ -794,14 +794,14 @@ local function start()
   end
 
   -- Terrain around airfields (minimum altitudes of radar vectoring): grid 1 NM, ±30 NM, per cell highest of 3×3 points.
-  -- Airfields near players first and every mission anew, the rest once per map (file missing); one after another.
+  -- Once per map (file missing), airfields near players first; one after another.
   -- File %TMP%\DcsAtc-Terrain-<map>-<Id>.txt
-  -- n×n cells from x0/z0, per cell highest of 3×3 points; at most 1.5 ms per 0.1 s (land.getHeight in bulk = stutter), done(rows) at the end
+  -- n×n cells from x0/z0, per cell highest of 3×3 points; at most 1 ms per 0.1 s (land.getHeight in bulk = stutter), done(rows) at the end
   local function grid(x0, z0, cell, n, done)
     local rows, r, i, j = {}, {}, 0, 0
     timer.scheduleFunction(function()
       local t0 = os.clock()
-      while os.clock() - t0 < 0.0015 do
+      while os.clock() - t0 < 0.001 do
         if i >= n then done(table.concat(rows, "\n")) return nil end
         local m = 0
         for a = 0, 2 do for b = 0, 2 do
@@ -830,14 +830,13 @@ local function start()
   local function terrainFor(f, first)
     if terrainDone[f.id] then return end
     terrainDone[f.id] = true
+    local fh = io.open(terrainFile(f), "r")   -- forum 0.16 (VR): terrain is the same in every mission, computed once per map (was: near airfields every mission anew)
+    if fh then fh:close() return end
     table.insert(terrainQ, first and 1 or #terrainQ + 1, f)
     if not terrainBusy then terrainNext() end
   end
   local function allTerrain()
-    for _, f in ipairs(fields) do
-      local fh = io.open(terrainFile(f), "r")
-      if fh then fh:close() else terrainFor(f) end
-    end
+    for _, f in ipairs(fields) do terrainFor(f) end
   end
 
   -- Coarse grid over the whole map (V15: terrain warning en route): airfields ±60 NM, cell 2 NM, once per map
@@ -1687,12 +1686,18 @@ local function start()
     log("Befehl " .. line)
   end
 
-  local stateNext = 0
+  local stateNext, stateMax, stateLog = 0, 0, 60
   timer.scheduleFunction(function(_, t)
     if t >= stateNext then
       stateNext = t + (cvNear and 0.25 or 0.5)
+      local c0 = os.clock()
       local ok, err = pcall(state)
       if not ok then env.error("DCS-ATC state: " .. tostring(err)) end
+      stateMax = math.max(stateMax, os.clock() - c0)   -- forum 0.16 (VR): time in the DCS frame, in dcs.log from 2 ms (big missions)
+      if t >= stateLog then
+        if stateMax >= 0.002 then log(string.format("Status-Takt bis %.0f ms im DCS-Frame", stateMax * 1000)) end
+        stateLog, stateMax = t + 60, 0
+      end
     end
     local files = {}
     for f in lfs.dir(dir) do
