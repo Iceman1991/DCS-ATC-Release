@@ -1,5 +1,5 @@
 ﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe
-#define AppVer "0.15.1-alpha"
+#define AppVer "0.16.0-alpha"
 #define Src ".."
 
 [Setup]
@@ -104,6 +104,7 @@ Source: "{#Src}\installer\config.jsonc"; DestDir: "{app}"; Flags: onlyifdoesntex
 Source: "{#Src}\installer\LIESMICH.txt"; DestDir: "{app}"; Languages: de; Flags: ignoreversion isreadme
 Source: "{#Src}\installer\README.txt"; DestDir: "{app}"; Languages: en; Flags: ignoreversion isreadme
 Source: "{#Src}\installer\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#Src}\charts\caucasus.jsonc"; DestDir: "{app}\charts"; Flags: ignoreversion
 Source: "{#Src}\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 Source: "{#Src}\mod\DcsAtc-Patch.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Src}\airfields.txt"; DestDir: "{app}"; Flags: ignoreversion
@@ -170,6 +171,7 @@ Type: files; Name: "{code:SavedGames}\Scripts\DcsAtc\DcsAtcModules.txt"
 Type: files; Name: "{code:ServerSaved}\Scripts\DcsAtc\DcsAtcModules.txt"
 Type: files; Name: "{code:SavedGames}\Scripts\DcsAtc\DcsAtcOff.txt"
 Type: files; Name: "{code:ServerSaved}\Scripts\DcsAtc\DcsAtcOff.txt"
+Type: files; Name: "{code:SavedGames}\Kneeboard\ATC-*.png"
 
 [Code]
 const ExportLine = 'pcall(function() local l=require(''lfs''); dofile(l.writedir()..[[Scripts\DcsAtcExport.lua]]) end)   -- DCS-ATC';

@@ -71,6 +71,7 @@
   "AirspaceWatch": true,   // Kontrollzonen überwachen (Einflug ohne Kontakt wird angerufen) und Verstöße ansagen ("possible pilot deviation", z. B. Start ohne Freigabe) und ins Debriefing; false = nur Sicherheitswarnungen
   "AltimeterUnit": "auto",   // Höhenmesser-Einstellung im Funk: "auto" (nach eigenem Flugzeugtyp: westliche Typen "altimeter two niner niner two" in inHg, sonst "QNH one zero one three" in hPa; ATIS nennt beides), "hpa", "inhg"
   "DebugLog": true,   // ausführliches Protokoll atc-debug.txt für Fehlerberichte (Spracherkennung, Platzwahl, Phasen, Telemetrie alle 10 s), höchstens 2 × 20 MB; false = aus
+  "KneeboardPages": true,   // Kneeboard-Seiten (Funk, Plätze, Platzrunden, Navigation, AWACS) bei Missionsstart nach Saved Games\DCS\Kneeboard, in jedem Flugzeug sichtbar (nur Kaukasus, deutsch); false = keine
   "Dedicated": false,   // Dedicated Server ohne Spieler am PC: kein Funkrad, keine Tasten, kein Mikrofon, nur SRS + Missionsdaten; läuft DCS_server.exe ohne DCS.exe, gilt das automatisch
 
   "SrsPath": "C:\\Program Files\\DCS-SimpleRadio-Standalone"   // SRS-Ordner (mit ExternalAudio); stimmt er nicht, nimmt DCS-ATC die SRS-Installation aus der Registry bzw. das laufende SRS. Auch im Einstellungsfenster wählbar

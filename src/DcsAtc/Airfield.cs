@@ -215,13 +215,16 @@ public class Airfield
     // ------------------------------------------------------------------ Kneeboard chart data (charts/caucasus.jsonc, PLATZVERFAHREN-PLAN.md)
     static JsonDocument? chart;
     internal static string? ChartFile;   // --charttest <file>
+    internal static JsonElement? OwnChart;   // forum 0.15: charts.jsonc in the DCS-ATC folder, an airfield in there replaces the built-in entry (own procedures)
+    internal static readonly JsonDocumentOptions ChartOpts = new() { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
     internal static JsonElement Chart => (chart ??= JsonDocument.Parse(ChartFile != null ? File.OpenRead(ChartFile) : typeof(Airfield).Assembly.GetManifestResourceStream("caucasus.jsonc")!,
-        new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true })).RootElement;
+        ChartOpts)).RootElement;
 
     /// Procedures from the chart data if the airfield is in there; without entry everything stays as before (E5).
     public Airfield ApplyChart()
     {
-        if (!Chart.TryGetProperty(Name, out var a)) return this;
+        JsonElement a = default;
+        if (OwnChart?.TryGetProperty(Name, out a) != true && !Chart.TryGetProperty(Name, out a)) return this;
         static Dictionary<string, string> Strs(JsonElement e, string key) =>
             e.TryGetProperty(key, out var v) ? v.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString()!) : new();
         if (a.TryGetProperty("pattern_ft", out var p)) PatternFt = p.GetDouble();

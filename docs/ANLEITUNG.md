@@ -20,7 +20,7 @@ Funk ist Englisch: Alle Funksprüche, die du sagst oder hörst, stehen in diesem
 5. [AWACS, Tanker und Range](#awacs-tanker-und-range)
    - [AWACS](#awacs) · [Tanker](#tanker) · [Range](#range) · [JTAC und FAC(A)](#jtac-und-faca) · [KI-Flüge im Funk](#ki-flüge-im-funk) · [Bodenpersonal und Crew Chief](#bodenpersonal-und-crew-chief)
 6. [Multiplayer, Dedicated Server, eigene Frequenzen und andere Karten](#multiplayer-dedicated-server-eigene-frequenzen-und-andere-karten)
-   - [So funktioniert Multiplayer](#so-funktioniert-multiplayer) · [Dedicated Server einrichten](#dedicated-server-einrichten) · [Eigene Frequenzen je Platz](#eigene-frequenzen-je-platz) · [Andere Karten als Kaukasus](#andere-karten-als-kaukasus)
+   - [So funktioniert Multiplayer](#so-funktioniert-multiplayer) · [Dedicated Server einrichten](#dedicated-server-einrichten) · [Eigene Frequenzen je Platz](#eigene-frequenzen-je-platz) · [Eigene Platzverfahren](#eigene-platzverfahren-chartsjsonc) · [Kneeboard-Seiten](#kneeboard-seiten) · [Andere Karten als Kaukasus](#andere-karten-als-kaukasus)
 7. [Anhang: Einstellungen, Logs und Fehlersuche](#anhang-einstellungen-logs-und-fehlersuche)
    - [Das Einstellungsfenster](#das-einstellungsfenster) · [config.jsonc-Referenz](#configjsonc-referenz) · [Logdateien](#logdateien) · [Fehlersuche](#fehlersuche)
 
@@ -2501,6 +2501,49 @@ Beispiel in Nellis mit der Datei oben:
 
 Die älteren Einstellungen „Frequencies“ (gemeinsame Lotsenfrequenzen) und „AtisFreqs“ (eine ATIS-Frequenz je Platz, braucht Neustart) in config.jsonc gelten weiter. Für einen einzelnen Platz hat ein Eintrag in `frequencies.jsonc` Vorrang vor beiden.
 
+### Eigene Platzverfahren (charts.jsonc)
+
+Die Platzverfahren im Kaukasus (CRPs, Ein- und Ausflug je Bahn, Platzrundenhöhe, Rollwege, Warteplätze) stammen aus den DCS-Kneeboard-Karten und sind eingebaut. Eigene oder aktuellere Verfahren trägst du in einer Datei `charts.jsonc` im DCS-ATC-Ordner ein (`%LOCALAPPDATA%\Programs\DCS-ATC`, dort liegt auch `config.jsonc`). Die Datei gibt es erst, wenn du sie anlegst.
+
+- Ein Platz in `charts.jsonc` ersetzt den eingebauten Eintrag ganz. Plätze, die nicht drinstehen, behalten die eingebauten Verfahren.
+- Vorlage ist `charts\caucasus.jsonc` im DCS-ATC-Ordner, die eingebauten Daten aller Plätze mit Erklärungen. Am einfachsten kopierst du den Eintrag eines Platzes in deine `charts.jsonc` und änderst ihn dort. Die Vorlage selbst wird bei jedem Update überschrieben.
+- Platzname wie in DCS (`Kutaisi`, `Sochi-Adler`, `Senaki-Kolkhi`).
+- Koordinaten wie auf der Karte gedruckt (`"42°15.924'N 042°30.086'E"`) oder als DCS-Koordinaten `[x, z]`. Kurse in Grad missweisend.
+- Gelesen wird die Datei bei jedem Missionsstart. Ist sie fehlerhaft, meldet das DCS-ATC-Fenster den Fehler, und es gelten die eingebauten Verfahren.
+- Nur Karte Kaukasus. Echte SIDs und STARs mit Wegpunktfolgen kennt DCS-ATC nicht, es geht um die Sichtflugverfahren.
+
+Beispiel: Kutaisi mit Platzrunde 1500 ft und nur zwei CRPs.
+
+```jsonc
+{
+  "Kutaisi": {
+    "pattern_ft": 1500, "arrdep_max_ft": 2200, "ctr_top_ft": 2700,
+    "crp": {
+      "north": "42°15.924'N 042°30.086'E",
+      "south": "42°06.277'N 042°31.824'E"
+    },
+    "rwy": {
+      "07": { "hand": "right", "side": "south", "initial_nm": 2.3,
+              "entry": { "north": { "crs": 178, "via": "overhead" }, "south": { "crs": 272, "via": "initial" } },
+              "exit": { "north": { "crs": 336 }, "south": { "crs": 166 } } },
+      "25": { "hand": "left", "side": "south", "initial_nm": 2.3,
+              "entry": { "north": { "crs": 178, "via": "overhead" }, "south": { "crs": 26, "via": "initial" } },
+              "exit": { "north": { "crs": 20 }, "south": { "crs": 116 } } }
+    }
+  }
+}
+```
+
+Ohne Abschnitt `ground` gibt es für den Platz keine Rollwegnamen und Warteplätze aus der Karte. Willst du sie behalten, kopiere `ground` aus der Vorlage mit.
+
+### Kneeboard-Seiten
+
+Bei jedem Missionsstart legt DCS-ATC seine Kneeboard-Seiten in `Saved Games\DCS\Kneeboard` ab. DCS zeigt sie im Kneeboard jedes Flugzeugs. Die Seiten: Funk, Kutaisi, Plätze mit Frequenzen, Platzrunden und CRPs, Navigationsanlagen, AWACS und Tanker, Hinweise zur Karte. Die Frequenzen sind die der laufenden Mission.
+
+- Nur Karte Kaukasus und nur auf Deutsch. Auf anderen Karten und bei englischer Sprache entfernt DCS-ATC seine Seiten wieder.
+- Ausschalten: `"KneeboardPages": false` in `config.jsonc`.
+- Die Dateien heißen `ATC-*.png`. Beim Deinstallieren werden sie gelöscht.
+
 ### Andere Karten als Kaukasus
 
 DCS-ATC läuft auf jeder DCS-Karte. Es hat keine eingebaute Platzliste, sondern liest beim Missionsstart aus der Mission und deiner DCS-Installation:
@@ -2656,6 +2699,7 @@ Eigene Frequenzen je Platz und Lotse stehen nicht in `config.jsonc`, sondern in 
 | `RunwayLights` | `"silent"` | Bahnbefeuerung in Dämmerung, Nacht oder schlechter Sicht über das DCS-eigene ATC-Menü: `"silent"` (DCS-Lotse bleibt stumm), `"dcs"` (DCS-Lotse 15 s hörbar), `"off"`. |
 | `AltimeterUnit` | `"auto"` | Höhenmessereinstellung in Sprüchen. `"auto"`: westliche Typen „altimeter two niner niner two“ (inHg), andere „QNH one zero one three“ (hPa); die ATIS nennt beides. Oder `"hpa"`, `"inhg"`. |
 | `DebugLog` | `true` | `atc-debug.txt` schreiben. |
+| `KneeboardPages` | `true` | Kneeboard-Seiten bei Missionsstart nach `Saved Games\DCS\Kneeboard` (nur Kaukasus, deutsch), siehe [Kneeboard-Seiten](#kneeboard-seiten). |
 
 **Optionen je Mission.** Bodenpersonal (Tank-/Munitionswagen, Feuerwehr) ist eine Missionsoption, nicht Teil von `config.jsonc`:
 

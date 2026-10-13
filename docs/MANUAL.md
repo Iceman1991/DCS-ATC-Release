@@ -18,7 +18,7 @@ DCS-ATC never spawns aircraft. It only provides the radio for units that are alr
 5. [AWACS, tankers and ranges](#awacs-tankers-and-ranges)
    - [AWACS](#awacs) · [Tankers](#tankers) · [Range](#range) · [JTAC and FAC(A)](#jtac-and-faca) · [AI flights on the radio](#ai-flights-on-the-radio) · [Ground crew and crew chief](#ground-crew-and-crew-chief)
 6. [Multiplayer, dedicated server, custom frequencies and other maps](#multiplayer-dedicated-server-custom-frequencies-and-other-maps)
-   - [How multiplayer works](#how-multiplayer-works) · [Dedicated server, step by step](#dedicated-server-step-by-step) · [Custom frequencies per airfield](#custom-frequencies-per-airfield) · [Other maps than Caucasus](#other-maps-than-caucasus)
+   - [How multiplayer works](#how-multiplayer-works) · [Dedicated server, step by step](#dedicated-server-step-by-step) · [Custom frequencies per airfield](#custom-frequencies-per-airfield) · [Own airfield procedures](#own-airfield-procedures-chartsjsonc) · [Kneeboard pages](#kneeboard-pages) · [Other maps than Caucasus](#other-maps-than-caucasus)
 7. [Appendix: settings, logs and troubleshooting](#appendix-settings-logs-and-troubleshooting)
    - [The settings window](#the-settings-window) · [config.jsonc reference](#configjsonc-reference) · [Log files](#log-files) · [Troubleshooting](#troubleshooting)
 
@@ -2499,6 +2499,49 @@ Example exchange at Nellis with the file above:
 
 The older "Frequencies" (shared controller frequencies) and "AtisFreqs" (one ATIS frequency per airfield, needs a restart) settings in config.jsonc still work. For a single airfield, a `frequencies.jsonc` entry takes priority over both.
 
+### Own airfield procedures (charts.jsonc)
+
+The Caucasus airfield procedures (CRPs, entry and exit per runway, pattern altitude, taxiways, holding points) come from the DCS kneeboard charts and are built in. Put your own or more current procedures into a file `charts.jsonc` in the DCS-ATC folder (`%LOCALAPPDATA%\Programs\DCS-ATC`, next to `config.jsonc`). The file only exists once you create it.
+
+- An airfield in `charts.jsonc` replaces the built-in entry completely. Airfields not in the file keep the built-in procedures.
+- The template is `charts\caucasus.jsonc` in the DCS-ATC folder: the built-in data of all airfields with explanations. The easiest way is to copy one airfield's entry into your `charts.jsonc` and change it there. The template itself is overwritten by every update.
+- Airfield names as in DCS (`Kutaisi`, `Sochi-Adler`, `Senaki-Kolkhi`).
+- Coordinates as printed on the chart (`"42°15.924'N 042°30.086'E"`) or as DCS coordinates `[x, z]`. Courses in degrees magnetic.
+- The file is read at every mission start. If it is faulty, the DCS-ATC window shows the error and the built-in procedures apply.
+- Caucasus map only. DCS-ATC has no real SIDs and STARs with waypoint sequences; this is about the visual procedures.
+
+Example: Kutaisi with a 1500 ft pattern and only two CRPs.
+
+```jsonc
+{
+  "Kutaisi": {
+    "pattern_ft": 1500, "arrdep_max_ft": 2200, "ctr_top_ft": 2700,
+    "crp": {
+      "north": "42°15.924'N 042°30.086'E",
+      "south": "42°06.277'N 042°31.824'E"
+    },
+    "rwy": {
+      "07": { "hand": "right", "side": "south", "initial_nm": 2.3,
+              "entry": { "north": { "crs": 178, "via": "overhead" }, "south": { "crs": 272, "via": "initial" } },
+              "exit": { "north": { "crs": 336 }, "south": { "crs": 166 } } },
+      "25": { "hand": "left", "side": "south", "initial_nm": 2.3,
+              "entry": { "north": { "crs": 178, "via": "overhead" }, "south": { "crs": 26, "via": "initial" } },
+              "exit": { "north": { "crs": 20 }, "south": { "crs": 116 } } }
+    }
+  }
+}
+```
+
+Without a `ground` section the airfield has no taxiway names and holding points from the chart. To keep them, copy `ground` from the template as well.
+
+### Kneeboard pages
+
+At every mission start DCS-ATC puts its kneeboard pages into `Saved Games\DCS\Kneeboard`. DCS shows them in the kneeboard of every aircraft. The pages: radio, Kutaisi, airfields with frequencies, patterns and CRPs, navaids, AWACS and tankers, notes on the map. The frequencies are those of the running mission.
+
+- Caucasus map only, and only in German. On other maps and with English as language DCS-ATC removes its pages again.
+- Switch off: `"KneeboardPages": false` in `config.jsonc`.
+- The files are named `ATC-*.png`. Uninstalling deletes them.
+
 ### Other maps than Caucasus
 
 DCS-ATC works on any DCS map. It doesn't use a built-in airfield list. At mission start it reads the following from the mission and from your DCS installation:
@@ -2654,6 +2697,7 @@ Own frequencies per airfield and controller are not in `config.jsonc` but in the
 | `RunwayLights` | `"silent"` | Runway lighting at dusk, at night or in poor visibility, through DCS's own ATC menu: `"silent"` (DCS controller stays muted), `"dcs"` (DCS controller audible for 15 s), `"off"`. |
 | `AltimeterUnit` | `"auto"` | Altimeter setting in calls. `"auto"`: western types get "altimeter two niner niner two" (inHg), others "QNH one zero one three" (hPa); ATIS gives both. Or `"hpa"`, `"inhg"`. |
 | `DebugLog` | `true` | Write `atc-debug.txt`. |
+| `KneeboardPages` | `true` | Kneeboard pages into `Saved Games\DCS\Kneeboard` at mission start (Caucasus only, German), see [Kneeboard pages](#kneeboard-pages). |
 
 **Per-mission options.** Ground crew (fuel/ammo trucks, fire service) is a mission option, not part of `config.jsonc`:
 

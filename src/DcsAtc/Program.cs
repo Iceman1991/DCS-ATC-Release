@@ -44,6 +44,7 @@ public class Config
     public bool Atis { get; set; } = true;             // continuous ATIS broadcast for airfields with players nearby
     public bool AirspaceWatch { get; set; } = true;    // monitor control zones (N2) and announce violations ("possible pilot deviation") and into the debrief (N4); off: safety warnings only
     public bool DebugLog { get; set; } = true;         // atc-debug.txt for bug reports (speech recognition, airfield selection, phases, telemetry every 10 s), at most 2 × 20 MB
+    public bool KneeboardPages { get; set; } = true;   // kneeboard pages into Saved Games\DCS\Kneeboard on mission start (Caucasus, German)
     public Dictionary<string, double> AtisFreqs { get; set; } = new();   // A35: own ATIS frequency per airfield (airfield name -> MHz), if the airfield is missing: Frequencies["ATIS"]; only after restart
     public int WheelKey { get; set; } = 0xDE;          // selection wheel: key (0xDE = Ä), 0 = off
     public int WheelJoystick { get; set; } = -1;       // selection wheel on the HOTAS: button opens, coolie hat selects
@@ -1307,6 +1308,42 @@ static partial class Program
     internal static bool TestRun;
     static bool MissionFields => !TestRun && File.Exists(AirfieldFile);
 
+    /// Forum 0.15: own procedures in charts.jsonc (DCS-ATC folder), format like the built-in charts/caucasus.jsonc; an airfield in there replaces the built-in entry.
+    /// Faulty file: message, the built-in data stay.
+    internal static JsonElement? OwnChart(string path)
+    {
+        if (!File.Exists(path)) return null;
+        try
+        {
+            var own = JsonDocument.Parse(File.ReadAllText(path), Airfield.ChartOpts).RootElement;
+            Airfield.OwnChart = own;
+            foreach (var a in own.EnumerateObject()) new Airfield { Name = a.Name }.ApplyChart();   // checks every entry once
+            Log(L($"[Karten] eigene Verfahren aus charts.jsonc: {string.Join(", ", own.EnumerateObject().Select(a => a.Name))}", $"[Charts] own procedures from charts.jsonc: {string.Join(", ", own.EnumerateObject().Select(a => a.Name))}"));
+            return own;
+        }
+        catch (Exception e)
+        {
+            Log(L($"[Karten] charts.jsonc fehlerhaft, es gelten die eingebauten Verfahren: {e.Message}", $"[Charts] charts.jsonc is faulty, the built-in procedures apply: {e.Message}"));
+            return null;
+        }
+        finally { Airfield.OwnChart = null; }
+    }
+
+    static readonly string[] BoardPages = { "ATC-1-Funk", "ATC-2-Kutaisi", "ATC-3-Plaetze", "ATC-3b-Platzrunden", "ATC-4-Navigation", "ATC-5-AWACS", "ATC-6-Hinweise" };
+
+    /// Forum 0.15: kneeboard pages into Saved Games\DCS\Kneeboard (shown in every aircraft) on a new mission, with its frequencies. The pages exist only
+    /// for Caucasus and in German; other map, English or KneeboardPages off: our pages are removed (no Caucasus pages on another map).
+    static void WriteKneeboard()
+    {
+        var dir = Path.Combine(SavedGamesDcs(), "Kneeboard");
+        try
+        {
+            if (Directory.Exists(dir)) foreach (var p in BoardPages) File.Delete(Path.Combine(dir, p + ".png"));
+            if (Cfg.KneeboardPages && !En && Airfield.Theatre == "Caucasus" && Fields.Any(f => f.Name == "Kutaisi")) Kneeboard.Write(dir, Fields, Cfg);
+        }
+        catch (Exception e) { Log(L($"[Kneeboard] Seiten nicht geschrieben: {e.Message}", $"[Kneeboard] pages not written: {e.Message}")); }
+    }
+
     static void LoadFields()
     {
         var copy = Path.Combine(Root, "airfields.txt");   // last known data, in case DCS has not run yet
@@ -1316,6 +1353,7 @@ static partial class Program
             try { File.Copy(AirfieldFile, copy, true); } catch (IOException) { }
         }
         Tower.Freqs = Cfg.Frequencies;
+        if (!TestRun) Airfield.OwnChart = OwnChart(Path.Combine(Root, "charts.jsonc"));
         Fields = Airfield.Load(MissionFields ? AirfieldFile : copy);
         standStamp = default;   // new airfield objects: stand names again (TickAll)
         Tower.All = Fields;
@@ -1327,6 +1365,7 @@ static partial class Program
         Airfield.LoadBeacons(Fields, dcs);
         Rollnetz.LoadAll(Fields, dcs);
         if (!TestRun) { WriteFreqFile(FreqPath); ApplyOwnFreqs(); }   // new map: extend frequencies.jsonc, own frequencies (also ATIS transmitters) of these airfields
+        if (!TestRun && !Dedicated) WriteKneeboard();
         foreach (var p in Pilots.Values.Append(Solo)) { p.Towers.Clear(); p.Active = null; p.Pinned = null; p.OnBoat = null; }
         Console.WriteLine(L("Plätze", "Airfields") + $" ({Fields.Count}): {string.Join(", ", Fields.Select(f => f.Name))}");
         foreach (var c in FreqClashes(Fields, Cfg.Frequencies))   // also old config.jsonc (the installer does not overwrite it)
@@ -1339,7 +1378,7 @@ static partial class Program
     internal static double MapMagVar(IEnumerable<Airfield> fields) =>
         Math.Round(fields.Where(f => f.Name != "Kutaisi" || Airfield.Theatre == "Caucasus").Select(f => f.MagVar).DefaultIfEmpty(6).Average());
 
-    /// Forum request: apply frequencies.jsonc (OwnFreqs) to the airfields (Airfield.Own). Airfield name as in DCS or Radio.lua name (RadioName), case, hyphen/space irrelevant, a unique partial name suffices;
+    /// Forum request: apply frequencies.jsonc (OwnFreqs) to the airfields (Airfield.OwnChart). Airfield name as in DCS or Radio.lua name (RadioName), case, hyphen/space irrelevant, a unique partial name suffices;
     /// per controller (ATIS, Ground, Tower, Departure, Approach) one frequency or a list (UHF, VHF), 30–400 MHz. Invalid: entry dropped, one line per error (return value, for the log);
     /// duplicate controller frequency (two airfields, also the map frequency of another): stays, one warning line.
     internal static List<string> ApplyFreqs(List<Airfield> fields, Dictionary<string, JsonElement>? cfg)
@@ -3490,6 +3529,19 @@ static partial class Program
         if (err.Count > 0) throw new Exception("ChartTest: " + string.Join(" | ", err));
         Console.WriteLine($"OK   ChartTest: {Airfield.Chart.EnumerateObject().Count()} Plätze aus caucasus.jsonc passen zu airfields.txt");
         if (hints.Count > 0) Console.WriteLine($"--   ChartTest Hinweis (Daten ergänzen): {string.Join("; ", hints)}");
+        // Forum 0.15: own charts.jsonc replaces the built-in airfield; a faulty one is ignored (built-in data stay)
+        var ownF = Path.Combine(Path.GetTempPath(), "dcsatc-charts-test.jsonc");
+        File.WriteAllText(ownF, "// eigene\n{ \"Kutaisi\": { \"pattern_ft\": 1234, \"crp\": { \"x\": [1, 2] }, }, }");
+        var ownOk = OwnChart(ownF);
+        Airfield.OwnChart = ownOk;
+        var ownK = Airfield.Kutaisi();
+        File.WriteAllText(ownF, "{ \"Kutaisi\": { \"crp\": { \"x\": \"kaputt\" } } }");
+        var ownBad = OwnChart(ownF);
+        Airfield.OwnChart = null;
+        File.Delete(ownF);
+        if (ownOk == null || ownK.PatternFt != 1234 || !ownK.Crp.ContainsKey("x") || ownK.Crp.ContainsKey("north") || ownBad != null || Airfield.Kutaisi().PatternFt == 1234)
+            throw new Exception($"Eigene charts.jsonc: {ownOk != null} {ownK.PatternFt} {string.Join(",", ownK.Crp.Keys)} {ownBad != null}");
+        Console.WriteLine("OK   Eigene charts.jsonc ersetzt den Platz, fehlerhafte wird ignoriert");
     }
 
     /// Radio: confidence from Whisper JSON, priorities, "stand by" only on an occupied frequency (AI radio does not count).
