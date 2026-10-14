@@ -126,13 +126,14 @@ sealed class Wheel : Form
         get
         {
             var (aw, tk) = Up();
-            var t = Vis(Mod(All.Where(i => i.Label switch { "Range" => Ops.Range != null, "Carrier" => Carrier.Boats.Count > 0, "AWACS" => aw, "Tanker" => tk, "JTAC" => Jtac(), "Center" => Cen(), _ => true })), Fits(), 2);
+            var t = Vis(Mod(All.Where(i => i.Label switch { "Range" => Ops.Range != null, "Carrier" => Cv(), "AWACS" => aw, "Tanker" => tk, "JTAC" => Jtac(), "Center" => Cen(), _ => true })), Fits(), 2);
             if (top == null || !t.SequenceEqual(top)) top = t;
             return top;
         }
     }
     public static Func<(bool Awacs, bool Tanker)> Up = () => (true, true);   // own AWACS/GCI or tanker in the air, Program sets it (fellow players, preview: both)
     public static Func<bool> Jtac = () => true;   // J11: own side has a living JTAC / FAC(A), Program sets it (fellow players, preview: yes)
+    public static Func<bool> Cv = () => true;   // the mission has a carrier, Program sets it (fellow players: the host has the mission, preview: yes)
     public static Func<bool> Cen = () => true;   // the map has a Center for the own side (module on), Program sets it (fellow players, preview: yes)
     public static Func<string[]> Jtacs = Array.Empty<string>;   // callsigns of the own JTAC / FAC(A), Program sets it; with two or more "Check in" asks which one
     /// R307: does this radio call fit right now (Program.WheelFits: phase, open question, traffic advisory, Range/Tanker/Carrier)? Fellow players/preview: no state, everything.
@@ -167,7 +168,10 @@ sealed class Wheel : Form
         Up = () => (false, true);
         var tl = string.Join(",", Top.Select(i => i.Label));
         Up = up;
-        check(!tl.Contains("AWACS") && tl.Contains("Tanker") && Top.Any(i => i.Label == "AWACS"), "Funkrad ohne AWACS: " + tl);
+        var jt = Jtac; Jtac = () => false;   // client mode (ClientMode): no JTAC, so Carrier fits into the 9
+        var cl = string.Join(",", Top.Select(i => i.Label));
+        Jtac = jt;
+        check(!tl.Contains("AWACS") && tl.Contains("Tanker") && cl.Contains("AWACS") && cl.Contains("Carrier"), "Funkrad ohne AWACS / Mitspieler mit AWACS und Carrier: " + tl + " / " + cl);
         // R13: AWACS "Nächster Tanker" names the tanker (with frequency), not the nearest airfield
         var tkText = All.First(i => i.Label == "AWACS").Sub!.First(i => i.Label == L("Nächster Tanker", "Nearest tanker")).Text!;
         var me = new Ops.Me("Enfield 1-1", new Telemetry(6000, 6000, 200, 0, 0, 0, 0, 0, 0), "FA-18C_hornet", 2);

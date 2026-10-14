@@ -246,9 +246,18 @@ static class Kneeboard
             if (!File.Exists(Path.Combine(tmp, "ATC-6-Hinweise.png"))) throw new Exception("Kneeboard: ATC-6-Hinweise.png fehlt");
             if (!File.Exists(Path.Combine(tmp, "ATC-5-AWACS.png")) || new FileInfo(Path.Combine(tmp, "ATC-5-AWACS.png")).Length < 1000)
                 throw new Exception("Kneeboard: ATC-5-AWACS.png fehlt");
+            var old = new FileInfo(Path.Combine(tmp, "ATC-3-Plaetze.png")).Length;
+            Note(new[] { Path.Combine(tmp, "ATC-3-Plaetze.png") });
+            if (new FileInfo(Path.Combine(tmp, "ATC-3-Plaetze.png")).Length is var n && (n == old || n < 1000)) throw new Exception("Kneeboard: Hinweis statt alter Seite fehlt");
         }
         finally { try { Directory.Delete(tmp, true); } catch (IOException) { } }
-        Console.WriteLine("OK   Kneeboard: Rollwege aus Airfield.Ramps, NDB in NavText, AWACS-Seite mit Config-Frequenz, Hinweisseite");
+        Console.WriteLine("OK   Kneeboard: Rollwege aus Airfield.Ramps, NDB in NavText, AWACS-Seite mit Config-Frequenz, Hinweisseite, andere Karte: Hinweis statt alter Seite");
+    }
+
+    /// Other map, English or pages switched off: note instead of the old pages (DCS already listed them).
+    public static void Note(IEnumerable<string> files)
+    {
+        foreach (var f in files) Page(f, "DCS-ATC", new[] { "Diese Seiten gibt es nur im Kaukasus", "(deutsch).", "", "These pages exist for Caucasus only", "(German)." });
     }
 
     static void Page(string file, string title, string[] lines, bool mono = false)

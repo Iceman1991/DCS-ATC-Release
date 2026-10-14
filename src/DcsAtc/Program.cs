@@ -177,6 +177,7 @@ static partial class Program
             {
                 SetThreadExecutionState(0x80000000 | 0x1 | 0x2);   // ES_CONTINUOUS | SYSTEM | DISPLAY: no standby while DCS runs (HOTAS input does not count as activity for Windows); ends with the thread
                 while (Session()[0] != "stop" && RunningDcs().Length > 0) Thread.Sleep(2000);
+                if (dropBoard) DeleteBoardPages();   // English or pages off: gone from the next mission on (not earlier, DCS already listed them)
                 Environment.Exit(0);
             }) { IsBackground = true }.Start();
         }
@@ -240,6 +241,7 @@ static partial class Program
         {
             lock (TowerLock) { var h = Host(); return h == null ? (false, false) : Ops.WheelUp(TrafficFor(h), MeOf(h)); }
         };
+        Wheel.Cv = () => Carrier.Boats.Count > 0;
         Wheel.Cen = () => { lock (TowerLock) { var h = Host(); return h != null && Tower.CenterName(h.Coalition) != null; } };   // Center: the map has one for the own side (module on)
         Wheel.Jtac = () => { lock (TowerLock) { var h = Host(); return h != null && Ops.Leaders.Any(l => l.Alive && l.Side == h.Coalition); } };   // J11
         Wheel.Jtacs = () => { lock (TowerLock) { var h = Host(); return h == null ? Array.Empty<string>() : Ops.Leaders.Where(l => l.Alive && l.Side == h.Coalition).Select(l => l.Cs).ToArray(); } };   // several JTAC / FAC(A): check in picks one
@@ -311,6 +313,13 @@ static partial class Program
             if (Clock >= nextTick)
             {
                 nextTick = Clock.AddSeconds(1);
+                if (!auto && Session()[0] == "client" && File.GetLastWriteTime(Path.Combine(Path.GetTempPath(), "DcsAtc-Session.txt")) > Process.GetCurrentProcess().StartTime)
+                {   // started by hand, then joined someone else's server: the host has the mission, this one would be a second ATC without AWACS/carrier -> client mode
+                    Log(L("[ATC] Mitspieler auf fremdem Server: Neustart im Client-Modus", "[ATC] Joined another server: restart in client mode"));
+                    single.ReleaseMutex();
+                    Process.Start(Environment.ProcessPath!, "--auto");
+                    Environment.Exit(0);
+                }
                 if (Clock >= nextScriptCheck) { nextScriptCheck = Clock.AddSeconds(15); CheckMissionScripting(); }
                 if (File.GetLastWriteTimeUtc(ConfigPath) != cfgAt) ReloadLive();
                 if (File.GetLastWriteTimeUtc(FreqPath) != freqAt) lock (TowerLock) { ApplyOwnFreqs(); Log("[ATC] frequencies.jsonc übernommen"); }   // own airfield frequencies immediately (airfield selection, monitoring, handovers, ATIS)
@@ -578,6 +587,7 @@ static partial class Program
         var dir = Path.Combine(Path.GetTempPath(), "DcsAtc-Chat");
         Directory.CreateDirectory(dir);
         int n = 0;
+        Wheel.Jtac = () => false;   // the wheel shows 9 entries: without mission data Carrier instead of JTAC (JTAC by voice over SRS)
         Wheel.Start(Cfg, text =>
         {
             try
@@ -1339,16 +1349,26 @@ static partial class Program
     static readonly string[] BoardPages = { "ATC-1-Funk", "ATC-2-Kutaisi", "ATC-3-Plaetze", "ATC-3b-Platzrunden", "ATC-4-Navigation", "ATC-5-AWACS", "ATC-6-Hinweise" };
 
     /// Forum 0.15: kneeboard pages into Saved Games\DCS\Kneeboard (shown in every aircraft) on a new mission, with its frequencies. The pages exist only
-    /// for Caucasus and in German; other map, English or KneeboardPages off: our pages are removed (no Caucasus pages on another map).
+    /// for Caucasus and in German. DCS reads the page list when the mission loads, before the mission data reach us: pages deleted now show
+    /// MISSINGTEXTURE, pages written now only appear from the next mission. So the files stay; another map gets a note in them (the next Caucasus
+    /// mission lists them again). English or KneeboardPages off: note now, deleted when the mission ends (app exit).
     static void WriteKneeboard()
     {
         var dir = Path.Combine(SavedGamesDcs(), "Kneeboard");
         try
         {
-            if (Directory.Exists(dir)) foreach (var p in BoardPages) File.Delete(Path.Combine(dir, p + ".png"));
-            if (Cfg.KneeboardPages && !En && Airfield.Theatre == "Caucasus" && Fields.Any(f => f.Name == "Kutaisi")) Kneeboard.Write(dir, Fields, Cfg);
+            dropBoard = !Cfg.KneeboardPages || En;
+            if (!dropBoard && Airfield.Theatre == "Caucasus" && Fields.Any(f => f.Name == "Kutaisi")) Kneeboard.Write(dir, Fields, Cfg);
+            else Kneeboard.Note(BoardPages.Select(p => Path.Combine(dir, p + ".png")).Where(File.Exists));
         }
         catch (Exception e) { Log(L($"[Kneeboard] Seiten nicht geschrieben: {e.Message}", $"[Kneeboard] pages not written: {e.Message}")); }
+    }
+    static bool dropBoard;
+
+    static void DeleteBoardPages()
+    {
+        try { foreach (var p in BoardPages) File.Delete(Path.Combine(SavedGamesDcs(), "Kneeboard", p + ".png")); }
+        catch (Exception) { }
     }
 
     static void LoadFields()
@@ -3086,17 +3106,10 @@ static partial class Program
         if (o.Contains("Could not connect")) Console.WriteLine(L("      (SRS-Server nicht erreichbar)", "      (SRS server not reachable)"));
     }
 
-    /// Forum 0.16 (VR, CPU-bound): whisper/piper/ffmpeg below normal and only on the upper half of the logical processors,
-    /// DCS keeps the lower half (Intel hybrid: E-cores are numbered last, AMD/HT: whole cores). Below 8 logical processors all of them.
+    /// whisper/piper/ffmpeg below normal: DCS frames first. Not limited to half the cores (0.16.2 tried that: voices choppy, answers slow).
     static void Background(Process p)
     {
-        try { p.PriorityClass = ProcessPriorityClass.BelowNormal; p.ProcessorAffinity = (nint)UpperHalf(Environment.ProcessorCount); } catch (Exception) { }
-    }
-    internal static long UpperHalf(int n)
-    {
-        n = Math.Min(n, 64);
-        ulong all = n >= 64 ? ulong.MaxValue : (1UL << n) - 1;
-        return (long)(n < 8 ? all : all & ~((1UL << n / 2) - 1));
+        try { p.PriorityClass = ProcessPriorityClass.BelowNormal; } catch (Exception) { }
     }
 
     static (string stdout, int exit) Run(string exe, string? stdin, params string[] args)
@@ -3391,10 +3404,9 @@ static partial class Program
             if (ClientSavedGames(sv, Path.Combine(sv, "Inst1")) != Path.Combine(sv, "DCS.openbeta")) throw new Exception("Saved Games: nur DCS.openbeta");
             Directory.CreateDirectory(Path.Combine(sv, "DCS"));
             if (ClientSavedGames(sv, Path.Combine(sv, "Inst1")) != Path.Combine(sv, "DCS")) throw new Exception("Saved Games: alte Setup-Wahl gewinnt");
-            if (UpperHalf(4) != 0xF || UpperHalf(16) != 0xFF00 || UpperHalf(20) != 0xFFC00 || UpperHalf(128) != unchecked((long)0xFFFFFFFF00000000)) throw new Exception("Kernmaske whisper/piper");
         }
         finally { try { Directory.Delete(sv, true); } catch (IOException) { } }
-        Console.WriteLine("OK   Dedicated Server: nur DCS_server läuft -> Hintergrundbetrieb (mit DCS nicht), bin\\DCS_server.exe zählt als DCS-Ordner, Saved Games: Hook (-w) vor Installer vor DCS.server/DCS.dcs_serverrelease; Client: Windows-Ordner DCS vor alter Setup-Wahl; whisper/piper auf der oberen Kernhälfte");
+        Console.WriteLine("OK   Dedicated Server: nur DCS_server läuft -> Hintergrundbetrieb (mit DCS nicht), bin\\DCS_server.exe zählt als DCS-Ordner, Saved Games: Hook (-w) vor Installer vor DCS.server/DCS.dcs_serverrelease; Client: Windows-Ordner DCS vor alter Setup-Wahl");
         string Vr(string on) => $"options = {{\n\t[\"VR\"] = {{\n\t\t[\"custom_IPD_enable\"] = true,\n\t\t[\"enable\"] = {on},\n\t\t[\"pixel_density\"] = 1,\n\t}},\n\t[\"graphics\"] = {{\n\t\t[\"enable\"] = true,\n\t}},\n}}";
         const string Cl = "2026-10-08 11:44:51.233 INFO    APP (Main): Command line: \"D:\\DCS World\\bin/DCS.exe\" ";
         if (!VrOn(Vr("true"), "") || VrOn(Vr("false"), "") || VrOn("options = { [\"VR\"] = { [\"bloom\"] = true }, [\"x\"] = { [\"enable\"] = true } }", "")
