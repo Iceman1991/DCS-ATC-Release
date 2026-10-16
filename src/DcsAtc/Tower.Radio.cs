@@ -297,9 +297,11 @@ public partial class Tower
                 if (!again && t != null && FreeSpot(t, traffic) is { } fs) { spot = (fs.X, fs.Z); parkNum = fs.Num; home = NearestRamp(t with { X = fs.X, Z = fs.Z }); }   // named ramp = that of the parking spot
                 var park = parkNum > 0 ? $"parking spot {StandName(parkNum)}" : "parking";
                 var route = home != null ? $"taxi to {home.Name}{ParkRoute()}{(parkNum > 0 ? ", " + park : "")}" : $"taxi to {park}";
-                taxiSaid = route;
                 var where = F.Net == null && t != null && ParkDir(t) is { } pd ? (parkNum > 0 ? $", {pd}" : $", your parking position {pd}") : "";   // DCS network: no clock direction (wrong way only)
-                return Say($"{c}, {route}{where}.{TaxiNote(home, landedRw, true)}");
+                (crossOk, crossWait) = (null, null);
+                var hxi = t != null && CrossIn(t) is { } xi ? $", hold short runway {RwSay(xi)}" : "";   // LA06 (log Nellis): runway on the way to the parking position, crossing on report
+                taxiSaid = route + hxi;
+                return Say($"{c}, {route}{where}{hxi}.{TaxiNote(home, landedRw, true)}");
 
             case "clearance":   // V14: route clearance; destination = named airfield, otherwise out of the control zone
             {
@@ -336,6 +338,8 @@ public partial class Tower
             case "taxi":
             {
                 if (VfrBlocked) return Neg(VfrUnable(hdr));
+                if (t != null && OnRwyWait && OnRunwayPos(t.X, t.Z))   // LA04: no taxi clearance on the runway (TaxiOut there is a runway incursion)
+                    return Say(Phase == Phase.ClearedTakeoff ? $"{c}, runway {RwSay(rw)}, {Wind(t)}, cleared for takeoff." : $"{c}, you are on runway {RwSay(rw)}, report ready for departure.", "Tower");
                 bool first = Phase == Phase.Parked;   // First call: check ATIS identifier, "request startup and taxi" answers both; A33: QNH only here and only without reported ATIS, not again after "start up approved"
                 Phase = Phase.TaxiOut;
                 climbOut = null; backtrack = false;   // new departure
@@ -381,7 +385,7 @@ public partial class Tower
             }
 
             case "cross":   // Forum 0.9.7: at the parallel runway holding point (also "ready for departure" there): no takeoff clearance, crossing of the parallel runway, holding point of the assigned one
-                return Say(Cross(CrossNext(t!)!, traffic));
+                return Say(Cross(CrossAhead(t!)!, traffic));
 
             case "rto":   // R100: takeoff clearance expired; HoldShort with lineUp (no "not cleared onto runway" when vacating), holdSince -2 (no auto-clearance, reporting obligation #14)
                 Phase = Phase.HoldShort; lineUp = true; holdSince = -2; rejecting = true;   // R267: vacate and to Ground as after landing, not "report ready for departure" (FAA JO 7110.65 3-10-9)
@@ -861,10 +865,13 @@ public partial class Tower
     bool ReadsBack(string n, string intent)
     {
         if (last == null || Has(n, @"ready\b") && !Has(n, "when ready")) return false;   // "holding short runway 25, ready" is the report (R111)
+        // LA05 (log Nellis): taxi clearance read back ("taxi … hold short 21 right … 7 0 3 3"), "Trident 5-1, taxi." after the taxi clearance to parking (a request stays a request)
+        if (Phase == Phase.TaxiOut && (Has(n, "hold short") || Squawk != null && Regex.Replace(NoCs(n), @"\D", "").Contains(Squawk))
+            || Phase == Phase.TaxiIn && taxiInTold && Has(n, "taxi") && !Has(n, "runway", "active", "departure", "holding point", "take off", "takeoff")) return true;
         var l = Normalize(last.Text);
         if (RwySlot(n) is { } r && RwySlot(l) is { } lr && r != lr) return false;   // other runway: no readback (reply corrects)
         static string? After(string s, string p) => Regex.Match(s, $@"\b{p}\b((?: \d+{(p == "altimeter" ? "| point(?= \\d)" : "")})*)") is { Success: true } m ? Regex.Replace(m.Groups[1].Value, @"\D", "") : null;   // "altimeter 29.92" = "2 9 9 2"
-        return new[] { Phase == Phase.TaxiOut ? "hold short" : "hold(?:ing)? short", "hold(?:ing)? position", "giv(?:e|ing) way", "line up", "contact", "vacate", "when vacated", "when ready", "expect", "squawk(?:ing)?", "qnh", "altimeter", "until established", "frequency change", "own navigation", "maintain vfr" }   // TaxiOut: "holding short runway 25" reports at the holding point, Ground's "Hold short, contact Tower" is read back only as "hold short" (R111)
+        return new[] { Phase is Phase.TaxiOut or Phase.TaxiIn ? "hold short" : "hold(?:ing)? short", "hold(?:ing)? position", "giv(?:e|ing) way", "line up", "contact", "vacate", "when vacated", "when ready", "expect", "squawk(?:ing)?", "qnh", "altimeter", "until established", "frequency change", "own navigation", "maintain vfr" }   // TaxiOut: "holding short runway 25" reports at the holding point, Ground's "Hold short, contact Tower" is read back only as "hold short" (R111); LA06: likewise taxiing in
                    .Any(p => After(n, p) is { } v && (v == After(l, p) || p is "qnh" or "altimeter" && v == After(l, p == "qnh" ? "altimeter" : "qnh")))   // "altimeter 1013" reads back "QNH 1013"
             || HdgSlot(n) is { } h && h == HdgSlot(l)   // the pilot states a heading only when reading back ("request heading" is a request)
             || intent == "unknown" && (AltSlot(n) is { } a && a == AltSlot(l) || RwySlot(n) is { } rn && rn == RwySlot(l)
@@ -900,10 +907,12 @@ public partial class Tower
         {
             if (Has(n, "clearance", "ifr to") && !Has(n, "takeoff", "take off", "landing")) return "clearance";
             if (Has(n, "progressive") && (Phase == Phase.TaxiOut || Phase == Phase.TaxiIn && taxiInTold)) return "progressive";   // N26: otherwise part of the taxi request (taxi/taxiin)
+            if (Phase == Phase.TaxiIn && taxiInTold && lastTel is { } it && CrossIn(it) is { } ix && NearRwy(it, ix) && Has(n, "cross", "holding short")) return "cross";   // LA06: holding short of a runway on the way to parking
             // A7: parking spot/apron before departure only as destination ("taxi to parking"), "parking spot 12, information Charlie, request taxi" states the location
             if (Has(n, "vacated", "clear of") && !Has(n, "holding point", "departure", "take off", "takeoff") || Regex.IsMatch(n, (Phase is Phase.ClearedLand or Phase.TaxiIn ? @"\b" : @"\bto (?:the )?") + "(?:parking|ramp|apron)") ||   // R267: "runway vacated, request taxi to holding point" (after aborted takeoff) = back to the start
                 (Has(n, "taxi") && !Has(n, "departure", "runway", "holding", "take off", "takeoff") &&
                  (Phase == Phase.ClearedLand || Phase == Phase.TaxiIn && !taxiInTold))) return "taxiin";   // after taxi clearance to parking: "request taxi" = start again
+            if (Has(n, "taxi") && OnRwyWait && Has(n, "departure", "take off", "takeoff")) return "ready";   // LA04 (log Kutaisi): "request taxi, request takeoff" on the runway is the takeoff request
             if (Has(n, "taxi")) return "taxi";   // A6: before "start" ("engines started, request taxi"); "request startup and taxi" is answered by case "taxi" too
             if (StartReq(n) && Phase is Phase.Parked or Phase.StartupApproved) return "startup";   // otherwise e.g. the takeoff clearance would be lost
             if (Phase == Phase.TaxiOut && lastTel is { } ct && CrossNext(ct) is { } cx && NearRwy(ct, cx) && Has(n, "cross", "ready", "departure", "take off", "takeoff", "holding short", "holding point")) return "cross";   // Forum 0.9.7: at the parallel runway holding point
@@ -1105,6 +1114,7 @@ public partial class Tower
                        : option == "low pass" ? null : ("Tower", $"base, gear down, {option ?? "full stop"}"),   // A47: low pass without pattern; R200: landing report base with gear
         Phase.Away when intr is 1 or 2 && transitFt == null && t != null && !OnGround(t) => ("Tower", "request zone transit"),   // N2: called in the zone without contact, legal way (N3)
         Phase.Departing => ("Approach", "airborne, climbing"),
+        Phase.TaxiIn when taxiInTold && t != null && CrossIn(t) is { } ci && NearRwy(t, ci) => ci == crossOk || ci == crossWait ? null : ("Ground", $"holding short runway {RwSay(ci)}, request crossing"),   // LA06: runway on the way to parking
         Phase.TaxiIn => taxiInTold ? (specArea && (t == null || Gs(t) < Kt) ? ("Ground", "request taxi to parking") : null) : ("Ground", "runway vacated, request taxi to parking"),   // R265: stopped in the de-arm/hot-brake area   // "request taxi" would be the taxi clearance to the holding point
         Phase.ClearedTakeoff or Phase.ClearedLand => null,   // "request startup"/"inbound" would cancel the clearance
         _ => t != null && !OnGround(t) ? ("Approach", Following ? "cancel flight following" : "inbound for landing") : ("Ground", "request startup"),   // end FF: no longer in the wheel (R17)
@@ -1112,6 +1122,8 @@ public partial class Tower
 
     /// At the runway holding point of the active runway (R349: 250 m around the holding point or the threshold) or already on a runway: "ready for departure" fits.
     /// Forum 0.9.7: not while a parallel runway still lies in between (holding point 03L with assigned 03R, close together like Nellis).
+    /// LA04: cleared for takeoff or lined up (spawn on the runway, line up and wait, backtrack), not after a rejected takeoff
+    bool OnRwyWait => Phase == Phase.ClearedTakeoff || Phase == Phase.HoldShort && lineUp && holdSince != -2;
     bool AtHold(Telemetry? t) => t == null || CrossNext(t) == null && (OnRunwayPos(t.X, t.Z) || OnRwySpot(t) || Dist(t.X, t.Z, Thr(Runway).X, Thr(Runway).Z) <= 250 ||
                                                                        HoldPt(Runway, t) is var h && Dist(t.X, t.Z, h.X, h.Z) <= 250 ||
                                                                        F.Holds.Values.Any(o => o.Rwy.Contains(Runway) && Dist(t.X, t.Z, o.X, o.Z) <= 150));   // K29: any holding point of the chart for this runway (DCS runway ends have none: Kobuleti 350-440 m)
@@ -1133,6 +1145,17 @@ public partial class Tower
                      .OrderByDescending(o => Math.Abs(Lat(o.CX, o.CZ))).FirstOrDefault()?.Name;
     }
 
+    /// LA06: taxi in: runway between the aircraft and its parking position (nearest first, not the landing runway), name in the direction of the active runway. Without taxiways:
+    /// only if the straight line to the parking position crosses the centerline within the runway (otherwise it goes around its end).
+    string? CrossIn(Telemetry t) => spot is not { } sp ? null : F.Ends.Where(o => HdgDiff(o.Hdg, F.End(Runway).Hdg) < 90 && !Landed(o.Name)).Select(o =>
+    {
+        double la = (t.X - o.CX) * o.Dz - (t.Z - o.CZ) * o.Dx, lb = (sp.X - o.CX) * o.Dz - (sp.Z - o.CZ) * o.Dx;   // lateral: aircraft, parking position
+        double aa = (t.X - o.CX) * o.Dx + (t.Z - o.CZ) * o.Dz, ab = (sp.X - o.CX) * o.Dx + (sp.Z - o.CZ) * o.Dz;   // along
+        return (o.Name, La: Math.Abs(la), Ok: la * lb < 0 && Math.Abs(la) > 30 && Math.Abs(aa + la / (la - lb) * (ab - aa)) < o.Len / 2);
+    }).Where(x => x.Ok).OrderBy(x => x.La).Select(x => x.Name).FirstOrDefault();
+    bool Landed(string r) => landRw != "" && (r == landRw || r == Airfield.Opposite(landRw));   // LA06: runway of the last landing (either direction)
+    string? CrossAhead(Telemetry t) => Phase == Phase.TaxiIn ? CrossIn(t) : CrossNext(t);
+
     /// Forum 0.9.7 (FAA JO 7110.65 3-7-2): crossing parallel runway x only clear if nobody is taxiing/standing on it and nobody approaches it within 2 NM (both directions).
     Traffic? CrossBlock(IReadOnlyList<Traffic> traffic, string x) =>
         traffic.FirstOrDefault(a => Blocks(F, x, a.X, a.Z, a.AltMsl - FieldElev, a.Hdg, a.Speed)) ?? FinalTraffic(traffic, x, 2 * NM).Concat(FinalTraffic(traffic, Airfield.Opposite(x), 2 * NM)).FirstOrDefault();
@@ -1143,6 +1166,7 @@ public partial class Tower
         var c = Cs();
         if (CrossBlock(traffic, x) is { } b) { (crossWait, crossRole) = (x, role); return $"{c}, hold short runway {RwSay(x)}, traffic {Describe(b, x)}."; }
         (crossOk, crossWait) = (x, null);
+        if (Phase == Phase.TaxiIn) return $"{c}, cross runway {RwSay(x)}, continue to {(parkNum > 0 ? $"parking spot {StandName(parkNum)}" : "parking")}.";   // LA06
         return $"{c}, cross runway {RwSay(x)}, hold short runway {RwSay(Runway)}" +
                (role == "Tower" || SameFreq("Tower") ? ", report ready for departure." : $", contact {Contact("Tower")} when ready for departure.");
     }

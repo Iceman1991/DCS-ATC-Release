@@ -137,7 +137,7 @@ static partial class Program
         TestRun = args.Any(a => a is "--selftest" or "--anflugtest" or "--mptest" or "--asr-test" or "--srs-test" or "--platztest");
         if (args.Length >= 1 && args[0] == "--charttest") { if (args.Length > 1) Airfield.ChartFile = args[1]; ChartTest(); return 0; }   // chart data check, optionally a file instead of the embedded one
         if (args.Contains("--platztest")) { Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); return 0; }
-        if (args.Contains("--selftest")) { RadioTest(); ChartTest(); Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); AtisTest(); CrewTest(); ExpectTest(); return Tower.SelfTest(); }
+        if (args.Contains("--selftest")) { RadioTest(); ChartTest(); Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); AtisTest(); CrewTest(); ExpectTest(); PromptTest(); return Tower.SelfTest(); }
         LoadConfig();
         if (args.Contains("--settings")) { Dedicated = DedicatedNow(); Settings.Show(Cfg); return 0; }   // language then also in the server's Saved Games
         if (args.Contains("--buttons")) { ShowButtons(); return 0; }
@@ -438,7 +438,7 @@ static partial class Program
         if (role is not ("AWACS" or "Tanker" or "Range" or "Carrier" or "JTAC")) lock (TowerLock) (via, role) = FreqRoute(tx.FreqMHz, role);
         else lock (TowerLock) shared = FreqRoute(tx.FreqMHz, null);
         role ??= via == null ? "Tower" : null;
-        var (text, conf) = Transcribe(SaveWav(tx.Pcm), p);
+        var (text, conf) = Transcribe(SaveWav(tx.Pcm), p, role: shared.Via != null ? null : role ?? "Tower", via: via ?? shared.Via);   // LF1: prompt of the frequency (shared: airfield plus AWACS/tanker)
         var who = p == null ? "Rufzeichen im Spruch" : !MissionData ? "Host" : tx.UnitId != 0 && p.Id == tx.UnitId ? "Unit-ID" : p.Name == tx.Name ? "SRS-Name" : "einziger Spieler";   // Debug log
         if (Environment.GetEnvironmentVariable("DCSATC_SRSDEBUG") == "1") Console.WriteLine($"OnSrs {role} unit {tx.UnitId} '{tx.Name}': {text} ({conf:0.00})");
         if (Regex.Replace(text, @"\[[^\]]*\]|\([^)]*\)", "").Trim().Length < 2) { Trace("SRS", $"{tx.FreqMHz:0.000} MHz unit {tx.UnitId} '{tx.Name}' {tx.Pcm.Length / 16000.0:0.0} s: leer/Rauschen verworfen ({text})"); return; }   // [BLANK_AUDIO], noise
@@ -2756,23 +2756,17 @@ static partial class Program
 
     // ------------------------------------------------------------ Speech recognition (whisper.cpp)
     /// Text and mean word confidence (0–1, Whisper token probabilities from -ojf).
-    static (string Text, double Conf) Transcribe(string wav, Pilot? p = null, bool keep = true)
+    /// role: controller of the receiving frequency (SrsRole/FreqRoute, null = unknown, local push-to-talk), via: airfield of that frequency.
+    static (string Text, double Conf) Transcribe(string wav, Pilot? p = null, bool keep = true, string? role = null, Airfield? via = null)
     {
-        string stations, cs, crps;
+        string cs, prompt;
         lock (TowerLock)
         {
             var h = p ?? Host();   // A141: callsign and airfield of the sender (SRS), otherwise of the host
-            var f = (h?.Lead ?? h)?.Active?.F ?? Fields[0];
-            stations = $"{f.StationOf("Ground")}, {f.StationOf("Tower")}, {f.StationOf("Approach")}. " +
-                       string.Join(", ", Fields.Where(x => x != f).Select(x => x.Name.Replace('-', ' ') + (x.Name.Contains(x.Callsign) ? "" : $" ({x.Callsign})")));   // "Mineralnye Vody (Minvody)"
             cs = h?.Callsign ?? Cfg.Callsign;
-            crps = f.Charted ? string.Join(". ", f.Crp.Keys.Select(k => "CRP " + k)) : "CRP South";   // chart CRP names ("black sea", "river west") as Whisper context
+            prompt = WhisperPrompt(role, via ?? (h?.Lead ?? h)?.Active?.F ?? Fields[0], Fields, PromptNames(role, h),
+                                   h?.SlotCallsign is { Length: > 0 } sc && sc != cs ? $"{sc}, {cs}" : cs);   // slot call sign too ("Trident 5-1" with own "Victory 9-1")
         }
-        var prompt = $"{stations}. {cs}, request startup. Request taxi, departure north. Ready for departure runway 25. " +
-                     $"Inbound for landing. {crps}. Initial 07. Overhead. Break. Downwind. Final runway 25, touch and go. " +
-                     "Request ILS approach. Going around. Mayday. Runway vacated. Radio check. Information Alpha. " +
-                     $"Wilco, {cs}. Cleared to land runway 25, {cs}. Cleared for takeoff. Hold short, line up and wait. Roger. " +
-                     "Range Alpha, checking in, IP inbound, in hot, off safe. Overlord, request picture, bogey dope. Texaco, Shell, request rejoin, pre-contact.";
         var model = Path.Combine(Root, "models", "ggml-small.en.bin");   // small: significantly fewer mishearings than base, ~1.7 s instead of 0.5 s
         if (!File.Exists(model)) model = Path.Combine(Root, "models", "ggml-base.en.bin");
         var json = Path.ChangeExtension(wav, null);   // -of: <wav without extension>.json
@@ -2782,9 +2776,56 @@ static partial class Program
             "-m", model, "-t", Math.Clamp(Environment.ProcessorCount / 2 - 2, 2, 8).ToString(), "-f", wav, "-nt", "-np", "-l", "en", "--prompt", prompt, "-ojf", "-of", json);   // ponytail: -t leaves two cores to DCS (main/render thread), 16 threads -> 6; raise if replies lag, lower if DCS stutters while talking
         double conf = 1;
         try { conf = Confidence(File.ReadAllText(json + ".json")); File.Delete(json + ".json"); } catch (Exception e) when (e is IOException or JsonException or KeyNotFoundException or InvalidOperationException) { Trace("FEHLER", $"Whisper-Sicherheit: {e.GetType().Name}: {e.Message}"); }
-        Trace("WHISPER", $"{Path.GetFileName(wav)} {Path.GetFileName(model)} {sw.ElapsedMilliseconds} ms conf {conf:0.00} (Sender {cs}): {output.Trim()}");
+        Trace("WHISPER", $"{Path.GetFileName(wav)} {Path.GetFileName(model)} {sw.ElapsedMilliseconds} ms conf {conf:0.00} (Sender {cs}, Prompt {role ?? "allgemein"}): {output.Trim()}");
         if (keep) Keep(wav, output.Trim());
         return (output.Trim(), conf);
+    }
+
+    /// LF1: phrases per frequency role; airfield roles (Ground/Tower/Approach/Departure) and unknown use the airfield phrases.
+    static readonly Dictionary<string, string> PromptPhrases = new()
+    {
+        ["AWACS"] = "Checking in as fragged, angels 25, playtime 30 minutes. Request picture. Bogey dope. Bullseye 270, 30. Committing. Fox 3. Splash one. Cranking. Picture clean. Checking out.",
+        ["Tanker"] = "Request rejoin. Visual. Pre-contact. Ready pre-contact. Contact. Disconnect. Request 10,000 pounds. Fuel state. Clear of the tanker.",
+        ["Center"] = "Checking in, flight level 250. Request flight following. Request direct. Request descent. Leaving frequency. Switching to approach.",
+        ["Range"] = "Checking in. IP inbound. In hot. Off safe. Cleared hot. Off dry. Range Alpha.",
+        ["Carrier"] = "Request case 1 recovery. See you at 10. Commencing. Platform. Hornet ball, 4.5. Clara. Marshal, Paddles, Strike, Mother.",
+        ["JTAC"] = "Checking in, ready for nine line. IP inbound. In hot. Contact. Tally. Capture. Laser on. Spot. Type 2 control.",
+    };
+
+    /// LF1: Whisper prompt for the role of the receiving frequency (null = unknown: airfield plus AWACS/tanker). whisper.cpp keeps only the last
+    /// n_text_ctx/2 = 224 prompt tokens, so phrases first, then the five nearest other airfields, mission call names, own stations, the sender's callsign last.
+    internal static string WhisperPrompt(string? role, Airfield f, IEnumerable<Airfield> fields, IEnumerable<string> names, string cs)
+    {
+        if (PromptPhrases.TryGetValue(role ?? "", out var ph)) return $"{ph} {string.Join(", ", names.Append(cs).Distinct())}.";
+        string Fn(Airfield x) => x.Name.Replace('-', ' ') + (x.Name.Contains(x.Callsign) ? "" : $" ({x.Callsign})");   // "Mineralnye Vody (Minvody)"
+        var crps = f.Charted ? string.Join(", ", f.Crp.Keys.Select(k => "CRP " + k)) : "CRP South";   // chart CRP names ("black sea", "river west")
+        return $"Request startup. Request taxi. Ready for departure runway 25. Airborne, switching to departure. Inbound, {crps}. " +
+               "Initial 07, overhead, break, downwind. Final, touch and go. Request ILS approach. Runway vacated. Wilco. " +
+               (role == null ? "Request picture. Request rejoin. " : "") +
+               string.Join(", ", fields.OrderBy(x => Dist(x.X, x.Z, f.X, f.Z)).Take(6).Reverse().Select(Fn).Where(n => !f.StationOf("Tower").StartsWith(n))   // the five nearest and the own airfield (unless its stations already say it)
+                   .Concat(names).Concat(Airfield.Roles.Select(f.StationOf)).Append(cs).Distinct()) + ".";
+    }
+
+    /// LF1: call names of the mission for the role (under TowerLock): AWACS (own as Ops names it, plus all with a mission frequency), tankers, Center, JTAC;
+    /// then the call names of the four nearest other players ("Springfield").
+    static IEnumerable<string> PromptNames(string? role, Pilot? h)
+    {
+        static string Word(string cs) => Regex.Match(cs, "^[A-Za-z]{3,}").Value is { Length: > 0 } w ? Tower.Cap(w.ToLowerInvariant()) : "";   // "Darkstar11" -> Darkstar
+        var mission = Ops.AwacsFreq.Keys.Select(g => Word(AiCallsign.GetValueOrDefault(g, ""))).Where(w => w != "").ToList();
+        var own = h == null ? "Overlord" : Ops.AwacsName(Ops.AwacsOf(TrafficFor(h), MeOf(h)), MeOf(h));
+        var awacs = own == "Overlord" && mission.Count > 0 ? mission : mission.Prepend(own);   // Overlord is the fallback name: not next to a mission AWACS
+        var tankers = Ops.TankerFreq.Keys.Select(g => Word(AiCallsign.GetValueOrDefault(g, ""))).Where(w => w != "").Concat(new[] { "Texaco", "Arco", "Shell" });   // DCS tanker call names
+        var others = Pilots.Values.Where(x => x != h && x.Tel != null).OrderBy(x => h?.Tel is { } t ? Dist(t.X, t.Z, x.Tel!.X, x.Tel.Z) : 0)
+                           .SelectMany(x => new[] { Word(x.Callsign), Word(x.SlotCallsign) }).Where(w => w != "").Distinct().Take(4);
+        return (role switch
+        {
+            "AWACS" => awacs,
+            "Tanker" => tankers,
+            "Center" => new[] { (h?.Tel is { } t ? Tower.CenterFor(h.Coalition, t.X, t.Z)?.Name : null) ?? Tower.CenterName(h?.Coalition ?? 2) ?? "Center" },
+            "JTAC" => Ops.Leaders.Where(l => l.Alive && l.Side == (h?.Coalition ?? 2)).Select(l => l.Cs).Take(4),
+            null => awacs.Concat(tankers),
+            _ => Array.Empty<string>(),
+        }).Concat(others);
     }
 
     /// ASR corpus (V3): every radio call as WAV + recognized text in debrief\asr, the newest 400.
@@ -2802,6 +2843,33 @@ static partial class Program
             foreach (var old in Directory.GetFiles(dir, "*.wav").OrderByDescending(f => f).Skip(400)) { File.Delete(old); File.Delete(Path.ChangeExtension(old, ".txt")); }
         }
         catch (IOException) { }
+    }
+
+    /// LF1: every airfield of airfields.txt and every role under 200 prompt tokens (with four other players and a slot call sign), own stations and callsign at the end,
+    /// AWACS prompt with the mission AWACS and without the fallback Overlord.
+    static void PromptTest()
+    {
+        static int Tokens(string s) => (s.Length + 2) / 3;   // ponytail: chars/3, measured 3.2-3.6 for these prompts (airfield names alone 2.5); whisper tokenizer if it gets tight
+        var fields = Airfield.Load(Path.Combine(Root, "airfields.txt"));
+        var keep = Pilots.ToList();
+        AiCallsign["LF1-AWACS"] = "Darkstar11"; Ops.AwacsFreq["LF1-AWACS"] = 324.4;
+        try
+        {
+            Pilots.Clear();
+            foreach (var (u, cs, slot) in new[] { ("LF1a", "Springfield 1-1", ""), ("LF1b", "Dodge 1-1", ""), ("LF1c", "Colt 1-1", "Trident 5-1"), ("LF1d", "Pontiac 1-1", "") })
+                Pilots[u] = new Pilot { Unit = u, Callsign = cs, SlotCallsign = slot, Tel = new Telemetry(0, 0, 0, 0, 0, 0, 0, 0, 0) };
+            var all = fields.SelectMany(f => new string?[] { null, "Ground", "Tower", "Approach", "Departure", "AWACS", "Tanker", "Center", "Range", "Carrier", "JTAC" }
+                                                .Select(r => (F: f.Name, R: r ?? "allgemein", P: WhisperPrompt(r, f, fields, PromptNames(r, null), "Trident 5-1, Victory 9-1")))).ToList();
+            var max = all.MaxBy(x => x.P.Length);
+            var kut = all.First(x => x.F == "Kutaisi" && x.R == "Tower").P;
+            var aw = all.First(x => x.R == "AWACS").P;
+            if (Tokens(max.P) >= 200 || !all.All(x => x.P.EndsWith(" Trident 5-1, Victory 9-1.")) || !kut.EndsWith("Kutaisi Tower, Kutaisi Approach, Kutaisi Departure, Trident 5-1, Victory 9-1.")
+                || !kut.Contains("Senaki") || kut.Contains("Anapa") || !aw.EndsWith("Darkstar, Springfield, Dodge, Colt, Trident, Trident 5-1, Victory 9-1.") || !aw.Contains("Bullseye") || aw.Contains("Overlord"))
+                throw new Exception($"LF1 Whisper-Prompt: längster {Tokens(max.P)} Token ({max.F} {max.R}): {max.P} / Kutaisi Tower: {kut} / AWACS: {aw}");
+            Console.WriteLine($"OK   LF1 Whisper-Prompt: {fields.Count} Plätze x 11 Rollen unter 200 Token (längster {Tokens(max.P)}, {max.F} {max.R}), Kutaisi nur 5 Nachbarn, " +
+                              "Stationen, Slot- und eigenes Rufzeichen am Ende, 4 andere Spieler, AWACS mit Darkstar ohne Overlord");
+        }
+        finally { Pilots.Clear(); foreach (var kv in keep) Pilots[kv.Key] = kv.Value; AiCallsign.Remove("LF1-AWACS"); Ops.AwacsFreq.Remove("LF1-AWACS"); }
     }
 
     /// --asr-test [Ordner]: re-recognize the corpus, word errors against the .txt (normalized: "6,000" = "6000", "one" = "1").

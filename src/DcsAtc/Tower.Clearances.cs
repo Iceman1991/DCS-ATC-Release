@@ -47,7 +47,7 @@ public partial class Tower
     string TakeoffClearance(Telemetry? t, IReadOnlyList<Traffic> traffic, Traffic? fin = null)   // fin: approach 2.5-6 NM -> "immediate" with traffic (A10)
     {
         Phase = Phase.ClearedTakeoff; handedOff = zoneReport = false; wxTold = false;   // A145: new flight, next approach states the weather again
-        lineUp = rejecting = backtrack = false; popM = 0;
+        lineUp = rejecting = backtrack = false; popM = 0; (clrStill, clrAsked) = (-1, false);   // LA02: a new clearance restarts the 60/120-s standing timer (R348)
         var c = (Cs() + ", " + Wake(t, traffic, Runway)).TrimEnd(',', ' ');   // R205: wake turbulence ahead
         // A95: departure part before the clearance ("after departure exit via …, runway …, wind …, cleared for takeoff")
         var clr = $"{(IsHeli ? "" : $"runway {RwSay(Runway)}, ")}{Wind(t)}, cleared for {(fin != null ? "immediate " : "")}takeoff{(IsHeli ? " from present position" : "")}{(fin != null ? $", traffic {Describe(fin, Runway)}" : "")}";   // R347: helicopter without runway (FAA JO 7110.65 3-11-2)

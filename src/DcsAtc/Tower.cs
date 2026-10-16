@@ -92,7 +92,7 @@ public partial class Tower
     bool missDep;                            // R253: the open "missed approach" is the departure to the radar pattern (check-in "airborne, climbing")
     double popM;                            // R113: handoff distance after pop-up IFR (smallest distance since then + 5 NM, at least 15 NM), 0 = 15 NM
     Telemetry? lastTel;
-    double lastSeen = -999, lastTaxiWarn = -999, lastAltWarn = -999, landedAt = -999, stoppedSince = -1, holdSince, touchAt = -999, rollBack = -1, clrStill = -1;   // rollBack: since when away from the holding point (A12); clrStill: cleared for takeoff and standing since (R348)
+    double lastSeen = -999, lastTaxiWarn = -999, lastAltWarn = -999, landedAt = -999, stoppedSince = -1, holdSince = -1, touchAt = -999, rollBack = -1, clrStill = -1;   // rollBack: since when away from the holding point (A12); clrStill: cleared for takeoff and standing since (R348)
     // Navigation / coordination
     (double X, double Z)? nav;          // target for headings (CRP, initial, airfield, final, departure CRP)
     string navName = "";
@@ -288,6 +288,7 @@ public partial class Tower
         (Squawk, climbOut, climbFt) = (s.Squawk, s.ClimbOut, s.ClimbFt);
         (airborne, handedOff, exitDir, entry, Laps, wasAir) = (s.Airborne, s.HandedOff, s.ExitDir, s.Entry, s.Laps, s.WasAir);
         (lastTel, lastSeen, wantStraight, wantVisual) = (t, now, s.Straight, s.Visual);   // otherwise the next tick resets everything (gap > 10 s)
+        (holdSince, lineUp) = (-1, Phase == Phase.HoldShort && OnRunwayPos(t.X, t.Z));   // LA01: holding short after a restart: takeoff clearance only on "ready", on the runway no "not cleared onto runway"
         if (s.Vectoring && Phase == Phase.Inbound && !holding) StartVectors(t, s.VecFinal, now);   // re-plan radar vectoring, continue with headings from here
     }
 }

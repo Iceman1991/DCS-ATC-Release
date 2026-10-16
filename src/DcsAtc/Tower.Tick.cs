@@ -27,7 +27,7 @@ public partial class Tower
         bool ground = OnGround(t);
         double kt = t.Ias / Kt;
         if (!ground && t.Agl > 30 && kt > 30) { airborne = true; graded = false; }   // forum 0.15: not at standstill (AGL outlier in the first frames of a runway spawn)
-        role = Owner();
+        role = Phase == Phase.TaxiIn && !taxiInTold ? "Tower" : Owner();   // LA07: after landing he stays with the Tower until the Ground call (Brasher, "contact Ground" with frequency)
 
         // Touchdown on a runway -> landing evaluation (text only in the game)
         bool touchdown = wasAir && airborne && ground && !graded && OnRunwayPos(t.X, t.Z, 45, 300);
@@ -120,17 +120,18 @@ public partial class Tower
         // Runway entered without clearance / takeoff roll without clearance; after "line up and wait" he may stand (hold position until 40 kt dropped), not taxi
         if (kt <= 40) rejecting = false;
         // Forum 0.9.7: waits at the holding point of the parallel runway, which is now free -> clear to cross (like the takeoff clearance after "hold short")
-        if (ground && Phase == Phase.TaxiOut && crossWait is { } cw && CrossNext(t) == cw && CrossBlock(traffic, cw) == null) { role = crossRole; return Say(Cross(cw, traffic)); }
-        if (ground && RunwayAt(t.X, t.Z, t.Hdg * 180 / Math.PI, rw) is { } hitRw && !(Phase == Phase.TaxiOut && kt <= 30 && crossOk is { } co && (hitRw == co || hitRw == Airfield.Opposite(co)))   // cleared to cross
-            && Phase is Phase.Parked or Phase.StartupApproved or Phase.TaxiOut or Phase.HoldShort)
+        if (ground && Phase is Phase.TaxiOut or Phase.TaxiIn && crossWait is { } cw && CrossAhead(t) == cw && CrossBlock(traffic, cw) == null) { role = crossRole; return Say(Cross(cw, traffic)); }
+        if (ground && RunwayAt(t.X, t.Z, t.Hdg * 180 / Math.PI, rw) is { } hitRw && !(Phase is Phase.TaxiOut or Phase.TaxiIn && Gs(t) / Kt <= 40 && crossOk is { } co && (hitRw == co || hitRw == Airfield.Opposite(co)))   // cleared to cross (LA03: up to 40 kt ground speed)
+            && (Phase is Phase.Parked or Phase.StartupApproved or Phase.TaxiOut or Phase.HoldShort || Phase == Phase.TaxiIn && vacatedAt > landedAt && !Landed(hitRw)))   // LA06: taxiing in after vacating, another runway (the landing runway as before: wrong-side exits, loops at its end)
         {
+            bool along = HdgDiff(t.Hdg * 180 / Math.PI, F.End(hitRw).Hdg) is < 30 or > 150;   // LA03: takeoff roll only along the runway (either direction), across it is a crossing
             // Reporting obligation #14: spawned on the runway (holdSince -1) or after rejected takeoff (-2, R100) there is no silent takeoff clearance any more, only on "ready for departure"
-            if (kt > (Phase == Phase.HoldShort && lineUp ? 40 : 30) && !rejecting && now - lastAbort > 20)   // R105: without lineUp from 30 kt (on the runway only the Tower speaks, no "reduce taxi speed")
+            if (along && Phase != Phase.TaxiIn && kt > (Phase == Phase.HoldShort && lineUp ? 40 : 30) && !rejecting && now - lastAbort > 20)   // R105: without lineUp from 30 kt (on the runway only the Tower speaks, no "reduce taxi speed")
             {
-                lastAbort = now;
+                lastAbort = lastIncursion = now;   // LA03: no "not cleared onto runway" right after it
                 return Dev($"{c}, stop immediately, I say again, stop immediately! You are not cleared for takeoff.", $"Start ohne Freigabe {F.Name} {hitRw}", $"takeoff without clearance {F.Name} {hitRw}", "Tower");
             }
-            if (kt <= 40 && !(Phase == Phase.HoldShort && lineUp) && now - lastIncursion > 45)
+            if ((kt <= 40 || !along) && !(Phase == Phase.HoldShort && lineUp) && now - lastIncursion > 45)
             {
                 lastIncursion = now;
                 return Dev($"{c}, hold position! You are not cleared onto runway {RwSay(hitRw)}.", $"Bahn ohne Freigabe betreten {F.Name} {hitRw}", $"runway entered without clearance {F.Name} {hitRw}", "Tower");   // A38: the entered runway, not the active one

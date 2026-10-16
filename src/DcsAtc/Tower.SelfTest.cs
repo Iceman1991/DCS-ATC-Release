@@ -1706,6 +1706,43 @@ public partial class Tower
             tn2.Tick(nh03L, none, 100);
             var n6 = tn2.OnTranscript("Ground: ready for departure", nh03L, none, 101);
             Check(n6 is [{ } t6] && t6.Text.Contains("cross runway zero three left, hold short runway zero three right") && tn2.Phase == Phase.TaxiOut, "Forum 0.9.7 'ready for departure' am Haltepunkt der Parallelbahn: " + string.Join(" | ", n6.Select(m => m.Text)));
+            // LA03 (log Nellis 14.10.): crossing with clearance at 36 kt, heading 51° off the runway -> no deviation; rolling along the runway without clearance -> exactly one call
+            var tn3 = new Tower(nel, "Enfield 1-1");
+            tn3.Tick(np, none, 0);
+            tn3.OnTranscript("Nellis Ground, Enfield 1-1, request taxi, runway 03 right", np, none, 1);
+            tn3.Tick(nh03L, none, 100);
+            var x3 = tn3.OnTranscript("Nellis Tower, Enfield 1-1, ready for departure", nh03L, none, 101);
+            var c3 = new[] { 20.0, 0, -20 }.SelectMany((l, i) => tn3.Tick(NT(Pt(-1400, l), 36 * Kt) with { Hdg = h + 51 * Math.PI / 180 }, none, 102 + i)).ToList();
+            Check(x3 is [{ } tx3] && tx3.Text.Contains("cross runway zero three left") && c3.Count == 0 && tn3.Phase == Phase.TaxiOut,
+                  "LA03 Querung mit Freigabe, 36 kt quer: " + string.Join(" | ", x3.Concat(c3).Select(m => m.Text)));
+            foreach (var kt3 in new[] { 35.0, 45 })
+            {
+                var tn4 = new Tower(nel, "Enfield 1-1");
+                tn4.Tick(np, none, 0);
+                tn4.OnTranscript("Nellis Ground, Enfield 1-1, request taxi, runway 03 right", np, none, 1);
+                var r4 = new[] { -1000.0, -950, -900 }.SelectMany((a, i) => tn4.Tick(NT(Pt(a, 0), kt3 * Kt), none, 100 + i)).Where(m => m.Role != "Info").ToList();
+                Check(r4 is [{ } t4] && t4.Text.Contains("stop immediately"), $"LA03 Rollen {kt3} kt auf Bahnkurs ohne Freigabe -> eine Meldung: " + string.Join(" | ", r4.Select(m => m.Text)));
+            }
+            // LA06 (log Nellis 15.10.): landed 03R, vacated between the runways, parking position beyond 03L: taxi clearance with hold short, "holding short" -> cross, crossing without deviation;
+            // without crossing clearance -> "not cleared onto runway"
+            foreach (var clr6 in new[] { true, false })
+            {
+                var twLa6 = new Tower(nel, "Enfield 1-1");
+                twLa6.Tick(np, none, 0);   // own parking position on the apron
+                (twLa6.Phase, twLa6.landedAt, twLa6.landRw) = (Phase.TaxiIn, 1, "03R");
+                var v6 = NT(Pt(-500, -150));
+                var r6 = twLa6.Tick(v6, none, 2).Concat(twLa6.OnTranscript("Nellis Ground, Enfield 1-1, request taxi to parking", v6, none, 3)).ToList();
+                var hs6 = NT(Pt(-600, -60));
+                twLa6.Tick(hs6, none, 8);
+                var sg6 = twLa6.Suggest(hs6);   // radio wheel: crossing request at the hold short point
+                var x6 = clr6 ? twLa6.OnTranscript("Enfield 1-1, holding short runway 03 left", hs6, none, 9) : new();
+                var sg6b = twLa6.Suggest(hs6);
+                var c6 = new[] { -20.0, 0, 20 }.SelectMany((l, i) => twLa6.Tick(NT(Pt(-610 - 10 * i, l), 15 * Kt) with { Hdg = h - Math.PI / 2 }, none, 10 + i)).ToList();
+                Check(r6 is [{ } t6r] && t6r.Text.Contains("hold short runway zero three left") && twLa6.Phase == Phase.TaxiIn && sg6 is ("Ground", "holding short runway zero three left, request crossing") && (sg6b == null) == clr6 &&
+                      (clr6 ? x6 is [{ } t6x] && t6x.Text.Contains("cross runway zero three left, continue to parking") && c6.Count == 0
+                            : c6.Any(m => m.Text.Contains("You are not cleared onto runway"))),
+                      $"LA06 Einrollen über 03L (Freigabe {clr6}): " + $"{sg6} / {sg6b} / " + string.Join(" | ", r6.Concat(x6).Concat(c6).Select(m => m.Text)));
+            }
         }
         // --- A2: Unintelligible -> ask again without overwriting the last call, "say again" repeats the taxi clearance
         r = twRb.OnTranscript("Blorf garble, Enfield 1-1", parked, none, 50);
@@ -2071,6 +2108,66 @@ public partial class Tower
             Check(r348[0] == "" && r348[1] == "" && r348[2].Contains("verify rolling, runway two five, cleared for takeoff") && r348[3] == "" && r348[5] == "" && tw348.Phase == Phase.HoldShort && tw348.LineUp == onRwy348 &&
                   r348[4].Contains("cancel takeoff clearance, " + (onRwy348 ? "exit the runway" : "hold short runway two five") + ", report ready for departure"),
                   $"R348 Freigabe ohne Rollen (Bahn {onRwy348}): " + string.Join(" | ", r348));
+        }
+        {   // LA02 (log Kandahar): a second takeoff clearance restarts the standing timer, no cancel 26 s after it
+            var t02 = Cleared();
+            var s02 = Enumerable.Range(4, 100).SelectMany(s => t02.Tick(hold, none, s)).ToList();
+            var c02 = t02.OnTranscript("Enfield 11 ready for departure", hold, none, 104);
+            var w02 = Enumerable.Range(105, 130).Select(s => (s, m: string.Join(" ", t02.Tick(hold, none, s).Select(m => m.Text)))).Where(x => x.m != "").ToList();
+            Check(c02.Count == 1 && c02[0].Contains("cleared for takeoff") && w02.Count == 2 && w02[0].m.Contains("verify rolling") && w02[0].s >= 164 &&
+                  w02[1].m.Contains("cancel takeoff clearance") && w02[1].s >= 224, "LA02 zweite Startfreigabe setzt Timer zurück: " + string.Join(" | ", w02.Select(x => $"{x.s}: {x.m}")));
+        }
+        {   // LA01 (log Kandahar): HoldShort restored after an app restart: no takeoff clearance without "ready", none on the runway either; "ready" -> clearance
+            foreach (var on01 in new[] { false, true })
+            {
+                var t01 = new Tower("Enfield 1-1");
+                var at01 = on01 ? At(CX, CZ, 0, 254, 0) : hold;
+                t01.Load(new State(Phase.HoldShort, "25", null, false, false, 0, null, "", false, false, false, false, null, 0, 0, null, false, false, null, null, 0, false), at01, 0);
+                var lu01 = t01.LineUp;
+                var r01 = Enumerable.Range(1, 200).SelectMany(s => t01.Tick(at01, none, s)).ToList();
+                var c01 = t01.OnTranscript("Kutaisi Tower, Enfield 11, ready for departure", at01, none, 201);
+                Check(r01.Count == 0 && lu01 == on01 && c01.Count == 1 && c01[0].Contains("cleared for takeoff"),
+                      $"LA01 Neustart in HoldShort (Bahn {on01}): " + string.Join(" | ", r01.Concat(c01).Select(m => m.Text)));
+            }
+        }
+        {   // LA04 (log Kutaisi): "request taxi, request takeoff" on the runway -> takeoff clearance, no incursion; plain "request taxi" there -> clearance repeated / report ready
+            var on04 = At(CX, CZ, 0, 254, 0);
+            var t04 = new Tower("Enfield 1-1");
+            t04.Tick(on04, none, 0);
+            var a04 = t04.OnTranscript("Kutaisi Tower, Enfield 11, request taxi tower, request takeoff", on04, none, 2);
+            var b04 = t04.OnTranscript("Kutaisi Ground, Enfield 11, request taxi", on04, none, 40);
+            var k04 = Enumerable.Range(41, 5).SelectMany(s => t04.Tick(on04, none, s)).ToList();
+            var t04b = new Tower("Enfield 1-1");
+            t04b.Tick(on04, none, 0);
+            var c04 = t04b.OnTranscript("Kutaisi Ground, Enfield 11, request taxi", on04, none, 2);
+            var k04b = Enumerable.Range(3, 5).SelectMany(s => t04b.Tick(on04, none, s)).ToList();
+            Check(a04 is [{ } a4] && a4.Text.Contains("cleared for takeoff") && b04 is [{ } b4] && b4.Text.Contains("runway two five, wind calm, cleared for takeoff") && t04.Phase == Phase.ClearedTakeoff && k04.Count == 0 &&
+                  c04 is [{ Role: "Tower" } c4] && c4.Text.Contains("you are on runway two five, report ready for departure") && t04b.Phase == Phase.HoldShort && k04b.Count == 0,
+                  "LA04 taxi auf der Bahn: " + string.Join(" | ", a04.Concat(b04).Concat(k04).Concat(c04).Concat(k04b).Select(m => m.Text)));
+        }
+        {   // LA05 (log Nellis): readbacks with "taxi" are no new taxi request: "Trident 5-1, taxi." after the clearance to parking, late readback with hold short and squawk
+            var t05 = new Tower("Enfield 1-1");
+            t05.Tick(At(CX, CZ, 300, 254, 80), none, 0); t05.Tick(At(CX, CZ, 0, 254, 20), none, 5); t05.Tick(At(CX, CZ, 0, 254, 5), none, 8);
+            var p05 = t05.OnTranscript("Kutaisi Ground, Enfield 11, runway vacated, request taxi to parking", offRwy, none, 20);
+            var a05 = t05.OnTranscript("Enfield 1-1, taxi.", offRwy, none, 36);
+            var ph05 = t05.Phase;
+            var q05 = t05.OnTranscript("Kutaisi Ground, Enfield 11, request taxi", offRwy, none, 50);   // a request stays a request (start again)
+            var t05b = new Tower("Enfield 1-1");
+            t05b.Tick(parked, none, 0);
+            var g05 = t05b.OnTranscript("Kutaisi Ground, Enfield 11, request taxi", parked, none, 1);
+            var b05 = t05b.OnTranscript($"Taxi via November Delta, hold short two five, {string.Join("-", t05b.Squawk ?? "")}. Enfield 1-1.", parked, none, 70);
+            Check(p05 is [{ } p5] && p5.Text.Contains("taxi to") && a05.Count == 0 && ph05 == Phase.TaxiIn && q05.Count == 1 &&
+                  g05 is [{ } g5] && g5.Text.Contains("Squawk") && b05.Count == 0 && t05b.Phase == Phase.TaxiOut,
+                  "LA05 Rücklesung mit taxi still: " + string.Join(" | ", p05.Concat(a05).Concat(q05).Concat(g05).Concat(b05).Select(m => m.Text)));
+        }
+        {   // LA07 (log Nellis): landing without clearance, still on the Tower frequency: Brasher from the Tower, standing after vacating -> "contact Kutaisi Ground two seven five decimal eight"
+            var k7 = Airfield.Kutaisi();
+            (k7.Own["Ground"], k7.Own["Tower"]) = (new[] { 275.8 }, new[] { 327.0 });
+            var t7 = new Tower(k7, "Enfield 1-1");
+            t7.Tick(At(CX, CZ, 300, 254, 80), none, 0); t7.Tick(At(CX, CZ, 0, 254, 20), none, 5); t7.Tick(At(CX, CZ, 0, 254, 5), none, 8);
+            var s7 = Enumerable.Range(20, 41).SelectMany(s => t7.Tick(offRwy with { Ias = 0 }, none, s)).Where(m => m.Role != "Info").ToList();
+            Check(s7.Count == 2 && s7[0] is { Role: "Tower" } b7 && b7.Text.Contains("possible pilot deviation") && s7[1] is { Role: "Tower", Text: "Enfield one one, contact Kutaisi Ground two seven five decimal eight." },
+                  "LA07 Brasher und Ground-Hinweis vom Tower: " + string.Join(" | ", s7.Select(m => $"{m.Role}: {m.Text}")));
         }
         // R347: helicopter: air taxi, takeoff clearance without runway number
         var tw347 = new Tower("Enfield 1-1") { AcType = "UH-1H" };
