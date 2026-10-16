@@ -110,6 +110,41 @@ public partial class Tower
         r = twD.OnTranscript("Kutaisi Approach, Enfield 11, airborne, passing 2000", At(dx, dz, 600, LandHdg("25"), 250), none, 20);
         // R7: VFR in the zone: departure clearance remains valid, sign-off at the zone edge with "resume own navigation" (before, directly "resume own navigation, maintain VFR")
         Check(r[0].Role == "Approach" && r[0].Text.EndsWith("radar contact, 1 mile west of the field. Continue as cleared, report leaving the control zone.") && twD.Phase == Phase.Away, "R7 Airborne-Meldung in der Zone: " + r[0]);
+        {   // LA19 (log Kandahar): "say again" and in the same second "contact Approach now" from the tick -> the reminder waits until 5 s after the transmission
+            var w19 = new Tower("Enfield 1-1");
+            w19.Tick(parked, none, 0);
+            w19.OnTranscript("Enfield 11 request startup", parked, none, 1); w19.OnTranscript("Enfield 11 request taxi", parked, none, 2); w19.OnTranscript("Enfield 11 ready for departure", hold, none, 3);
+            w19.Tick(At(dx, dz, 120, LandHdg("25"), 180), none, 10);
+            var ho19 = w19.Tick(At(dx, dz, 250, LandHdg("25"), 200), none, 11);
+            var air19 = At(dx, dz, 600, LandHdg("25"), 250);
+            var q19 = Enumerable.Range(12, 59).SelectMany(s => w19.Tick(air19, none, s)).ToList();
+            var sa19 = w19.SayAgain("Can approach Dodge 1-1.", 71);
+            var n19 = Enumerable.Range(71, 10).Select(s => (s, m: w19.Tick(air19, none, s + 0.5))).Where(x => x.m.Count > 0).ToList();
+            Check(ho19.Any(m => m.Text.Contains("contact Kutaisi Approach")) && q19.Count == 0 && sa19 is [{ } s19] && s19.Text.EndsWith("say again.") &&
+                  n19 is [var (at19, m19)] && at19 == 76 && m19[0].Text.Contains("contact Kutaisi Approach now"), $"LA19 Erinnerung wartet 5 s nach dem Spruch: {string.Join(" | ", q19.Select(m => m.Text))} / " + string.Join(" | ", n19.Select(x => $"{x.s + 0.5}: {x.m[0].Text}")));
+        }
+        foreach (var z20 in new[] { "Clearing control zone, Enfield 1-1.", "Enfield 1-1, leave in control zone.", "Enfield 1-1, leaving controls on." })   // LA20 (log): variants of the zone report
+        {
+            var w20 = new Tower("Enfield 1-1");
+            w20.Tick(parked, none, 0);
+            w20.OnTranscript("Enfield 11 request startup", parked, none, 1); w20.OnTranscript("Enfield 11 request taxi", parked, none, 2); w20.OnTranscript("Enfield 11 ready for departure", hold, none, 3);
+            w20.Tick(At(dx, dz, 120, LandHdg("25"), 180), none, 10); w20.Tick(At(dx, dz, 250, LandHdg("25"), 200), none, 11);
+            w20.OnTranscript("Kutaisi Approach, Enfield 11, airborne, passing 2000", At(dx, dz, 600, LandHdg("25"), 250), none, 20);
+            var r20 = w20.OnTranscript(z20, At(CX + 4 * NM, CZ, 600, 270, 250), none, 40);
+            Check(r20 is [{ } t20] && !t20.Text.Contains("say again") && w20.lastIntent == "leavezone", $"LA20 \"{z20}\": " + string.Join(" | ", r20.Select(m => m.Text)));
+        }
+        {   // LA25 (log Kandahar/Silverbow): Tower and Approach on one frequency -> no "contact Approach" at the handover, Approach checks in right away; "airborne" afterwards only roger
+            var k25 = Airfield.Kutaisi();
+            (k25.Own["Tower"], k25.Own["Approach"]) = (new[] { 327.0 }, new[] { 327.0 });
+            var w25 = new Tower(k25, "Enfield 1-1");
+            w25.Tick(parked, none, 0);
+            w25.OnTranscript("Enfield 11 request startup", parked, none, 1); w25.OnTranscript("Enfield 11 request taxi", parked, none, 2); w25.OnTranscript("Enfield 11 ready for departure", hold, none, 3);
+            w25.Tick(At(dx, dz, 120, LandHdg("25"), 180), none, 10);
+            var h25 = w25.Tick(At(dx, dz, 250, LandHdg("25"), 200), none, 11);
+            var a25 = w25.OnTranscript("Kutaisi Approach, Enfield 11, airborne", At(dx, dz, 600, LandHdg("25"), 250), none, 20);
+            Check(h25 is [{ Role: "Approach" } m25] && m25.Text.Contains("Kutaisi Approach, radar contact") && w25.Phase == Phase.Away && a25 is [{ } r25] && (r25.Text.Contains("roger") || r25.Text.Contains("copy")),
+                  "LA25 gleiche Frequenz: " + string.Join(" | ", h25.Concat(a25).Select(m => m.Text)));
+        }
         // Forum request AirfieldFrequencies: own frequency per controller -> handovers name it, Approach leads the departure as Departure on its frequency, sign-off too
         var kO = Airfield.Kutaisi();
         (kO.Own["Ground"], kO.Own["Tower"], kO.Own["Departure"], kO.Own["Approach"]) = (new[] { 275.8 }, new[] { 327.0 }, new[] { 273.55 }, new[] { 379.0 });
@@ -303,7 +338,7 @@ public partial class Tower
         twA4.OnTranscript("Kutaisi Ground, Colt 1-1, request startup", parked, none, 2);
         twA4.OnTranscript("Kutaisi Ground, Colt 1-1, request taxi", parked, none, 3);
         Check(twA4.Callsign == "Enfield 1-1" && ExtractCallsign(Normalize("Squawk four three two one")) == null, "A4 Rottenruf einmal, Missions-Rufzeichen fest: " + twA4.Callsign);
-        // Forum log 0.9.4: after takeoff with Approach, then back to Tower; Whisper hears "outfit 1-1" -> same reply as with Enfield, never renamed; without a station at the start no flight radio (same number)
+        // Forum log 0.9.4: after takeoff with Approach, then back to Tower; Whisper hears "outfit 1-1" -> same reply as with Enfield, never renamed; without a station at the start no flight radio (same number); LA09: "checking in" is a check-in, the second only after the repeat window (otherwise silent)
         foreach (var (fixd, say) in new[] { true, false }.SelectMany(b => new[] { "Kutaisi Tower, {0} 1-1, checking in.", "{0} 1-1, checking in.", "{0} 1-1, unable." }.Select(s => (b, s))))
         {
             var rs = new[] { "Enfield", "outfit" }.Select(w =>
@@ -315,12 +350,12 @@ public partial class Tower
                 tO.Tick(At(dx, dz, 120, LandHdg("25"), 180), none, 10);
                 for (int i = 0; i < 40; i++) tO.Tick(At(dx - i * 0.1 * NM, dz, 250, LandHdg("25"), 200), none, 11 + i);
                 tO.OnTranscript("Kutaisi Approach, checking in.", At(dx - 4 * NM, dz, 250, LandHdg("25"), 200), none, 60);
-                var rt = tO.OnTranscript(string.Format(say, w), At(dx - 4.2 * NM, dz, 250, LandHdg("25"), 200), none, 72)
-                    .Concat(tO.Tick(At(dx - 4.4 * NM, dz, 250, LandHdg("25"), 200), none, 90));
+                var rt = tO.OnTranscript(string.Format(say, w), At(dx - 4.2 * NM, dz, 250, LandHdg("25"), 200), none, 110)
+                    .Concat(tO.Tick(At(dx - 4.4 * NM, dz, 250, LandHdg("25"), 200), none, 125));
                 return (tO.Callsign, Text: string.Join(" | ", rt.Select(m => m.Text)));
             }).ToList();
             Check(rs.All(x => x.Callsign == "Enfield 1-1") && rs[1].Text == rs[0].Text && rs[1].Text.StartsWith("Enfield one one") && !rs[1].Text.Contains("Station calling") && !rs[1].Text.Contains("Outfit"),
-                  $"Verhörtes Rufzeichen \"{string.Format(say, "outfit")}\" (fest {fixd}) wie Enfield: {rs[1].Callsign}: {rs[1].Text}");
+                  $"Verhörtes Rufzeichen \"{string.Format(say, "outfit")}\" (fest {fixd}) wie Enfield ({rs[0].Text}): {rs[1].Callsign}: {rs[1].Text}");
         }
         twCl.OnTranscript("Enfield 11 request taxi", parked, none, 2);
         r = twCl.OnTranscript("Enfield 11 ready for departure", hold, none, 3);
@@ -740,6 +775,18 @@ public partial class Tower
             cenF.AwacsContact = "Magic two five one decimal five";
             var awC = cenF.Tick(posC, none, 50);
             Check(awC.Count == 1 && awC[0].Text == "Enfield one one, contact Magic two five one decimal five." && !cenF.Center, "Center A2: AWACS in Reichweite -> contact Magic: " + string.Join(" | ", awC.Select(m => m.Text)));
+            var lvF = cenF.OnTranscript("Center: Los Angeles, and Enfield 1-1, leaving frequency for taxi. Have a good one.", posC, none, 67);   // LA11 (log Nellis 14.10.): sign-off on the Center frequency after the AWACS handover
+            Check(lvF is [{ Role: "Center" } lf] && lf.Text.Contains("frequency change approved"), "LA11 Abmeldung auf der Center-Frequenz -> Center: " + string.Join(" | ", lvF.Select(m => $"{m.Role}: {m.Text}")));
+            {   // LA12 (log): "Center: Clear." after the check-in is no second check-in, an altitude report gets "roger"; own AWACS already in range -> radar contact and handover in one call
+                var c12 = CenC();
+                var a12 = c12.OnTranscript("Center: Clear.", posC, none, 50).Concat(c12.OnTranscript("Los Angeles Center, Enfield 11, flight level 250", posC, none, 60)).ToList();
+                var w12 = IfrC();
+                w12.AwacsContact = "Magic two five one decimal five";
+                var b12 = w12.OnTranscript("Los Angeles Center, Enfield 11, checking in, flight level 250", posC, none, 30).Concat(w12.Tick(posC, none, 31)).Concat(w12.Tick(posC, none, 40)).ToList();
+                Check(a12.Count == 2 && !a12.Any(m => m.Text.Contains("radar contact") || m.Text.Contains("identified") || m.Text.Contains("contact Magic")) && a12[1].Text == "Enfield one one, roger." && c12.Center &&
+                      b12 is [{ Role: "Center" } b] && b.Text.Contains("contact Magic two five one decimal five") && (b.Text.Contains("radar contact") || b.Text.Contains("identified")) && !w12.Center,
+                      "LA12 Center-Check-in nur mit Inhalt, AWACS sofort: " + string.Join(" | ", a12.Concat(b12).Select(m => $"{m.Role}: {m.Text}")));
+            }
             // sectors: nearest center point inside the radius wins, side filter, handover into the next sector, check-in with its name and frequency
             CenterSectors = new() { new() { Name = "Nellis Control", Freq = 270.0, X = CX + 150 * NM, Z = CZ, RadiusNm = 40, Side = "blue" }, new() { Name = "Edwards Control", Freq = 271.0, X = CX + 120 * NM, Z = CZ, RadiusNm = 40 },
                                     new() { Name = "Rostov Control", Freq = 272.0, X = CX + 150 * NM, Z = CZ, RadiusNm = 40, Side = "red" } };
@@ -1536,7 +1583,7 @@ public partial class Tower
         Check(Wind(parked with { WindZ = 10 }).StartsWith("wind two six zero degrees, one niner knots"), "Windansage magnetisch");
 
         Check(new Tower("Enfield 1-1").OnTranscript("blah blah", parked, none, 0)[0].StartsWith("Station calling"), "Unbekanntes");
-        Check(new Tower("Enfield 1-1").SayAgain("Kutaisi Tower, blorf garble") is [{ Role: "Tower", Text: "Enfield one one, Kutaisi Tower, say again." }], "Unsicher verstanden -> say again");
+        Check(new Tower("Enfield 1-1").SayAgain("Kutaisi Tower, blorf garble", 0) is [{ Role: "Tower", Text: "Enfield one one, Kutaisi Tower, say again." }], "Unsicher verstanden -> say again");
         var twPl = new Tower("Enfield 1-1") { last = new Msg("Approach", "Enfield one one, turn left heading two seven zero.") };
         Check(twPl.Plain("Copied.") && twPl.Plain("Enfield 1-1, say again") && !twPl.Plain("Kutaisi Tower, blorf garble"), "Unsicher, aber Quittung/say again -> kein Rückfragen");
 
@@ -1711,6 +1758,8 @@ public partial class Tower
             tn3.Tick(np, none, 0);
             tn3.OnTranscript("Nellis Ground, Enfield 1-1, request taxi, runway 03 right", np, none, 1);
             tn3.Tick(nh03L, none, 100);
+            Check(tn3.Suggest(nh03L) is { } sg10 && tn3.IntentOf("Ground: Ground, Enfield 1-1 holding short zero three left.", nh03L) is "cross" && tn3.IntentOf(sg10.Text, nh03L) == "cross",
+                  "LA10 \"holding short\" (0.64) am Rollhalt der Parallelbahn ist der erwartete Spruch");   // Program then accepts it from 0.50
             var x3 = tn3.OnTranscript("Nellis Tower, Enfield 1-1, ready for departure", nh03L, none, 101);
             var c3 = new[] { 20.0, 0, -20 }.SelectMany((l, i) => tn3.Tick(NT(Pt(-1400, l), 36 * Kt) with { Hdg = h + 51 * Math.PI / 180 }, none, 102 + i)).ToList();
             Check(x3 is [{ } tx3] && tx3.Text.Contains("cross runway zero three left") && c3.Count == 0 && tn3.Phase == Phase.TaxiOut,
@@ -2168,6 +2217,85 @@ public partial class Tower
             var s7 = Enumerable.Range(20, 41).SelectMany(s => t7.Tick(offRwy with { Ias = 0 }, none, s)).Where(m => m.Role != "Info").ToList();
             Check(s7.Count == 2 && s7[0] is { Role: "Tower" } b7 && b7.Text.Contains("possible pilot deviation") && s7[1] is { Role: "Tower", Text: "Enfield one one, contact Kutaisi Ground two seven five decimal eight." },
                   "LA07 Brasher und Ground-Hinweis vom Tower: " + string.Join(" | ", s7.Select(m => $"{m.Role}: {m.Text}")));
+        }
+        {   // LA13 (log Nellis): after "check runway" still on final of the opposite direction: tailwind over 10 kt -> go around before 1 NM; calm -> landing clearance for that runway
+            foreach (var kt13 in new[] { 13.0, 0 })
+            {
+                Telemetry F07(double nm) { var (x, z) = P("07", nm * NM); return At(x, z, nm * NM * Math.Tan(3 * Math.PI / 180) + 15, LandHdg("07"), 75) with { Gear = 1, WindX = kt13 * Kt * Ux, WindZ = kt13 * Kt * Uz }; }
+                var w13 = new Tower("Enfield 1-1");
+                w13.Load(new State(Phase.Pattern, "25", null, false, false, 0, null, "", false, false, false, false, null, 0, 0, null, true, false, null, null, 0, true), F07(4.5), 0);
+                var r13 = new[] { 4.0, 3.5, 2.8, 2.4, 2, 1.6, 1.2, 0.8 }.Select((nm, i) => (nm, m: w13.Tick(F07(nm), none, 1 + i * 10))).Where(x => x.m.Count > 0).ToList();
+                var s13 = string.Join(" | ", r13.Select(x => $"{x.nm}: {string.Join(" ", x.m.Select(m => m.Text))}"));
+                Check(r13.Count == 2 && r13[0].m[0].Text.Contains("check runway") && r13[1].nm > 1 && (kt13 > 0
+                          ? r13[1].m[0].Text.Contains("go around, tailwind one three knots, fly runway heading") && r13[1].m[0].Text.Contains("downwind runway two five") && w13.Phase == Phase.Pattern
+                          : r13[1].m[0].Text.Contains("runway zero seven, wind calm, cleared to land") && w13.Phase == Phase.ClearedLand && w13.Runway == "07"),
+                      $"LA13 Endanflug Gegenrichtung (Rückenwind {kt13} kt): " + s13);
+            }
+        }
+        {   // LA14 (log Nellis 21L): "wrong side" at most twice, the second time with heading; overhead in the downwind direction names the side
+            var wsP = new[] { 1.2 * NM, -1.2 * NM }.Select(l => kTower.Pt("25", -0.5 * NM, l)).First(p => kTower.PatternOffset(p.X, p.Z, "25") < -900);
+            var ws = At(wsP.X, wsP.Z, PatternFt * Ft - FieldElev, LandHdg("25") + 180, 150 * Kt);
+            var w14 = new Tower("Enfield 1-1");
+            w14.Load(new State(Phase.Pattern, "25", null, false, false, 0, null, "", false, false, false, false, null, 0, 0, null, true, false, null, null, 0, true), ws, 0);
+            var a14 = new[] { 1.0, 62, 123, 184 }.SelectMany(s => w14.Tick(ws, none, s)).ToList();
+            var r14 = a14.Where(m => m.Text.Contains("wrong side") || m.Text.Contains("pattern is south")).ToList();   // Kutaisi: side from the chart
+            var side14 = kTower.Hand("25").Split(' ')[0];
+            Tower Ovh14() { var o = new Tower("Enfield 1-1"); o.Load(new State(Phase.Entering, "25", null, false, false, 0, new[] { kTower.Ovh.X, kTower.Ovh.Z }, "overhead", false, false, false, false, null, 0, 0, null, true, false, null, null, 0, true), ws, 0); return o; }
+            var oDw = Ovh14().OnTranscript("Kutaisi Tower, Enfield 11, overhead", At(kTower.Ovh.X, kTower.Ovh.Z, PatternFt * Ft - FieldElev + 150, LandHdg("25") + 180, 150 * Kt), none, 1);
+            var oUp = Ovh14().OnTranscript("Kutaisi Tower, Enfield 11, overhead", At(kTower.Ovh.X, kTower.Ovh.Z, PatternFt * Ft - FieldElev + 150, LandHdg("25"), 150 * Kt), none, 1);
+            Check(r14.Count == 2 && !r14[0].Text.Contains("heading") && r14[1].Text.Contains(", turn ") && r14[1].Text.Contains("cross midfield") &&
+                  oDw is [{ } od] && od.Text.Contains($"continue east, keep the field on your {side14}, join {side14} hand downwind runway two five") && oUp is [{ } ou] && !ou.Text.Contains("keep the field"),
+                  "LA14 wrong side höchstens zweimal, Overhead nennt Seite: " + string.Join(" | ", a14.Concat(oDw).Concat(oUp).Select(m => m.Text)));
+        }
+        {   // LA08 (log 13.–15.10.): farewell, frequency readback, acknowledgement after the own handover/sign-off -> silent, also below the confidence threshold (SayAgain);
+            // without handover the farewell is answered, after 60 s too, a request after the handover gets its reply, garbage "say again"
+            var far8 = At(CX + 20 * NM, CZ, 3000, 90, 300);
+            const string ffEnd = "Springfield one one, roger, resume own navigation, squawk VFR, frequency change approved. Goodbye.", toDark = "Trident five one, roger, resume own navigation, contact Darkstar three two four decimal four.";
+            string La8(string cs, string lastTx, string said, double dt, bool unsure = false)
+            {
+                var w = new Tower(cs);
+                w.Tick(far8, none, 0);
+                (w.Phase, w.last, w.lastAt) = (Phase.Away, new Msg("Approach", lastTx), 100);
+                return string.Join(" | ", (unsure ? w.SayAgain(said, 100 + dt) : w.OnTranscript(said, far8, none, 100 + dt)).Select(m => m.Text));
+            }
+            var q8 = new[]
+            {
+                La8("Springfield 1-1", ffEnd, "Springfield 1-1, goodbye.", 15), La8("Springfield 1-1", ffEnd, "Goodbye for Springfield 1-1.", 26),
+                La8("Trident 5-1", toDark, "Trident 5-1, goodbye.", 18),
+                La8("Victory 9-1", toDark.Replace("Trident five one", "Victory niner one"), "Dogstar 3-2, decimal 4. Victory 9-1.", 22, true),   // 0.46
+                La8("Victory 9-1", toDark.Replace("Trident five one", "Victory niner one"), "Victory 9-1 copied.", 33),
+                La8("Dodge 1-1", "Dodge one one, roger, resume own navigation, contact Overlord two five one decimal zero.", "241 decimal 0, Dodge 1-1", 17, true),   // 0.58
+            };
+            var a8 = new[]
+            {
+                La8("Springfield 1-1", ffEnd, "Springfield 1-1, goodbye.", 200), La8("Trident 5-1", "Trident five one, turn left heading one seven five.", "Trident 5-1, goodbye.", 10),
+                La8("Trident 5-1", toDark, "Trident 5-1, request flight following.", 10), La8("Trident 5-1", toDark, "Join fire.", 10, true),
+            };
+            Check(q8.All(x => x == "") && a8[0].Contains("good") && a8[1].Contains("good") && !a8[1].Contains("say again") && a8[2] != "" && !a8[2].Contains("say again") && a8[3].EndsWith("say again."),
+                  "LA08 Abschied/Rücklesung nach Übergabe still: " + string.Join(" || ", q8.Concat(a8)));
+        }
+        {   // LA09 (log Nellis): "Trident 5-1, checking in." to Approach -> inbound flow (was "say again")
+            var in9 = At(CX + 25 * NM, CZ, 3000, 270, 300);
+            var t9 = new Tower("Trident 5-1");
+            t9.Tick(in9, none, 0);
+            Check(t9.IntentOf("Neilas Approach, Trident 5-1 with you.", in9) == "inbound" && t9.IntentOf(t9.Suggest(in9)!.Value.Text, in9) == "inbound", "LA10 \"with you\" (0.58) ist der erwartete Spruch");
+            var r9 = t9.OnTranscript("Trident 5-1, checking in.", in9, none, 1);
+            Check(r9 is [{ Role: "Approach" } a9] && a9.Text.StartsWith("Trident five one, Kutaisi Approach, ") && !a9.Text.Contains("say again") && t9.Phase == Phase.Inbound,
+                  "LA09 checking in bei Approach: " + string.Join(" | ", r9.Select(m => m.Text)));
+        }
+        {   // LA11 (log Nellis): the controller of the frequency answers (Ground 275.8, Tower 327.0, Approach/Departure 385.4), not the one of the phase; shared/unknown: phase as before
+            var k11 = Airfield.Kutaisi();
+            (k11.Own["Ground"], k11.Own["Tower"], k11.Own["Approach"], k11.Own["Departure"]) = (new[] { 275.8 }, new[] { 327.0 }, new[] { 385.4 }, new[] { 385.4 });
+            var en11 = At(CX + 6 * NM, CZ, 900, 270, 300);
+            var t11 = new Tower(k11, "Trident 5-1");
+            t11.Tick(en11, none, 0);
+            t11.Phase = Phase.Entering;   // "contact Nellis Tower now", the pilot is still on 385.4
+            var s11 = new[] { 385.4, 327.0, 275.8, 0 }.Select(fq => { t11.CallFreq = fq; return string.Join(" | ", t11.SayAgain("Join fire.", 10).Select(m => $"{m.Role}: {m.Text}")); }).ToList();
+            t11.Load(t11.Save() with { Phase = Phase.Away, HandedOff = true }, en11, 20);   // after the departure handover: Departure keeps its name
+            t11.CallFreq = 385.4;
+            s11.Add(string.Join(" | ", t11.SayAgain("Join fire.", 21).Select(m => $"{m.Role}: {m.Text}")));
+            Check(s11.SequenceEqual(new[] { "Approach: Trident five one, Kutaisi Approach, say again.", "Tower: Trident five one, Kutaisi Tower, say again.", "Ground: Trident five one, Kutaisi Ground, say again.",
+                                            "Tower: Trident five one, Kutaisi Tower, say again.", "Departure: Trident five one, Kutaisi Departure, say again." }), "LA11 Stelle nach Frequenz: " + string.Join(" || ", s11));
         }
         // R347: helicopter: air taxi, takeoff clearance without runway number
         var tw347 = new Tower("Enfield 1-1") { AcType = "UH-1H" };

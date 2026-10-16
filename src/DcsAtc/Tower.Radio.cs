@@ -7,15 +7,31 @@ public partial class Tower
 {
     // ======================================================================= Pilot speaks
     /// Understood with low confidence (Whisper confidence): ask back instead of acting; responsible controller as in OnTranscript.
-    public List<Msg> SayAgain(string text)
+    public List<Msg> SayAgain(string text, double now)
     {
-        role = Addressed(Normalize(text)) ?? Owner();
+        var n = Normalize(text); heardAt = now;
+        if (SignedOff(n, IntentOf(text, lastTel), now)) return new();   // LA08: "Dogstar 3-2, decimal 4" (0.46) after "contact Darkstar …"
+        role = Addressed(n) ?? FreqRole() ?? Owner();
         return new() { new Msg(Dep(role), $"{Cs()}, {Station}, say again.") };
     }
     /// Low confidence on a bare acknowledgement or "say again": the phrase is clear anyway -> process normally instead of asking back ("Copied." -> "say again")
     public bool Plain(string text) => Normalize(text) is var n && (AckOnly(n) || Ops.BareSayAgain(n, callsign));
     /// Program: the transmission has actually gone out (radio queue) -> nag windows count from its end, not from queueing (vector repeated before the first call aired)
     public void Aired(double now, string text) => lastVecSaid = Math.Max(lastVecSaid, now + text.Split(' ').Length / 2.5);
+
+    /// Check-in with Departure (Approach) after the handover. LA25 (log: "contact Kandahar Approach." without frequency, pilot confused): on the frequency shared with the Tower
+    /// Approach checks in directly at the handover (tick), without "contact … Approach".
+    List<Msg> Airborne(Telemetry? t, double now, string hdr)
+    {
+        // R7: VFR still in the zone (not at the departure CRP): departure clearance remains valid, sign-off at the zone edge
+        zoneReport = !depClr && climbOut == null && Phase is Phase.ClearedTakeoff or Phase.Departing && t != null && Dist(t.X, t.Z, CX, CZ) < CtrM && !AtExit(t);
+        dueAt = -1;   // Reporting obligation: checked in; #10 "leaving the control zone" is due from now on
+        Phase = Phase.Away;
+        nav = null; handedOff = true;
+        if (Squawk == null && t != null && !OnGround(t)) { idAt = now + 6; idFf = false; return Say($"{hdr}, squawk {Digits(TakeSquawk())}.", "Approach"); }   // R128: flight without a prior code (no taxi call): assign first, "radar contact" after observing (tick)
+        return Say($"{hdr}, {AirRc(t)}", "Approach");   // R7 (zoneReport) in AirRc
+    }
+    double airRcAt = -1e9;   // LA25: time of the direct check-in on the shared frequency
 
     /// Called another airfield on this airfield's frequency: "Enfield 1-1, this is Senaki Tower, you are on Senaki frequency, contact Kutaisi Tower 134.0."
     public List<Msg> OtherField(string text, Airfield o)
@@ -26,7 +42,7 @@ public partial class Tower
 
     public List<Msg> OnTranscript(string text, Telemetry? t, IReadOnlyList<Traffic> traffic, double now, bool fromMenu = false)
     {
-        callAt = now;
+        callAt = heardAt = now;   // LA19: pilot transmission
         if (t != null) Seen(t, now);
         var n = Normalize(text);
         if (n.Length == 0) return new();
@@ -35,7 +51,7 @@ public partial class Tower
             if (SameCallsign(cs, callsign)) heardCs = null; else if (cs == heardCs) callsign = cs; else heardCs = cs;   // foreign one only after two in a row ("Enfield 1-2, check fuel" to the wingman does not count)
         var c = Cs();
         var addressed = Addressed(n);
-        role = addressed ?? Owner();
+        role = addressed ?? FreqRole() ?? Owner();
         bool ground = t == null || OnGround(t);
         var dir = Direction(n);
         var rw = Runway;
@@ -66,6 +82,7 @@ public partial class Tower
         // own reports do not; the same report within 30 s after the controller's last transmission is usually a readback too.
         // New request: anyone who calls the controller at the start of the transmission ("Kutaisi Tower, ...") or says "request/again/confirm/say" always gets a reply.
         var intent = Intent(n, ground);
+        if (!fromMenu && SignedOff(n, intent, now)) return new();   // LA08: "Springfield 1-1, goodbye" after "frequency change approved. Goodbye." -> no "say again", no second farewell
         var spoken = Normalize(Regex.Replace(text, @"^\s*[A-Za-z]+:", ""));   // "Ground: " (config frequency/menu) is not a call
         // forum 0.15: "Kutaisi Departure, Enfield 1-1" right after a Departure call without readback is the acknowledgement, not a new call-up (after a handover the last call is another station's)
         bool stAck = addressed != null && last != null && Dep(addressed) == last.Role && now - lastAt < 30 + last.Text.Split(' ').Length / 2.5 && AckOnly(spoken, true);
@@ -394,6 +411,9 @@ public partial class Tower
             case "centercheck":   // Center: check-in = flight following under the Center's name and frequency
             case "ff":   // V15
                 bool cen = addressed == "Center" || Center;
+                if (cen && Center) return Say($"{c}, {OneOf("roger", "copy")}.", "Center");   // LA12: already identified, no second "radar contact"
+                if (cen && AwacsContact is { } aw0 && t != null && !OnGround(t) && Phase is Phase.Away or Phase.Departing)   // LA12: own AWACS in range takes over right away (else the next tick hands over half a second later)
+                { CenterEnd(); return Say($"{hdr}, {Rc}, {Where(t, F.Name.Replace('-', ' '))}, contact {aw0}.", "Center"); }
                 if (Phase is Phase.Inbound or Phase.Entering || cen && Phase is not (Phase.Away or Phase.Departing or Phase.ClearedTakeoff)) return Say($"{c}, roger, continue as cleared.", "Approach");   // A103: already on radar (radar vectoring/approach), no restart
                 if (cen)
                 {
@@ -409,7 +429,7 @@ public partial class Tower
 
             case "ffoff":
             {
-                if (Center) { var cb = Say($"{c}, radar service terminated, {SquawkVfr()}frequency change approved.", "Approach"); CenterEnd(); return cb; }   // Center: leaving frequency; the next contact finds the next controller (Pick)
+                if (Center || role == "Center") { var cb = Say($"{c}, radar service terminated, {SquawkVfr()}frequency change approved.", "Center"); CenterEnd(); return cb; }   // Center: leaving frequency; the next contact finds the next controller (Pick); LA11: on the Center frequency also after its handover to the AWACS
                 Following = false; transitFt = null;
                 bool depOff = handedOff && Phase == Phase.Away;   // A51: this is the departure sign-off (at 15 NM a second one would follow), same ending as there
                 var head = depOff && depClr && nav != null ? $"proceed direct {navName}, resume own navigation. Radar service terminated" : "radar service terminated";
@@ -430,13 +450,8 @@ public partial class Tower
                 return Say($"{c}, you are airborne. Report intentions.");
 
             case "airborne":   // Report to Departure (Approach) after handover
-                // R7: VFR still in the zone (not at the departure CRP): departure clearance remains valid, sign-off at the zone edge
-                zoneReport = !depClr && climbOut == null && Phase is Phase.ClearedTakeoff or Phase.Departing && t != null && Dist(t.X, t.Z, CX, CZ) < CtrM && !AtExit(t);
-                dueAt = -1;   // Reporting obligation: checked in; #10 "leaving the control zone" is due from now on
-                Phase = Phase.Away;
-                nav = null; handedOff = true;
-                if (Squawk == null && t != null && !OnGround(t)) { idAt = now + 6; idFf = false; return Say($"{hdr}, squawk {Digits(TakeSquawk())}.", "Approach"); }   // R128: flight without a prior code (no taxi call): assign first, "radar contact" after observing (tick)
-                return Say($"{hdr}, {AirRc(t)}", "Approach");   // R7 (zoneReport) in AirRc
+                if (now - airRcAt < 120) return Say($"{c}, {OneOf("roger", "copy")}.", "Approach");   // LA25: already checked in by Approach on the shared frequency
+                return Airborne(t, now, hdr);
 
             case "leavezone":   // R7: "leaving the control zone" after "report leaving the control zone"
                 return LeaveZone(c, "roger");
@@ -922,8 +937,9 @@ public partial class Tower
         else
         {
             if (altAsk && Named(n) != null) return "alternate";   // N40: reply to "say alternate destination"
-            if (Addressed(n) == "Center" && (!Center || !Has(n, "request", "requesting")) && !Has(n, "leaving frequency", "leaving your frequency", "cancel", "terminat")) return "centercheck";   // Center: check-in (with request: the request follows), IFR/climbing in it is no clearance or takeoff
-            if (zoneReport && Has(n, "leaving (?:the )?(?:control )?zone", "clear of (?:the )?(?:control )?zone")) return "leavezone";   // R7
+            if (Addressed(n) == "Center" && (!Center || !Has(n, "request", "requesting")) && !Has(n, "leaving frequency", "leaving your frequency", "cancel", "terminat")
+                && (Has(n, "check", "with you", "request", "requesting", "level", "angels", "climbing", "descending", "passing", "maintaining", "radar", "flight following", "en ?route", "squawk") || AltSlot(n) != null)) return "centercheck";   // LA12 (log): check-in only with content ("Center: Clear." is none)   // Center: check-in (with request: the request follows), IFR/climbing in it is no clearance or takeoff
+            if (zoneReport && Has(n, "leaving (?:the )?(?:control )?zone", "clear of (?:the )?(?:control )?zone", @"(?:leav|clear)\w* (?:\w+ )?(?:the )?control(?:s on| zone)")) return "leavezone";   // R7; LA20 (log): "clearing control zone", "leave in control zone", "leaving controls on"
             if (Has(n, "clearance", "ifr to") && !Has(n, "approach clearance", "landing") && ClrDest(n) != null) return "clearance";   // R113: pop-up IFR to another airfield, no landing here
             if (Has(n, "cancel approach", "cancel the approach", "cancel landing", "cancel inbound", "abort approach", "abort landing",
                     "leave the pattern", "leaving the pattern", "cancel my approach")) return "cancelapproach";
@@ -959,17 +975,25 @@ public partial class Tower
             if (Has(n, "in sight", "looking", "negative contact", "no joy") && !Has(n, "field", "runway", "airport")) return "traffic";   // Reply to traffic advisory
             if (Has(n, "inbound", "landing", "recovery", "full stop", "rejoin")) return "inbound";
             // First call to Departure after takeoff ("Kutaisi Approach, Enfield 1-1", "…, with you"): check-in, not a landing announcement
-            if ((Phase is Phase.ClearedTakeoff or Phase.Departing || Phase == Phase.Away && handedOff) && (Has(n, "with you") || Addressed(n) == "Approach" && Rest(n) == "unknown")) return "airborne";
+            if ((Phase is Phase.ClearedTakeoff or Phase.Departing || Phase == Phase.Away && handedOff) && (Has(n, "with you", "checking in", "check in") || Addressed(n) == "Approach" && Rest(n) == "unknown")) return "airborne";   // LA09: "checking in" like "with you"
             if (Has(n, "airborne", "climbing") && Phase is Phase.Pattern or Phase.Entering or Phase.Initial or Phase.Inbound) return Rest(n);   // R112: no departure, so no first contact ("Approach: airborne, climbing")
             if (!Emergency && Phase is Phase.Initial or Phase.Pattern or Phase.ClearedLand && DepWish(n)) return "patterndep";   // forum 0.13: before "approach" ("low approach, then departure")
-            if (Has(n, "with you") || Has(n, "approach") && !Following && !handedOff) return "inbound";
+            if (Has(n, "with you", "checking in", "check in") || Has(n, "approach") && !Following && !handedOff && Rest(n) != "bye") return "inbound";   // LA09 (log Nellis): "Trident 5-1, checking in" to Approach; LA08: "Kutaisi Approach, Enfield 1-1, good day" is no check-in
             if (Has(n, "touch and go", "touch go", "low approach", "low pass", "fly by", "flyby", "closed pattern", "pattern work", "the option")) return "option";
         }
         return CallOnly(n) ? "callup" : Rest(n);   // "Kutaisi Tower, Enfield 1-1, information Charlie" is a first call, not a weather question (A27)
         // Question/farewell, also before check-in with Departure ("Kutaisi Approach, Enfield 1-1, good day" is not a check-in)
         static string Rest(string n) => Has(n, "qnh", "weather", "wind", "altimeter", "information", "atis",
-                "runway in use", "active runway", "which runway", "confirm runway", "say runway") ? "weather" : Has(n, "good day", "thank", "bye") ? "bye" : "unknown";
+                "runway in use", "active runway", "which runway", "confirm runway", "say runway") ? "weather" : Has(n, Bye) ? "bye" : "unknown";
     }
+    /// LA08 (log 13.–15.10.): farewell; "goodbye" is no word start for "bye"
+    const string Bye = "(?:good ?bye|bye|good day|have a good|cheers|see you|thank)";
+    /// LA08: controller transmission that ends the contact: handover ("contact Darkstar …", not "radar contact"), sign-off, farewell (Tower and Ops)
+    internal static readonly Regex HandoffRe = new(@"(?<!radar )\b[Cc]ontact [A-Z]|\b(?:frequency change approved|cleared to depart|checking out|cleared off the range|good ?bye|good day|good luck)\b");
+    /// LA08: farewell or frequency readback after it ("Have a good one. Goodbye.", "241 decimal 0, Dodge 1-1", "Dogstar 3-2, decimal 4"), no new request
+    internal static bool Farewell(string n) => (Has(n, Bye) || Regex.IsMatch(n, @"\b\d+ (?:decimal|point) \d")) && !Has(n, "request", "requesting", "say again", "confirm", "mayday", "pan pan", "check in", "checking in");
+    /// LA08: up to 60 s after the own handover/sign-off a farewell or frequency readback stays silent, also below the confidence threshold (SayAgain)
+    bool SignedOff(string n, string intent, double now) => intent is "bye" or "unknown" && last != null && now - lastAt < 60 + last.Text.Split(' ').Length / 2.5 && HandoffRe.IsMatch(last.Text) && Farewell(n);
 
     /// Startup requested ("request startup", "start up", "request engine start", "ready to start"), not "engines started".
     internal static bool StartReq(string n) => Has(n, "start up", "startup", @"(?:request|requesting|ready (?:to|for)) (?:engines? )?start\b");
@@ -1007,6 +1031,9 @@ public partial class Tower
         Phase.Departing when handedOff => "Approach",   // R7: after "contact Departure" only Departure speaks
         _ => "Tower",
     };
+    /// LA11 (log Nellis): controller of the frequency the call came on, if it is only his at this airfield (Departure on the Approach frequency counts as Approach, Dep names it); null = shared/unknown
+    string? FreqRole() => CallFreq <= 0 ? null
+        : Airfield.Roles.Where(r => F.FreqsOf(r)?.Any(x => Math.Abs(x - CallFreq) < 0.005) == true).Select(r => r == "Departure" ? "Approach" : r).Distinct().ToList() is [var one] ? one : null;
 
     /// Controller called at the start of the transmission (first three words, long airfield names correspondingly more): "Kutaisi Approach, ..." / "Minvody Approach, ..." (call name) / "Ground: ..." (menu) / "Tower, ...".
     /// Station further back, "contact Tower" or "radar contact/service" is a readback, not a call.

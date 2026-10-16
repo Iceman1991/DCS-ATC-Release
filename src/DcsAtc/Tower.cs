@@ -240,6 +240,7 @@ public partial class Tower
     public int FlightSize = 1;
     public int Side;   // N1: player's side (Program.Prep), en-route clearance only to own/neutral destinations; 0 = all
     public double HeardOn;   // K2: airfield frequency on which the pilot calls or which he has tuned (Program.SpokenFreq), 0 = unknown
+    public double CallFreq;  // LA11: SRS frequency of the current call (Program.Request), 0 = menu/unknown
     public string? AwacsContact;   // "Overlord two five one decimal zero": own AWACS/GCI of the mission, handoff after departure (Program), null = none
     public bool Following;   // V15: flight following (radar service en route), moves along on airfield change (Program)
     public bool Radar => handedOff || depClr || Following || transitFt != null;   // R47: Departure, Flight Following or transit (N3) still looks after the flight (Program.Pick keeps the airfield)

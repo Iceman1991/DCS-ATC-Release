@@ -59,7 +59,8 @@ static partial class Program
             "Ground: request taxi" => gnd && ph is null or Phase.Parked or Phase.StartupApproved or Phase.TaxiOut,
             "Ground: request IFR clearance" or "Tower: ready for departure" or "Tower: ready for departure, closed pattern" or "Tower: ready for departure, practice approach"
                 or "Tower: ready for departure, request unrestricted climb" or "Tower: ready for departure, request tactical departure" => gnd && before,
-            "Ground: runway vacated, request taxi to parking" => gnd && !before,   // after landing (or aborted takeoff back)
+            "Ground: runway vacated, request taxi to parking" => gnd && (!before && ph != Phase.ClearedTakeoff || ph == Phase.HoldShort && a!.HoldSince == -2),   // after landing or rejected takeoff; LA26: not while cleared for takeoff
+            "minimum fuel" => air,   // LA26 (log: on the ground "stand by" + "you are on the ground. Say request.")
             "Tower: high key" or "Tower: low key, gear down" => air && (a?.Sfo == true || ask.Contains(" key") || flow.Contains(" key")),   // after "request S F O"
             "Tower: request departure" => air && ph is Phase.Initial or Phase.Pattern or Phase.ClearedLand,   // forum 0.13: departure from the pattern
             "Approach: airborne, climbing" => airb,
@@ -331,6 +332,10 @@ static partial class Program
         Want(Sub("Tower") is var t1 && t1.Contains("Tower: ready for departure") && !t1.Contains("Tower: initial"), "geparkt Tower", t1);
         Want(Sub("Approach") is var a1 && a1.SequenceEqual(new[] { "Approach: say again" }), "geparkt Approach", a1);
         Want(Top() is var top1 && !top1.Contains("AWACS") && !top1.Contains("Tanker"), "geparkt Oberebene", top1);
+        // LA26 (log Kutaisi): cleared for takeoff on the ground: no "runway vacated", no "minimum fuel"
+        Ph(Phase.ClearedTakeoff, gnd);
+        Want(Sub("Ground") is var g26 && !g26.Contains("Ground: runway vacated, request taxi to parking"), "LA26 Startfreigabe Ground", g26);
+        Want(Sub(L("Notfall", "Emergency")) is var e26 && !e26.Contains("minimum fuel") && e26.Length > 0, "LA26 Boden Notfall", e26);
         // shortly after takeoff: Airborne, Request higher, no Ground, no Cancel approach
         Ph(Phase.Departing, air);
         Want(Sub("Approach") is var a2 && a2.Contains("Approach: airborne, climbing") && a2.Contains("Approach: request higher") && !a2.Contains("Approach: cancel approach") && !a2.Contains("Approach: report airspeed"), "Abflug Approach", a2);

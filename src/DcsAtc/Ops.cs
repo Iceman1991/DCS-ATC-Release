@@ -119,18 +119,21 @@ partial class Ops
         var n = Normalize(text.Contains(':') ? text[(text.IndexOf(':') + 1)..] : text);
         if (role == "JTAC") { var jr = JtacCall(n, me, now, unsure); if (jr.Count > 0 && !jr.Any(c => c.Text.Contains("say again"))) lastRole[role] = jr; return jr; }   // J6
         if (Ack(n, me.Callsign, role)) return new();   // forum 0.15: "Enfield 1-1" / "roger, Enfield 1-1" acknowledges a call without readback, no "say again"
+        if (now - byeAt < 60 && Farewell(n)) return new();   // LA08 (log): "Good day, Trident 5-1" after "copy checking out, good day", "… Have a good one. Goodbye." after "cleared to depart", also when unsure
         if (unsure || Has(n, "radio check", "how do you read"))
         {
-            var st = role == "Range" ? "Range Alpha" : role == "AWACS" ? AwacsName(AwacsOf(air, me), me) : Tankers(air, me).FirstOrDefault()?.Name ?? "Tanker";
-            return new() { new(role, st, unsure ? $"{Cs(me)}, {st}, say again." : $"{Cs(me)}, {st}, read you five.", role == "AWACS" ? AwacsFreqOf(AwacsOf(air, me)) : 0) };
+            var st = role == "Range" ? "Range Alpha" : role == "AWACS" ? AwacsName(MyAwacs(air, me), me) : Tankers(air, me).FirstOrDefault()?.Name ?? "Tanker";
+            return new() { new(role, st, unsure ? $"{Cs(me)}, {st}, say again." : $"{Cs(me)}, {st}, read you five.", role == "AWACS" ? AwacsFreqOf(MyAwacs(air, me)) : 0) };
         }
         if (role != "AWACS" && Has(n, "say again") && lastRole.TryGetValue(role, out var lc)) return lc;   // R393: repeat the last call of the Range/tanker (AWACS: `last`)
         var res = role == "Range" ? RangeCall(n, me, air, fields, cfgAwacs, now, qnhOf) : role == "AWACS" ? AwacsCall(n, me, air, fields, now) : TankerCall(n, me, air, now);
         if (role == "Range") HotEdge(now);   // Pass start/end to the second of the call
         if (role != "AWACS" && res.Count > 0 && !res.Any(c => c.Text.Contains("say again"))) lastRole[role] = res;   // R393 (not the "say again" of the controller himself)
+        if (res.Any(c => HandoffRe.IsMatch(c.Text))) byeAt = now;
         return res;
     }
     readonly Dictionary<string, List<Call>> lastRole = new();   // R393: last reply per role ("say again")
+    double byeAt = -999;   // LA08: last handover/sign-off to this player (AWACS, tanker, range)
     /// Acknowledgement only: own call sign plus roger/copy/thanks (digits of a readback allowed). With the station name in front only once in contact
     /// (tanker after the request, range checked in); "Overlord, Enfield 1-1" stays a call-up.
     bool Ack(string n, string own, string role)
@@ -343,7 +346,14 @@ partial class Ops
     Ask? ask;                                            // LD14: commit to him, still without reply (follow-up after 10 s, after 25 s to the next flight)
     int silent; bool noComm;                             // LD14: unanswered taskings; from 2 "no radio" (no longer planned until he speaks)
     double dirAt = -1e9;                                 // LD14: last item was a tasking to him (acknowledgment "Dagger one." gets no reply)
-    Call ToAll(string s) => new("AWACS", awName, s, awFreq, All: true);   // to everyone on the AWACS frequency (Gid 0), without callsign
+    Call? ToAll(string s)   // to everyone on the AWACS frequency (Gid 0), without callsign
+    {
+        var k = $"{side}:{awFreq}:all:{s}";
+        if (net.TryGetValue(k, out var w) && callNow - w.At is >= 0 and < 10) return null;   // LA23 (log): the same call to all twice within a second (two players' pictures)
+        net[k] = (callNow, this);
+        return new("AWACS", awName, s, awFreq, All: true);
+    }
+    double callNow, splashAt = -1e9;   // time of the current AwacsAuto/AwacsCall (ToAll dedupe); LA23: his last "splash" report
 
     /// Own AWACS (the nearest) with call name and frequency from the mission ("Magic11" -> Magic), otherwise Overlord / config.
     internal static Traffic? AwacsOf(IReadOnlyList<Traffic> air, Me me) =>
@@ -360,13 +370,23 @@ partial class Ops
     public static double TankerFreqOf(string group) => GroupFreq(TankerFreq, group);
     /// Mission frequency of the own tanker (radio wheel display, handoff), otherwise of the nearest matching one; 0 = config.
     public double TankerFreqFor(IReadOnlyList<Traffic> air, Me me) => TankerFreqOf(tanker != "" ? tanker : Tankers(air, me).FirstOrDefault()?.A.Group ?? "");
-    /// Frequency of the own AWACS (radio wheel display, Program), 0 = config.
-    public static double AwacsFreqFor(IReadOnlyList<Traffic> air, Me me) => AwacsFreqOf(AwacsOf(air, me));
     /// Handover after departure: "Overlord two five one decimal zero" (own AWACS or GCI), null = none in the air.
     /// maxNm > 0: an AWACS farther away than that is no contact (Center takes over); GCI has no position and stays.
     public static string? AwacsContact(IReadOnlyList<Traffic> air, Me me, double cfgFreq, double maxNm = 0) =>
         AwacsUp(air, me) && AwacsOf(air, me) is var a && (maxNm <= 0 || a == null || me.Tel == null || Dist(me.Tel.X, me.Tel.Z, a.X, a.Z) < maxNm * NM) ? $"{AwacsName(a, me)} {Tower.FreqSay(AwacsFreqOf(a) is > 0 and var f ? f : cfgFreq)}" : null;
-    void SetAwacs(IReadOnlyList<Traffic> air, Me me) { var a = AwacsOf(air, me); awName = AwacsName(a, me); awFreq = AwacsFreqOf(a); side = me.Coalition; flight = Flight(me); }
+    /// LA15 (log): the AWACS of this player: the one he calls on its mission frequency, otherwise the one he checked in with (while airborne and within 250 NM), otherwise the nearest.
+    /// Before, every call took the nearest one, so the name changed mid-fight and its calls came on a frequency he had not tuned (copy on Guard).
+    internal Traffic? MyAwacs(IReadOnlyList<Traffic> air, Me me)
+    {
+        bool Aw(Traffic a) => a.InAir && a.Coalition == me.Coalition && Regex.IsMatch(a.Type, "E-3|E-2|A-50|KJ-2000");
+        var a = (me.Freq > 0 ? air.FirstOrDefault(x => Aw(x) && Math.Abs(AwacsFreqOf(x) - me.Freq) < 0.005) : null)
+                ?? air.FirstOrDefault(x => x.Id == awId && Aw(x) && (me.Tel == null || Dist(me.Tel.X, me.Tel.Z, x.X, x.Z) < 250 * NM))
+                ?? AwacsOf(air, me);
+        awId = a?.Id ?? -1;
+        return a;
+    }
+    int awId = -1;
+    void SetAwacs(IReadOnlyList<Traffic> air, Me me) { var a = MyAwacs(air, me); awName = AwacsName(a, me); awFreq = AwacsFreqOf(a); side = me.Coalition; flight = Flight(me); }
 
     // LK3: group names per side, not per player: all players and AI flights of a side hear the same AWACS and talk about the same group
     static readonly Dictionary<int, Dictionary<int, string>> labels = new();   // side -> enemy unit -> "north group"
@@ -535,6 +555,7 @@ partial class Ops
     List<Call> AwacsCall(string n, Me me, IReadOnlyList<Traffic> air, IReadOnlyList<Airfield> fields, double now)
     {
         if (!AwacsUp(air, me)) return new();   // no own AWACS in the air: nobody answers
+        callNow = now;
         var c = Cs(me);
         var t = me.Tel;
         silent = 0; noComm = false;   // LD14: he speaks (again)
@@ -556,7 +577,7 @@ partial class Ops
         }
         if (Has(n, "check out", "checking out"))
         {
-            awacsIn = onStation = false; Abm.Release(side, Flight(me));   // no more calls by itself; LK9: no longer planned
+            awacsIn = onStation = false; awId = -1; Abm.Release(side, Flight(me));   // no more calls by itself; LK9: no longer planned
             var home = t == null ? null : fields.Where(f => f.Side == 0 || f.Side == me.Coalition).MinBy(f => Dist(t.X, t.Z, f.X, f.Z));
             if (home != null && Dist(t!.X, t.Z, home.X, home.Z) > 60 * NM && CenterFor(me.Coalition, t.X, t.Z) is { } cn)   // A6: home farther than 60 NM -> the Center takes over
                 return new() { A($"{c}, {awName}, copy checking out, contact {cn.Name} {FreqSay(cn.Freq)}.") };
@@ -649,6 +670,7 @@ partial class Ops
         if (Has(n, "splash", "kill"))
         {
             var k = Regex.Match(n, @"\b(?:splash|kill) (\d+)\b");
+            splashAt = now;
             // LK8: which group (last shot-down unit with name) and what remains ("South group remains." / "picture clean"); shot-down ones no longer count
             var rest = groups.Where(g => !g.Ids!.All(killed.ContainsKey)).ToList();
             var kg = killed.Where(x => now - x.Value < 30).OrderByDescending(x => x.Value).Select(x => named.GetValueOrDefault(x.Key)).FirstOrDefault(s => s != null);
@@ -817,6 +839,7 @@ partial class Ops
     Call? AwacsAuto(Me me, Telemetry t, IReadOnlyList<Traffic> air, double now)
     {
         bool lost = hadAw && AwacsOf(air, me) == null; hadAw = AwacsOf(air, me) != null;   // LD10: AWACS shot down/landed
+        callNow = now;
         if (!awacsIn || !AwacsUp(air, me)) { members.Clear(); watching = false; if (AwacsUp(air, me)) Hostiles(air, me, now); return null; }   // only after check-in; LK1: the AWACS tracks the tracks anyway (ID time)
         SetAwacs(air, me);
         bool scan = ScanSec <= 0 || Math.Floor(now / ScanSec) > Math.Floor(scanPrev / ScanSec); scanPrev = now;   // LD11
@@ -856,7 +879,7 @@ partial class Ops
         }
         evSince = since;
         Call Tell(Grp g, string s) { groupsTold.UnionWith(g.Ids!); hadContacts = true; lastTold = now; Nm(g); return A($"{c}, {awName}, {s}.") with { Lead = s.Contains("BRAA") ? g.Lead.Id : 0 }; }   // LD4: BRAA anew at transmit (Program, Rebraa)
-        Call Upd(Grp g, string s) { groupsTold.UnionWith(g.Ids!); hadContacts = true; lastTold = now; Nm(g); return Bull() != null ? ToAll($"{awName}, {s}.") : A($"{c}, {awName}, {s}."); }   // LK4: situation update to all (Bullseye)
+        Call? Upd(Grp g, string s) { groupsTold.UnionWith(g.Ids!); hadContacts = true; lastTold = now; Nm(g); return Bull() != null ? ToAll($"{awName}, {s}.") : A($"{c}, {awName}, {s}."); }   // LK4: situation update to all (Bullseye)
         var nk = $"{me.Coalition}:{awFreq}:";   // A64: blocks only what another player of the same side has just heard on the frequency
         bool Heard(string k, double s) => net.TryGetValue(nk + k, out var w) && w.By != this && now - w.At < s;
         if (!radarContact && t.Agl > 900)
@@ -867,7 +890,7 @@ partial class Ops
         if (groups.Count > 0) lastHostile = now;   // R53: "picture clean" only without a group in the radar picture (also beyond NewGroupNm)
         // LD9 (protection of the AWACS, HVAA): group hot on the AWACS under 50 NM -> to everyone "Overlord, north group, 45 miles from Overlord, hot, Overlord moving south.",
         // planned first (like a leaker, Abm); mode awacs: the AWACS evades 40 NM (mission script ORBIT, after 10 min continues as planned)
-        if (AwacsOf(air, me) is { } awT && groups.Select(x => x.G).FirstOrDefault(g => !g.Ids!.Any(hvaaTold.Contains) && Dist(g.Lead.X, g.Lead.Z, awT.X, awT.Z) < 50 * NM &&
+        if (MyAwacs(air, me) is { } awT && groups.Select(x => x.G).FirstOrDefault(g => !g.Ids!.Any(hvaaTold.Contains) && Dist(g.Lead.X, g.Lead.Z, awT.X, awT.Z) < 50 * NM &&
                 HdgDiff(g.Lead.Hdg * 180 / Math.PI, Bearing(g.Lead.X, g.Lead.Z, awT.X, awT.Z)) <= 30) is { } hg)
         {
             hvaaTold.UnionWith(hg.Ids!); groupsTold.UnionWith(hg.Ids!); hadContacts = true; Abm.Leaker(side, hg.Ids!);   // reported: no "new group" afterward
@@ -900,9 +923,11 @@ partial class Ops
             if (e.Kind == "aspect") return A(Abm.Say(e, awName).Replace(e.Flight + ",", c + ","));   // LD8: assigned group turns
             if (e.Kind == "reset")
             {
-                if (e.Label != "picture clean") return A($"{c}, {awName}, reset.");
+                int kills = e.Ids.Count(id => now - killed.GetValueOrDefault(id, -1e9) < 120);   // LA23 (log): his group shot down -> confirm the splash (unless he reported it himself)
+                var sp = kills > 0 && now - splashAt > 30 ? $"splash {Digits(kills.ToString())}, " : "";
+                if (e.Label != "picture clean") return A($"{c}, {awName}, {sp}reset.");
                 Clean(); net[nk + "clean"] = (now, this); cleanAt[side] = now;   // is already "picture clean": no second one afterward
-                return A($"{c}, {awName}, picture clean, reset.");
+                return A($"{c}, {awName}, {sp}picture clean, reset.");
             }
             if (groups.Select(x => x.G).FirstOrDefault(g => g.Ids!.Any(e.Ids.Contains)) is not { } eg) continue;   // commit/recommit: group gone meanwhile
             committed.UnionWith(eg.Ids!);
@@ -960,7 +985,7 @@ partial class Ops
             }
             // LK8 (ATP 1-02.1 LEAKER: past a defensive line): hostile, taken by no flight, closer to the own airfield than any CAP and heading toward it
             // -> once "Overlord, leaker, north group, bullseye …, track east, hostile." (without CAP there is no line, so no leaker)
-            if (!own && !fur && g.Hostile && Tgt(g) == "" && !g.Ids!.Any(leakTold.Contains) && Abm.Caps(side) is { Count: > 0 } caps &&
+            if (!own && !fur && g.Hostile && !Support.IsMatch(g.Lead.Type) && Tgt(g) == "" && !g.Ids!.Any(leakTold.Contains) && Abm.Caps(side) is { Count: > 0 } caps &&   // LA23: an AWACS/tanker is no leaker
                 Tower.All.Where(f => f.Side == me.Coalition).MinBy(f => Dist(f.X, f.Z, g.Lead.X, g.Lead.Z)) is { } af &&
                 HdgDiff(g.Lead.Hdg * 180 / Math.PI, Bearing(g.Lead.X, g.Lead.Z, af.X, af.Z)) <= 30 && caps.All(p => Dist(p.X, p.Z, af.X, af.Z) > Dist(g.Lead.X, g.Lead.Z, af.X, af.Z)))
             {
@@ -1023,7 +1048,7 @@ partial class Ops
             var p = live.Length > 0 ? lastPos[live[0]] : default;
             Forget(ids);
             foreach (var id in ids) lastPos.Remove(id);
-            if (live.Length == 0 || live.Any(id => heardBy("fade:" + id, 300))) continue;   // shot down: splash, no faded (LK8); A64: just said for another
+            if (live.Length < ids.Length || live.Any(id => heardBy("fade:" + id, 300))) continue;   // shot down: splash, no faded (LK8), LA23: not for the rest of that group either; A64: just said for another
             foreach (var id in live) net[nk + "fade:" + id] = (now, this);
             if (Bull() is not { } b) return A($"{c}, {awName}, {label} faded.");
             return ToAll($"{awName}, {label} faded, last known bullseye {Brg(Bearing(b.X, b.Z, p.X, p.Z))}, {Miles(Dist(b.X, b.Z, p.X, p.Z))}.");
@@ -1105,6 +1130,7 @@ partial class Ops
         tanker = tk.A.Group;
         cs = c;
         var l = Line(tk.A.Group);
+        if (Has(n, "complete", "departing", "thank", "good day", "leaving") && tank == 0 && was == tk.A.Group && now - byeAt < 60) return new();   // LA16 (log): readbacks after "cleared to depart" ("… thanks") get no second clearance
         if (Has(n, "complete", "departing", "thank", "good day", "leaving"))
         {
             bool first = l.FirstOrDefault(o => o.tank >= 2) == this;   // had the spot (e.g. after a deliberate partial amount, OnRefuel tank 3): the next one moves up (A66/A128)
@@ -1119,10 +1145,11 @@ partial class Ops
         {
             var dc = T($"{c}, {tk.Name}, {OneOf("copy disconnect", "roger disconnect")}, move to the right wing.");
             if (tank != 3) return dc;
-            tank = 2; OffLine();   // without DCS event (OnRefuel) only the report frees the spot, the next gets it as in OnRefuel (A65)
+            tank = 2; disc = true; OffLine();   // without DCS event (OnRefuel) only the report frees the spot, the next gets it as in OnRefuel (A65)
             if (l.FirstOrDefault(o => o.tank >= 2) is { } nx) dc.Add(new("Tanker", tk.Name, $"{nx.cs}, {tk.Name}, cleared pre-contact.", To: nx));
             return dc;
         }
+        if (Has(n, "mov") && Has(n, "right")) return new();   // LA16 (log): "moving to the right" reads back "move to the right wing"
         if (Has(n, "right wing"))   // back on the right wing: no clearance, continue with "pre contact" or "complete"
             return T($"{c}, {tk.Name}, {OneOf("roger", "copy")}, report complete or request more.");
         // R56: confirm join/pre-contact only if the receiver is close enough to the tanker (ATP-56(C)), otherwise state the situation
@@ -1135,7 +1162,7 @@ partial class Ops
             Menu = ("intent", tk.A.Group);   // TP6: DCS "Intent to refuel" only now, not with the request
             if (!l.Contains(this)) l.Add(this);
             Arrive(l);
-            tank = 2;
+            tank = 2; disc = false;
             var ahead = l.Where(o => o.tank >= 2).ToList();   // Order after arrival (A65)
             var order = ahead.Count > 1 ? $" {ahead[0].cs} first, then {string.Join(", then ", ahead.Skip(1).Select(o => o.cs))}." : "";
             return T($"{c}, {tk.Name}, {neg}cleared to join, left observation, number {Pos(l)}.{order}");
@@ -1148,18 +1175,18 @@ partial class Ops
             Arrive(l);
             if (Pos(l) > 1) { tank = 2; return T($"{c}, {tk.Name}, negative, hold left observation, number {Pos(l)}."); }
             Menu = (tank < 1 || !DcsIntent ? "intent" : "precontact", tk.A.Group);
-            tank = 3;
+            tank = 3; disc = false;
             return T($"{c}, cleared contact, {(Boom(tk.A) ? "boom" : "basket")} ready.");
         }
         if (tank < 2 && Has(n, "judy", "radar contact")) { vecEnd = true; return T($"{c}, {tk.Name}, {OneOf("roger", "copy")}, report visual."); }   // TP3: radar contact ends the vectors, the join needs "visual"
         if (tank < 2 && Has(n, "visual", "tally", "in sight"))
-            return dTk > 8 * NM ? T($"{c}, {tk.Name}, continue, {MilesTxt(dTk)}, report visual.") : Join("");   // R117: "visual" releases the join (2-5 NM as in TankVec), only not beyond 8 NM (TickLive discards over 10 NM); R286: continue with "visual", the tanker understands that
+            return dTk > 20 * NM ? T($"{c}, {tk.Name}, continue, {MilesTxt(dTk)}, report visual.") : Join("");   // R117: "visual" releases the join (2-5 NM as in TankVec); LA16 (log: "visual" at 16, 13, 8 NM rejected): up to 20 NM (TickLive discards over 25 NM); R286: continue with "visual", the tanker understands that
         if (Has(n, "observation", "left wing", "visual", "tally", "in sight", "joined"))
         {
             if (far) return Far();
             if (tank < 2) return Join("");   // R287: without "cleared to join" no "cleared pre-contact"
             if (!l.Contains(this)) l.Add(this);
-            tank = 2;
+            tank = 2; disc = false;
             return T(Pos(l) > 1 ? $"{c}, {tk.Name}, stabilize left observation, number {Pos(l)}." : $"{c}, {tk.Name}, cleared pre-contact.");
         }
         // Only a real request starts the rendezvous; chatter with the tanker (fuel state etc.) does not reset contact
@@ -1275,7 +1302,7 @@ partial class Ops
             Cold();   // landed / gone: range free
             if (t == null || t.Ias < 5)   // shut down: next flight with a new picture; touch-and-go keeps radar contact and reported items
             {
-                radarContact = awacsIn = hadContacts = onStation = false;
+                radarContact = awacsIn = hadContacts = onStation = false; awId = -1;
                 groupsTold.Clear(); committed.Clear(); threatTold.Clear(); mergeTold.Clear(); judy.Clear(); members.Clear(); seenAt.Clear(); heard.Clear(); mine.Clear(); lastPos.Clear(); watching = false;   // LK3: group names belong to the side, not the flight
                 if (cas > 0) CasEnd();   // R418: landed and stopped or gone: the JTAC is free for the next flight
                 RangeReset(); checkedIn = false;   // R131: landing/shutdown ends the range visit (debrief and rgPasses stay), touch-and-go stays checked in; the new flight starts with check-in again
@@ -1304,13 +1331,14 @@ partial class Ops
         // R236: waiting for the range ("continue, one aircraft in") -> free: "cleared hot" if position and heading still fit, otherwise silent (new "in")
         if (waitHot && Range is { } zw && !hot.Any(o => o != this) && InHot(me, zw, now) is var ih && (isHot || isDry)) { HotEdge(now); return new() { R(ih) }; }
         var tk = tank >= 2 ? Tankers(air, me).FirstOrDefault(k => k.A.Group == tanker) : null;
-        if (tk != null && Dist(t.X, t.Z, tk.A.X, tk.A.Z) > 10 * NM) { tank = 0; OffLine(); tk = null; }   // away from the tanker
+        if (tk != null && Dist(t.X, t.Z, tk.A.X, tk.A.Z) > 25 * NM) { tank = 0; OffLine(); tk = null; }   // away from the tanker (LA16: join from up to 20 NM)
         if (tk != null && TankerCoach(me, t, tk, now) is { } tc) return new() { tc };
         return awacs && AwacsAuto(me, t, air, now) is { } call ? new() { call } : new();
     }
 
     // Tanker coaching and turn call (V18), roughly from the positions at one-second rate
     double coachAt = -99, cAlong, cLat, cVert, cT = -99, stillSince, tkRef = double.NaN, tkPrev, tkStable, breakAt = -99;
+    bool disc;   // LA16: disconnected, on the way to the right wing (no "stabilize"), until pre-contact
     bool turning;
     static readonly Dictionary<string, (double At, bool Right)> tkTurn = new();   // last turn call per tanker (A121): one call to all, not per receiver
     public static int Breakaways;   // counters for the debrief (P3-TK3)
@@ -1347,7 +1375,7 @@ partial class Ops
             ((along > -20 && Math.Abs(lat) < 20 && Math.Abs(vert) < 20) || (closure > 6 && along > -50) || (tank == 4 && (Math.Abs(lat) > 25 || Math.Abs(vert) > 25))))
         { breakAt = now; Breakaways++; if (tank == 3) tank = 2; return Say($"{c}, breakaway, breakaway, breakaway."); }   // R289: back to observation, contact only after a new clearance (in contact: with the disconnect)
         if (turn != null) return Say(turn, true);
-        if (tank == 4 || along > 0 || along < -300 || Math.Abs(lat) > 60 || now - coachAt < 8) return null;
+        if (tank == 4 || tank == 2 && disc || along > 0 || along < -300 || Math.Abs(lat) > 60 || now - coachAt < 8) return null;   // LA16: after the disconnect no coaching until pre-contact
         if (closure > 3 && along > -150) return Say($"{c}, slow closure.");   // > 6 kt
         if (wobble > 1.5 && along > -80) return Say($"{c}, stabilize.");
         // ponytail: contact point flat 45 m behind the tanker center, more exact only with a type table; basket is not steered (A127)
@@ -1423,13 +1451,13 @@ partial class Ops
         var row = L("Luftbetankung", "Air refueling") + $" {name}: {contactSum:0} s " + L("Kontakt", "contact") + $", " + L("Tank", "fuel") + $" {fuelAtContact * 100:0} -> {fuel * 100:0} %{(lb > 0 ? $", {lb:0} lb" : "")}";
         if (dbText != null && Debrief.IndexOf(dbText) is var i and >= 0) Debrief[i] = row; else Debrief.Add(row);
         dbText = row; lastStop = now;
-        if (fuel < 0.97 && breakAt >= contactAt) { tank = 2; broken = false; return new(); }   // R289: disconnect after breakaway: observation, no "return to pre-contact", contact only after a new clearance
+        if (fuel < 0.97 && breakAt >= contactAt) { tank = 2; disc = true; broken = false; return new(); }   // R289: disconnect after breakaway: observation, no "return to pre-contact", contact only after a new clearance
         if (fuel < 0.97)   // unwanted, stays in the queue (ponytail: desired quantity only with N37)
         {
-            tank = 3; broken = true;
+            tank = 3; disc = false; broken = true;
             return new() { new("Tanker", name, $"{Cs(me)}, {name}, disconnect, return to pre-contact.") };
         }
-        tank = 2; broken = false;
+        tank = 2; disc = true; broken = false;
         OffLine();
         var next = line.GetValueOrDefault(tkr?.A.Group ?? "")?.FirstOrDefault(o => o.tank >= 2);
         var done = new Call("Tanker", name, $"{Cs(me)}, {name}, disconnect{(lb > 0 ? $", you received {lb / 1000:0.0}" : "")}, move to the right wing.{(next == null ? " Report complete, or pre-contact for more." : "")}");   // R288: "complete" first (Enter suggestion: first option), full is full
@@ -1815,6 +1843,22 @@ partial class Ops
         check(lk8[0].StartsWith("Enfield one one, Overlord, leaker, single group, BRAA") && lk8[0].EndsWith(", hostile.") && lk8[1] == "-" && !lk8n.Contains("leaker"),
               $"LK8 leaker: {string.Join(" | ", lk8)} | ohne CAP: {lk8n}");
         Abm.Reset();
+        {   // LA23 (log): his committed group shot down (kill event) -> "splash one" with the reset; the same call to all twice within a second -> once
+            labels.Clear(); net.Clear(); killed.Clear();
+            var o23 = new Ops();
+            o23.OnTranscript("AWACS", "Overlord, Enfield 1-1, on station", me, e3, f, 0); o23.Tick(me, e3, 1);
+            Tn(o23, W9(M9(121, 80 * NM, 0)), 2);
+            var cm23 = Tn(o23, W9(M9(121, 38 * NM, 0)), 3);
+            killed[121] = 4;
+            var rs23 = Tn(o23, e3, 5);
+            var (a23, b23) = (new Ops { callNow = 7, side = 2 }, new Ops { callNow = 7.5, side = 2 });
+            var (x1, x2) = (a23.ToAll("Overlord, northeast group, hostile."), b23.ToAll("Overlord, northeast group, hostile."));
+            a23.callNow = 18;
+            var x3 = a23.ToAll("Overlord, northeast group, hostile.");
+            check(cm23.Contains("commit") && rs23 == "Enfield one one, Overlord, splash one, picture clean, reset." && x1 != null && x2 == null && x3 != null,
+                  $"LA23 splash beim Reset, Doppelruf an alle -> {cm23} | {rs23} | {x1?.Text} | {x2?.Text} | {x3?.Text}");
+            killed.Clear(); Abm.Reset(); labels.Clear(); net.Clear();
+        }
         check(new Ops().Tick(me, air.Where(a => a.Type != "E-3A").ToList(), 1).Count == 0, "AWACS: ohne AWACS keine Meldungen");
         var join = Say("Tanker", "request rejoin");
         check(join.StartsWith("Texaco") && join.Contains("five two X-ray"), "Tanker: Hornet bekommt Korb-Tanker Texaco -> " + join);
@@ -1903,7 +1947,7 @@ partial class Ops
         var tdis = Ta("Texaco, Enfield 1-1, disconnect");
         var trw = Ta("Texaco, Enfield 1-1, right wing");
         var tdep = Ta("Texaco, Enfield 1-1, complete, thanks");
-        var tdep2 = Ta("Texaco, Enfield 1-1, good day");
+        var tdep2 = Ta("Texaco, Enfield 1-1, good day") == "" ? string.Join(" | ", ta.OnTranscript("Tanker", "Texaco, Enfield 1-1, good day", meN, air, f, 100).Select(y => y.Text)) : "?";   // LA08: farewell after "cleared to depart" silent, after 60 s again without amount
         check(tdis == "Texaco one one: Enfield one one, Texaco one one, copy disconnect, move to the right wing." && trw == "Texaco one one: Enfield one one, Texaco one one, roger, report complete or request more."
               && !trw.Contains("pre-contact"), $"Tanker A67: disconnect/right wing -> {tdis} | {trw}");
         check(tdep.StartsWith("Texaco one one: Enfield one one, Texaco one one, total offload 5.4, cleared to depart, contact Overlord two five one decimal ") && ta.tank == 0
@@ -2201,6 +2245,14 @@ partial class Ops
         var bd5 = oa.OnTranscript("AWACS", "Magic, bogey dope", me, civ, f, 0)[0].Text;
         check(bd5.Contains("hostile, single, Fulcrum"), "AWACS V5: bogey dope ohne Neutrale -> " + bd5);
         check(AwacsFreqOf(civ[^1] with { Group = "Overlord#002" }) == 260.5, "AWACS: nachträglich gespawnt (Overlord#002) -> Frequenz der Vorlage");
+        {   // LA15 (log): two AWACS, check-in with the farther one on its frequency -> its name and frequency stay (later calls without frequency, own calls in Tick)
+            Callsigns = new Dictionary<string, string> { ["Overlord"] = "Magic11", ["Far"] = "Darkstar11" }; AwacsFreq["Far"] = 324.4;
+            var two15 = new List<Traffic>(civ) { new(77, "E-3A", 100 * NM, 0, 9000, 0, 150, "Far", "", true, 2) };
+            var o15b = new Ops();
+            var c15 = o15b.OnTranscript("AWACS", "Darkstar, Enfield 1-1, checking in", me with { Freq = 324.4 }, two15, f, 0)
+                          .Concat(o15b.OnTranscript("AWACS", "Darkstar, Enfield 1-1, picture", me, two15, f, 10)).Concat(o15b.Tick(me, two15, 20)).Where(x => x.Role == "AWACS").ToList();
+            check(c15.Count >= 2 && c15.All(x => x.Station == "Darkstar" && x.Freq == 324.4), "LA15 AWACS bleibt der beim Check-in: " + string.Join(" | ", c15.Select(x => $"{x.Station} {x.Freq}: {x.Text}")));
+        }
         Callsigns = keep; AwacsFreq.Clear();
         // V9: only what own sensors have detected (MiG yes, type unknown; Su-27 not)
         Detected[2] = new() { [1] = false };
@@ -2249,6 +2301,16 @@ partial class Ops
         check(TypeSay("FA-18C_hornet") == "Hornet" && TypeSay("F-16C_50") == "Viper" && TypeSay("F-15ESE") == "Strike Eagle" && TypeSay("F-15C") == "Eagle" && TypeSay("F-14B") == "Tomcat" && TypeSay("A-10C_2") == "Warthog" && TypeSay("MiG-21Bis") == "MiG 21Bis" && TypeSay("C-130") == "C 130", "TypeSay: Sprechnamen");
         var co = od2.OnTranscript("AWACS", "Overlord, Enfield 1-1, checking out", me, air, f, 0)[0].Text;
         check(co.Contains("checking out") && !od2.awacsIn && od2.Tick(me, air, 1).Count == 0, "AWACS: check out -> " + co);
+        {   // LA08 (log Nellis): farewell after "copy checking out, good day" / "cleared to depart, contact Darkstar" -> silent (also unsure), the next request answered
+            var gd8 = od2.OnTranscript("AWACS", "AWACS: Good day, Enfield 1-1.", me, air, f, 15).Count + od2.OnTranscript("AWACS", "AWACS: Good day, Enfield 1-1.", me, air, f, 16, true).Count;
+            var in8 = od2.awacsIn;
+            var tk8 = new Ops();
+            var dp8 = string.Join(" ", tk8.OnTranscript("Tanker", "Texaco, Enfield 1-1, request rejoin", meN, air, f, 0).Concat(tk8.OnTranscript("Tanker", "Texaco, Enfield 1-1, complete", meN, air, f, 1)).Select(y => y.Text));
+            var by8 = tk8.OnTranscript("Tanker", "Tanker: Clear phone, navigation, contact during dark star. Have a good one. Goodbye.", meN, air, f, 15).Count;
+            var aw8 = od2.OnTranscript("AWACS", "Overlord, Enfield 1-1, checking in", me, air, f, 20);
+            check(gd8 == 0 && !in8 && dp8.Contains("cleared to depart") && by8 == 0 && aw8.Count > 0 && !aw8[0].Text.Contains("say again"),
+                  $"LA08 AWACS/Tanker Abschied still: {gd8} / {dp8} / {by8} / {string.Join(" ", aw8.Select(y => y.Text))}");
+        }
         // A6: home farther than 60 NM -> "contact Tbilisi Control …" (Center), close to home the usual farewell
         var (thA6, kA6) = (Airfield.Theatre, f[0]);
         Airfield.Theatre = "Caucasus";
@@ -2342,14 +2404,22 @@ partial class Ops
         var (zv, zo) = (K(z1, me, "Texaco, Enfield 1-1, visual"), K(z1, me, "Texaco, Enfield 1-1, observation"));
         check(zv.Contains("negative, bearing") && zo.Contains("negative, bearing") && !(zv + zo).Contains("cleared pre-contact"), $"Tanker R56: beigetreten, dann weit weg -> {zv} | {zo}");
         line.Clear();
-        // R117: "visual" from 4.5 NM (TankVec itself says "report visual" from 5 NM) frees the join, from 20 NM not
+        // R117: "visual" from 4.5 NM (TankVec itself says "report visual" from 5 NM) frees the join, LA16 (log): also from 16 NM, from 26 NM not
         {
             var (rv, rw) = (new Ops(), new Ops());
-            var (m45, m20) = (me with { Tel = me.Tel! with { Z = 25.5 * NM } }, me with { Tel = me.Tel! with { Z = 10 * NM } });
+            var (m45, m20) = (me with { Tel = me.Tel! with { Z = 25.5 * NM } }, me with { Tel = me.Tel! with { Z = 4 * NM } });
             K(rv, m45, "Texaco, Enfield 1-1, request rejoin"); K(rw, m20, "Texaco, Enfield 1-1, request rejoin");
             var (v45, v20) = (K(rv, m45, "Texaco, Enfield 1-1, visual"), K(rw, m20, "Texaco, Enfield 1-1, visual"));
-            check(v45.Contains("cleared to join, left observation, number 1.") && v20 == "Enfield one one, Texaco one one, continue, 20 miles, report visual." && rw.tank == 1,
-                  $"Tanker R117: visual aus 4,5 NM Join, aus 20 NM nicht -> {v45} | {v20}");
+            check(v45.Contains("cleared to join, left observation, number 1.") && v20 == "Enfield one one, Texaco one one, continue, 26 miles, report visual." && rw.tank == 1,
+                  $"Tanker R117: visual aus 4,5 NM Join, aus 26 NM nicht -> {v45} | {v20}");
+            line.Clear();
+            var r16 = new Ops(); var m16 = me with { Tel = me.Tel! with { Z = 14 * NM } };   // LA16 (log): "visual" at 16 NM
+            K(r16, m16, "Texaco, Enfield 1-1, request rejoin");
+            var v16 = K(r16, m16, "Texaco, Enfield 1-1, visual");
+            line.Clear();
+            var d16 = new Ops { tank = 2, tanker = "Texaco (KC-135MPRS Korb)" };   // LA16 (log): readback of the departure clearance and of "move to the right wing" stay silent
+            var (dep16, rb16, mv16) = (K(d16, me, "Texaco, Enfield 1-1, complete"), K(d16, me, "Cleared to depart, contact Overlord, thanks, Enfield 1-1"), K(new Ops { tank = 2, tanker = "Texaco (KC-135MPRS Korb)" }, me, "Enfield 1-1, moving to the right"));
+            check(v16.Contains("cleared to join, left observation") && dep16.Contains("cleared to depart") && rb16 == "" && mv16 == "", $"LA16 Tanker visual 16 NM, Rücklesungen still -> {v16} | {dep16} | {rb16} | {mv16}");
         }
         line.Clear();
         // R119: two tankers with the same call name (Texaco 1-1 / 2-1): queue, clearance and turn call per tanker, name with number
@@ -2401,6 +2471,19 @@ partial class Ops
         s18b.Add(Co(o18b, me2, tex, 16, -110, 20));
         check(s18[1] == "Enfield one one, slow closure." && s18[11] == "" && s18[^1] == "*Texaco one one, turning right." && s18.Count(x => x != "") == 2 && s18b.All(x => x == ""),
               "Tanker V18/A121/A127: Korb nicht gelenkt, Kurve einmal an alle -> " + string.Join(" / ", s18.Concat(s18b).Where(x => x != "")));
+        {   // LA16 (log): after the disconnect on the way to the right wing (lateral 3 m/s close behind) no "stabilize"; still before contact (no disconnect) yes
+            string Wob(Ops oo, double now, double lat)
+            {
+                double fx = Math.Cos(tex.Hdg), fz = Math.Sin(tex.Hdg);
+                var m = me with { Tel = new Telemetry(tex.AltMsl, 6000, 140, tex.Hdg, tex.X - 60 * fx - lat * fz, tex.Z - 60 * fz + lat * fx, 0, 0, 0) };
+                return string.Join(" | ", oo.Tick(m, air, now).Select(x => x.Text));
+            }
+            var (w16a, w16b) = (new Ops { tank = 2, tanker = "Texaco (KC-135MPRS Korb)", disc = true }, new Ops { tank = 2, tanker = "Texaco (KC-135MPRS Korb)" });
+            var s16a = string.Join(" ", new[] { 0.0, 3, 6, 9 }.Select((l, i) => Wob(w16a, 1 + i, l)));
+            var s16b = string.Join(" ", new[] { 0.0, 3, 6, 9 }.Select((l, i) => Wob(w16b, 1 + i, l)));
+            check(!s16a.Contains("stabilize") && s16b.Contains("stabilize"), $"LA16 kein stabilize nach Disconnect -> {s16a} / {s16b}");
+            tkTurn.Clear();
+        }
         // A127: boom, short calls near pre-contact; P3-TK3: breakaway on too close an approach
         var shell = air.First(a => a.Group.StartsWith("Shell"));
         var obm = new Ops { tank = 3, tanker = "Shell (KC-135 Boom)" };

@@ -187,6 +187,8 @@ public partial class Tower
             var other = F.Ends.Select(e => e.Name).FirstOrDefault(e => HdgDiff(LandHdg(e), LandHdg(rw)) > 10 && OnFinalLoose(t, e));   // Parallel runway: Aligned
             if (other != null && ViaOther(other) && Phase == Phase.Entering)   // guided this way: overhead via the opposite direction
                 return Say($"{c}, negative, runway {RwSay(rw)} in use, continue overhead, {Hand(rw)} pattern runway {RwSay(rw)}, report overhead.");
+            if (other != null && wrongRwyTold && Phase is Phase.Pattern or Phase.Entering or Phase.Initial && callAt - lastGa >= 60 && OnFinal(t.X, t.Z, t.Hdg, t.Agl, other, 3 * NM))
+                return OtherFinal(t, traffic, other, c);   // LA13: told already, now short final there
             if (other != null)
             {
                 Phase = Phase.Pattern;
@@ -310,7 +312,9 @@ public partial class Tower
         Phase = Phase.Pattern;
         PatternReset();
         needWx = false;
-        return Say($"{Cs()}, join {Hand(Runway)} downwind runway {RwSay(Runway)}{(wx ? $", {Wind(t)}, {Qnh(t)}" : "")}, {Alt(PatternFt)}, report base.");
+        // LA14 (log Nellis 21L): overhead in the downwind direction (led in over the opposite runway): name the side, otherwise he turns to the wrong one
+        var keep = t != null && HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(Runway)) > 120 ? $"continue {Dir8(t.Hdg * 180 / Math.PI)}, keep the field on your {Hand(Runway).Split(' ')[0]}, " : "";
+        return Say($"{Cs()}, {keep}join {Hand(Runway)} downwind runway {RwSay(Runway)}{(wx ? $", {Wind(t)}, {Qnh(t)}" : "")}, {Alt(PatternFt)}, report base.");
     }
 
     /// R212: first call to the Tower after the circling clearance: "circle to runway 31, left traffic, report base" (FAA JO 7110.65 4-8-6, 3-10-1), then traffic pattern.
@@ -324,7 +328,8 @@ public partial class Tower
     }
 
     void PatternReset() { nav = null; kneeTo = null; lastAltFt = -1; if (navName == "circle") navName = "";   // Review R212: no old "circle" (otherwise a later first call at the Tower becomes circling)
-        baseCalled = extended = s360 = wrongRwyTold = finalLowTold = iniAsked = iniWaved = ovhAsked = ovhWaved = crpAsked = crpWaved = landCall = finAsked = gearDown = sfo = towerDue = towerNag = false; }
+        baseCalled = extended = s360 = wrongRwyTold = finalLowTold = iniAsked = iniWaved = ovhAsked = ovhWaved = crpAsked = crpWaved = landCall = finAsked = gearDown = sfo = towerDue = towerNag = false; sideWarns = 0; }
+    int sideWarns;   // LA14: "wrong side" in this pattern (at most twice, the second time with heading)
     double vecLim;   // R315: lead for the next waypoint turn
     bool intentsAsked;   // R318: "say intentions" already said within the gate
     bool fromHold;   // R319: radar vectoring from holding
@@ -357,6 +362,25 @@ public partial class Tower
         Phase = Phase.Pattern; PatternReset();
         return Say($"{c}, {head}, climb and maintain {Alt(PatternFt)}, join {Hand(Runway)} downwind runway {RwSay(Runway)}, report base.");
     }
+    /// LA13 (log Nellis): after "check runway" still on final of the other runway under 3 NM: traffic or tailwind over 10 kt -> go around into the pattern of the runway in use,
+    /// otherwise landing clearance for the runway he is lined up with, with the tailwind (the runway in the clearance counts, FAA JO 7110.65 3-10-5).
+    List<Msg> OtherFinal(Telemetry t, IReadOnlyList<Traffic> traffic, string other, string c)
+    {
+        double tail = TailKt(t, other);
+        string Kts(double k) => Digits(((int)Math.Round(k)).ToString());
+        var why = TrafficOnRunway(traffic) ? BusyWhy(traffic) : EmgWithin(8) ? "emergency traffic" : FinalTraffic(traffic, Runway, 6 * NM).FirstOrDefault() is { } f ? $"traffic {Describe(f, Runway)}"
+                : RunwayClaimed > 0 ? "departing traffic" : tail > 10 ? $"tailwind {Kts(tail)} knots" : null;
+        if (why != null)
+        {
+            lastGa = callAt;
+            var ga = GoAround(c, $"go around, {why}, fly runway heading");
+            wrongRwyTold = true;   // climbing out over the other runway: no second "check runway"
+            return ga;
+        }
+        (Runway, Phase, landCall) = (other, Phase.ClearedLand, true);
+        return Say($"{c}, runway {RwSay(other)}, {Wind(t)}{(tail > 2 ? $", tailwind {Kts(tail)} knots" : "")}, {ClearText()}.", "Tower");
+    }
+
     /// Terrain: Approach deliberately leads over the opposite-direction centerline to overhead or circling -> no "check runway" there.
     bool ViaOther(string other) => vecOver && other == vrw && (Phase == Phase.Inbound && vec != null || Phase == Phase.Entering && navName is "overhead" or "circle" || Phase == Phase.Pattern && navName == "circle");   // R212: Circling onto the opposite runway
 }

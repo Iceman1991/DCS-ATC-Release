@@ -8,6 +8,8 @@
     <AssemblyName>DcsAtc</AssemblyName>
     <InvariantGlobalization>true</InvariantGlobalization>
     <UseWindowsForms>true</UseWindowsForms>
+    <!-- LA24: version from the installer script (one place), otherwise the log shows 1.0.0.0 -->
+    <Version>$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)..\..\installer\DcsAtc.iss')), '#define AppVer "([^"]+)"').Groups[1].Value)</Version>
   </PropertyGroup>
 
   <ItemGroup>

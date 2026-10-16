@@ -16,7 +16,21 @@ public partial class Tower
         lastSeen = now;
     }
 
+    /// LA19 (log): a call of its own right after the pilot's transmission (and the reply to it) talks into it ("say again" and 0.7 s later "report leaving the control zone"):
+    /// a reminder (contact … now, report leaving …, say intentions, verify …, request taxi) from the tick within 1.5 s after it waits until 5 s after it, dropped if the phase changed meanwhile.
     public List<Msg> Tick(Telemetry? t, IReadOnlyList<Traffic> traffic, double now)
+    {
+        if (held is { } h && now - heardAt >= 5) { held = null; if (h.Ph == Phase) return h.M; }
+        var m = TickCore(t, traffic, now);
+        if (now - heardAt >= 1.5 && held == null || now - heardAt >= 5 || !m.Any(x => x.Role != "Info") || !m.All(x => x.Role == "Info" || Nag.IsMatch(x.Text))) return m;
+        held = (held?.M.Concat(m).ToList() ?? m, held?.Ph ?? Phase);
+        return new();
+    }
+    (List<Msg> M, Phase Ph)? held;
+    double heardAt = -999;   // LA19: last transmission of the pilot (OnTranscript, SayAgain)
+    static readonly Regex Nag = new(@"^[^,]+, (?:[^,]+ (?:Tower|Approach|Ground|Departure|Center|Control), )?(?:contact [^,]+ now\b|report leaving|say intentions|verify|request taxi)", RegexOptions.IgnoreCase);   // not "report final", "hold position, say intentions"
+
+    List<Msg> TickCore(Telemetry? t, IReadOnlyList<Traffic> traffic, double now)
     {
         if (t == null) return new();
         near = traffic; callAt = now; WatchSaid = false;
@@ -176,6 +190,7 @@ public partial class Tower
             if (!handedOff && !ground && t.Agl > 150)   // approx. 500 ft: Tower hands over to Departure
             {
                 handedOff = true; handedAt = now; dueAt = -1;
+                if (SameFreq("Approach")) { (role, airRcAt) = ("Approach", now); return Airborne(t, now, $"{c}, {Station}"); }   // LA25: same frequency, no handover
                 return Say($"{c}, contact {Contact("Approach")}.", "Tower");
             }
             bool atExit = AtExit(t), outside = atExit || Dist(t.X, t.Z, CX, CZ) > CtrM;
@@ -450,12 +465,14 @@ public partial class Tower
             double side = PatternOffset(t.X, t.Z, rw);
             bool downwind = side > 700 && side < 5000 && HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(rw) + 180) < 35;
             if (downwind || StraightIn(t, rw)) Phase = Phase.Pattern;   // Break flown (or without break on short final with landing cues): only now landing clearance on final (Initial lies in the 3-NM zone)
-            if (side < -900 && (Phase == Phase.Pattern || HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(rw) + 180) < 60) && now - lastPatternWarn > 60)   // Initial: only on downwind
+            if (side < -900 && (Phase == Phase.Pattern || HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(rw) + 180) < 60) && now - lastPatternWarn > 60 && sideWarns < 2)   // Initial: only on downwind; LA14: at most twice
             {
                 lastPatternWarn = now;
+                double to = LandHdg(rw) + (Hand(rw) == "left hand" ? -90 : 90), hd = t.Hdg * 180 / Math.PI;   // LA14: second time with the heading across to the pattern side
+                var steer = sideWarns++ == 0 ? "" : $", turn {(((to - hd) % 360 + 540) % 360 - 180 >= 0 ? "right" : "left")} {HdgSay(to, 10)}, cross midfield";
                 return Say(F.SideOf.TryGetValue(rw, out var sd)
-                    ? $"{c}, pattern is {sd} of the runway, {Hand(rw)} pattern runway {RwSay(rw)}."
-                    : $"{c}, wrong side, {Hand(rw)} pattern runway {RwSay(rw)}.");
+                    ? $"{c}, pattern is {sd} of the runway, {Hand(rw)} pattern runway {RwSay(rw)}{steer}."
+                    : $"{c}, wrong side, {Hand(rw)} pattern runway {RwSay(rw)}{steer}.");
             }
             if (downwind && Math.Abs(IndFt(t) - PatternFt) > 500 && t.Vs * Math.Sign(IndFt(t) - PatternFt) > -2.5 && now - lastAltWarn > 60)
             {
@@ -537,6 +554,8 @@ public partial class Tower
                 return Say($"{c}, check runway! You are lined up for runway {RwSay(other)}, runway {RwSay(rw)} in use. " +
                            $"Join {Hand(rw)} downwind runway {RwSay(rw)}, {Alt(PatternFt)}.");
             }
+            if (wrongRwyTold && !unannounced && Phase is Phase.Pattern or Phase.Entering or Phase.Initial && now - lastGa >= 60 && other != null && OnFinal(t.X, t.Z, t.Hdg, t.Agl, other, 3 * NM))
+                return OtherFinal(t, traffic, other, c);   // LA13 (log Nellis): still on final of the other runway under 3 NM: go around or clearance for it
             if (along > 9 * NM) { glide.Clear(); gearTold = false; }
             // Gear (only own aircraft known): still up shortly before landing -> like a real Tower "check wheels down"
             if (!gearTold && t.Gear is >= 0 and < 0.5 && option is not ("low approach" or "low pass") && along > 0.3 * NM && along < 2.5 * NM && t.Agl < 250 &&
