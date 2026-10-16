@@ -117,6 +117,7 @@ partial class Ops
     public List<Call> OnTranscript(string role, string text, Me me, IReadOnlyList<Traffic> air, IReadOnlyList<Airfield> fields, double now, bool unsure = false, double cfgAwacs = 251.5, Func<Airfield, (double Qnh, double Wx, double Wz)>? qnhOf = null)   // cfgAwacs: AWACS frequency from the config (handover at range check-out); qnhOf: QNH (0 = unknown) and wind of an airfield from the mission weather
     {
         var n = Normalize(text.Contains(':') ? text[(text.IndexOf(':') + 1)..] : text);
+        if (role == "AWACS" && air.Where(a => Aw(a, me) && CsWord(a) is { } w && Has(Blank(n, me.Callsign), w.ToLowerInvariant())).ToList() is [var named]) awId = named.Id;   // issue #4: AWACS called by name (unique) is his (MyAwacs; on another one's frequency that one answers)
         if (role == "JTAC") { var jr = JtacCall(n, me, now, unsure); if (jr.Count > 0 && !jr.Any(c => c.Text.Contains("say again"))) lastRole[role] = jr; return jr; }   // J6
         if (Ack(n, me.Callsign, role)) return new();   // forum 0.15: "Enfield 1-1" / "roger, Enfield 1-1" acknowledges a call without readback, no "say again"
         if (now - byeAt < 60 && Farewell(n)) return new();   // LA08 (log): "Good day, Trident 5-1" after "copy checking out, good day", "… Have a good one. Goodbye." after "cleared to depart", also when unsure
@@ -356,9 +357,8 @@ partial class Ops
     double callNow, splashAt = -1e9;   // time of the current AwacsAuto/AwacsCall (ToAll dedupe); LA23: his last "splash" report
 
     /// Own AWACS (the nearest) with call name and frequency from the mission ("Magic11" -> Magic), otherwise Overlord / config.
-    internal static Traffic? AwacsOf(IReadOnlyList<Traffic> air, Me me) =>
-        air.Where(a => a.InAir && a.Coalition == me.Coalition && Regex.IsMatch(a.Type, "E-3|E-2|A-50|KJ-2000"))
-           .MinBy(a => me.Tel == null ? 0 : Dist(me.Tel.X, me.Tel.Z, a.X, a.Z));
+    internal static Traffic? AwacsOf(IReadOnlyList<Traffic> air, Me me) => air.Where(a => Aw(a, me)).MinBy(a => me.Tel == null ? 0 : Dist(me.Tel.X, me.Tel.Z, a.X, a.Z));
+    static bool Aw(Traffic a, Me me) => a.InAir && a.Coalition == me.Coalition && Regex.IsMatch(a.Type, "E-3|E-2|A-50|KJ-2000");
     internal static string AwacsName(Traffic? a, Me me) => a == null && Gci.Contains(me.Coalition) ? (me.Coalition == 1 ? "Moscow" : "Magic") :   // GCI (V19)
         a != null && CsWord(a) is { } s ? s : a != null && Callsigns.TryGetValue(a.Group, out var cs) && Regex.IsMatch(cs, @"^\d+$") ? Digits(cs) : "Overlord";   // plain number: "two four seven" (A117)
     /// Letter call name of the group's DCS callsign ("Texaco11" / "Texaco 1-1" -> Texaco), null = none.
@@ -376,12 +376,12 @@ partial class Ops
         AwacsUp(air, me) && AwacsOf(air, me) is var a && (maxNm <= 0 || a == null || me.Tel == null || Dist(me.Tel.X, me.Tel.Z, a.X, a.Z) < maxNm * NM) ? $"{AwacsName(a, me)} {Tower.FreqSay(AwacsFreqOf(a) is > 0 and var f ? f : cfgFreq)}" : null;
     /// LA15 (log): the AWACS of this player: the one he calls on its mission frequency, otherwise the one he checked in with (while airborne and within 250 NM), otherwise the nearest.
     /// Before, every call took the nearest one, so the name changed mid-fight and its calls came on a frequency he had not tuned (copy on Guard).
+    /// Issue #4: several on the called frequency -> the one he checked in with or called by name (OnTranscript), otherwise the nearest of them (before: the first in the list).
     internal Traffic? MyAwacs(IReadOnlyList<Traffic> air, Me me)
     {
-        bool Aw(Traffic a) => a.InAir && a.Coalition == me.Coalition && Regex.IsMatch(a.Type, "E-3|E-2|A-50|KJ-2000");
-        var a = (me.Freq > 0 ? air.FirstOrDefault(x => Aw(x) && Math.Abs(AwacsFreqOf(x) - me.Freq) < 0.005) : null)
-                ?? air.FirstOrDefault(x => x.Id == awId && Aw(x) && (me.Tel == null || Dist(me.Tel.X, me.Tel.Z, x.X, x.Z) < 250 * NM))
-                ?? AwacsOf(air, me);
+        var on = air.Where(x => me.Freq > 0 && Aw(x, me) && Math.Abs(AwacsFreqOf(x) - me.Freq) < 0.005).ToList();
+        var a = on.Count > 0 ? on.FirstOrDefault(x => x.Id == awId) ?? AwacsOf(on, me)
+                : air.FirstOrDefault(x => x.Id == awId && Aw(x, me) && (me.Tel == null || Dist(me.Tel.X, me.Tel.Z, x.X, x.Z) < 250 * NM)) ?? AwacsOf(air, me);
         awId = a?.Id ?? -1;
         return a;
     }
@@ -2252,6 +2252,12 @@ partial class Ops
             var c15 = o15b.OnTranscript("AWACS", "Darkstar, Enfield 1-1, checking in", me with { Freq = 324.4 }, two15, f, 0)
                           .Concat(o15b.OnTranscript("AWACS", "Darkstar, Enfield 1-1, picture", me, two15, f, 10)).Concat(o15b.Tick(me, two15, 20)).Where(x => x.Role == "AWACS").ToList();
             check(c15.Count >= 2 && c15.All(x => x.Station == "Darkstar" && x.Freq == 324.4), "LA15 AWACS bleibt der beim Check-in: " + string.Join(" | ", c15.Select(x => $"{x.Station} {x.Freq}: {x.Text}")));
+            // Issue #4: two AWACS on one frequency -> the nearest answers, the one called by name takes over and stays for unnamed calls and the radio wheel (frequency 0)
+            AwacsFreq["Far"] = 260.5;
+            var (oI4, mI4) = (new Ops(), me with { Freq = 260.5 });
+            var cI4 = string.Join(" ", new[] { ("Enfield 1-1, radio check", mI4), ("Darkstar, Enfield 1-1, checking in", mI4), ("Enfield 1-1, picture", mI4), ("Enfield 1-1, picture", me), ("Magic, Enfield 1-1, picture", mI4) }
+                                      .Select((x, i) => oI4.OnTranscript("AWACS", x.Item1, x.Item2, two15, f, 10 * i).FirstOrDefault(c => c.Role == "AWACS")?.Station ?? "-"));
+            check(cI4 == "Magic Darkstar Darkstar Darkstar Magic", "Issue #4 zwei AWACS auf einer Frequenz: nächster, dann der gerufene -> " + cI4);
         }
         Callsigns = keep; AwacsFreq.Clear();
         // V9: only what own sensors have detected (MiG yes, type unknown; Su-27 not)

@@ -334,10 +334,10 @@ public partial class Tower
             return Say(ifrDep ? $"{c}, check altitude, maintain {Alt(depFt)}." : $"{c}, check altitude, pattern altitude {Alt(PatternFt)}.");
         }
 
-        // R7 · Reporting obligation #10: VFR departure after "report leaving the control zone": the pilot reports himself. At the zone edge or departure CRP without report remind once,
-        // 1 NM outside (at the earliest 30 s later) "I show you clear of the zone, radar service terminated" and into the debriefing
+        // R7 · Reporting obligation #10: VFR departure after "report leaving the control zone": the pilot reports himself. 0.5 NM outside the zone (issue #1: not right at the edge)
+        // or at the departure CRP without report remind once, 2 NM outside (at the earliest 30 s later) "I show you clear of the zone, radar service terminated" and into the debriefing
         if (zoneReport && (ground || Phase != Phase.Away || !handedOff || Following)) zoneReport = false;
-        else if (zoneReport && Overdue(Dist(t.X, t.Z, CX, CZ) > CtrM || AtExit(t), Dist(t.X, t.Z, CX, CZ) > CtrM + NM, 30, now, () => Say($"{c}, report leaving the control zone.", "Approach"), () =>
+        else if (zoneReport && Overdue(Dist(t.X, t.Z, CX, CZ) > CtrM + 0.5 * NM || AtExit(t), Dist(t.X, t.Z, CX, CZ) > CtrM + 2 * NM, 30, now, () => Say($"{c}, report leaving the control zone.", "Approach"), () =>
                  {
                      var lm = LeaveZone(c, "I show you clear of the zone, radar service terminated");
                      return Note(Say(lm[0].Text, "Approach"), $"keine Meldung „leaving the control zone“ {F.Name}", $"no report \"leaving the control zone\" {F.Name}");

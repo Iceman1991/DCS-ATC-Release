@@ -123,7 +123,7 @@ public partial class Tower
             Check(ho19.Any(m => m.Text.Contains("contact Kutaisi Approach")) && q19.Count == 0 && sa19 is [{ } s19] && s19.Text.EndsWith("say again.") &&
                   n19 is [var (at19, m19)] && at19 == 76 && m19[0].Text.Contains("contact Kutaisi Approach now"), $"LA19 Erinnerung wartet 5 s nach dem Spruch: {string.Join(" | ", q19.Select(m => m.Text))} / " + string.Join(" | ", n19.Select(x => $"{x.s + 0.5}: {x.m[0].Text}")));
         }
-        foreach (var z20 in new[] { "Clearing control zone, Enfield 1-1.", "Enfield 1-1, leave in control zone.", "Enfield 1-1, leaving controls on." })   // LA20 (log): variants of the zone report
+        foreach (var z20 in new[] { "Clearing control zone, Enfield 1-1.", "Enfield 1-1, leave in control zone.", "Enfield 1-1, leaving controls on.", "Left control zone, Enfield 1-1.", "Enfield 1-1, left the control zone." })   // LA20 (log), issue #1: variants of the zone report
         {
             var w20 = new Tower("Enfield 1-1");
             w20.Tick(parked, none, 0);
@@ -166,8 +166,8 @@ public partial class Tower
         var twLi = new Tower("Enfield 1-1"); var farLi = At(CX + 20 * NM, CZ, 1500, 270, 200); twLi.Tick(farLi, none, 0);
         var rLi = twLi.OnTranscript("Kutaisi Approach, Enfield 1 1, 20 miles east, 4900 feet, inbound for landing.", farLi, none, 1);
         Check(rLi.Count > 0 && rLi[0].Text.StartsWith("Enfield one one, Kutaisi Approach, ") && rLi[0].Text.Contains("xpect vectors") && twLi.Phase == Phase.Inbound, "R275 Erstanruf mit Position und Höhe: " + string.Join(" | ", rLi.Select(m => m.Text)));
-        var oBye = twAf.Tick(At(CX - 9.5 * NM, CZ, 2000, 270, 200), none, 25);   // Zone edge without report (#10): reminder from Departure
-        oBye.AddRange(twAf.OnTranscript("Kutaisi Departure, Enfield 11, leaving the control zone", At(CX - 9.6 * NM, CZ, 2000, 270, 200), none, 26));   // report -> sign-off from Departure
+        var oBye = twAf.Tick(At(CX - twAf.CtrM - 0.6 * NM, CZ, 2000, 270, 200), none, 25);   // 0.5 NM outside the zone without report (#10): reminder from Departure
+        oBye.AddRange(twAf.OnTranscript("Kutaisi Departure, Enfield 11, leaving the control zone", At(CX - twAf.CtrM - 0.7 * NM, CZ, 2000, 270, 200), none, 26));   // report -> sign-off from Departure
         var twOc = new Tower(kO, "Enfield 1-1") { HeardOn = 275.8 };   // IFR clearance on the ground: Departure frequency in the clearance
         twOc.Tick(parked, none, 0);
         var oCl = twOc.OnTranscript("Kutaisi Ground, Enfield 11, request IFR clearance to Batumi", parked, none, 1);
@@ -191,14 +191,15 @@ public partial class Tower
         Check(akSt.Count == 0 && akBad.Count == 0 && twId.OnTranscript("Kutaisi Approach, Enfield 11", airId, none, 200).Count == 1,
               $"Quittung nur mit Rufzeichen -> still: {string.Join(" | ", akSt.Select(m => m.Text))} / {string.Join(", ", akBad)}");
         twD.AwacsContact = "Overlord two five one decimal zero";
-        // Reporting obligation #10: at the zone edge without "leaving the control zone" remind once, sign off 1 NM outside (30 s later) and into the debriefing, no second one at 15 NM
-        r = twD.Tick(At(CX - 9.5 * NM, CZ, 2000, 270, 200), none, 25);
-        var zr2 = twD.Tick(At(CX - 10.5 * NM, CZ, 2000, 270, 200), none, 40);
-        var zr3 = twD.Tick(At(CX - 11 * NM, CZ, 2000, 270, 200), none, 56);
-        Check(r.Count == 1 && r[0].Role == "Approach" && r[0].Text == "Enfield one one, report leaving the control zone." && zr2.Count == 0 &&
+        // Reporting obligation #10: 0.5 NM outside the zone without "leaving the control zone" remind once (issue #1: not right at the edge), sign off 2 NM outside (30 s later) and into the debriefing, no second one at 15 NM
+        var zr0 = twD.Tick(At(CX - twD.CtrM - 0.3 * NM, CZ, 2000, 270, 200), none, 24);
+        r = twD.Tick(At(CX - twD.CtrM - 0.6 * NM, CZ, 2000, 270, 200), none, 25);
+        var zr2 = twD.Tick(At(CX - twD.CtrM - 1.5 * NM, CZ, 2000, 270, 200), none, 40).Concat(twD.Tick(At(CX - twD.CtrM - 1.8 * NM, CZ, 2000, 270, 200), none, 56)).ToList();
+        var zr3 = twD.Tick(At(CX - twD.CtrM - 2.2 * NM, CZ, 2000, 270, 200), none, 57);
+        Check(zr0.Count == 0 && r.Count == 1 && r[0].Role == "Approach" && r[0].Text == "Enfield one one, report leaving the control zone." && zr2.Count == 0 &&
               zr3.Count == 2 && zr3[0].Role == "Approach" && zr3[0].Text == "Enfield one one, I show you clear of the zone, radar service terminated, resume own navigation, contact Overlord two five one decimal zero." &&
               zr3[1].Text.StartsWith(L("Verstoß: keine Meldung", "Deviation: no report")) && twD.Tick(At(CX - 16 * NM, CZ, 4000, 270, 300), none, 60).Count == 0,
-              "#10 Abmeldung am Zonenrand ohne Meldung, keine zweite bei 15 NM: " + string.Join(" | ", r.Concat(zr2).Concat(zr3)));
+              "#10 Erinnerung 0,5 NM, Abmeldung 2 NM außerhalb ohne Meldung, keine zweite bei 15 NM: " + string.Join(" | ", zr0.Concat(r).Concat(zr2).Concat(zr3)));
         // VFR, check-in outside the zone: "resume own navigation, maintain VFR", sign-off at 15 NM, with AWACS handover there (once)
         var twDo = new Tower("Enfield 1-1");
         twDo.Tick(parked, none, 0);

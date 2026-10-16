@@ -44,6 +44,7 @@ public class Config
     public bool Atis { get; set; } = true;             // continuous ATIS broadcast for airfields with players nearby
     public bool AirspaceWatch { get; set; } = true;    // monitor control zones (N2) and announce violations ("possible pilot deviation") and into the debrief (N4); off: safety warnings only
     public bool DebugLog { get; set; } = true;         // atc-debug.txt for bug reports (speech recognition, airfield selection, phases, telemetry every 10 s), at most 2 × 20 MB
+    public bool AsrGpu { get; set; } = true;           // GPU1: speech recognition on a dedicated graphics card (Vulkan), CPU without one or if it fails; false = always CPU
     public bool KneeboardPages { get; set; } = true;   // kneeboard pages into Saved Games\DCS\Kneeboard on mission start (Caucasus, German)
     public Dictionary<string, double> AtisFreqs { get; set; } = new();   // A35: own ATIS frequency per airfield (airfield name -> MHz), if the airfield is missing: Frequencies["ATIS"]; only after restart
     public int WheelKey { get; set; } = 0xDE;          // selection wheel: key (0xDE = Ä), 0 = off
@@ -94,6 +95,7 @@ class Pilot
     public double[]? LastFq; public Airfield? Fresh;   // last reported SRS frequencies; airfield most recently tuned in (wins when several are tuned)
     public double TankMenuAt = -1e9, TankFq;         // R304: last press in the DCS tanker menu; frequency DCS (Easy Comms) tuned itself afterwards (mission frequency of the tanker, 0 = none)
     public (double Mhz, bool Field)? SharedPick;      // shared frequency (airfield = AWACS/tanker/...): last choice by station name, unnamed calls go there
+    public (double Mhz, string Role)? OpsPick;        // issue #3: AWACS and tanker on one frequency: last station named there
     public (string Role, double At)? LastOps;         // R393: Range/AWACS/tanker spoke last (an airfield call clears it): "say again" without a station goes there
     public string? OnBoat;                            // carrier selected in the radio wheel: radio calls without a target go to Marshal/Paddles
     public bool Crew;                                // ground crew stands at the aircraft (mission: C;unit;crew|back)
@@ -137,7 +139,7 @@ static partial class Program
         TestRun = args.Any(a => a is "--selftest" or "--anflugtest" or "--mptest" or "--asr-test" or "--srs-test" or "--platztest");
         if (args.Length >= 1 && args[0] == "--charttest") { if (args.Length > 1) Airfield.ChartFile = args[1]; ChartTest(); return 0; }   // chart data check, optionally a file instead of the embedded one
         if (args.Contains("--platztest")) { Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); return 0; }
-        if (args.Contains("--selftest")) { RadioTest(); ChartTest(); Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); AtisTest(); CrewTest(); ExpectTest(); PromptTest(); return Tower.SelfTest(); }
+        if (args.Contains("--selftest")) { RadioTest(); ChartTest(); Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); AtisTest(); CrewTest(); ExpectTest(); PromptTest(); GpuTest(); return Tower.SelfTest(); }
         LoadConfig();
         if (args.Contains("--settings")) { Dedicated = DedicatedNow(); Settings.Show(Cfg); return 0; }   // language then also in the server's Saved Games
         if (args.Contains("--buttons")) { ShowButtons(); return 0; }
@@ -461,6 +463,7 @@ static partial class Program
             // A26: sender unknown -> match the spoken call sign to a player (otherwise Request(null): "say again your callsign")
             p ??= ByCallsign(text);
             if (p != null) p.CalledOn = tx.FreqMHz;   // K2: reply names this frequency
+            if (p != null && role is "AWACS" or "Tanker") role = OpsPick(p, tx.FreqMHz, text, role);
             if (p != null && shared.Via is { } sv)
             {
                 if (SharedChoice(p, tx.FreqMHz, text, sv, role!) is not { } toField) return;   // unclear: asked back
@@ -482,6 +485,15 @@ static partial class Program
         var f = mhz.ToString("0.0##", CultureInfo.InvariantCulture);
         SayQueue.Add(new Tx(L($"{f} MHz: {field.Name} oder {station}? Bitte mit Stationsnamen rufen.", $"{f} MHz: {field.Name} or {station}? Call again with the station name."), "Info", "", p.Gid));
         return null;
+    }
+
+    /// Issue #3: AWACS and tanker on one frequency (Instant Action, mission or config): the station name in the call decides and is remembered for unnamed calls; never named -> role of the frequency.
+    internal static string OpsPick(Pilot p, double mhz, string text, string role)
+    {
+        bool On(IEnumerable<double> fs) => fs.Any(f => Math.Abs(f - mhz) < 0.01);
+        if (!On(Ops.AwacsFreq.Values.Append(Cfg.Frequencies.GetValueOrDefault("AWACS"))) || !On(Ops.TankerFreq.Values.Append(Cfg.Frequencies.GetValueOrDefault("Tanker")).Append(p.TankFq))) return role;
+        if (Ops.RoleOf(Tower.Normalize(text), p.Callsign) is ("AWACS" or "Tanker") and var r) p.OpsPick = (mhz, r);
+        return p.OpsPick is { } op && Math.Abs(op.Mhz - mhz) < 0.01 ? op.Role : role;
     }
 
     /// Role of a called frequency: the tanker frequency DCS tuned for the sender (R387, also if it equals an airfield frequency), config, mission AWACS/carrier; null = airfield frequency or unknown.
@@ -2850,14 +2862,37 @@ static partial class Program
         var json = Path.ChangeExtension(wav, null);   // -of: <wav without extension>.json
         try { File.Delete(json + ".json"); } catch (IOException) { }   // do not read old confidence
         var sw = Stopwatch.StartNew();
-        var (output, _) = Run(Path.Combine(Root, "tools", "whisper", "Release", "whisper-cli.exe"), null,
-            "-m", model, "-t", Math.Clamp(Environment.ProcessorCount / 2 - 2, 2, 8).ToString(), "-f", wav, "-nt", "-np", "-l", "en", "--prompt", prompt, "-ojf", "-of", json);   // ponytail: -t leaves two cores to DCS (main/render thread), 16 threads -> 6; raise if replies lag, lower if DCS stutters while talking
+        var exe = Path.Combine(Root, "tools", "whisper", "Release", "whisper-cli.exe");
+        string[] args = { "-m", model, "-t", Math.Clamp(Environment.ProcessorCount / 2 - 2, 2, 8).ToString(), "-f", wav, "-nt", "-l", "en", "--prompt", prompt, "-ojf", "-of", json };   // ponytail: -t leaves two cores to DCS (main/render thread), 16 threads -> 6; raise if replies lag, lower if DCS stutters while talking
+        int dev = Cfg.AsrGpu ? asrDev : -1;
+        string[] On(int d) => args.Concat(d == -2 ? Array.Empty<string>() : d < 0 ? new[] { "-np", "-ng" } : new[] { "-np", "-dev", d.ToString() }).ToArray();   // -2: without -np, whisper lists its devices
+        var (output, exit, err) = RunErr(exe, null, On(dev));
+        if (exit != 0 && dev != -1)   // GPU1: GPU failed (memory full, driver): this call again and the rest of the session on the CPU
+        {
+            asrDev = dev = -1;
+            Log(L("[ASR] Grafikkarte fehlgeschlagen, Spracherkennung ab jetzt auf dem Prozessor", "[ASR] Graphics card failed, speech recognition on the CPU from now on"));
+            (output, _, _) = RunErr(exe, null, On(-1));
+        }
+        else if (dev == -2)
+        {
+            (asrDev, var name) = GpuOf(err);
+            Log(asrDev < 0 ? L("[ASR] Keine dedizierte Grafikkarte: Spracherkennung auf dem Prozessor", "[ASR] No dedicated graphics card: speech recognition on the CPU")
+                           : L($"[ASR] Spracherkennung auf der Grafikkarte: {name}", $"[ASR] Speech recognition on the graphics card: {name}"));
+        }
         double conf = 1;
         try { conf = Confidence(File.ReadAllText(json + ".json")); File.Delete(json + ".json"); } catch (Exception e) when (e is IOException or JsonException or KeyNotFoundException or InvalidOperationException) { Trace("FEHLER", $"Whisper-Sicherheit: {e.GetType().Name}: {e.Message}"); }
-        Trace("WHISPER", $"{Path.GetFileName(wav)} {Path.GetFileName(model)} {sw.ElapsedMilliseconds} ms conf {conf:0.00} (Sender {cs}, Prompt {role ?? "allgemein"}): {output.Trim()}");
+        Trace("WHISPER", $"{Path.GetFileName(wav)} {Path.GetFileName(model)} {(dev == -2 ? "Gerätewahl" : dev < 0 ? "CPU" : $"GPU {dev}")} {sw.ElapsedMilliseconds} ms conf {conf:0.00} (Sender {cs}, Prompt {role ?? "allgemein"}): {output.Trim()}");
         if (keep) Keep(wav, output.Trim());
         return (output.Trim(), conf);
     }
+
+    /// GPU1: whisper device: -2 = not yet known (the first call lists the devices), -1 = CPU, otherwise Vulkan device of the dedicated GPU.
+    static volatile int asrDev = -2;
+
+    /// GPU1: whisper's Vulkan list ("ggml_vulkan: 0 = NVIDIA GeForce RTX 5070 Ti (NVIDIA) | uma: 0 | …") -> first dedicated GPU, -1 = none (no Vulkan or iGPU only:
+    /// an iGPU is slower than the CPU, GPU-MESSUNG.md 3.8 s instead of 2.1 s). ponytail: the first call runs on whisper's device 0, which may be the iGPU (one slow call)
+    internal static (int Dev, string Name) GpuOf(string stderr) =>
+        Regex.Match(stderr, @"ggml_vulkan: (\d+) = (.+?)(?: \([^)]*\))? \| uma: 0 ") is { Success: true } m ? (int.Parse(m.Groups[1].Value), m.Groups[2].Value) : (-1, "");
 
     /// LF1: phrases per frequency role; airfield roles (Ground/Tower/Approach/Departure) and unknown use the airfield phrases.
     static readonly Dictionary<string, string> PromptPhrases = new()
@@ -2948,6 +2983,15 @@ static partial class Program
                               "Stationen, Slot- und eigenes Rufzeichen am Ende, 4 andere Spieler, AWACS mit Darkstar ohne Overlord");
         }
         finally { Pilots.Clear(); foreach (var kv in keep) Pilots[kv.Key] = kv.Value; AiCallsign.Remove("LF1-AWACS"); Ops.AwacsFreq.Remove("LF1-AWACS"); }
+    }
+
+    /// GPU1: first dedicated GPU of whisper's Vulkan list (also behind an iGPU), iGPU only or no Vulkan -> CPU.
+    static void GpuTest()
+    {
+        const string nv = "ggml_vulkan: 0 = NVIDIA GeForce RTX 5070 Ti (NVIDIA) | uma: 0 | fp16: 1 | bf16: 1\n", amd = "ggml_vulkan: 1 = AMD Radeon(TM) Graphics (AMD proprietary driver) | uma: 1 | fp16: 1\n";
+        var (a, b, c, d) = (GpuOf("ggml_vulkan: Found 2 Vulkan devices:\n" + nv + amd), GpuOf(amd.Replace(": 1 =", ": 0 =") + nv.Replace(": 0 =", ": 1 =")), GpuOf(amd), GpuOf("load_backend: loaded CPU backend\n"));
+        if (a != (0, "NVIDIA GeForce RTX 5070 Ti") || b.Dev != 1 || c.Dev != -1 || d.Dev != -1) throw new Exception($"GPU1 Whisper-Gerät: {a} {b} {c} {d}");
+        Console.WriteLine("OK   GPU1 Whisper-Gerät: erste dedizierte GPU (auch hinter einer iGPU), nur iGPU oder kein Vulkan -> CPU");
     }
 
     /// --asr-test [Ordner]: re-recognize the corpus, word errors against the .txt (normalized: "6,000" = "6000", "one" = "1").
@@ -3258,7 +3302,10 @@ static partial class Program
     }
 
     static bool srsDown;   // LA24: ExternalAudio last could not connect
-    static (string stdout, int exit) Run(string exe, string? stdin, params string[] args)
+    static (string stdout, int exit) Run(string exe, string? stdin, params string[] args) { var (o, x, _) = RunErr(exe, stdin, args); return (o, x); }
+
+    /// Run with stderr (GPU1: whisper's device list).
+    static (string stdout, int exit, string stderr) RunErr(string exe, string? stdin, params string[] args)
     {
         var psi = new ProcessStartInfo(exe)
         {
@@ -3282,13 +3329,13 @@ static partial class Program
             if (first) Console.WriteLine(L("      (SRS-Server nicht erreichbar)", "      (SRS server not reachable)"));
             if (p.ExitCode != 0 && !down || first)
                 Trace("FEHLER", $"{Path.GetFileName(exe)} Exit {p.ExitCode}: " + (err.Result.Contains("garbage collected delegate") ? "Absturz in SRS ExternalAudio selbst (garbage collected delegate)" : $"{err.Result.Trim()} {o.Trim()}"));
-            return (o, p.ExitCode);
+            return (o, p.ExitCode, err.Result);
         }
         catch (Exception e)
         {
             Console.WriteLine(L("      Fehler beim Start von ", "      Error starting ") + $"{Path.GetFileName(exe)}: {e.Message}");
             Trace("FEHLER", $"Start {exe}: {e.GetType().Name}: {e.Message}");
-            return ("", -1);
+            return ("", -1, "");
         }
     }
 
@@ -4646,6 +4693,13 @@ static partial class Program
         Ops.TankerFreq.Clear(); pr.Ops.TankerGroup = "";
         if (tp7 != "Tanker True 255.5/225.0") throw new Exception("TP7 Tanker-Missionsfrequenz: " + tp7);
         Console.WriteLine("OK   TP7: Tankerfrequenz aus der Mission wird abgehört, dem Tanker zugeordnet, Antwort auch dort");
+        // Issue #3: AWACS and tanker on one frequency (Instant Action): the station name decides and is remembered for unnamed calls; a pure AWACS frequency stays AWACS
+        (Ops.AwacsFreq["I3-AW"], Ops.TankerFreq["I3-TK"], Ops.AwacsFreq["I3-AW2"]) = (230.0, 230.0, 240.0);
+        var i3 = string.Join(" ", new[] { "Enfield 1-1, radio check", "Texaco, Enfield 1-1, request rejoin", "Enfield 1-1, ready pre-contact", "Overlord, Enfield 1-1, request picture", "Enfield 1-1, say again" }
+                                  .Select(s => OpsPick(pr, 230.0, s, SrsRole(pr, 230.0)!)).Append(OpsPick(pr, 240.0, "Texaco, Enfield 1-1, request rejoin", "AWACS")));
+        Ops.AwacsFreq.Remove("I3-AW"); Ops.AwacsFreq.Remove("I3-AW2"); Ops.TankerFreq.Clear(); pr.OpsPick = null;
+        if (i3 != "AWACS Tanker Tanker AWACS AWACS AWACS") throw new Exception("Issue #3 AWACS und Tanker auf einer Frequenz: " + i3);
+        Console.WriteLine("OK   Issue #3: AWACS und Tanker auf einer Frequenz, der Stationsname entscheidet und gilt für Rufe ohne Namen");
         // R393: "say again" without a station goes to the controller who spoke last (ops role within 5 minutes), otherwise to the airfield (which clears it)
         pr.LastOps = ("Tanker", Now());
         Request(pr, "Enfield 1-1, say again", "RAD", false);

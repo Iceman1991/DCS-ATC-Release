@@ -1,4 +1,4 @@
-DCS-ATC 0.16.5 ALPHA – sprechende Flugsicherung für DCS World (alle Karten, getestet im Kaukasus)
+DCS-ATC 0.16.6 ALPHA – sprechende Flugsicherung für DCS World (alle Karten, getestet im Kaukasus)
 =====================================================================
 
 !! ALPHA-VERSION !!
@@ -22,7 +22,9 @@ Voraussetzungen
     Ein noch nicht verbundener SRS-Client wird automatisch mit dem lokalen SRS-Server verbunden
     (über die Auto-Connect-Funktion von SRS; abschalten: "SrsAutoConnect": false in config.jsonc).
   - Mikrofon; gefunkt wird auf Englisch
-  - ca. 1,2 GB Platz. Die Spracherkennung läuft auf der CPU (ein paar Sekunden pro Funkspruch).
+  - ca. 1,2 GB Platz. Die Spracherkennung läuft auf einer eigenen Grafikkarte (unter 1 Sekunde pro
+    Funkspruch, ca. 1 GB Grafikspeicher), sonst auf der CPU (ein paar Sekunden pro Funkspruch).
+    Immer CPU: "AsrGpu": false in config.jsonc.
 
 Installation
   1. DCS beenden, DCS-ATC-Setup.exe starten. Keine Adminrechte nötig – nur eine Windows-Abfrage für

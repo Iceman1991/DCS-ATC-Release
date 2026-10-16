@@ -15,6 +15,7 @@ Programm-Laufzeit (in DcsAtc.exe)
 
 Spracherkennung (tools\whisper)
   whisper.cpp / ggml ............ MIT ............ https://github.com/ggml-org/whisper.cpp
+  ggml-vulkan (aus llama.cpp) ... MIT ............ https://github.com/ggml-org/llama.cpp
   SDL2 .......................... zlib ........... https://github.com/libsdl-org/SDL
   Modell ggml-small.en .......... MIT (OpenAI Whisper)
                                   https://huggingface.co/ggerganov/whisper.cpp · https://github.com/openai/whisper
