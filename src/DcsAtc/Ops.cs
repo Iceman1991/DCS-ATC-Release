@@ -1130,8 +1130,8 @@ partial class Ops
         tanker = tk.A.Group;
         cs = c;
         var l = Line(tk.A.Group);
-        if (Has(n, "complete", "departing", "thank", "good day", "leaving") && tank == 0 && was == tk.A.Group && now - byeAt < 60) return new();   // LA16 (log): readbacks after "cleared to depart" ("… thanks") get no second clearance
-        if (Has(n, "complete", "departing", "thank", "good day", "leaving"))
+        if (Has(n, "complete", "departing", "thank", "good day", "leaving", "abort") && tank == 0 && was == tk.A.Group && now - byeAt < 60) return new();   // LA16 (log): readbacks after "cleared to depart" ("… thanks") get no second clearance
+        if (Has(n, "complete", "departing", "thank", "good day", "leaving", "abort"))   // #5 (issue): "abort" ends the refueling like "complete"
         {
             bool first = l.FirstOrDefault(o => o.tank >= 2) == this;   // had the spot (e.g. after a deliberate partial amount, OnRefuel tank 3): the next one moves up (A66/A128)
             tank = 0; OffLine();
@@ -1953,6 +1953,9 @@ partial class Ops
         check(tdep.StartsWith("Texaco one one: Enfield one one, Texaco one one, total offload 5.4, cleared to depart, contact Overlord two five one decimal ") && ta.tank == 0
               && tdep2.Contains("cleared to depart") && !tdep2.Contains("total offload"), $"Tanker A122: Abflug mit Menge, Übergabe -> {tdep} | {tdep2}");
         check(Ta("Texaco, Enfield 1-1, complete", new Ops(), null, air.Where(a => a.Type != "E-3A").ToList()).EndsWith("cleared to depart, frequency change approved."), "Tanker A122: ohne AWACS keine Übergabe, keine Menge");
+        var tab = new Ops(); Ta("Texaco, Enfield 1-1, request rejoin", tab); Ta("Texaco, Enfield 1-1, visual", tab); Ta("Texaco, Enfield 1-1, pre contact", tab);   // #5 (issue): "abort" ends the sequence
+        var tabT = Ta("Texaco, Enfield 1-1, abort", tab);
+        check(tabT.Contains("cleared to depart") && tab.tank == 0 && !tabT.Contains("say again"), "Tanker #5: abort -> " + tabT);
         var tv = new Ops();   // without DCS event: "disconnect" frees the spot, the next one moves up
         Ta("Texaco, Enfield 1-1, request rejoin", tv); Ta("Texaco, Enfield 1-1, visual", tv); Ta("Texaco, Enfield 1-1, pre contact", tv);
         var tw = new Ops();   // second waits on the left (A65), gets the spot on the first's "disconnect"

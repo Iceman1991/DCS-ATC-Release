@@ -537,7 +537,7 @@ The IFR clearance list shows nearby airfields; carriers and your current airfiel
 
 **JTAC:** Check in, Ready to copy, Readback (DCS-ATC adds lines 4 and 6 and the restrictions), Say again 9-line, Mark / laser (request mark, red, green, white, orange or blue smoke, illumination, sparkle, laser on; colours and illumination only from a ground JTAC), Tally, In and Off (DCS-ATC adds the direction), Check out. No mission edits needed for the mark type. Details in [JTAC and FAC(A)](#jtac-and-faca).
 
-**Tanker:** Request rejoin (in the air, before the rejoin), Visual (during the rejoin), Observation (during the rejoin and in observation), Pre-contact (`pre contact`), Refuel complete (after "cleared to join") and Say position (in the air).
+**Tanker:** Request rejoin (in the air, before the rejoin), Visual (during the rejoin), Observation (during the rejoin and in observation), Pre-contact (`pre contact`), Refuel complete (after "cleared to join"), Abort (from the rejoin on, ends the refueling like Refuel complete) and Say position (in the air).
 
 **Carrier:** Marshal check in (in the air, DCS-ATC fills in your full check-in) and Pigeons (in the air); after the Marshal check-in: See you at (`see you at angels`), Initial, Commencing, Platform, Ball, Clara. Details in [Carrier operations](#carrier-operations).
 
@@ -607,7 +607,7 @@ In every mission with DCS-ATC, each player group gets **F10 Other → ATC**. If 
 | Tower | Ready for departure · Ready, closed pattern · Initial · Overhead · Base, gear down · Final, gear down, full stop · Base, touch and go · Going around · Closed / SFO → Request closed · Request SFO · High key · Low key, gear down · Ready, practice approach · Ready, unrestricted climb · Ready, tactical departure |
 | Approach | Airborne (after takeoff) · Inbound for landing · Inbound, pattern work · Request ILS / straight in · Flight following · Cancel approach · Traffic → Traffic in sight / Negative contact · C R P · More → Report airspeed / Say again / Request higher |
 | Range (only if the mission has a range) | Check in · IP inbound · In hot · Off safe · Check out · Check out, hung ordnance |
-| AWACS / Tanker / Center | AWACS → Check in · Picture · Bogey dope · Sort · Nearest tanker · Vector nearest airfield · Check out · Combat → Committing / Fox three / Splash / Defending / Request support / Unable / Winchester / Bingo, RTB / Say again. Tanker → Request rejoin · Visual · Observation · Pre-contact · Refuel complete · Say position · Center → Check in · Request altitude · Request direct · Leaving frequency |
+| AWACS / Tanker / Center | AWACS → Check in · Picture · Bogey dope · Sort · Nearest tanker · Vector nearest airfield · Check out · Combat → Committing / Fox three / Splash / Defending / Request support / Unable / Winchester / Bingo, RTB / Say again. Tanker → Request rejoin · Visual · Observation · Pre-contact · Refuel complete · Abort · Say position · Center → Check in · Request altitude · Request direct · Leaving frequency |
 | Carrier (only if the mission has a carrier) | Marshal check in · See you at · Initial · Commencing · Platform · Ball · Clara · Pigeons · Strike check in/out · Red Crown check in/out (only with an own cruiser) |
 | Emergency | MAYDAY → kind · PAN PAN → kind · Minimum fuel · Hung ordnance · Flameout, high key · Cancel emergency (kinds: engine failure, fuel (MAYDAY only), hydraulic failure, battle damage, medical, bird strike) |
 | General | Radio check · Say again · QNH / weather · Listen to ATIS · Request zone transit · Debriefing |
@@ -678,6 +678,7 @@ How the voice values work:
 | Setting | Default | Meaning |
 |---|---|---|
 | `"RadioFx"` | `true` | Radio sound: band-pass, quiet static, squelch tail. In combat, calls are faster and sound like an overdriven mask microphone. |
+| `"RadioText"` | `true` | Radio calls also as DCS text on screen. `false` = speech only; notes from DCS-ATC still appear as text. |
 | `"Volume"` | `0.6` | Controller volume in SRS (0–1). Lower it if the voices are too loud. |
 | `"SpeechRate"` | `0.85` | Speech pace: 1 = Piper standard, lower = faster, higher = slower. The slider in the settings window ranges from 0.70 to 1.50. All voices are balanced to the same pace. |
 | `"ReplyPause"` | `1.5` | Seconds of pause between two calls on one frequency (pilot → controller → readback). Slider in the settings window: 0–5 s. |
@@ -712,7 +713,7 @@ DCS switches on an airfield's lights only after someone contacts its built-in DC
 **When it doesn't happen:**
 
 - A DCS controller dialog is already open, for example after a hot start on the runway.
-- DCS "Easy Communication" is off and none of your radios is tuned to the airfield's map frequency (UHF or VHF).
+- DCS "Easy Communication" is off (see Easy Communication below).
 - The airfield isn't among the 10 entries that the DCS menu lists.
 
 | Setting | Default | Values |
@@ -1858,7 +1859,7 @@ Radio wheel entries:
 |---|---|
 | Range | Check in · In hot · Off safe · Check out |
 | AWACS | Check in · Picture · Bogey dope · Sort · Nearest tanker · Vector nearest airfield · Check out · Combat (Committing · Fox three · Splash · Defending · Request support · Unable · Winchester · Bingo, RTB · Say again) |
-| Tanker | Request rejoin · Visual · Observation · Pre-contact · Refuel complete |
+| Tanker | Request rejoin · Visual · Observation · Pre-contact · Refuel complete · Abort |
 | JTAC | Check in · Ready to copy · Readback · Say again 9-line · Mark / laser (Request mark · Red / Green / White / Orange / Blue smoke · Illumination · Sparkle (IR) · Laser on) · Tally · In · Off · Check out |
 
 The centre of the wheel suggests the answer to whatever the controller just asked for. For example, after *"Report in hot"* it suggests **Range: in hot**, after *"cleared pre-contact"* it suggests **Tanker: pre contact**, and after *"report complete or request more"* it suggests **Tanker: complete**.
@@ -1993,6 +1994,7 @@ DCS still only operates the basket or boom through its own F-menu tanker dialog.
 
 - DCS-ATC's tanker listens and talks on the tanker's mission frequency (the AWACS and the radio wheel name it) as well as on the default 255.5. With Easy Communication, DCS tunes your radio to the mission frequency by itself. If the tanker shares it with an airfield (e.g. 261.0 = Senaki UHF), DCS-ATC doesn't switch you to that airfield.
 - This uses `"CommsKey"` (the DCS radio menu key as a scan code, default `43`, which is `\` on US and `#` on German keyboards). With `0`, DCS-ATC doesn't press the menu.
+- With Easy Communication off, DCS-ATC doesn't press the menu either: send *Intent to refuel* and *Ready pre-contact* yourself with your radio's own menu key (or VAICOM).
 - **Other players** in multiplayer operate the DCS tanker menu themselves.
 
 #### Calls you can make
@@ -2308,7 +2310,7 @@ The crew chief's voice is set in `config.jsonc` → `"Voices"` → `"Crew"` (def
 | Station | Say | Gets you |
 |---|---|---|
 | AWACS | checking in · picture · bogey dope · declare [bullseye 030 45] · spiked 270 · request sort · committing north group · splash one · request nearest tanker · bingo, vectors to Kutaisi · mayday · checking out · Ford one, say status (AI flight) | check-in with picture · picture · nearest group BRAA · ID · spike source · targets per element · confirmation · copy · tanker position and TACAN · bearing and distance to the field · nearest field and handover · no more unprompted calls · the AI flight answers with its status |
-| Tanker | request rejoin · visual · observation · pre-contact · disconnect · right wing · refuel complete | rendezvous · cleared to join / number · cleared pre-contact · cleared contact · move to the right wing · report complete or request more · total offload, cleared to depart |
+| Tanker | request rejoin · visual · observation · pre-contact · disconnect · right wing · refuel complete · abort | rendezvous · cleared to join / number · cleared pre-contact · cleared contact · move to the right wing · report complete or request more · total offload, cleared to depart |
 | Range | checking in · in hot · in dry · off safe · winchester · checking out | range briefing · cleared hot · cleared dry · pass result · switches safe · summary and exit |
 | JTAC / FAC(A) | checking in · ready to copy · readback · request mark · laser on · tally target · in from the west · off north · checking out | situation · 9-line · readback check · mark · laser · advise IN · cleared hot / continue / abort · damage report · copy checking out |
 
@@ -2593,6 +2595,7 @@ Open it from **Start menu → DCS-ATC → Settings** or from **Radio wheel → G
 | **Speech pace** (1 = normal, higher = slower) | 0.70–1.50 | `SpeechRate` |
 | **Pause between calls** | 0–5 s | `ReplyPause` |
 | **Radio effect (noise, squelch)** | on/off | `RadioFx` |
+| **Radio calls also as text in the game** | on/off | `RadioText` |
 | **Speak your wheel requests (pilot voice)** | on/off. Off sets the pilot voice to empty. | `PilotVoice` |
 | **AWACS picture as bullseye (instead of BRAA)** | on/off | `AwacsBullseye` |
 | **AWACS calls new groups within** | 40–200 NM | `AwacsNewGroupNm` |
@@ -2670,6 +2673,7 @@ Own frequencies per airfield and controller are not in `config.jsonc` but in the
 | `Voices` | As installed: Tower `"en_US-ryan-medium\|en_US-ljspeech-medium"`, Ground `"en_US-bryce-medium"`, Approach `"en_US-ryan-medium@1.05"`, ATIS `"en_US-ryan-medium@0.94"`, Range `"en_US-ryan-medium@1.06"`, AWACS `"en_GB-alan-medium\|en_US-ljspeech-medium"`, Tanker `"en_US-bryce-medium"`, Crew `"en_US-ryan-medium"`. Carrier (added automatically) `"en_US-ryan-medium@0.97\|en_GB-alan-medium@1.02"` | Piper voice per controller, from the `models` folder. `@0.9` = lower pitch. If you give several voices separated by `\|`, each airfield or station is assigned one of them. More voices: huggingface.co/rhasspy/piper-voices. |
 | `PilotVoice` | `"en_US-joe-medium"` | Speaks your wheel and F10 requests before the answer. `""` = off. |
 | `RadioFx` | `true` | Radio sound: band-pass, light noise, squelch tail. |
+| `RadioText` | `true` | Radio calls also as DCS text on screen. `false` = speech only. |
 | `Volume` | `0.6` | Controller volume in SRS (0–1). |
 | `SpeechRate` | `0.85` | Speech pace: 1 = Piper standard, smaller = faster. |
 | `ReplyPause` | `1.5` | Seconds between two calls on the same frequency. |
@@ -2738,8 +2742,8 @@ When you report a bug, include the time, the airfield, a short description, `atc
 
 **Easy Communication**
 - DCS-ATC's radio doesn't depend on DCS's Easy Communication option.
-- The option matters for night runway lighting. With Easy Communication off, DCS answers only if your radio is tuned to the airfield frequency, so DCS-ATC requests the lights only in that case.
-- It also matters for the DCS tanker menu. With Easy Communication off, tune a radio to the tanker's mission frequency yourself before the join. Otherwise DCS greys out the tanker entry, DCS-ATC doesn't press the menu (the log says why) and the basket or boom is not extended.
+- The option matters for the DCS radio menu that DCS-ATC presses for you (runway lighting, tanker basket or boom). With Easy Communication off, DCS sends a menu call only if you open the menu with your radio's own menu key; the general communication-menu key opens it on the intercom, and nothing goes out.
+- So with Easy Communication off DCS-ATC doesn't press anything (the log says why). Request the lights and send *Intent to refuel* / *Ready pre-contact* yourself with your radio's menu key (or VAICOM). The DCS-ATC controllers talk you through it as usual.
 - If the lights never come on, check that `CommsKey` matches your DCS communication-menu key.
 
 **SRS not found**

@@ -38,6 +38,7 @@ public class Config
     };
     public string PilotVoice { get; set; } = "en_US-joe-medium";   // speaks your menu/wheel requests, "" = off
     public bool RadioFx { get; set; } = true;          // Radio sound: bandpass, noise, squelch
+    public bool RadioText { get; set; } = true;        // #6 (issue): radio calls also as DCS text on screen; false = speech only (notes and calls without SRS unit ID stay text)
     public double Volume { get; set; } = 0.6;          // controller volume in SRS (0–1)
     public string RunwayLights { get; set; } = "silent";   // runway lighting via the DCS-ATC menu: silent (airfield stays mute), dcs (DCS controller audible 15 s), off
     public string AltimeterUnit { get; set; } = "auto";   // altimeter setting on the radio: auto (by own type: western inHg/altimeter, otherwise hPa/QNH; ATIS both), hpa, inhg
@@ -160,7 +161,7 @@ static partial class Program
 
         TraceOn = Cfg.DebugLog;   // live from here: debug log (tests above without file)
         Dedicated = DedicatedNow();
-        Trace("START", $"DCS-ATC {System.Windows.Forms.Application.ProductVersion} {string.Join(" ", args)} | {JsonSerializer.Serialize(Cfg)}");
+        Trace("START", $"{DateTime.Now:yyyy-MM-dd} DCS-ATC {System.Windows.Forms.Application.ProductVersion} {string.Join(" ", args)} | {JsonSerializer.Serialize(Cfg)}");
         bool auto = args.Contains("--auto");   // started by the DCS hook at mission start
         using var single = new Mutex(true, "DcsAtc", out bool first);
         if (!first && !args.Contains("--say") && !args.Contains("--srs-test"))
@@ -332,7 +333,8 @@ static partial class Program
     }
 
     // follow along: console + atc-log.txt in the project folder
-    static void Log(string s) { if (SimLog != null) { SimLog.Add(s); return; } Console.WriteLine(s); Trace("LOG", s); try { File.AppendAllText(Path.Combine(Root, "atc-log.txt"), $"{Clock:HH:mm:ss} {s}\r\n"); } catch (IOException) { } }
+    static bool logDated;   // issue #7: date once per start, so a flight can be found
+    static void Log(string s) { if (SimLog != null) { SimLog.Add(s); return; } Console.WriteLine(s); Trace("LOG", s); try { File.AppendAllText(Path.Combine(Root, "atc-log.txt"), (logDated ? "" : $"===== {DateTime.Now:yyyy-MM-dd} =====\r\n") + $"{Clock:HH:mm:ss} {s}\r\n"); logDated = true; } catch (IOException) { } }
 
     // Debug log for bug reports: atc-debug.txt "HH:mm:ss.fff [KAT] Text", rolls over to atc-debug.old.txt via TraceMax. Live only with Config.DebugLog (TraceOn), tests without file.
     internal static bool TraceOn;
@@ -782,7 +784,7 @@ static partial class Program
                 if (p.Ops.Menu is { } mn && Cfg.CommsKey != 0 && MissionData && p == Host())   // basket/boom only via the DCS menu: "Intent to refuel" (mission looks it up in the list) or "Ready pre-contact"
                 {
                     if (mn.Step == "precontact") { Wheel.PressDcs((ushort)Cfg.CommsKey, 0x3B); p.TankMenuAt = Now(); }
-                    else AiCmd($"MENU;{p.Unit};tanker;{mn.Group};s{(Srs?.TunedFreqs(p.Id) is { } fq && Ops.TankerFreqOf(mn.Group) is > 0 and var mf && !fq.Any(m => Math.Abs(m - mf) < 0.005) ? "u" : "")}");   // R304: s = DCS tanker stays mute, our controller speaks (without s: audible 15 s like the airfields); TP7 u: mission frequency not tuned (matters only without Easy Communication)
+                    else AiCmd($"MENU;{p.Unit};tanker;{mn.Group};s");   // R304: s = DCS tanker stays mute, our controller speaks (without s: audible 15 s like the airfields); mission refuses without Easy Communication (issue #5)
                 }
                 p.Ops.Menu = null;
                 foreach (var cm in p.Ops.Cmds.ToList()) AiCmd(cm);   // J4/J6: MARK / LASE / LASEOFF
@@ -1110,9 +1112,8 @@ static partial class Program
                 if (MissionData && p == host && Cfg.RunwayLights != "off" && On("atc") && p.Tel is { } lt && LightKind(tw.Phase, lt, tw.F) is { } lk && Now() - p.LitAt.GetValueOrDefault((tw.F.Id, lk), -1e9) > 900)
                 {
                     p.LitAt[(tw.F.Id, lk)] = Now();   // lighting: only after DCS-ATC contact. Mission checks sun/weather (w) and open DCS dialog, switches the airfield on audibly for a short time
-                    bool untuned = Srs?.TunedFreqs(p.Id) is { } fq && new[] { tw.F.Uhf, tw.F.Vhf }.Where(x => x > 0).ToArray() is { Length: > 0 } fs && !fs.Any(x => fq.Any(m => Math.Abs(m - x) < 0.005));   // u: counts only without Easy Communication; DCS knows only the map frequency, not AirfieldFrequencies
                     if (Cfg.CommsKey == 0) Log($"[DCS] Befeuerung {tw.F.Name}: keine Funkmenü-Taste (CommsKey 0)");
-                    else AiCmd($"MENU;{p.Unit};{lk};{tw.F.Id};{(tw.Ifr ? "w" : "")}{(untuned ? "u" : "")}{(Cfg.RunwayLights == "dcs" ? "" : "s")}");
+                    else AiCmd($"MENU;{p.Unit};{lk};{tw.F.Id};{(tw.Ifr ? "w" : "")}{(Cfg.RunwayLights == "dcs" ? "" : "s")}");
                 }
                 foreach (var m in msgs.Where(m => m.Role == "Info" && (m.Text.StartsWith(L("Landebewertung", "Landing grade")) || m.Text.StartsWith(L("Platzrunde", "Pattern")) || m.Text.StartsWith(L("Anflug ohne", "Approach without")) || m.Text.StartsWith(L("Verstoß:", "Deviation:")))))   // R11, N4
                     foreach (var o in ActivePilots().Where(o => o == p || o.Lead == p)) o.Ops.Debrief.Add(m.Text.Split(L(". Beenden", ". To end"))[0]);
@@ -2898,7 +2899,7 @@ static partial class Program
     static readonly Dictionary<string, string> PromptPhrases = new()
     {
         ["AWACS"] = "Checking in as fragged, angels 25, playtime 30 minutes. Request picture. Bogey dope. Bullseye 270, 30. Committing. Fox 3. Splash one. Cranking. Picture clean. Checking out.",
-        ["Tanker"] = "Request rejoin. Visual. Pre-contact. Ready pre-contact. Contact. Disconnect. Request 10,000 pounds. Fuel state. Clear of the tanker.",
+        ["Tanker"] = "Request rejoin. Visual. Pre-contact. Ready pre-contact. Contact. Disconnect. Abort. Request 10,000 pounds. Fuel state. Clear of the tanker.",
         ["Center"] = "Checking in, flight level 250. Request flight following. Request direct. Request descent. Leaving frequency. Switching to approach.",
         ["Range"] = "Checking in. IP inbound. In hot. Off safe. Cleared hot. Off dry. Range Alpha.",
         ["Carrier"] = "Request case 1 recovery. See you at 10. Commencing. Platform. Hornet ball, 4.5. Clara. Marshal, Paddles, Strike, Mother.",
@@ -3132,7 +3133,7 @@ static partial class Program
             void Show()   // Text for the mission (*.out in the game, to the player's group; Gid -1 = speech only)
             {
                 tx.Aired?.Invoke();
-                if (tx.Gid < 0) return;
+                if (tx.Gid < 0 || !Cfg.RadioText && !info && freq != 0) return;   // #6: RadioText off = speech only
                 var dur = ShowSec(tx, label);
                 foreach (var gid in ShowTo(tx.Gid, info ? 0 : freq, freq2, tx.Side))
                     try

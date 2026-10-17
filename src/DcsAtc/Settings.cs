@@ -131,6 +131,7 @@ static class Settings
         var pause = new Slider(0, 5, 0.5, cfg.ReplyPause, "0.0' s'");
         Row(L("Pause zwischen Funksprüchen", "Pause between calls"), pause);
         var fx = Check(L("Funkklang (Rauschen, Squelch)", "Radio effect (noise, squelch)"), cfg.RadioFx);
+        var rtx = Check(L("Funksprüche auch als Text im Spiel", "Radio calls also as text in the game"), cfg.RadioText);
         var pv = Check(L("Eigene Anfragen vorsprechen (Pilotenstimme)", "Speak your wheel requests (pilot voice)"), cfg.PilotVoice != "");
 
         Group(left, "AWACS");
@@ -222,7 +223,7 @@ static class Settings
             var set = new (string Key, string Value, string After)[]
             {
                 ("MyCallsign", J(call), "Callsign"), ("CallsignFromUnit", J(unitCs.Checked), "MyCallsign"), ("Volume", D(vol.Value / 100), "RadioFx"), ("SpeechRate", D(rate.Value), "Volume"),
-                ("ReplyPause", D(pause.Value), "SpeechRate"), ("RadioFx", J(fx.Checked), "PilotVoice"),
+                ("ReplyPause", D(pause.Value), "SpeechRate"), ("RadioFx", J(fx.Checked), "PilotVoice"), ("RadioText", J(rtx.Checked), "RadioFx"),
                 ("PilotVoice", J(pv.Checked ? (cfg.PilotVoice != "" ? cfg.PilotVoice : new Config().PilotVoice) : ""), "Voices"),
                 ("AiChatter", J(chat.Checked), "ReplyPause"), ("AwacsBullseye", J(bull.Checked), "Coalition"), ("AwacsNewGroupNm", D(awNm.Value), "AwacsBullseye"), ("Atis", J(atis.Checked), "AiChatter"), ("RunwayLights", J(lights[light.SelectedIndex]), "Atis"), ("AltimeterUnit", J(units[unit.SelectedIndex]), "RunwayLights"), ("AiFlightComms", J(modes[combat.SelectedIndex]), "Volume"), ("AirspaceWatch", J(watch.Checked), "RunwayLights"), ("DebugLog", J(dbg.Checked), "AirspaceWatch"),
                 ("WheelInGame", J(ingames[ingame.SelectedIndex]), "WheelSize"), ("MicName", J(mic.SelectedIndex == 0 ? "" : mics[mic.SelectedIndex - 1]), "WheelSize"), ("SrsPath", J(srs.Text.Trim()), "DebugLog"),

@@ -84,7 +84,7 @@ sealed class Wheel : Form
         new("Tanker", Sub: new Item[]
         {
             new("Request rejoin", "Tanker: request rejoin"), new("Visual", "Tanker: visual"), new("Observation", "Tanker: observation"), new("Pre-contact", "Tanker: pre contact"),
-            new("Refuel complete", "Tanker: refuel complete"), new("Say position", "Tanker: say position"),
+            new("Refuel complete", "Tanker: refuel complete"), new("Abort", "Tanker: abort"), new("Say position", "Tanker: say position"),
         }),
         new("Carrier", Sub: new Item[]
         {

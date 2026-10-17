@@ -233,7 +233,7 @@ local function start()
           { "Winchester", "AWACS: winchester" }, { "Bingo, RTB", "AWACS: bingo, RTB" }, { "Say again", "AWACS: say again" } } } } },
       { "Tanker", nil, {
         { "Request rejoin", "Tanker: request rejoin" }, { "Visual", "Tanker: visual" }, { "Observation", "Tanker: observation" },
-        { "Pre-contact", "Tanker: pre contact" }, { "Refuel complete", "Tanker: refuel complete" }, { "Say position", "Tanker: say position" } } },
+        { "Pre-contact", "Tanker: pre contact" }, { "Refuel complete", "Tanker: refuel complete" }, { "Abort", "Tanker: abort" }, { "Say position", "Tanker: say position" } } },
       { "Center", nil, {   -- en-route controller (module center), like the radio wheel group Center
         { "Check in", "Center: checking in" }, { "Request altitude", "Center: request higher" }, { "Request direct", "Center: request direct", ifr = true },
         { "Leaving frequency", "Center: leaving frequency" } }, need = "center" } } },
@@ -1525,7 +1525,7 @@ local function start()
   -- sorted like RadioCommandDialogsPanel (Config/Common/Tanker.lua, ATC.lua) by distance -> "M;Unit;tanker|atc|dep;number;count", otherwise "M;Unit;type;0;reason".
   -- Airfield (lighting, atc = "Inbound" in the air, dep = "Request startup" on the ground): only sun below 6° or poor visibility (flag w of the app),
   -- the ATC is audible for 15 s for this (it switches on the lighting with the answer), then silent again.
-  -- Easy Communication off: list the same (just grayed), but DCS does not tune by itself -> without a tuned airfield frequency (flag u, SRS) nothing gets through.
+  -- Easy Communication off: DCS sends menu calls only via the radio's own menu key; the general key (\) opens the menu on the intercom -> no presses (issue #5).
   local CUM = { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 }
   local TZ = { Caucasus = 4, PersianGulf = 4, Nevada = -8, Normandy = 0, TheChannel = 2, Syria = 3, MarianaIslands = 10,
                Falklands = -3, SinaiMap = 2, Kola = 3, Afghanistan = 4.5, Iraq = 3, GermanyCW = 1 }   -- Mission clock = local time of the map, UTC+h (as MOOSE)
@@ -1567,7 +1567,7 @@ local function start()
       if not f then return no("Platz " .. target .. " nicht in der Mission") end
       local sun = sunAt(f.p)
       if sun >= 6 and not fl:find("w") then return no(string.format("Tag (Sonne %.0f Grad, gute Sicht)", sun)) end
-      if not easy and fl:find("u") then return no("Easy Communication aus und Platzfrequenz nicht gerastet") end
+      if not easy then return no("Easy Communication aus") end
       for _, s in ipairs({ coalition.side.NEUTRAL, side }) do
         for _, a in ipairs(coalition.getServiceProviders(s, coalition.service.ATC) or {}) do list[#list + 1] = a end
       end
@@ -1575,7 +1575,7 @@ local function start()
       table.sort(list, function(l, r) return key(l) < key(r) end)
       want = function(a) return a:getID() == f.id end
     else
-      if not easy and fl:find("u") then return no("Easy Communication aus und Tankerfrequenz nicht gerastet") end   -- TP7: DCS greys the entry, blind keys would get stuck in the menu
+      if not easy then return no("Easy Communication aus") end   -- blind keys would get stuck in the menu or hit "Abort rejoin"
       list = coalition.getServiceProviders(side, coalition.service.TANKER) or {}
       table.sort(list, function(l, r) return d(l) < d(r) end)
       want = function(t) local g = t.getGroup and t:getGroup() return g and g:getName() == target end

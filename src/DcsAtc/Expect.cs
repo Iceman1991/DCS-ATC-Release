@@ -88,6 +88,7 @@ static partial class Program
             "Tanker: say position" => air,
             "Tanker: observation" => tk is 1 or 2,
             "Tanker: pre contact" or "Tanker: refuel complete" => tk >= 2,   // after the join
+            "Tanker: abort" => tk >= 1,   // #5 (issue): from the join on
             "Carrier: Marshal, checking in" => air && h.Boat.Stage == 0,
             "Carrier: pigeons" => air,
             "Carrier: Strike, checking in" or "Carrier: Strike, checking out" => air && h.Boat.Stage == 0,   // optional, outside the recovery

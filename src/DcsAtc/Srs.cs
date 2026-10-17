@@ -199,7 +199,12 @@ sealed class SrsListener
         if (Debug && !open.ContainsKey(sender)) Console.WriteLine($"rx start {freq} ({n} Frequenzen im Paket) unit {unit} '{name}'");
         lock (open)
         {
-            if (!open.TryGetValue(sender, out var rx)) open[sender] = rx = new Rx { Freq = freq, Unit = unit, Name = name };
+            if (!open.TryGetValue(sender, out var rx))
+            {
+                open[sender] = rx = new Rx { Freq = freq, Unit = unit, Name = name };
+                // Issue #7: the radio SRS really transmits on (selected radio first; in-cockpit modules choose it by the cockpit PTT, not the SRS selection)
+                Program.Trace("SRS", $"Sendung unit {unit} '{name}' auf {string.Join("/", Enumerable.Range(0, n).Select(i => (BitConverter.ToDouble(b, 6 + audio + 10 * i) / 1e6).ToString("0.0##")))}, gehört {freq:0.0##}");
+            }
             rx.Frames[packet] = b[6..(6 + audio)];
             rx.Last = DateTime.Now;
         }
