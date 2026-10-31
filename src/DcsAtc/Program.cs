@@ -755,7 +755,16 @@ static partial class Program
                     Wheel.PressDcs(MenuKeys(e[2], mi, int.Parse(e[4])));
                     if (e[2] == "tanker") p.TankMenuAt = Now();   // R304: DCS then tunes the tanker frequency itself (Pick)
                 }
-                else if (mi == 0) Trace("DCS", $"Funkmenü {e[2]} nicht gedrückt: {e[4]}");
+                else if (mi == 0)
+                {
+                    Trace("DCS", $"Funkmenü {e[2]} nicht gedrückt: {e[4]}");
+                    if (e[2] == "tanker")   // Forum (fabio.dangelo): the controller says "boom ready", without the menu DCS never extends it: say so in the game
+                    {
+                        Log($"[DCS] Funkmenü tanker nicht gedrückt: {e[4]}");
+                        SayQueue.Add(new Tx(L("Tanker: DCS-Funkmenü nicht gedrückt, Korb/Boom bleiben aus. \"Intent to refuel\" und \"Ready pre-contact\" selbst senden: Menütaste deines Funkgeräts -> Tanker.",
+                                              "Tanker: DCS radio menu not pressed, basket/boom stay off. Send \"Intent to refuel\" and \"Ready pre-contact\" yourself: your radio's menu key -> Tanker."), "Info", "", p.Gid));
+                    }
+                }
                 else Log($"[DCS] Funkmenü {e[2]} nicht gedrückt: {(mi > 10 ? $"Nr. {mi}, DCS listet nur 10" : "keine Funkmenü-Taste (CommsKey 0)")}");
             }
             else if (e[0] == "C" && e.Length >= 3 && e[2] == "stopped") p.Active?.EngineOff(p.Tel);   // R6/N25: engine off at the parking spot after taxi-in = parked (debrief in TickAll), not on the taxiway; R107: also before departure at the parking spot
@@ -874,7 +883,7 @@ static partial class Program
                 var calls = p.Ops.OnTranscript(opsRole, text, MeOf(p) with { Freq = src == "SRS" ? p.CalledOn : 0 }, TrafficFor(p), Fields, Now(), conf < MinConf, Cfg.Frequencies.GetValueOrDefault("AWACS", 251.5), FieldWxOf);
                 if (p.Ops.Menu is { } mn && Cfg.CommsKey != 0 && MissionData && p == Host())   // basket/boom only via the DCS menu: "Intent to refuel" (mission looks it up in the list) or "Ready pre-contact"
                 {
-                    if (mn.Step == "precontact") { Wheel.PressDcs((ushort)Cfg.CommsKey, 0x3B); p.TankMenuAt = Now(); }
+                    if (mn.Step == "precontact") { Log("[DCS] Funkmenü tanker Ready pre-contact"); Wheel.PressDcs((ushort)Cfg.CommsKey, 0x3B); p.TankMenuAt = Now(); }
                     else AiCmd($"MENU;{p.Unit};tanker;{mn.Group};s");   // R304: s = DCS tanker stays mute, our controller speaks (without s: audible 15 s like the airfields); mission refuses without Easy Communication (issue #5)
                 }
                 p.Ops.Menu = null;
@@ -1175,6 +1184,13 @@ static partial class Program
         lock (TowerLock)
         {
             PauseCheck(CurrentTel());   // LA17
+            if (Srs is { Connected: true, HasPlayers: false } && Host()?.Tel != null)   // Forum (Tony86): SRS client on another server: SrsAutoConnect leaves it alone, nothing goes either way
+            {
+                if (Now() - (noSrsClientAt ??= Now()) > 30)
+                    SrsHint(L($"Kein Funk: dein SRS-Client ist nicht mit dem SRS-Server auf diesem PC verbunden. Im Client 127.0.0.1:{SrsPort} eintragen und Connect drücken, kein anderer Server.",
+                              $"No voice: your SRS client is not connected to the SRS server on this PC. Enter 127.0.0.1:{SrsPort} in the client and press Connect, no other server."));
+            }
+            else noSrsClientAt = null;
             if (MissionFields && File.GetLastWriteTime(AirfieldFile) != airfieldStamp) LoadFields();
             if (MissionFields && File.GetLastWriteTime(StandFile) is var ss && ss != standStamp)
                 try { Airfield.LoadStands(Fields, StandFile); standStamp = ss; Trace("PLATZ", $"DCS-Standnamen: {Fields.Sum(f => f.Stands.Count)}"); }
@@ -1987,9 +2003,9 @@ static partial class Program
                         wx[p[1]] = (D(2), D(3), D(4), D(5));
                         if (p.Length > 6) FieldSide(p[1], (int)D(6));
                         break;
-                    case "T" when p.Length >= 11:   // T;unit;group;type;x;z;alt;hdg;speed;inAir;flag;coalition;callsign;fuel;gid;freq;ammo;kind;fuelkg
+                    case "T" when p.Length >= 11:   // T;unit;group;type;x;z;alt;hdg;speed;inAir;flag;coalition;callsign;fuel;gid;freq;ammo;kind;fuelkg;task[;m]
                         ai.Add(new Traffic(p[1].GetHashCode(), p[3], D(4), D(5), D(6), D(7), D(8), p[2], p[10], p[9] == "1", p.Length > 11 ? int.Parse(p[11]) : 0,
-                            Cs: p.Length > 12 ? p[12] : "", Fuel: p.Length > 13 ? D(13) : 1, Heli: p.Length > 17 && p[17] == "h"));   // Callsign and fuel per unit (ball call), AiCallsign/AiFuel per group only
+                            Cs: p.Length > 12 ? p[12] : "", Fuel: p.Length > 13 ? D(13) : 1, Heli: p.Length > 17 && p[17] == "h", Mission: p.Length > 20 && p[20] == "m"));   // Callsign and fuel per unit (ball call), AiCallsign/AiFuel per group only
                         if (p.Length > 12) AiCallsign[p[2]] = p[12];
                         if (p.Length > 13) AiFuel[p[2]] = D(13);
                         if (p.Length > 14) AiGid[p[2]] = (int)D(14);
@@ -2187,7 +2203,7 @@ static partial class Program
             var cur = new Dictionary<string, double>();
             // Distance to the airfield; in holding that of the holding point (circling should not upset the sequence)
             double D(string k, double x, double z) => Holds.TryGetValue(k, out var h) ? Dist(h.X, h.Z, fld.X, fld.Z) : Dist(x, z, fld.X, fld.Z);
-            foreach (var a in Ai.Where(a => a.InAir && a.Group != ""))
+            foreach (var a in Ai.Where(a => a.InAir && a.Group != "" && !a.Heli))   // helicopters land beside the runway: not in the landing sequence
             {
                 var fl = a.Flag.Split(':', 2);
                 if (fl[0] is "arr" or "arr-hold" && (fl.Length > 1 ? fl[1] : "Kutaisi") == fld.Name && (a.Coalition == 0 || Served(a.Coalition, fld))) cur.TryAdd("ai:" + a.Group, D("ai:" + a.Group, a.X, a.Z));   // N40: captured -> out (DIVERT)
@@ -2302,7 +2318,7 @@ static partial class Program
             if (Fields.FirstOrDefault(f => f.Name == (fl.Length > 1 ? fl[1] : "Kutaisi")) is not { } fld || fld.Ends.Count == 0) continue;
             if (a.Coalition > 0 && !Served(a.Coalition, fld))   // N40: airfield captured: no radio from the hostile airfield, divert approaches once to the nearest own (they check in anew there)
             {
-                if (flag is "arr" or "arr-hold" && a.InAir && Once("DIVERT;" + g.Key)) { AiCmd($"DIVERT;{g.Key}"); aiStage.Remove(g.Key); Holds.Remove("ai:" + g.Key); Log($"[KI ] {g.Key}: {fld.Name} erobert -> umgeleitet"); }
+                if (flag is "arr" or "arr-hold" && a.InAir && !a.Mission && Once("DIVERT;" + g.Key)) { AiCmd($"DIVERT;{g.Key}"); aiStage.Remove(g.Key); Holds.Remove("ai:" + g.Key); Log($"[KI ] {g.Key}: {fld.Name} erobert -> umgeleitet"); }
                 continue;
             }
             var herePl = pilots.Where(p => p.Active?.F == fld && p.Tel != null && Dist(p.Tel.X, p.Tel.Z, fld.X, fld.Z) < 30 * NM).ToList();
@@ -2332,12 +2348,15 @@ static partial class Program
             double Al(double x, double z) => -((x - thr.ThrX) * thr.Dx + (z - thr.ThrZ) * thr.Dz);
             var leadPl = herePl.Where(p => p.Active!.Phase == Phase.ClearedLand && p.Tel!.Agl >= 15 && Al(p.Tel.X, p.Tel.Z) < Al(a.X, a.Z)).MaxBy(p => Al(p.Tel!.X, p.Tel.Z));
             bool depNow = aiDep || here.Any(t => t.Phase == Phase.ClearedTakeoff);
-            bool rwyBusyArr = emergency || depNow || luaw || leadPl != null || blocked || herePl.Any(p => p.Active!.Phase == Phase.ClearedLand && p.Tel!.Agl < 15);
+            bool rwyBusyArr = emergency || !a.Heli && (depNow || luaw || leadPl != null || blocked || herePl.Any(p => p.Active!.Phase == Phase.ClearedLand && p.Tel!.Agl < 15));
             string busyWhy = leadPl != null ? $"number two, follow the {Ops.TypeSay(leadPl.Type)} on {Math.Max(1, (int)Math.Round(Al(leadPl.Tel!.X, leadPl.Tel.Z) / NM))} mile final, continue"
                            : $"continue approach, {(emergency ? "emergency in progress" : depNow ? $"traffic departing runway {rws}" : "traffic on runway")}";
             var m = Regex.Match(AiCallsign.GetValueOrDefault(g.Key, ""), @"^([A-Za-z]+)\s*(\d)\s*-?\s*(\d)");
             var cs = m.Success ? Tower.SpokenCallsign($"{m.Groups[1].Value} {m.Groups[2].Value}-{m.Groups[3].Value}") : a.Type.Split('_')[0] + " flight";
             var stage = aiStage.GetValueOrDefault(g.Key, "");
+            if (flag == "arr" && stage == "gone") stage = aiStage[g.Key] = "";   // mission AI back from its departure: approach calls anew
+            var rwTo = a.Heli ? "" : $" runway {rws}";   // helicopter: no runway in the calls (R347)
+            string landClr = $"{cs}{(a.Heli ? "" : $", runway {rws}")}, cleared to land.", landRb = $"Cleared to land{rwTo}, {cs}.";
             // Like real radio: audible to players ≤ 50 NM who have the airfield frequency tuned in SRS (frequency unknown: players at this airfield)
             bool Heard(string role) => concerns || pilots.Any(p => p.Tel != null && Dist(p.Tel.X, p.Tel.Z, a.X, a.Z) < 50 * NM &&
                 (Srs?.TunedFreqs(p.Id) is { } fq ? (FieldFreqs(fld, role) ?? new[] { Cfg.Frequencies.GetValueOrDefault(role, 265.0) }).Any(f => fq.Any(m => Math.Abs(m - f) < 0.005))
@@ -2365,7 +2384,7 @@ static partial class Program
             bool wait = emergency || !spaced || contra || luaw || depRoll;   // A10: player waiting on the runway; landing sequence: one after another (DCS flies the approach itself, own waypoints disturb it)
             // R298: two thresholds (AIM 5-5-15): "minimum fuel" advisory only without priority, below that MAYDAY FUEL with priority (UpdateQueues); clearance is the RESUME branch
             double fuel = AiFuel.GetValueOrDefault(g.Key, 1);
-            if (flag is "arr" or "arr-hold" && a.InAir && Heard("Approach"))
+            if (flag is "arr" or "arr-hold" && a.InAir && pos >= 0 && Heard("Approach"))
             {
                 if (fuel < LowFuel && fuelTold.Add("may:" + g.Key))
                 {
@@ -2387,20 +2406,31 @@ static partial class Program
             }
             // Takeoff clearance only after taxiing (parking spot close to the threshold: not right after engine start) and with a clear runway (player rolling out, other AI taking off),
             // already on approach from 600 m instead of only when stationary under 450 m (A82): DCS often taxis the AI onto the runway without stopping, the clearance otherwise came after the takeoff roll
-            else if (flag == "dep-go" && !a.InAir && stage == "taxi" && Dist(a.X, a.Z, thr.ThrX, thr.ThrZ) < 600 && !rwyBusy && !finalNear &&
+            // Helicopter: lifts off from the spot (R347 "from present position"); airplane started by itself (mission AI) rolling near the threshold without a taxi call: also
+            else if (flag == "dep-go" && (a.Heli ? a.InAir && stage == "taxi" : !a.InAir && (stage == "taxi" || stage == "" && a.Speed > 2) && Dist(a.X, a.Z, thr.ThrX, thr.ThrZ) < 600) && !rwyBusy && !finalNear &&
                      !Ai.Any(o => o.Group != g.Key && o.InAir && FieldOf(o) == fld.Name && aiStage.GetValueOrDefault(o.Group) is "final" or "final-wait" && Dist(o.X, o.Z, thr.ThrX, thr.ThrZ) < 4 * NM) &&   // AI with landing clearance under 4 NM (like TrafficOnFinal for the player)
                      (Clock - lastAiStart.GetValueOrDefault(fld.Name)).TotalSeconds > 90)
             {
                 aiStage[g.Key] = "ready";
-                Chat("Tower", $"{fld.StationOf("Tower")}, {cs}, holding short runway {rws}, ready for departure.",
-                     $"{cs}, runway {rws}{WindSay(fld)}, cleared for takeoff.", $"Cleared for takeoff runway {rws}, {cs}.");   // R386: wind like the player clearance
+                if (a.Heli)
+                    Chat("Tower", $"{fld.StationOf("Tower")}, {cs}, ready for departure.", $"{cs}{WindSay(fld)}, cleared for takeoff from present position.", $"Cleared for takeoff, {cs}.");
+                else
+                    Chat("Tower", $"{fld.StationOf("Tower")}, {cs}, holding short runway {rws}, ready for departure.",
+                         $"{cs}, runway {rws}{WindSay(fld)}, cleared for takeoff.", $"Cleared for takeoff runway {rws}, {cs}.");   // R386: wind like the player clearance
+            }
+            // Mission AI starts and taxis by itself (no START): taxi call when it starts moving (helicopter: lifts off), K36 route like after START
+            else if (flag == "dep-go" && stage == "" && (a.Heli ? a.InAir || a.Speed > 1 : !a.InAir && a.Speed > 2 && Dist(a.X, a.Z, thr.ThrX, thr.ThrZ) >= 600) && Dist(a.X, a.Z, fld.X, fld.Z) < 3 * NM)
+            {
+                aiStage[g.Key] = "taxi";
+                Chat("Ground", $"{fld.StationOf("Ground")}, {cs}, request {(a.Heli ? "air " : "")}taxi.",
+                     $"{cs}, {Tower.TaxiOut(fld.RampAt(a.X, a.Z), rw, rws, a.Heli)}.", $"{(a.Heli ? "Air taxi" : "Taxi")} holding point runway {rws}, {cs}.");
             }
             else if (flag == "dep-go" && a.InAir && stage is "taxi" or "ready" && Dist(a.X, a.Z, fld.X, fld.Z) > 5000)
             {
                 aiStage[g.Key] = "gone";
                 Chat("Tower", "", $"{cs}, contact departure, good day.", OneOf($"Good day, {cs}.", $"Contact departure, {cs}."));
             }
-            else if (flag == "arr" && wait && (stage == "" || emergency || contra && !aiSent.ContainsKey("RESUME;" + g.Key)) && a.InAir && Dist(a.X, a.Z, fld.X, fld.Z) > 8 * NM && Once("WAIT;" + g.Key))   // cleared: not into holding again
+            else if (flag == "arr" && wait && !a.Mission && (stage == "" || emergency || contra && !aiSent.ContainsKey("RESUME;" + g.Key)) && a.InAir && Dist(a.X, a.Z, fld.X, fld.Z) > 8 * NM && Once("WAIT;" + g.Key))   // cleared: not into holding again
             {
                 AiCmd($"WAIT;{g.Key};1200;{stack:0}");
                 aiStackFt[g.Key] = stack;
@@ -2422,33 +2452,35 @@ static partial class Program
                 Holds["ai:" + g.Key] = (hp.X, hp.Z, stack);
                 Chat("Approach", "", $"{cs}, descend and maintain {stack:0} feet, number {pos + 1}.", $"Down to {stack:0}, {cs}.");
             }
-            else if (flag == "arr" && a.InAir && stage == "" && pos >= 0)   // only in the sequence (holding or approach)
+            else if (flag == "arr" && a.InAir && stage == "" && (pos >= 0 || a.Heli))   // only in the sequence (holding or approach); helicopters outside it
             {
                 aiStage[g.Key] = "inbound";
                 Chat("Approach", $"{fld.StationOf("Approach")}, {cs}, inbound for landing.",
-                     $"{cs}, {fld.StationOf("Approach")}, radar contact, expect runway {rws}.", $"Runway {rws}, {cs}.");
+                     $"{cs}, {fld.StationOf("Approach")}, radar contact{(a.Heli ? "" : $", expect runway {rws}")}.", a.Heli ? $"Wilco, {cs}." : $"Runway {rws}, {cs}.");
             }
-            else if (flag == "arr" && a.InAir && stage == "inbound" && a.AltMsl - fld.Elev < 700 && Tower.HdgDiff(a.Hdg * 180 / Math.PI, thr.Hdg) < 30 &&
-                     -((a.X - thr.ThrX) * thr.Dx + (a.Z - thr.ThrZ) * thr.Dz) is > 0 and < 7 * NM)   // really on final, not in the DCS downwind
+            else if (flag == "arr" && a.InAir && stage == "inbound" && (a.Heli ? a.AltMsl - fld.Elev < 300 && Dist(a.X, a.Z, fld.X, fld.Z) < 2 * NM :
+                     a.AltMsl - fld.Elev < 700 && Tower.HdgDiff(a.Hdg * 180 / Math.PI, thr.Hdg) < 30 &&
+                     -((a.X - thr.ThrX) * thr.Dx + (a.Z - thr.ThrZ) * thr.Dz) is > 0 and < 7 * NM))   // really on final, not in the DCS downwind
             {
                 aiStage[g.Key] = rwyBusyArr ? "final-wait" : "final";   // Runway occupied: landing clearance follows as soon as it is free (A83)
                 // R301: handover Approach -> Tower with frequency and readback (FAA JO 7110.65 2-1-17, 5-9-4); same frequency: no handover (R104)
                 if ((FieldFreqs(fld, "Tower") ?? new[] { Cfg.Frequencies.GetValueOrDefault("Tower", 265.0) })[^1] is var tfq &&
                     Math.Abs(tfq - (FieldFreqs(fld, "Approach") ?? new[] { Cfg.Frequencies.GetValueOrDefault("Approach", 266.5) })[^1]) >= 0.005)
                     Chat("Approach", "", $"{cs}, contact {fld.StationOf("Tower")} {Tower.FreqSay(tfq)}.", $"Tower {Tower.FreqSay(tfq)}, {cs}.");
-                Chat("Tower", $"{fld.StationOf("Tower")}, {cs}, final runway {rws}.",
-                     rwyBusyArr ? $"{cs}, {busyWhy}." : $"{cs}, runway {rws}, cleared to land.",
-                     rwyBusyArr ? $"Continue, {cs}." : $"Cleared to land runway {rws}, {cs}.");
+                Chat("Tower", $"{fld.StationOf("Tower")}, {cs}, final{rwTo}.",
+                     rwyBusyArr ? $"{cs}, {busyWhy}." : landClr,
+                     rwyBusyArr ? $"Continue, {cs}." : landRb);
             }
             else if (flag == "arr" && a.InAir && stage == "final-wait" && !rwyBusyArr)
             {
                 aiStage[g.Key] = "final";
-                Chat("Tower", "", $"{cs}, runway {rws}, cleared to land.", $"Cleared to land runway {rws}, {cs}.");
+                Chat("Tower", "", landClr, landRb);
             }
             else if (stage is "final" or "final-wait" && !a.InAir && a.Speed < 15)   // final-wait: DCS lands the AI even without clearance
             {
                 aiStage[g.Key] = "landed";
-                Chat("Ground", $"{fld.StationOf("Ground")}, {cs}, runway vacated, request taxi to parking.", $"{cs}, taxi to parking{Tower.ParkVia(fld.RampAt(a.X, a.Z), rw)}.", $"Taxi to parking, {cs}.");   // K36: vacate route from the chart (the apron nearest the AI)
+                var air = a.Heli ? "air " : "";
+                Chat("Ground", $"{fld.StationOf("Ground")}, {cs}, {(a.Heli ? "on the ground" : "runway vacated")}, request {air}taxi to parking.", $"{cs}, {air}taxi to parking{Tower.ParkVia(fld.RampAt(a.X, a.Z), rw)}.", $"{(a.Heli ? "Air taxi" : "Taxi")} to parking, {cs}.");   // K36: vacate route from the chart (the apron nearest the AI)
             }
         }
     }
@@ -2658,6 +2690,39 @@ static partial class Program
             if (!mf.Contains("roger minimum fuel, you are number 1") || mf.Contains("mayday") || !mm.Contains("roger mayday, you are number 1") || mm.Contains("minimum fuel"))
                 throw new Exception($"KI-Sprit R298: \"{mf}\" / \"{mm}\"");
             Console.WriteLine($"OK   R298 KI-Sprit: \"{mf}\" (kein Vorrang), dann \"{mm}\"");
+
+            // Mission AI on its own route (forum: AI helicopter silent on the airfield frequency): no START/WAIT, taxi call when it starts moving;
+            // helicopter: air taxi, takeoff from present position, landing without runway, not in the landing sequence
+            {
+                string All() { var s = string.Join(" | ", outq.Select(t => t.Text)); outq.Clear(); return s; }
+                aiStage.Clear(); aiSent.Clear(); lastAiStart.Clear(); cmds.Clear(); outq.Clear();
+                Player(Phase.Parked, rw);
+                Ai = new() { Plane("MIS1", "dep-go:Kutaisi", e.At(-1200, 300), false, 0) with { Mission = true } };
+                Run(); var m0 = All();
+                Ai = new() { Ai[0] with { Speed = 5 } }; Run(); var m1 = All();
+                var (tx, tz) = e.At(500, 150);
+                Ai = new() { Ai[0] with { X = tx, Z = tz } }; Run(); var m2 = All();
+                Ai = new() { Plane("HEL1", "dep-go:Kutaisi", e.At(-1200, 300), true, 3, 5) with { Mission = true, Heli = true } };
+                Run(); var h1 = All(); Run(); var h2 = All();
+                Player(Phase.TaxiOut, opp);   // A41: AI arrivals wait -> exercise traffic into the hold, mission AI not
+                Ai = new() { Plane("MIS2", "arr:Kutaisi", e.At(12 * NM, 0), true, 120, 1200) with { Mission = true }, Plane("ARR6", "arr:Kutaisi", e.At(14 * NM, 0), true, 120, 1200) };
+                UpdateQueues(new() { pl }); Run(); var a1 = All();
+                ArrQueue.Clear(); Holds.Remove("ai:ARR6");
+                Player(Phase.Parked, rw);
+                var hl = Plane("HEL2", "arr:Kutaisi", (fld.X + 5 * NM, fld.Z), true, 40, 400) with { Mission = true, Heli = true };
+                Ai = new() { hl }; UpdateQueues(new() { pl }); var hq = ArrQueue.ContainsKey(fld.Name); Run(); var l1 = All();
+                Ai = new() { hl with { X = fld.X + NM, AltMsl = fld.Elev + 100 } }; Run(); var l2 = All();
+                Ai = new() { hl with { X = fld.X + NM, AltMsl = fld.Elev, InAir = false, Speed = 0 } }; Run(); var l3 = All();
+                aiStage["MIS3"] = "gone";   // round trip: back at the departure field
+                Ai = new() { Plane("MIS3", "arr:Kutaisi", e.At(12 * NM, 0), true, 120, 1200) with { Mission = true } }; UpdateQueues(new() { pl }); Run(); var r1 = All();
+                ArrQueue.Clear();
+                if (m0 != "" || !m1.Contains("request taxi") || !m1.Contains("taxi to holding point") || aiStage["MIS1"] != "ready" || !m2.Contains("cleared for takeoff") || cmds.Any(c => c.Contains("MIS1"))
+                    || !h1.Contains("request air taxi") || !h1.Contains("air taxi") || !h2.Contains("cleared for takeoff from present position") || h2.Contains("runway")
+                    || !a1.Contains("inbound for landing") || !cmds.Any(c => c.StartsWith("WAIT;ARR6;")) || cmds.Any(c => c.Contains("MIS2"))
+                    || !l1.Contains("radar contact.") || hq || !l2.Contains("cleared to land.") || l2.Contains("runway") || !l3.Contains("request air taxi to parking") || !r1.Contains("inbound for landing"))
+                    throw new Exception($"Missions-KI: \"{m0}\" / \"{m1}\" / \"{m2}\" / \"{h1}\" / \"{h2}\" / \"{a1}\" / \"{l1}\" / \"{l2}\" / \"{l3}\" / \"{r1}\" / {string.Join(",", cmds)}");
+                Console.WriteLine($"OK   Missions-KI funkt ohne START/WAIT (\"{m1}\"), Hubschrauber: \"{h2}\" / \"{l2}\"");
+            }
 
             // Carrier into the wind: mission does not turn (land ahead) -> Marshal states the BRC being steered, after 5 min new CVTURN; leg finished (ship stationary) likewise
             cmds.Clear();
@@ -3568,6 +3633,18 @@ static partial class Program
     }
 
     static bool srsDown;   // LA24: ExternalAudio last could not connect
+    static bool srsHinted;
+    static double? noSrsClientAt;
+    /// Forum (Tony86): with DCS in full screen nobody reads the console: SRS problem once per session as text in the game (Gid 0 = all).
+    static void SrsHint(string text)
+    {
+        if (srsHinted) return;
+        srsHinted = true;
+        Log("[SRS] " + text);
+        SayQueue.Add(new Tx(text, "Info", "", 0));
+    }
+    static string SrsDownText() => L($"Kein Lotsen-Ton: SRS-Server auf diesem PC (Port {SrsPort}) nicht erreichbar. SRS-Ordner in den Einstellungen prüfen, Server starten.",
+                                     $"No controller voice: SRS server on this PC (port {SrsPort}) not reachable. Check the SRS folder in the settings, start the server.");
     static (string stdout, int exit) Run(string exe, string? stdin, params string[] args) { var (o, x, _) = RunErr(exe, stdin, args); return (o, x); }
 
     /// Run with stderr (GPU1: whisper's device list).
@@ -3593,6 +3670,7 @@ static partial class Program
             bool down = o.Contains("Could not connect"), first = down && !srsDown;
             if (exe.Contains("ExternalAudio")) srsDown = down;
             if (first) Console.WriteLine(L("      (SRS-Server nicht erreichbar)", "      (SRS server not reachable)"));
+            if (down && (DateTime.Now - Process.GetCurrentProcess().StartTime).TotalSeconds > 60) SrsHint(SrsDownText());   // right after the start the server may still be coming up
             if (p.ExitCode != 0 && !down || first)
                 Trace("FEHLER", $"{Path.GetFileName(exe)} Exit {p.ExitCode}: " + (err.Result.Contains("garbage collected delegate") ? "Absturz in SRS ExternalAudio selbst (garbage collected delegate)" : $"{err.Result.Trim()} {o.Trim()}"));
             return (o, p.ExitCode, err.Result);
@@ -3601,6 +3679,7 @@ static partial class Program
         {
             Console.WriteLine(L("      Fehler beim Start von ", "      Error starting ") + $"{Path.GetFileName(exe)}: {e.Message}");
             Trace("FEHLER", $"Start {exe}: {e.GetType().Name}: {e.Message}");
+            if (exe.Contains("ExternalAudio")) SrsHint(SrsDownText());
             return ("", -1, "");
         }
     }
@@ -3752,8 +3831,8 @@ static partial class Program
         LoadConfig();
         var n = Cfg;
         Cfg = old;
-        (Cfg.MyCallsign, Cfg.Volume, Cfg.SpeechRate, Cfg.ReplyPause, Cfg.RadioFx, Cfg.PilotVoice, Cfg.AiChatter, Cfg.AiFlightComms, Cfg.Atis, Cfg.AltimeterUnit, Cfg.WheelInGame, Cfg.AirspaceWatch, Cfg.RunwayLights, Cfg.CallsignFromUnit) =   // R392: RunwayLights is read per call (line ~995), applies immediately
-            (n.MyCallsign, n.Volume, n.SpeechRate, n.ReplyPause, n.RadioFx, n.PilotVoice, n.AiChatter, n.AiFlightComms, n.Atis, n.AltimeterUnit, n.WheelInGame, n.AirspaceWatch, n.RunwayLights, n.CallsignFromUnit);
+        (Cfg.MyCallsign, Cfg.Volume, Cfg.SpeechRate, Cfg.ReplyPause, Cfg.RadioFx, Cfg.RadioText, Cfg.PilotVoice, Cfg.AiChatter, Cfg.AiFlightComms, Cfg.Atis, Cfg.AltimeterUnit, Cfg.WheelInGame, Cfg.AirspaceWatch, Cfg.RunwayLights, Cfg.CallsignFromUnit) =   // R392: RunwayLights is read per call (line ~995), applies immediately
+            (n.MyCallsign, n.Volume, n.SpeechRate, n.ReplyPause, n.RadioFx, n.RadioText, n.PilotVoice, n.AiChatter, n.AiFlightComms, n.Atis, n.AltimeterUnit, n.WheelInGame, n.AirspaceWatch, n.RunwayLights, n.CallsignFromUnit);
         (Cfg.IffCheck, Cfg.StationPositions) = (n.IffCheck, n.StationPositions);   // Tower.IffCheck is set by LoadConfig, StationPositions is read per transmission
         (Cfg.RandomNotams, Cfg.Notams) = (n.RandomNotams, n.Notams);
         SetNotams();
@@ -5098,6 +5177,11 @@ static partial class Program
         sv.OnVoice(VoicePkt("a", 243.0, 263.0)); sv.OnVoice(VoicePkt("b", 263.0, 243.0)); sv.OnVoice(VoicePkt("c", 243.0, 251.0));
         var svf = sv.OpenFreqs();
         if (svf.Length != 2 || svf.Any(f => f != 263.0)) throw new Exception("SRS-Paket mit zwei Frequenzen: " + string.Join(",", svf));
+        string SrsClient(string id, string name, int unit) => $"{{\"MsgType\":1,\"Client\":{{\"ClientGuid\":\"{id}\",\"Name\":\"{name}\",\"RadioInfo\":{{\"unitId\":{unit}}}}}}}";
+        sv.OnServerMessage(SrsClient("a", "DCS-ATC", 0)); sv.OnServerMessage(SrsClient("b", "Tower", 100000));
+        bool svAlone = !sv.HasPlayers;
+        sv.OnServerMessage(SrsClient("c", "Tony", 16778752));
+        if (!svAlone || !sv.HasPlayers) throw new Exception("SRS HasPlayers: DCS-ATC/ExternalAudio zählen nicht, ein Spieler schon");
         Console.WriteLine("OK   SRS-Simultansenden: Paket [243.0, 263.0] mit Abhörfrequenz 263.0 -> Rx auf 263.0, [263.0, 243.0] ebenso, [243.0, 251.0] verworfen");
         {   // A22: SRS monitoring: active airfield before taxi and mission AWACS (9 of them), over 10 frequencies as secFreq of the radios
             var aw0 = Ops.AwacsFreq;

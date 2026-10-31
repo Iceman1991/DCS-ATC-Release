@@ -791,6 +791,7 @@ DCS-ATC wählt den Platz in dieser Reihenfolge:
 - **Format:** Station, dein Rufzeichen, Nachricht. „Kutaisi Ground, Enfield 1-1, request startup.“
 - **Dein Rufzeichen** kommt aus deinem DCS-Slot oder aus `MyCallsign` in den Einstellungen.
 - **Rotten:** Spieler derselben Gruppe im Verband werden als Rotte angesprochen („Enfield one one flight“). Freigaben gelten für die ganze Rotte.
+- **KI-Verkehr am Platz:** KI-Flugzeuge und -Hubschrauber deiner Seite, deren Missionsroute an einem Platz beginnt oder mit einer Landung dort endet, funken mit Ground, Tower und Approach auf der Frequenz dieses Platzes: Rollanfrage, sobald sie losrollen, Startfreigabe, „inbound for landing“, Landefreigabe, Rollen zum Abstellplatz. Hubschrauber bekommen „air taxi“ und „cleared for takeoff from present position“ und landen ohne Bahn. DCS-ATC spricht nur für sie. Sie fliegen ihre Route aus dem Missionseditor und werden weder gestartet noch in die Warteschleife geschickt. Du hörst sie, wenn sie nah bei dir oder in der Landefolge direkt vor oder hinter dir sind, oder wenn du die Platzfrequenz in SRS eingestellt hast und höchstens 50 NM entfernt bist. Bei einem MAYDAY am Platz schweigen sie. Die Pilotenseite dieser Rufe folgt `"AiChatter"` (Standard `true`).
 - **Readbacks, „say again“, „confirm“, Radio Check und „unable“** gehen bei jedem Lotsen gleich: siehe [Grundlegende Phrasen](#grundlegende-phrasen).
 - **Wie du sendest** (SRS, Sprechtaste, Funkrad, F10, Chat): siehe [Wege zu funken](#wege-zu-funken).
 
@@ -2831,7 +2832,8 @@ Für einen Fehlerbericht: Uhrzeit, Platz, kurze Beschreibung, `atc-log.txt` und 
   - Station, dann Rufzeichen, dann Anliegen sagen.
   - Nach dem Drücken der Sprechtaste kurz warten, dann sprechen.
   - Bei „say again“ wiederholen oder das Funkrad nehmen.
-- **Text im Spiel, aber keine Stimme?** Zeigt das DCS-ATC-Fenster „(SRS-Server nicht erreichbar)“, läuft der SRS-Server nicht lokal oder auf einem anderen Port.
+- **Text im Spiel, aber keine Stimme?** Zeigt das DCS-ATC-Fenster „(SRS-Server nicht erreichbar)“, läuft der SRS-Server nicht lokal oder auf einem anderen Port. Dein SRS-Client muss mit dem SRS-Server auf dem DCS-ATC-PC verbunden sein (`127.0.0.1`), nicht mit einem anderen Server, sonst geht in keine Richtung Ton. Beides erscheint auch einmal als Text im Spiel.
+- **VoiceAttack, VAICOM, WhisperAttack:** DCS-ATC braucht sie nicht, nur SRS und deine SRS-Sprechtaste. Kommst du nicht durch, schalte sie aus und teste nur mit SRS.
 - **Kein F10 → ATC und falsches Rufzeichen?** DCS-ATC hat keine Missionsdaten, `MissionScripting.lua` ist also nicht angepasst. Siehe „Nach einem DCS-Update“ unten.
 
 **Falsche Frequenz**
@@ -2844,7 +2846,7 @@ Für einen Fehlerbericht: Uhrzeit, Platz, kurze Beschreibung, `atc-log.txt` und 
 **Easy Communication**
 - Der Funk von DCS-ATC hängt nicht von der DCS-Option Easy Communication ab.
 - Die Option zählt für das DCS-Funkmenü, das DCS-ATC für dich drückt (Bahnbefeuerung, Korb bzw. Boom am Tanker). Mit Easy Communication aus sendet DCS einen Menüspruch nur, wenn du das Menü mit der Menütaste deines Funkgeräts öffnest. Die allgemeine Taste für das Kommunikationsmenü öffnet es auf dem Bordfunk (Intercom), dann geht nichts raus.
-- Mit Easy Communication aus drückt DCS-ATC deshalb nichts (Grund steht im Log). Licht sowie *Intent to refuel* und *Ready pre-contact* forderst du dann selbst mit der Menütaste deines Funkgeräts an (oder VAICOM). Die DCS-ATC-Lotsen führen dich wie gewohnt.
+- Mit Easy Communication aus drückt DCS-ATC deshalb nichts (Grund steht im Log, am Tanker sagt es dir ein Text im Spiel). Licht sowie *Intent to refuel* und *Ready pre-contact* forderst du dann selbst mit der Menütaste deines Funkgeräts an (oder VAICOM). Die DCS-ATC-Lotsen führen dich wie gewohnt.
 - Geht das Licht nie an, prüfen, ob `CommsKey` deiner DCS-Taste für das Kommunikationsmenü entspricht.
 
 **SRS nicht gefunden**

@@ -14,7 +14,8 @@ public record Iff(int Mode3, int Status, bool Mode4);
 /// Other aircraft nearby (AI/players). Speed, Vs (climb/descent rate) in m/s. Flag: AI control (dep/dep-go/arr/arr-hold).
 public record Traffic(int Id, string Type, double X, double Z, double AltMsl, double Hdg, double Speed,
                       string Group = "", string Flag = "", bool InAir = true, int Coalition = 0, double Vs = 0, string Cs = "", double Fuel = 1, bool Heli = false,   // Heli: helicopter (mission, N50)
-                      double AsgFt = 0);   // R216: altitude assigned by ATC (holding/radar vectoring/IFR departure), 0 = none (VFR/unknown)
+                      double AsgFt = 0,   // R216: altitude assigned by ATC (holding/radar vectoring/IFR departure), 0 = none (VFR/unknown)
+                      bool Mission = false);   // mission AI on its own editor route: radio only, no START/WAIT/DIVERT
 
 /// Radio call of a controller. Role: Ground / Tower / Approach / ATIS, "Info" = text only in the game (not spoken).
 public record Msg(string Role, string Text)

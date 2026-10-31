@@ -789,6 +789,7 @@ Over SRS, DCS-ATC listens on the frequencies of your current airfield and of the
 - **Format:** station, your callsign, message. "Kutaisi Ground, Enfield 1-1, request startup."
 - **Your callsign** comes from your DCS slot, or from `MyCallsign` in the settings.
 - **Formation flights:** players in the same group who fly in formation are answered as a flight ("Enfield one one flight"). Clearances apply to the whole flight.
+- **AI traffic at the airfield:** AI aircraft and helicopters of your side whose mission route starts at an airfield or ends with a landing there talk to Ground, Tower and Approach on that airfield's frequency: taxi request when they start rolling, takeoff clearance, "inbound for landing", landing clearance, taxi to parking. Helicopters get "air taxi" and "cleared for takeoff from present position" and are cleared to land without a runway. DCS-ATC only talks for them. They fly their route from the mission editor and are never started or sent to a hold. You hear them when they are close to you or right before or after you in the landing sequence, or when you have the airfield frequency tuned in SRS within 50 NM. During a MAYDAY at the airfield they stay silent. The pilot side of these calls follows `"AiChatter"` (default `true`).
 - **Readbacks, "say again", "confirm", radio checks and "unable"** work the same with every controller: see [Phrasing that is always understood](#phrasing-that-is-always-understood).
 - **How to transmit** (SRS, push-to-talk, radio wheel, F10, chat): see [Ways to talk](#ways-to-talk).
 
@@ -2829,7 +2830,8 @@ When you report a bug, include the time, the airfield, a short description, `atc
   - Say the station, then your callsign, then the request.
   - Wait a moment after pressing PTT before you speak.
   - If you get "say again", repeat your call or use the radio wheel.
-- **Text in the game but no voice?** If the DCS-ATC window shows "(SRS server not reachable)", the SRS server isn't running locally or is on another port.
+- **Text in the game but no voice?** If the DCS-ATC window shows "(SRS server not reachable)", the SRS server isn't running locally or is on another port. Your SRS client must be connected to the SRS server on the PC running DCS-ATC (`127.0.0.1`), not to another server; otherwise no voice goes either way. Both cases also show once as text in the game.
+- **VoiceAttack, VAICOM, WhisperAttack:** DCS-ATC doesn't need them, only SRS and your SRS push-to-talk. If you can't transmit, turn them off and test with SRS alone.
 - **No F10 → ATC menu and the wrong callsign?** DCS-ATC has no mission data, which means `MissionScripting.lua` isn't patched. See "After a DCS update" below.
 
 **Wrong frequency**
@@ -2842,7 +2844,7 @@ When you report a bug, include the time, the airfield, a short description, `atc
 **Easy Communication**
 - DCS-ATC's radio doesn't depend on DCS's Easy Communication option.
 - The option matters for the DCS radio menu that DCS-ATC presses for you (runway lighting, tanker basket or boom). With Easy Communication off, DCS sends a menu call only if you open the menu with your radio's own menu key; the general communication-menu key opens it on the intercom, and nothing goes out.
-- So with Easy Communication off DCS-ATC doesn't press anything (the log says why). Request the lights and send *Intent to refuel* / *Ready pre-contact* yourself with your radio's menu key (or VAICOM). The DCS-ATC controllers talk you through it as usual.
+- So with Easy Communication off DCS-ATC doesn't press anything (the log says why, and at the tanker a text in the game tells you). Request the lights and send *Intent to refuel* / *Ready pre-contact* yourself with your radio's menu key (or VAICOM). The DCS-ATC controllers talk you through it as usual.
 - If the lights never come on, check that `CommsKey` matches your DCS communication-menu key.
 
 **SRS not found**

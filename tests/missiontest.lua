@@ -139,6 +139,9 @@ env.mission.coalition.blue.country[1].ship = { group = { { name = "CVN", units =
 env.mission.coalition.blue.country[1].plane.group[2] = { name = "Hornet CV", units = { {} }, route = { points = { { type = "Land", linkUnit = 501 } } } }
 plane("Hornet CV", 3000, 2000).air = true
 env.mission.coalition.blue.country[1].plane.group[3] = { name = "Viper", frequency = 141, task = "CAP", units = { {} } }   -- AI radio: flight frequency, editor task (R376)
+env.mission.coalition.blue.country[1].helicopter = { group = {   -- mission AI (airfield radio): round trip Kutaisi, air start to Senaki
+  { name = "Mission Huey", units = { {} }, route = { points = { { type = "TakeOffParking", airdromeId = 26 }, { type = "Turning Point" }, { type = "Land", airdromeId = 26 } } } },
+  { name = "Mission Hip", units = { {} }, route = { points = { { type = "Turning Point" }, { type = "Land", airdromeId = 23 } } } } } }
 local cv = unit("CVN-73", 1000, 2000); cv.v = vec(10, 0); cv.air = false
 function cv:getTypeName() return "CVN_73" end
 groups["CVN"] = { cat = 3, getUnits = function() return { cv } end, getUnit = function() return cv end, getName = function() return "CVN" end, getController = function() return { getDetectedTargets = function() return {} end, setTask = function(_, k) cvTask = k end } end }
@@ -246,6 +249,21 @@ groups["Hornet CV"] = nil
 local dp = divTask and divTask.params.route.points
 assert(dp and dp[2].type == "Land" and dp[2].airdromeId, "DIVERT ohne Landewegpunkt")
 run(T + 1); assert(not stateFile():find("T;Hornet CV;[^\n]*;cv;"), "DIVERT: Flag cv bleibt")
+
+do   -- Mission AI on its own route: dep-go at the start field, cleared beyond 5 NM (no "inbound" right after, even heading home), arr when heading in; "m" in the T line, no WAIT
+  local mh = coalition.addGroup(2, Group.Category.HELICOPTER, { name = "Mission Huey", units = { { name = "MH1", x = 300, y = 0 } } })
+  local mi = coalition.addGroup(2, Group.Category.HELICOPTER, { name = "Mission Hip", units = { { name = "MI1", x = 0, y = 100000 - 8 * 1852, alt = 300 } } })
+  local u, v = mh:getUnit(), mi:getUnit()
+  local function fl(n) return tostring(DCSATC.ai[n]) end
+  v.v = vec(0, -50)   -- flying away from Senaki
+  run(T + 3); assert(fl("Mission Huey") == "dep-go:Kutaisi" and ("\n" .. stateFile()):find("\nT;MH1;Mission Huey;[^\n]*;dep%-go:Kutaisi;[^\n]*;m\n"), "Missions-KI Abflug: " .. fl("Mission Huey") .. " " .. stateFile())
+  assert(fl("Mission Hip") == "nil", "Missions-KI fliegt weg und ist arr")
+  u.air, u.p, u.v = true, vec(0, 6 * 1852), vec(0, -50); run(T + 3)
+  assert(fl("Mission Huey") == "nil" and not stateFile():find("T;MH1;[^\n]*;m\n"), "Missions-KI nach 5 NM / gleich zurück: " .. fl("Mission Huey"))
+  v.v = vec(5, 50); run(T + 3); assert(fl("Mission Hip") == "arr:Senaki" and stateFile():find("T;MI1;[^\n]*;arr:Senaki;[^\n]*;m\n"), "Missions-KI Anflug: " .. fl("Mission Hip"))
+  files["9-10.cmd"] = "WAIT;Mission Hip;300;3000"; run(T + 1); assert(not hasTask("Mission Hip:push"), "Missions-KI nimmt WAIT an")
+  mh:destroy(); mi:destroy()
+end
 
 -- AI traffic: after 30 s first flight at Kutaisi
 run(80)

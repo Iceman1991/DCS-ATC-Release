@@ -25,6 +25,7 @@ sealed class SrsListener
     readonly Dictionary<string, (string Name, uint UnitId, double[]? Freqs, Iff? Iff)> clients = new();
     readonly Dictionary<string, Rx> open = new();
     public bool Connected { get; private set; }
+    public bool HasPlayers { get { lock (clients) return clients.Values.Any(c => c.Name != "DCS-ATC" && c.UnitId != 100000 && !ignoreName(c.Name)); } }   // Forum (Tony86): a real SRS client on this server (not we, not ExternalAudio)
     static readonly bool Debug = Environment.GetEnvironmentVariable("DCSATC_SRSDEBUG") == "1";
 
     sealed class Rx { public readonly SortedDictionary<ulong, byte[]> Frames = new(); public double Freq; public uint Unit; public string Name = ""; public DateTime Last; }

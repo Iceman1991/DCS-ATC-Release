@@ -939,6 +939,50 @@ local function start()
     for name in pairs(flights) do local g = Group.getByName(name) if g then g:destroy() end flights[name] = nil; A.ai[name] = nil end
   end
 
+  -- Mission AI with an editor route from/to an airdrome talks to Ground/Tower: flag dep-go while departing (≤ 5 NM), arr when heading in (planes ≤ 25 NM and
+  -- below 3000 m AGL, helicopters ≤ 10 NM; after a departure not within 5 min: no "inbound" when turning back over the field on course).
+  -- Route stays with DCS: not in flights (no START/WAIT, not removed), "m" in the T line.
+  -- ponytail: arr from distance + track toward the field (DCS gives no current waypoint); an orbit low near the home field can count as inbound until it leaves.
+  local mroute, byId = {}, {}
+  A.mai = {}
+  for _, f in ipairs(fields) do byId[f.id] = f end
+  for sideName, coa in pairs(env.mission.coalition or {}) do
+    if playerSides[({ red = 1, blue = 2 })[sideName] or 0] then
+      for _, ctry in pairs(coa.country or {}) do
+        for _, cat in ipairs({ "plane", "helicopter" }) do
+          for _, g in pairs(ctry[cat] and ctry[cat].group or {}) do
+            local pts = g.route and g.route.points or {}
+            local dep = pts[1] and tostring(pts[1].type):match("^TakeOff") and byId[pts[1].airdromeId]
+            local arr = pts[#pts] and pts[#pts].type == "Land" and byId[pts[#pts].airdromeId]
+            if (dep or arr) and not slots[g.name] and not cvBound[g.name] then mroute[g.name] = { dep = dep, arr = arr, heli = cat == "helicopter", out = not dep and -math.huge or nil } end   -- out: time it left the departure field
+          end
+        end
+      end
+    end
+  end
+  timer.scheduleFunction(function()
+    for side in pairs(playerSides) do
+      for _, cat in ipairs({ Group.Category.AIRPLANE, Group.Category.HELICOPTER }) do
+        for _, g in ipairs(coalition.getGroups(side, cat) or {}) do pcall(function()
+          local name = g:getName()
+          local m, u = mroute[name] or mroute[(name:gsub("%s*#%d+$", ""))], (g:getUnits() or {})[1]
+          if not m or not u or not u:isActive() or flights[name] or u:getPlayerName() then return end
+          local p, st = u:getPoint(), (A.ai[name] or ""):match("^[%a-]+")
+          local function set(s, f) A.ai[name] = s and s .. ":" .. f.name; A.mai[name] = s and true end
+          if not m.out then
+            if d2(p, m.dep.p) > (5 * NM) ^ 2 then m.out = timer.getTime(); set() elseif not st then set("dep-go", m.dep) end
+          elseif m.arr and timer.getTime() - m.out > 300 then
+            local d, v, r = d2(p, m.arr.p), u:getVelocity(), (m.heli and 10 or 25) * NM
+            if st == "arr" then if u:inAir() and d > (r + 5 * NM) ^ 2 then set() end
+            elseif u:inAir() and d < r ^ 2 and (m.heli or p.y - land.getHeight({ x = p.x, y = p.z }) < 3000)
+              and (m.arr.p.x - p.x) * v.x + (m.arr.p.z - p.z) * v.z > 0.7 * math.sqrt(d * (v.x ^ 2 + v.z ^ 2)) then set("arr", m.arr) end   -- track within 45° of the field
+          end
+        end) end
+      end
+    end
+    return timer.getTime() + 2
+  end, nil, timer.getTime() + 3)
+
   -- Air refueling of the player: real contact/separation (instead of distance to the tanker) -> "F;Unit;start|stop;Tank 0–1;internal tank kg" (kg = fuelMassMax, from it the amount delivered in lb)
   world.addEventHandler({ onEvent = function(_, e)
     local u = e.initiator
@@ -1544,6 +1588,7 @@ local function start()
                   clean(A.ai[g:getName()] or (cvBound[g:getName()] and "cv") or ""), u:getCoalition(), clean(u:getCallsign()), u.getFuel and u:getFuel() or 1, g:getID(),   -- Tank 0–1: fuel shortage -> priority; group ID: AI flight member of the player
                   gfreq[g:getName()] or gfreq[(g:getName():gsub("%s*#%d+$", ""))] or 0, ammo[un], kind, fmax[un],   -- Flight frequency (editor), ammunition fox3/fox1/fox2/gun/air-to-ground (AI radio), h/a, internal tank kg
                   clean(gtask[g:getName()] or gtask[(g:getName():gsub("%s*#%d+$", ""))] or ""))   -- editor task (CAP, SEAD, ...)
+                  .. (A.mai[g:getName()] and not flights[g:getName()] and ";m" or "")   -- mission AI on its own route: radio only, no commands
               end
             end
           end
