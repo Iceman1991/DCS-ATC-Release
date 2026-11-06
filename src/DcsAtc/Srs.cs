@@ -17,6 +17,7 @@ sealed class SrsListener
     internal const int Max = 20;
     volatile int resync;   // counter: every connection sends RADIO_UPDATE when it changes
     volatile bool security;   // K4: COALITION_AUDIO_SECURITY of the server (SYNC/SERVER_SETTINGS) - it forwards voice only within the coalition
+    string serverSettings = "";
     readonly Action<Transmission> onTx;
     readonly Func<string, bool> ignoreName;   // do not monitor own controller voices (ExternalAudio)
     readonly string[] guids = { NewGuid(), NewGuid() };   // K4: connection 0 (spectator, blue with security), 1 (red, only with security)
@@ -121,12 +122,14 @@ sealed class SrsListener
 
         var nextPing = DateTime.Now.AddSeconds(1);
         bool pong = false;
+        var noPongAt = (DateTime?)DateTime.Now.AddSeconds(10);   // Forum (Tony86): TCP up, UDP blocked (firewall) = no voice, no error
         var nextSync = DateTime.Now.AddSeconds(30);
         udp.Client.ReceiveTimeout = 100;
         while (reader.IsAlive && (conn == 0 || security))
         {
             try { var any = new IPEndPoint(IPAddress.Any, 0); var b = udp.Receive(ref any); if (Debug) Console.WriteLine($"udp {b.Length}"); if (b.Length == 22) pong = true; else OnVoice(b); }   // K4: duplicate packets (global frequencies) land on the same packet ID
             catch (SocketException e) when (e.SocketErrorCode == SocketError.TimedOut) { }
+            if (noPongAt != null && (pong || DateTime.Now >= noPongAt)) { Program.Trace("SRS", pong ? $"UDP-Antwort vom Server ({conn})" : $"keine UDP-Antwort vom Server nach 10 s ({conn}), Firewall?"); noPongAt = null; }
             if (DateTime.Now >= nextPing) { nextPing = DateTime.Now.AddSeconds(pong ? 15 : 1); udp.Send(ping); }   // every second until the first reply
             if (synced != resync) { synced = resync; writer.WriteLine(Message(3, conn)); }   // also K4: coalition changed
             if (DateTime.Now >= nextSync) { nextSync = DateTime.Now.AddSeconds(30); writer.WriteLine(Message(1, conn)); writer.WriteLine(Message(3, conn)); }   // PING + radios
@@ -182,12 +185,17 @@ sealed class SrsListener
                 {
                     var was = clients.TryGetValue(id, out var o3) ? o3 : default;
                     if (was.Name != name || was.UnitId != unit || was.Iff != iff || !(was.Freqs ?? Array.Empty<double>()).SequenceEqual(fq ?? Array.Empty<double>()))   // Debug log: tuned frequencies and transponder per player
-                        Program.Trace("SRS", $"Client '{name}' unit {unit}: {Fl(was.Freqs)} -> {Fl(fq)}{(iff == null ? "" : $", IFF {iff.Mode3} Status {iff.Status}{(iff.Mode4 ? " M4" : "")}")}");
+                        Program.Trace("SRS", $"Client '{name}' unit {unit} Koalition {(c.TryGetProperty("Coalition", out var side) ? side.ToString() : "?")}: {Fl(was.Freqs)} -> {Fl(fq)}{(iff == null ? "" : $", IFF {iff.Mode3} Status {iff.Status}{(iff.Mode4 ? " M4" : "")}")}");
                     clients[id] = (name, unit, fq, iff);
                 }
             }
             static string Fl(double[]? f) => f == null ? "?" : string.Join("/", f.Select(x => x.ToString("0.0##")));
             int type = root.GetProperty("MsgType").GetInt32();
+            if (root.TryGetProperty("ServerSettings", out var st) && st.ValueKind == JsonValueKind.Object)   // Forum (Tony86): settings that can silence a transmission (no passwords: they end up in logs posted in the forum)
+            {
+                var sv = string.Join(", ", new[] { "COALITION_AUDIO_SECURITY", "SPECTATORS_AUDIO_DISABLED", "LOS_ENABLED", "DISTANCE_ENABLED" }.Select(k => st.TryGetProperty(k, out var x) ? $"{k}={x}" : k + "=?"));
+                if (sv != serverSettings) Program.Trace("SRS", "Server: " + (serverSettings = sv));
+            }
             if (root.TryGetProperty("ServerSettings", out var ss) && ss.ValueKind == JsonValueKind.Object && ss.TryGetProperty("COALITION_AUDIO_SECURITY", out var cs)
                 && (bool.TryParse(cs.ToString(), out var sec) && sec) != security)   // K4: "true"/"false" (SYNC, SERVER_SETTINGS)
             {

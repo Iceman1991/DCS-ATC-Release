@@ -728,6 +728,13 @@ static partial class Program
     {
         var e = line.Split(';');
         if (e.Length < 2) return;
+        if (e[0] == "WING")   // DcsAtcHook.lua: wingman command performed ("ok") or why not
+        {
+            if (e[1] == "ok") return;
+            Log($"[DCS] Wingman-Befehl nicht gesendet: {e[1]} ({string.Join(";", e.Skip(2))})");
+            lock (TowerLock) SayQueue.Add(new Tx(L($"Wingman: Befehl nicht gesendet ({e[1]}). Nimm das DCS-Funkmenü.", $"Wingman: command not sent ({e[1]}). Use the DCS radio menu."), "Info", "", Host()?.Gid ?? 0));
+            return;
+        }
         if (e[0] == "X") { lock (TowerLock) try { Ops.OnEvent(e, Now()); foreach (var q in Pilots.Values) q.Ops.OnCasEvent(e, q.Unit, Now()); Flights.OnEvent(e, Now(), FlightWorld()); } catch (FormatException x) { Trace("FEHLER", $"Ereignis {line}: {x.Message}"); } return; }   // AI radio
         List<Ops.Call> calls = new();
         Pilot? p;
@@ -829,6 +836,13 @@ static partial class Program
             if (Regex.IsMatch(spoken, @"\bcheck ?ride\b|\bcheck flight\b", RegexOptions.IgnoreCase)) { SayQueue.Add(CheckrideReq(p, spoken)); return; }
             if (CsarReq(p, to, spoken) is { } cr) { foreach (var x in cr) SayQueue.Add(x); return; }
             if (Regex.IsMatch(spoken, @"\b(?:fox (?:one|two|three)|defensive|defending)\b", RegexOptions.IgnoreCase)) HotUntil = Clock.AddSeconds(5);   // LD3: radio pause for picture/replies
+            if (!fromMenu && p == Host() && WingCmd(Tower.Normalize(spoken), p.Callsign) is { } wc)   // forum (jojojung): own AI wingmen, only on this PC (its DCS radio menu)
+            {
+                Log($"[DCS] Wingman {(wc.Par == 5 ? "Flight" : (wc.Par + 1).ToString())}: {wc.Msg}");
+                try { File.WriteAllText(WingFile + ".tmp", $"{wc.Par};{wc.Msg}"); File.Move(WingFile + ".tmp", WingFile, true); }
+                catch (IOException e) { Trace("FEHLER", $"Wingman-Befehl {wc.Msg}: {e.Message}"); }
+                return;
+            }
             if (!fromMenu && MissionData && Flights.Ask(Tower.Normalize(spoken), p.Coalition, Now(), FlightWorld())) return;   // LK15: "Ford one, say status" to an AI flight (reply comes via FlightComms)
             p.AtcAt = Now();   // N2: call to a controller (airfield, carrier, AWACS, tanker, range)
             var ask = new[] { p, p.Lead }.Select(x => x?.Expect).FirstOrDefault(x => x is { } v && v.Until > Now());   // LA10: open question (as Expected)
@@ -1109,6 +1123,36 @@ static partial class Program
     static ushort[] MenuKeys(string kind, int nr, int count) =>
         new[] { (ushort)Cfg.CommsKey, (ushort)(kind == "tanker" ? 0x40 : 0x3F) }.Concat(count > 1 ? new[] { (ushort)(0x3A + nr) } : Array.Empty<ushort>())
             .Append((ushort)(kind == "dep" ? 0x3D : 0x3B)).ToArray();
+
+    /// Forum (jojojung): AI wingmen by voice, as the DCS radio menu. Phrase (normalised) -> message the menu sends; first match wins (longer phrases first).
+    static readonly (string Rx, string Msg)[] WingCmds =
+    {
+        (@"(?:mission|primary)(?: and)? (?:rejoin|join up)", "FulfilTheTaskAndJoinUp"), (@"(?:mission|primary)(?: and)? (?:rtb|r t b|return to base)", "FulfilTheTaskAndReturnToBase"),
+        (@"(?:engage|attack) my target", "EngageMyTarget"), (@"(?:engage|attack) my (?:enemy|attacker)", "MyEnemyAttack"),
+        (@"engage (?:air defen[cs]es?|sams?|s a m|triple a|aaa)", "EngageAirDefenses"), (@"engage (?:ground|armor|tanks?)", "EngageGroundTargets"),
+        (@"engage (?:ships?|naval|boats?)", "EngageNavalTargets"), (@"engage (?:bandits?|air|fighters?)", "EngageBandits"),
+        (@"cover me", "CoverMe"), (@"rejoin|re join|join up|form up", "JoinUp"),
+        (@"line abreast", "LineAbreast"), (@"trail", "GoTrail"), (@"wedge", "Wedge"), (@"echelon left", "EchelonLeft"), (@"echelon(?: right)?", "EchelonRight"),
+        (@"finger four", "FingerFour"), (@"spread four", "SpreadFour"), (@"close (?:formation|up)|tighten up", "CloseFormation"), (@"open (?:formation|up)|loosen up|spread out", "OpenFormation"),
+        (@"rtb|r t b|return to base|go home", "ReturnToBase"), (@"(?:resume|fly) (?:route|mission)|continue mission", "FlyRoute"), (@"hold position|anchor here|orbit here|hold here", "AnchorHere"),
+        (@"(?:go|fly) to (?:the )?tanker|go refuel", "GoRefueling"), (@"(?:radar|music) on", "RadarOn"), (@"(?:radar|music) off", "RadarOff"),
+        (@"(?:ecm|jammer|jamming) on", "DisturberOn"), (@"(?:ecm|jammer|jamming) off", "DisturberOff"), (@"smoke on", "SmokeOn"), (@"smoke off", "SmokeOff"),
+        (@"jettison", "JettisonWeapons"), (@"pinc?h?er left", "PincerLeft"), (@"pinc?h?er right", "PincerRight"), (@"pinc?h?er high", "PincerHigh"), (@"pinc?h?er low", "PincerLow"),
+        (@"check in", "FlightCheckIn"),
+    };
+
+    /// "Two, go trail", "Enfield 1-3, rejoin", "Flight, engage bandits" -> recipient as in the DCS radio menu (1–3 = wingman 2–4, 5 = flight) and wMsgLeader…, else null.
+    /// A callsign before the number counts only if it is the own flight's ("Texaco 1-2, … request rejoin" is the tanker).
+    internal static (int Par, string Msg)? WingCmd(string n, string callsign)
+    {
+        var own = Regex.Match(Tower.Normalize(callsign), @"^[a-z]+ \d").Value;
+        var m = Regex.Match(n, $@"^(?:{Regex.Escape(own)} )?([234]|flight)\b(.*)$");
+        if (!m.Success) return null;
+        var c = WingCmds.FirstOrDefault(w => Regex.IsMatch(m.Groups[2].Value, $@"\b(?:{w.Rx})\b"));
+        return c.Msg == null ? null : (m.Groups[1].Value == "flight" ? 5 : m.Groups[1].Value[0] - '1', "wMsgLeader" + c.Msg);
+    }
+
+    static readonly string WingFile = Path.Combine(Path.GetTempPath(), "DcsAtc-Wing.txt");   // DcsAtcHook.lua performs the radio menu item, reply as event "WING;result;par;msg"
 
     /// K2/K4: airfield frequency on which p hears the controller: tuned (SRS, most recently called first), otherwise the called (SRS state may be older than the call), otherwise VHF (= map), otherwise UHF. 0 = without Radio.lua.
     /// any: any controller frequency of the airfield (Tower.HeardOn, own per controller from AirfieldFrequencies), otherwise that of the tower.
@@ -3972,6 +4016,12 @@ static partial class Program
         var mk = string.Join(",", MenuKeys("dep", 2, 6).Select(k => k.ToString("X2")));
         if (lk != "atc,atc,-,dep,-,-" || mk != $"{Cfg.CommsKey:X2},3F,3C,3D" || MenuKeys("tanker", 1, 1).Length != 3) throw new Exception($"Befeuerung: {lk} / {mk}");
         Console.WriteLine($"OK   Befeuerung: Notfall/Platzrunde in der Luft -> Inbound, Rollfreigabe -> Request startup (Tasten {mk}), 25 NM/geparkt/Ausrollen nichts");
+        // Forum (jojojung): wingman commands by voice -> recipient as in the DCS menu + message; not to a foreign callsign, not without a command
+        string Wc(string s) => WingCmd(Tower.Normalize(s), "Enfield 1-1") is { } w ? $"{w.Par}:{w.Msg[10..]}" : "-";
+        var wcs = string.Join(",", new[] { "Two, go trail.", "Enfield 1-3, rejoin", "Flight, engage bandits", "Four, mission and RTB", "flight, check in", "Two, attack my target",
+            "Texaco 1-2, Enfield 1-1, request rejoin", "Two, unable", "flight level 240", "Kutaisi Tower, Enfield 1-1, ready for departure", "Two, echelon left", "Three, radar off" }.Select(Wc));
+        if (wcs != "1:GoTrail,2:JoinUp,5:EngageBandits,3:FulfilTheTaskAndReturnToBase,5:FlightCheckIn,1:EngageMyTarget,-,-,-,-,1:EchelonLeft,2:RadarOff") throw new Exception("Wingman-Befehle: " + wcs);
+        Console.WriteLine("OK   Wingman-Befehle: Two/Enfield 1-3/Flight + Befehl -> Empfaenger wie im DCS-Menue, fremdes Rufzeichen und Rottenfunk ohne Befehl nicht");
         // Debug log: format "HH:mm:ss.fff [KAT] Text", via TraceMax to .old.txt, off/tests (SimLog) without a line
         var (tp, tm, to, sl0) = (TracePath, TraceMax, TraceOn, SimLog);
         var dir = Directory.CreateTempSubdirectory("dcsatc-trace").FullName;

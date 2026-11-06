@@ -18,7 +18,7 @@ Funk ist Englisch: Alle Funksprüche, die du sagst oder hörst, stehen in diesem
    - [Plätze, Rufnamen und Frequenzen](#plätze-rufnamen-und-frequenzen) · [ATIS](#atis) · [Bahnwahl](#bahnwahl) · [NOTAMs](#notams) · [Wetter: VFR und IFR](#wetter-vfr-und-ifr) · [Ground](#ground) · [Tower: Abflug](#tower-abflug) · [Tower: Ankunft](#tower-ankunft) · [Approach](#approach) · [Center](#center) · [Luftraum](#luftraum) · [Transponder (IFF)](#transponder-iff) · [Notfälle](#notfälle) · [Landebewertung und Debriefing](#landebewertung-und-debriefing) · [Prüfflug](#prüfflug) · [Meldepflicht](#meldepflicht) · [Phrasentabelle](#phrasentabelle)
 4. [Carrier-Betrieb](#carrier-betrieb)
 5. [AWACS, Tanker und Range](#awacs-tanker-und-range)
-   - [AWACS](#awacs) · [Tanker](#tanker) · [Range](#range) · [JTAC und FAC(A)](#jtac-und-faca) · [KI-Flüge im Funk](#ki-flüge-im-funk) · [CSAR (Hubschrauber)](#csar-hubschrauber) · [Bodenpersonal und Crew Chief](#bodenpersonal-und-crew-chief)
+   - [AWACS](#awacs) · [Tanker](#tanker) · [Range](#range) · [JTAC und FAC(A)](#jtac-und-faca) · [KI-Flüge im Funk](#ki-flüge-im-funk) · [Deine KI-Rottenflieger befehlen](#deine-ki-rottenflieger-befehlen) · [CSAR (Hubschrauber)](#csar-hubschrauber) · [Bodenpersonal und Crew Chief](#bodenpersonal-und-crew-chief)
 6. [Multiplayer, Dedicated Server, eigene Frequenzen und andere Karten](#multiplayer-dedicated-server-eigene-frequenzen-und-andere-karten)
    - [So funktioniert Multiplayer](#so-funktioniert-multiplayer) · [Dedicated Server einrichten](#dedicated-server-einrichten) · [Eigene Frequenzen je Platz](#eigene-frequenzen-je-platz) · [Eigene Platzverfahren](#eigene-platzverfahren-chartsjsonc) · [Kneeboard-Seiten](#kneeboard-seiten) · [Andere Karten als Kaukasus](#andere-karten-als-kaukasus)
 7. [Anhang: Einstellungen, Logs und Fehlersuche](#anhang-einstellungen-logs-und-fehlersuche)
@@ -314,7 +314,7 @@ Du hörst (und siehst) nur, worauf du gerastet bist. Lotsensprüche erscheinen a
 - **Eigenes Rufzeichen:** `"MyCallsign"` setzen (Standard `""` = aus DCS) oder Einstellungsfenster → *Eigenes Rufzeichen*. Format: Name und zwei Ziffern, etwa `Viper 1-1`. Es ersetzt das Slot-Rufzeichen des Spielers an diesem PC (Host); andere Spieler behalten ihres.
 - **Rufzeichen aus dem Unitnamen:** `"CallsignFromUnit": true` oder Einstellungsfenster → *Rufzeichen aus dem Unitnamen der Mission*. Heißt die Unit in der Mission wie ein Rufzeichen (`VICTORY 9-1`, `WOLF-2-1`), wirst du so gerufen („Victory 9-1“) statt mit dem DCS-Rufzeichen (etwa Pontiac). Andere Unitnamen (`Aerial-1-1`, `F-4E ADVERSARIES NELLIS 1-1`) behalten das DCS-Rufzeichen. Gilt für alle Spieler, „MyCallsign“ geht für den Host vor.
 - **Verhörer werden toleriert.** Dein Rufzeichen wird erkannt, wenn die Ziffern stimmen und das Wort nur leicht abweicht („Enfeld 1-1“ zählt als „Enfield 1-1“).
-- **Was du sagst, ändert dein Rufzeichen nicht.** Liefert die Mission dein Rufzeichen (oder hast du eins gesetzt), benennt dich ein anderes Rufzeichen im Gesprochenen nicht um. Ein Spruch, der mit einem anderen Rufzeichen oder einer Rottennummer beginnt und deins nicht enthält („Enfield 1-2, check fuel“, „Two, go trail“), gilt als Rottenfunk, der Lotse ignoriert ihn.
+- **Was du sagst, ändert dein Rufzeichen nicht.** Liefert die Mission dein Rufzeichen (oder hast du eins gesetzt), benennt dich ein anderes Rufzeichen im Gesprochenen nicht um. Ein Spruch, der mit einem anderen Rufzeichen oder einer Rottennummer beginnt und deins nicht enthält („Enfield 1-2, check fuel“, „Two, go trail“), gilt als Rottenfunk, der Lotse ignoriert ihn. Ein Befehl wie „Two, go trail“ geht an deine KI-Rottenflieger (siehe [Deine KI-Rottenflieger befehlen](#deine-ki-rottenflieger-befehlen)).
 - **Wer gesendet hat:** dein Spruch wird dir über deine SRS-/DCS-Einheit zugeordnet. Klappt das nicht, über das gesprochene Rufzeichen.
 - **Ähnliches Rufzeichen:** hat ein KI-Flugzeug im Umkreis von 30 NM ein Rufzeichen mit gleichem Wort, aber anderer erster Ziffer, kommt einmal: „Caution similar callsign, Enfield five one is also on this frequency.“
 
@@ -2061,7 +2061,8 @@ Es spricht immer der **DCS-ATC-Tanker**, auch wenn die Mission einen eigenen DCS
 DCS bedient Korb bzw. Boom aber nur über seinen eigenen Tankerdialog im F-Menü. Für **den Spieler am PC mit DCS-ATC** drückt DCS-ATC deshalb im Hintergrund das DCS-Funkmenü für dich: *Intent to refuel* erst beim Join (*„cleared to join“*), nicht schon bei der Anfrage, *Ready pre-contact* bei deinem „pre-contact“. Der DCS-Tanker antwortet darauf nicht hörbar.
 
 - Der DCS-ATC-Tanker hört und spricht auf der Missionsfrequenz des Tankers (AWACS und Funkrad nennen sie) und auf dem Standard 255.5. Mit Easy Communication rastet DCS dein Funkgerät selbst auf die Missionsfrequenz. Teilt sie sich der Tanker mit einem Platz (etwa 261.0 = Senaki UHF), wechselt DCS-ATC deshalb nicht den Platz.
-- Das nutzt `"CommsKey"` (DCS-Funkmenü-Taste als Scancode, Standard `43`, also `\` auf US- und `#` auf deutschen Tastaturen). Mit `0` drückt DCS-ATC das Menü nicht.
+- Das nutzt `"CommsKey"` (DCS-Funkmenü-Taste als Scancode, Standard `43`, also `\` auf US- und `#` auf deutschen Tastaturen). Mit `0` drückt DCS-ATC das Menü nicht. Ältere `config.jsonc` enthalten die Zeile nicht, dann gilt der Standard. Ist deine Menütaste eine andere, die Zeile ergänzen, z. B. `"CommsKey": 43,`.
+- Das DCS-Funkmenü muss zu sein, wenn DCS-ATC drückt. Leg die SRS-PTT nicht auf dieselben Knöpfe wie eine DCS-Funk-PTT, die das Menü öffnet (z. B. COMM 1 / COMM 2 der Hornet mit Easy Communication): Der Druck von DCS-ATC landet sonst im offenen Menü und schließt es.
 - Mit Easy Communication aus drückt DCS-ATC das Menü auch nicht: *Intent to refuel* und *Ready pre-contact* sendest du dann selbst mit der Menütaste deines Funkgeräts (oder VAICOM).
 - **Andere Spieler** im Multiplayer bedienen das DCS-Tankermenü selbst.
 
@@ -2352,6 +2353,27 @@ Eigene KI-Flüge innerhalb 60 NM um einen Spieler ihrer Seite funken im Gefecht.
 | `"AiFollowAwacs"` | `true` | Eigene KI-Jäger fliegen die Gruppe wirklich an, auf die das AWACS sie ansetzt (AttackGroup im Missionsskript); *skip it* / *reset* nimmt sie wieder weg. Außerdem weicht das AWACS einer Gruppe, die auf es zufliegt, 40 NM aus (10 min). Ein beschossener Jäger greift sofort die Gruppe des Schützen an. `false`: die KI fliegt ihre Mission; das AWACS setzt KI-Flüge nicht an, ein Flug meldet selbst „Overlord, Ford one, committing.“, wenn eine Gruppe unter 40 NM hot ist |
 
 Damit die Frequenz brauchbar bleibt, gehen je Frequenz höchstens 10 niedrig priorisierte und 16 normale Sprüche pro Minute raus. Überzählige niedrig priorisierte fallen weg.
+
+### Deine KI-Rottenflieger befehlen
+
+Deine KI-Rottenflieger nehmen Befehle per Sprache an, wie im DCS-Funkmenü (Wingman / Flight). Fang mit der Nummer des Rottenfliegers oder „Flight“ an, wahlweise mit dem Rufzeichen deines Flugs davor: *„Two, go trail.“* · *„Enfield one three, rejoin.“* · *„Flight, engage bandits.“* DCS-ATC wählt dann genau diesen Punkt im DCS-Funkmenü für dich. Es drückt keine Tasten, deshalb geht das auch mit Easy Communication aus, in jedem Flugzeug und in jeder DCS-Sprache. Den Befehl und die Antwort des Rottenfliegers spricht DCS selbst, wie beim Menü.
+
+| Sag | Befehl im DCS-Menü |
+|---|---|
+| *rejoin* · *join up* | Rejoin Formation |
+| *go trail* · *line abreast* · *wedge* · *echelon right* / *left* · *finger four* · *spread four* · *close formation* · *open formation* | Formation |
+| *cover me* | Cover Me |
+| *engage my target* · *engage my enemy* · *engage bandits* · *engage air defences* · *engage ground targets* · *engage ships* | Engage |
+| *mission and rejoin* · *mission and RTB* | Engage → Mission and Rejoin / RTB |
+| *RTB* · *resume route* · *hold position* · *go to tanker* | Go To / Hold Position |
+| *pincer left* / *right* / *high* / *low* | Go Pincer |
+| *radar on* / *off* · *ECM on* / *off* · *smoke on* / *off* · *jettison* | Radar, ECM, Smoke, Jettison Weapons |
+| *Flight, check in* | Flight Check-In |
+
+- **Nur was das Menü deines Flugzeugs anbietet.** In der F-16C zum Beispiel gibt es Formationen nur im Flight-Menü. Steht ein Befehl nicht im Menü, sagt dir ein Text im Spiel das.
+- **Zweierrotte:** Manche Module (F-16C, F/A-18C) listen „Wingman 2“ nicht, wenn ihr zu zweit fliegt. „Two, …“ geht dann über Flight, das nur ihn erreicht. Aus demselben Grund erreichst du dort den letzten Rottenflieger eines größeren Flugs nur über Flight.
+- **Nur für den Spieler am PC mit DCS-ATC** (Einzelspieler oder der Host im Mehrspieler). Deine Rottenflieger müssen auf der Frequenz deines Funkgeräts sein, wie beim Menü.
+- **Ein anderes Rufzeichen davor** ist kein Befehl: *„Texaco one two, Enfield one one, request rejoin“* geht an den Tanker.
 
 ### CSAR (Hubschrauber)
 
@@ -2833,6 +2855,7 @@ Für einen Fehlerbericht: Uhrzeit, Platz, kurze Beschreibung, `atc-log.txt` und 
   - Nach dem Drücken der Sprechtaste kurz warten, dann sprechen.
   - Bei „say again“ wiederholen oder das Funkrad nehmen.
 - **Text im Spiel, aber keine Stimme?** Zeigt das DCS-ATC-Fenster „(SRS-Server nicht erreichbar)“, läuft der SRS-Server nicht lokal oder auf einem anderen Port. Dein SRS-Client muss mit dem SRS-Server auf dem DCS-ATC-PC verbunden sein (`127.0.0.1`), nicht mit einem anderen Server, sonst geht in keine Richtung Ton. Beides erscheint auch einmal als Text im Spiel.
+- **Virenscanner oder Firewall:** Sie können Piper und andere Teile von DCS-ATC oder den SRS-Ton über UDP blockieren, während SRS weiter „verbunden“ zeigt. Bleibt die Stimme aus, trage Ausnahmen für den DCS-ATC-Ordner und `C:\Program Files\DCS-SimpleRadio-Standalone` ein, auch in der Firewall.
 - **VoiceAttack, VAICOM, WhisperAttack:** DCS-ATC braucht sie nicht, nur SRS und deine SRS-Sprechtaste. Kommst du nicht durch, schalte sie aus und teste nur mit SRS.
 - **Kein F10 → ATC und falsches Rufzeichen?** DCS-ATC hat keine Missionsdaten, `MissionScripting.lua` ist also nicht angepasst. Siehe „Nach einem DCS-Update“ unten.
 

@@ -1,5 +1,5 @@
 @echo off
-rem All regression tests: selftest, approach test, multiplayer test, mission and crew Lua tests. Exit 1 on any failure, log in tmp\tests.log.
+rem All regression tests: selftest, approach test, multiplayer test, mission, crew and hook Lua tests. Exit 1 on any failure, log in tmp\tests.log.
 rem Every fixed bug gets a check in one of these suites; installer\build.cmd runs this first.
 cd /d "%~dp0.."
 if not exist tmp mkdir tmp
@@ -12,6 +12,7 @@ call :run mptest %EXE% --mptest * * || exit /b 1
 if not exist "%LUAE%" (echo luae.exe fehlt, Lua-Tests uebersprungen & goto ok)
 call :run missiontest "%LUAE%" tests\missiontest.lua mod\Scripts\DcsAtc\DcsAtcMission.lua || exit /b 1
 call :run crewtest "%LUAE%" tests\crewtest.lua mission\KutaisiTraffic.lua || exit /b 1
+call :run hooktest "%LUAE%" tests\hooktest.lua mod\Scripts\Hooks\DcsAtcHook.lua "%ProgramFiles%\Eagle Dynamics\DCS World" || exit /b 1
 :ok
 echo Alle Testsuiten OK
 exit /b 0

@@ -16,7 +16,7 @@ DCS-ATC never spawns aircraft. It only provides the radio for units that are alr
    - [Airfields, callsigns and frequencies](#airfields-callsigns-and-frequencies) · [ATIS](#atis) · [Runway selection](#runway-selection) · [NOTAMs](#notams) · [Weather: VFR and IFR](#weather-vfr-and-ifr) · [Ground](#ground) · [Tower: departure](#tower-departure) · [Tower: arrival](#tower-arrival) · [Approach](#approach) · [Center](#center) · [Airspace](#airspace) · [Transponder (IFF)](#transponder-iff) · [Emergencies](#emergencies) · [Landing grade and debriefing](#landing-grade-and-debriefing) · [Checkride](#checkride) · [Mandatory reports](#mandatory-reports) · [Phrase table](#phrase-table)
 4. [Carrier operations](#carrier-operations)
 5. [AWACS, tankers and ranges](#awacs-tankers-and-ranges)
-   - [AWACS](#awacs) · [Tankers](#tankers) · [Range](#range) · [JTAC and FAC(A)](#jtac-and-faca) · [AI flights on the radio](#ai-flights-on-the-radio) · [CSAR (helicopters)](#csar-helicopters) · [Ground crew and crew chief](#ground-crew-and-crew-chief)
+   - [AWACS](#awacs) · [Tankers](#tankers) · [Range](#range) · [JTAC and FAC(A)](#jtac-and-faca) · [AI flights on the radio](#ai-flights-on-the-radio) · [Commanding your AI wingmen](#commanding-your-ai-wingmen) · [CSAR (helicopters)](#csar-helicopters) · [Ground crew and crew chief](#ground-crew-and-crew-chief)
 6. [Multiplayer, dedicated server, custom frequencies and other maps](#multiplayer-dedicated-server-custom-frequencies-and-other-maps)
    - [How multiplayer works](#how-multiplayer-works) · [Dedicated server, step by step](#dedicated-server-step-by-step) · [Custom frequencies per airfield](#custom-frequencies-per-airfield) · [Own airfield procedures](#own-airfield-procedures-chartsjsonc) · [Kneeboard pages](#kneeboard-pages) · [Other maps than Caucasus](#other-maps-than-caucasus)
 7. [Appendix: settings, logs and troubleshooting](#appendix-settings-logs-and-troubleshooting)
@@ -312,7 +312,7 @@ You only hear (and see) what you are tuned to. Controller calls appear as text o
 - **Your own callsign:** set `"MyCallsign"` (default `""` = take it from DCS), or use the settings window → *Your callsign*. The format is a name and two digits, for example `Viper 1-1`. It replaces the slot callsign of the player at this PC (the host); other players keep theirs.
 - **Callsign from the unit name:** set `"CallsignFromUnit": true` or use the settings window → *Callsign from the mission unit name*. If the unit in the mission is named like a callsign (`VICTORY 9-1`, `WOLF-2-1`), you are called that ("Victory 9-1") instead of the DCS callsign (for example Pontiac). Other unit names (`Aerial-1-1`, `F-4E ADVERSARIES NELLIS 1-1`) keep the DCS callsign. It applies to all players; "MyCallsign" takes precedence for the host.
 - **Mishearings are tolerated.** Your callsign is still recognised when the digits match and the word is only slightly off ("Enfeld 1-1" counts as "Enfield 1-1").
-- **What you say doesn't change your callsign.** When the mission provides your callsign (or you set one), a different callsign in your speech doesn't rename you. A call that starts with another callsign or a wingman number and doesn't contain yours ("Enfield 1-2, check fuel", "Two, go trail") counts as flight chatter, and the controller ignores it.
+- **What you say doesn't change your callsign.** When the mission provides your callsign (or you set one), a different callsign in your speech doesn't rename you. A call that starts with another callsign or a wingman number and doesn't contain yours ("Enfield 1-2, check fuel", "Two, go trail") counts as flight chatter, and the controller ignores it. An order like "Two, go trail" goes to your AI wingmen (see [Commanding your AI wingmen](#commanding-your-ai-wingmen)).
 - **Who sent a call:** your call is matched to you by your SRS/DCS unit. If that fails, DCS-ATC matches the callsign you speak.
 - **Similar callsign:** if an AI aircraft within 30 NM has a callsign with the same word but a different first digit, you get one warning: "Caution similar callsign, Enfield five one is also on this frequency."
 
@@ -2059,7 +2059,8 @@ Overlord: Enfield one one, Overlord, Kutaisi bears 245, 62 miles.
 DCS still only operates the basket or boom through its own F-menu tanker dialog. So for **the player on the PC that runs DCS-ATC**, DCS-ATC presses the DCS radio menu for you in the background: *Intent to refuel* only at the join (*"cleared to join"*), not already at your request, *Ready pre-contact* when you call "pre-contact". The DCS tanker doesn't answer out loud.
 
 - DCS-ATC's tanker listens and talks on the tanker's mission frequency (the AWACS and the radio wheel name it) as well as on the default 255.5. With Easy Communication, DCS tunes your radio to the mission frequency by itself. If the tanker shares it with an airfield (e.g. 261.0 = Senaki UHF), DCS-ATC doesn't switch you to that airfield.
-- This uses `"CommsKey"` (the DCS radio menu key as a scan code, default `43`, which is `\` on US and `#` on German keyboards). With `0`, DCS-ATC doesn't press the menu.
+- This uses `"CommsKey"` (the DCS radio menu key as a scan code, default `43`, which is `\` on US and `#` on German keyboards). With `0`, DCS-ATC doesn't press the menu. Older `config.jsonc` files don't list it; the default applies. If your menu key is a different one, add the line, e.g. `"CommsKey": 43,`.
+- The DCS radio menu must be closed when DCS-ATC presses it. Don't put your SRS PTT on the same buttons as a DCS radio PTT that opens the menu (e.g. the Hornet's COMM 1 / COMM 2 with Easy Communication): DCS-ATC's press then lands in the open menu and closes it.
 - With Easy Communication off, DCS-ATC doesn't press the menu either: send *Intent to refuel* and *Ready pre-contact* yourself with your radio's own menu key (or VAICOM).
 - **Other players** in multiplayer operate the DCS tanker menu themselves.
 
@@ -2350,6 +2351,27 @@ Friendly AI flights within 60 NM of a player on their side talk on the radio dur
 | `"AiFollowAwacs"` | `true` | Friendly AI fighters actually fly the group the AWACS commits them on (AttackGroup in the mission script); *skip it* / *reset* takes it away again. The AWACS also moves 40 NM away from a group heading for it (10 min). A fighter shot at attacks the shooter's group at once. `false`: the AI flies its mission; the AWACS does not commit AI flights, a flight calls "Overlord, Ford one, committing." itself when a group is hot within 40 NM |
 
 To keep the frequency usable, at most 10 low-priority and 16 normal calls are sent per minute on each frequency. Extra low-priority calls are dropped.
+
+### Commanding your AI wingmen
+
+You can give your AI wingmen orders by voice, like the DCS radio menu (Wingman / Flight). Start with the wingman number or "Flight", optionally with your flight's callsign in front: *"Two, go trail."* · *"Enfield one three, rejoin."* · *"Flight, engage bandits."* DCS-ATC then selects that item of the DCS radio menu for you. No keys are pressed, so it works with Easy Communication off, in every aircraft and in every DCS language. DCS voices the order and the wingman's reply itself, the same as with the menu.
+
+| Say | Order in the DCS menu |
+|---|---|
+| *rejoin* · *join up* | Rejoin Formation |
+| *go trail* · *line abreast* · *wedge* · *echelon right* / *left* · *finger four* · *spread four* · *close formation* · *open formation* | Formation |
+| *cover me* | Cover Me |
+| *engage my target* · *engage my enemy* · *engage bandits* · *engage air defences* · *engage ground targets* · *engage ships* | Engage |
+| *mission and rejoin* · *mission and RTB* | Engage → Mission and Rejoin / RTB |
+| *RTB* · *resume route* · *hold position* · *go to tanker* | Go To / Hold Position |
+| *pincer left* / *right* / *high* / *low* | Go Pincer |
+| *radar on* / *off* · *ECM on* / *off* · *smoke on* / *off* · *jettison* | Radar, ECM, Smoke, Jettison Weapons |
+| *Flight, check in* | Flight Check-In |
+
+- **Only what the menu of your aircraft offers.** In the F-16C, for example, formations are only in the Flight menu. If an order isn't in the menu, a text in the game tells you so.
+- **Two-ship:** some modules (F-16C, F/A-18C) don't list "Wingman 2" when you are a flight of two. "Two, …" then goes through Flight, which reaches only him. For the same reason the last wingman of a bigger flight can only be reached through Flight in those modules.
+- **Only for the player at the PC running DCS-ATC** (single player, or the host in multiplayer). Your wingmen must be on your radio's frequency, as with the menu.
+- **Another callsign in front** is not an order: *"Texaco one two, Enfield one one, request rejoin"* goes to the tanker.
 
 ### CSAR (helicopters)
 
@@ -2831,6 +2853,7 @@ When you report a bug, include the time, the airfield, a short description, `atc
   - Wait a moment after pressing PTT before you speak.
   - If you get "say again", repeat your call or use the radio wheel.
 - **Text in the game but no voice?** If the DCS-ATC window shows "(SRS server not reachable)", the SRS server isn't running locally or is on another port. Your SRS client must be connected to the SRS server on the PC running DCS-ATC (`127.0.0.1`), not to another server; otherwise no voice goes either way. Both cases also show once as text in the game.
+- **Antivirus or firewall:** these can block Piper and other parts of DCS-ATC, or SRS voice over UDP, while SRS still shows connected. If there is still no voice, add exceptions for the DCS-ATC folder and `C:\Program Files\DCS-SimpleRadio-Standalone`, in the firewall too.
 - **VoiceAttack, VAICOM, WhisperAttack:** DCS-ATC doesn't need them, only SRS and your SRS push-to-talk. If you can't transmit, turn them off and test with SRS alone.
 - **No F10 → ATC menu and the wrong callsign?** DCS-ATC has no mission data, which means `MissionScripting.lua` isn't patched. See "After a DCS update" below.
 

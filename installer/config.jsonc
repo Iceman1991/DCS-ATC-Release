@@ -18,6 +18,9 @@
   // Funkrad zusätzlich als Text im Spiel (VR-Headset zeigt das Desktop-Rad nicht): "auto" = wenn DCS im VR-Modus (Option VR oder Startparameter --force_enable_VR), "on", "off"
   "WheelInGame": "auto",
 
+  // DCS-Funkmenü-Taste als Scancode: 43 = # (deutsch) bzw. \ (US), 0 = aus. DCS-ATC drückt damit das DCS-Tankermenü (Korb/Boom) und die Bahnbefeuerung
+  "CommsKey": 43,
+
   // Teil des Mikrofon-Namens (z. B. "FDUCE"), leer = Windows-Standardmikrofon
   "MicName": "",
 
