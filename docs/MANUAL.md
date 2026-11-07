@@ -2612,7 +2612,9 @@ The Caucasus airfield procedures (CRPs, entry and exit per runway, pattern altit
 - Airfield names as in DCS (`Kutaisi`, `Sochi-Adler`, `Senaki-Kolkhi`).
 - Coordinates as printed on the chart (`"42°15.924'N 042°30.086'E"`) or as DCS coordinates `[x, z]`. Courses in degrees magnetic.
 - The file is read at every mission start. If it is faulty, the DCS-ATC window shows the error and the built-in procedures apply.
-- Caucasus map only. DCS-ATC has no real SIDs and STARs with waypoint sequences; this is about the visual procedures.
+- Works on every map. Only the Caucasus has procedures built in; on other maps an airfield has them only if it is in `charts.jsonc`. Latitude/longitude there needs the map installed, because DCS-ATC takes the map projection from its beacon data. DCS coordinates `[x, z]` always work.
+- The control zone reaches 0.5 NM beyond the farthest CRP and up to `ctr_top_ft` (without CRPs: 5 NM around the airfield, 3000 ft above it). This is the airspace DCS-ATC watches for deviations.
+- DCS-ATC has no real SIDs and STARs with waypoint sequences; this is about the visual procedures.
 
 Example: Kutaisi with a 1500 ft pattern and only two CRPs.
 
@@ -2674,7 +2676,7 @@ The generated lines in `frequencies.jsonc` already contain the airfield names. T
 #### Limitations on other maps
 
 - **Only Caucasus has been tested.** Every other map should work, but expect rough edges, and please report them.
-- **Detailed procedures exist only on the Caucasus map, where they cover every airfield (Tbilisi-Lochini taxi routes only).** They cover reporting points, taxi routes with taxiway names and named holding points ("taxi to holding point Delta, runway three one"), backtrack on a runway with no taxiway to its end, and arrival and departure routes from the chart. Every airfield on another map is generic:
+- **Detailed procedures exist only on the Caucasus map, where they cover every airfield (Tbilisi-Lochini taxi routes only).** They cover reporting points, taxi routes with taxiway names and named holding points ("taxi to holding point Delta, runway three one"), backtrack on a runway with no taxiway to its end, and arrival and departure routes from the chart. Every airfield on another map is generic, unless you give it procedures in [charts.jsonc](#own-airfield-procedures-chartsjsonc):
   - Taxi clearances name the runway but no taxiways, for example "taxi to holding point runway one three".
   - The control zone is 5 NM around the airfield, up to 3000 ft above it.
   - The traffic pattern is on the left, unless terrain forces it to the right.

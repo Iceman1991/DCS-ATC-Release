@@ -2614,7 +2614,9 @@ Die Platzverfahren im Kaukasus (CRPs, Ein- und Ausflug je Bahn, Platzrundenhöhe
 - Platzname wie in DCS (`Kutaisi`, `Sochi-Adler`, `Senaki-Kolkhi`).
 - Koordinaten wie auf der Karte gedruckt (`"42°15.924'N 042°30.086'E"`) oder als DCS-Koordinaten `[x, z]`. Kurse in Grad missweisend.
 - Gelesen wird die Datei bei jedem Missionsstart. Ist sie fehlerhaft, meldet das DCS-ATC-Fenster den Fehler, und es gelten die eingebauten Verfahren.
-- Nur Karte Kaukasus. Echte SIDs und STARs mit Wegpunktfolgen kennt DCS-ATC nicht, es geht um die Sichtflugverfahren.
+- Gilt auf jeder Karte. Eingebaute Verfahren hat nur der Kaukasus, auf anderen Karten hat ein Platz nur welche, wenn er in `charts.jsonc` steht. Breite/Länge braucht dort die installierte Karte, weil DCS-ATC die Kartenprojektion aus ihren Funkfeuerdaten nimmt. DCS-Koordinaten `[x, z]` gehen immer.
+- Die Kontrollzone reicht 0,5 NM über den entferntesten CRP hinaus und bis `ctr_top_ft` (ohne CRPs: 5 NM um den Platz, bis 3000 ft darüber). Diesen Luftraum überwacht DCS-ATC auf Verstöße.
+- Echte SIDs und STARs mit Wegpunktfolgen kennt DCS-ATC nicht, es geht um die Sichtflugverfahren.
 
 Beispiel: Kutaisi mit Platzrunde 1500 ft und nur zwei CRPs.
 
@@ -2676,7 +2678,7 @@ Die erzeugten Zeilen in `frequencies.jsonc` enthalten die Platznamen schon. Sons
 #### Einschränkungen auf anderen Karten
 
 - **Nur Kaukasus ist getestet.** Jede andere Karte sollte gehen, aber rechne mit Ecken und Kanten und melde sie bitte.
-- **Detaillierte Verfahren gibt es nur auf der Karte Kaukasus, dort für alle Plätze (Tbilisi-Lochini nur Rollwege).** Meldepunkte, Rollwege mit Namen und benannte Warteplätze („taxi to holding point Delta, runway three one“), Backtrack auf einer Bahn ohne Rollweg bis zum Ende sowie An- und Abflugwege aus der Karte. Jeder Platz auf einer anderen Karte ist generisch:
+- **Detaillierte Verfahren gibt es nur auf der Karte Kaukasus, dort für alle Plätze (Tbilisi-Lochini nur Rollwege).** Meldepunkte, Rollwege mit Namen und benannte Warteplätze („taxi to holding point Delta, runway three one“), Backtrack auf einer Bahn ohne Rollweg bis zum Ende sowie An- und Abflugwege aus der Karte. Jeder Platz auf einer anderen Karte ist generisch, außer du gibst ihm Verfahren in [charts.jsonc](#eigene-platzverfahren-chartsjsonc):
   - Rollfreigaben nennen die Bahn, aber keine Rollwege, etwa „taxi to holding point runway one three“.
   - Die Kontrollzone ist 5 NM um den Platz, bis 3000 ft darüber.
   - Die Platzrunde liegt links, außer das Gelände erzwingt rechts.

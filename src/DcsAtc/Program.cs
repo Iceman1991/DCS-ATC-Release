@@ -1577,8 +1577,10 @@ static partial class Program
             try { File.Copy(AirfieldFile, copy, true); } catch (IOException) { }
         }
         Tower.Freqs = Cfg.Frequencies;
+        var file = MissionFields ? AirfieldFile : copy;
+        if (File.Exists(file) && File.ReadLines(file).FirstOrDefault() is { } m && m.StartsWith("M;")) Airfield.Theatre = m[2..];   // charts.jsonc check with the projection of this map
         if (!TestRun) Airfield.OwnChart = OwnChart(Path.Combine(Root, "charts.jsonc"));
-        Fields = Airfield.Load(MissionFields ? AirfieldFile : copy);
+        Fields = Airfield.Load(file);
         standStamp = default;   // new airfield objects: stand names again (TickAll)
         Tower.All = Fields;
         Ops.MagVar = MapMagVar(Fields);
@@ -4140,6 +4142,23 @@ static partial class Program
         double projErr = geo.Max(m => Airfield.Ll2Xz(G(m, 3), G(m, 4)) is var (x, z) ? Math.Sqrt(Math.Pow(x - G(m, 1), 2) + Math.Pow(z - G(m, 2), 2)) : 0);
         if (geo.Count < 100 || projErr > 5) throw new Exception($"Projektion: {geo.Count} Baken, max. {projErr:F1} m");
         Console.WriteLine($"OK   Projektion Kaukasus: {geo.Count} Baken aus Beacons.lua, max. {projErr:F1} m");
+        // Forum 0.20: fitted projection of every installed map (charts.jsonc on any map); Caucasus must hit the fixed values
+        foreach (var dir in Directory.GetDirectories(Path.Combine(DcsDir(), "Mods", "terrains")))
+        {
+            var fit = Airfield.FitProj(Path.Combine(dir, "Beacons.lua"));
+            var map = Path.GetFileName(dir);
+            if (fit is not { } q || q.Err > 5 || map == "Caucasus" && (q.Lon0 != 33 || Math.Abs(q.Dx + 4998115) > 2 || Math.Abs(q.Dz + 99517) > 2))
+                throw new Exception($"Projektion {map}: {fit}");
+            Console.WriteLine($"OK   Projektion {map}: Mittelmeridian {q.Lon0}°, max. {q.Err:F1} m");
+        }
+        var th = Airfield.Theatre;
+        try
+        {
+            Airfield.Theatre = "Syria";
+            var (sx, sz) = Airfield.Ll2Xz(35.228286, 35.957919);   // Beacons.lua Syria: BANIAS homer
+            if (Math.Abs(sx - 22735.7) > 5 || Math.Abs(sz - 5935.4) > 5) throw new Exception($"Ll2Xz Syria: {sx:F0}, {sz:F0}");
+        }
+        finally { Airfield.Theatre = th; }
     }
 
     /// ChartTest (PLATZVERFAHREN-PLAN.md Etappe 2): every entry of charts/caucasus.jsonc fits the DCS data in airfields.txt.
@@ -4225,6 +4244,20 @@ static partial class Program
         if (ownOk == null || ownK.PatternFt != 1234 || !ownK.Crp.ContainsKey("x") || ownK.Crp.ContainsKey("north") || ownBad != null || Airfield.Kutaisi().PatternFt == 1234)
             throw new Exception($"Eigene charts.jsonc: {ownOk != null} {ownK.PatternFt} {string.Join(",", ownK.Crp.Keys)} {ownBad != null}");
         Console.WriteLine("OK   Eigene charts.jsonc ersetzt den Platz, fehlerhafte wird ignoriert");
+        // Forum 0.20 (Lt_Jaeger): charts.jsonc on another map, lat/lon over the fitted projection; the built-in Caucasus data stay off there
+        var th = Airfield.Theatre;
+        try
+        {
+            Airfield.Theatre = "Syria";
+            File.WriteAllText(ownF, "{ \"Banias\": { \"ctr_top_ft\": 3500, \"crp\": { \"north\": \"35°18.000'N 035°57.475'E\" } } }");
+            Airfield.OwnChart = OwnChart(ownF);
+            var rw = new[] { ("09", 0.0, 22735.7, 5935.4, 2000.0) };
+            var (sy, bat) = (Airfield.FromDcs("Banias", 22735.7, 5935.4, 8, rw).ApplyChart(), Airfield.FromDcs("Batumi", 0, 0, 10, rw).ApplyChart());
+            if (!sy.Charted || sy.CtrTopFt != 3500 || Math.Abs(sy.CtrNm - 4.8) > 0.1 || bat.Charted)
+                throw new Exception($"charts.jsonc Syrien: {sy.Charted} {sy.CtrTopFt} {sy.CtrNm:F2} {bat.Charted}");
+            Console.WriteLine($"OK   charts.jsonc auf Syrien: Kontrollzone {sy.CtrNm:F1} NM bis {sy.CtrTopFt} ft aus eigenem CRP, Kaukasus-Daten nicht übernommen");
+        }
+        finally { (Airfield.OwnChart, Airfield.Theatre) = (null, th); File.Delete(ownF); }
     }
 
     /// Radio: confidence from Whisper JSON, priorities, "stand by" only on an occupied frequency (AI radio does not count).

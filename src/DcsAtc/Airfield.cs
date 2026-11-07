@@ -270,11 +270,11 @@ public class Airfield
     internal static JsonElement Chart => (chart ??= JsonDocument.Parse(ChartFile != null ? File.OpenRead(ChartFile) : typeof(Airfield).Assembly.GetManifestResourceStream("caucasus.jsonc")!,
         ChartOpts)).RootElement;
 
-    /// Procedures from the chart data if the airfield is in there; without entry everything stays as before (E5).
+    /// Procedures from the chart data if the airfield is in there; without entry everything stays as before (E5). Built-in data Caucasus only, charts.jsonc on every map (forum 0.20).
     public Airfield ApplyChart()
     {
         JsonElement a = default;
-        if (OwnChart?.TryGetProperty(Name, out a) != true && !Chart.TryGetProperty(Name, out a)) return this;
+        if (OwnChart?.TryGetProperty(Name, out a) != true && (Theatre != "Caucasus" || !Chart.TryGetProperty(Name, out a))) return this;
         static Dictionary<string, string> Strs(JsonElement e, string key) =>
             e.TryGetProperty(key, out var v) ? v.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString()!) : new();
         if (a.TryGetProperty("pattern_ft", out var p)) PatternFt = p.GetDouble();
@@ -324,17 +324,47 @@ public class Airfield
         return Ll2Xz((D(1) + D(2) / 60) * (m.Groups[3].Value == "S" ? -1 : 1), (D(4) + D(5) / 60) * (m.Groups[6].Value == "W" ? -1 : 1));
     }
 
-    /// WGS84 -> DCS Caucasus (Transverse Mercator lon_0 33°, k0 0.9996, Snyder series; selftest against Beacons.lua: 164 beacons under 1 m).
+    /// WGS84 -> DCS x/z. Caucasus: Transverse Mercator lon_0 33°, k0 0.9996 (selftest against Beacons.lua: 164 beacons under 1 m).
+    /// Other maps (forum 0.20, charts.jsonc): same projection, central meridian and offset fitted to the map's Beacons.lua (Proj).
     public static (double X, double Z) Ll2Xz(double lat, double lon)
+    {
+        var (l0, dx, dz) = Theatre == "Caucasus" ? (33, -4998115.0, -99517.0) : Proj(Theatre) is { } q ? (q.Lon0, q.Dx, q.Dz)
+            : throw new FormatException($"latitude/longitude unknown on {Theatre} (DCS installation or Beacons.lua not found), use DCS coordinates [x, z]");
+        var (n, e) = Tm(lat, lon, l0);
+        return (n + dx, e + dz);
+    }
+
+    static (string Map, (int Lon0, double Dx, double Dz, double Err)? P)? proj;
+    static (int Lon0, double Dx, double Dz, double Err)? Proj(string map) =>
+        (proj?.Map == map ? proj : proj = (map, FitProj(Path.Combine(TerrainDir(Program.DcsDir(), map), "Beacons.lua")))).Value.P;
+
+    /// Central meridian (whole degree) and offset with the smallest error over all beacons with positionGeo; null = no file or no fit under 50 m.
+    internal static (int Lon0, double Dx, double Dz, double Err)? FitProj(string beacons)
+    {
+        if (!File.Exists(beacons)) return null;
+        var pts = Regex.Matches(File.ReadAllText(beacons), @"position = \{ ([-\d.]+), [-\d.]+, ([-\d.]+) \};(?:(?!position)[\s\S])*?positionGeo = \{ latitude = ([-\d.]+), longitude = ([-\d.]+) \}")
+            .Select(m => Enumerable.Range(1, 4).Select(i => double.Parse(m.Groups[i].Value, CultureInfo.InvariantCulture)).ToArray()).ToList();
+        if (pts.Count < 3) return null;
+        var best = Enumerable.Range(-180, 361).Select(l0 =>
+        {
+            var d = pts.Select(p => Tm(p[2], p[3], l0) is var (n, e) ? (X: p[0] - n, Z: p[1] - e) : default).ToList();
+            var (dx, dz) = (d.Average(v => v.X), d.Average(v => v.Z));
+            return (l0, dx, dz, d.Max(v => Math.Sqrt((v.X - dx) * (v.X - dx) + (v.Z - dz) * (v.Z - dz))));
+        }).MinBy(r => r.Item4);
+        return best.Item4 < 50 ? best : null;
+    }
+
+    /// Transverse Mercator WGS84, k0 0.9996, Snyder series: (northing, easting) in m without false offsets.
+    static (double N, double E) Tm(double lat, double lon, double lon0)
     {
         const double a = 6378137, f = 1 / 298.257223563, k0 = 0.9996, e2 = f * (2 - f), ep2 = e2 / (1 - e2);
         double p = lat * Math.PI / 180, s = Math.Sin(p), c = Math.Cos(p), t = Math.Tan(p);
-        double n = a / Math.Sqrt(1 - e2 * s * s), T = t * t, C = ep2 * c * c, A = (lon - 33) * Math.PI / 180 * c;
+        double n = a / Math.Sqrt(1 - e2 * s * s), T = t * t, C = ep2 * c * c, A = (lon - lon0) * Math.PI / 180 * c;
         double M = a * ((1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 * e2 * e2 / 256) * p - (3 * e2 / 8 + 3 * e2 * e2 / 32 + 45 * e2 * e2 * e2 / 1024) * Math.Sin(2 * p)
                         + (15 * e2 * e2 / 256 + 45 * e2 * e2 * e2 / 1024) * Math.Sin(4 * p) - 35 * e2 * e2 * e2 / 3072 * Math.Sin(6 * p));
         double east = k0 * n * (A + (1 - T + C) * Math.Pow(A, 3) / 6 + (5 - 18 * T + T * T + 72 * C - 58 * ep2) * Math.Pow(A, 5) / 120);
         double north = k0 * (M + n * t * (A * A / 2 + (5 - T + 9 * C + 4 * C * C) * Math.Pow(A, 4) / 24 + (61 - 58 * T + T * T + 600 * C - 330 * ep2) * Math.Pow(A, 6) / 720));
-        return (north - 4998115, east - 99517);
+        return (north, east);
     }
 
     // ------------------------------------------------------------------ all others: data from DCS (Airbase:getRunways)
@@ -392,7 +422,7 @@ public class Airfield
         void Flush()
         {
             if (name == "Kutaisi") list[0].Spots = spots.ToList();
-            else if (name != null && rw.Count > 0) { var f = FromDcs(name, ax, az, el, rw); if (Theatre == "Caucasus") f.ApplyChart(); f.Id = id; f.Side = side; f.Spots = spots.ToList(); list.Add(f); }
+            else if (name != null && rw.Count > 0) { var f = FromDcs(name, ax, az, el, rw).ApplyChart(); f.Id = id; f.Side = side; f.Spots = spots.ToList(); list.Add(f); }
             spots.Clear();
             rw.Clear();
         }
