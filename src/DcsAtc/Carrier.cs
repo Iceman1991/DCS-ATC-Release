@@ -165,17 +165,22 @@ class Carrier
     }
     static int Sgn(double dev) => dev > 0.5 ? 1 : dev < -0.5 ? -1 : 0;   // up to 0.5° = "on"
     static string DevText(double hi, double rt) => $"{(Sgn(hi) > 0 ? "above glidepath" : Sgn(hi) < 0 ? "below glidepath" : "on glidepath")}, {(Sgn(rt) > 0 ? "right of course" : Sgn(rt) < 0 ? "left of course" : "on course")}";
-    /// Needle call "up and on", "down and left", "on and on" -> (glide path, course) each -1/0/+1 (up/right positive); null = not recognized.
+    /// Needle call "up and on", "down and left", "on and on" -> (glide path, course) each -1/0/+1 (up/right positive); null = not recognized. #13: also course first ("right and up").
     static (int V, int H)? Needles(string n)
     {
+        int V(string w) => Array.IndexOf(new[] { "down", "on", "up" }, w) - 1;
+        int H(string w) => Array.IndexOf(new[] { "left", "on", "right" }, w) - 1;
+        if (System.Text.RegularExpressions.Regex.IsMatch(n, @"\bcent(?:ere|re)d\b")) return (0, 0);   // "needles centered" = on and on
         var m = System.Text.RegularExpressions.Regex.Match(n, @"\b(up|down|on) and (left|right|on)\b");
-        return m.Success ? (Array.IndexOf(new[] { "down", "on", "up" }, m.Groups[1].Value) - 1, Array.IndexOf(new[] { "left", "on", "right" }, m.Groups[2].Value) - 1) : null;
+        if (m.Success) return (V(m.Groups[1].Value), H(m.Groups[2].Value));
+        m = System.Text.RegularExpressions.Regex.Match(n, @"\b(left|right|on) and (up|down|on)\b");
+        return m.Success ? (V(m.Groups[2].Value), H(m.Groups[1].Value)) : null;
     }
 
     /// Radio call to the carrier? (Marshal/Paddles by name, ball call; "initial"/"see you at" only if already checked in)
     public bool Wants(string n) => Boats.Count > 0 &&
-        (Has(n, "marshal", "mother", "paddles", "ball", "clara", "carrier", "pigeons", "strike", "red crown") ||
-         Stage >= 1 && Has(n, "initial", "see you at", "commencing", "charlie", "platform", "state", "needles", "up and", "down and", "on and on") ||
+        (Has(n, "marshal", "mother", @"moms?\b", "paddles", "ball", "clara", "carrier", "pigeons", "strike", "red crown") ||
+         Stage >= 1 && Has(n, "initial", "see you at", "commencing", "charlie", "platform", "state", "radial", "dme", "needles", "up and", "down and", "left and", "right and", "on and on") ||
         launch == 2 && Has(n, "airborne", "on top", "departure", "passing", "arcing", "outbound", "kilo"));
 
     /// Next radio call to the carrier (selection wheel: Enter), texts like the wheel entries. null = none (ball only after "call the ball", nothing on the deck).
@@ -220,7 +225,7 @@ class Carrier
             Stage = 4; OffStack();
             return new() { Say("Paddles", caseNo == 3 ? $"Roger ball, {Wod(b)}." : "Roger ball.", b) };   // R230: Case III/night with wind over deck
         }
-        if (needlesAsked && Has(n, "needles", "up and", "down and", "on and") && Needles(n) is { } nd)
+        if (needlesAsked && Has(n, "needles", "up and", "down and", "on and", "left and", "right and") && Needles(n) is { } nd)
         {
             needlesAsked = false;
             // A129: needles are fly-to (up = aircraft too low, left = right of the line); if the report is wrong, Approach states the offset
@@ -274,11 +279,11 @@ class Carrier
             var icls = b.Icls != "" ? $", ICLS channel {Digits(b.Icls)}" : "";
             return new() { Say("Marshal", $"{c}, {pos}expected BRC {Mag(b.ExpBrc)}{tac}{icls}.", b) };
         }
-        if (caseNo >= 2 && Stage == 1 && Has(n, "radial", "dme", "angels") && !Has(n, "check in", "checking in", "inbound", "recovery", "state"))   // R226/A25: readback of the Marshal instruction, no new check-in
+        if (Stage == 1 && Has(n, "radial", "dme", "angels") && !Has(n, "check in", "checking in", "inbound", "state"))   // R226/A25: readback of the Marshal instruction, no new check-in; #27: also Case I ("hold angels 2") and with "case three recovery" read back
         {
             string? Num(string re, int keep) => System.Text.RegularExpressions.Regex.Match(n, re) is { Success: true } m && m.Groups[1].Value.Replace(" ", "") is var d ? d[Math.Max(0, d.Length - keep)..] : null;   // strip the callsign digits in front
             var wrong = new[] { (Num(@"(\d+(?: \d+)*) radial", 3), MagNum(b.ExpFb + 180), $"{Mag(b.ExpFb + 180)} radial"), (Num(@"(\d+(?: \d+)*) dme", 2), angels + 15, $"{angels + 15} DME"),
-                                (Num(@"\bangels (\d+)", 2), angels,$"angels {angels}") }
+                                (Num(@"\bangels (\d+(?: \d+)*)", 2), angels,$"angels {angels}") }   // "angels one seven" arrives as "angels 1 7"
                         .Where(e => e.Item1 != null && int.Parse(e.Item1) != e.Item2).Select(e => e.Item3).ToList();
             return new() { Say("Marshal", wrong.Count == 0 ? OneOf($"{c}, readback correct.", $"{c}, readback is correct.") : $"{c}, negative, {string.Join(", ", wrong)}.", b) };
         }
@@ -291,9 +296,9 @@ class Carrier
             if (Signal(me, b, "Marshal", false, state * 1000) is { } sg) return sg;   // R23: reported fuel below bingo
             return new() { Say("Marshal", $"{c}, Marshal, {OneOf("roger", "copy")}{(fuel != "" ? ", state " + fuel : "")}.", b) };
         }
-        if (Stage == 1 && Has(n, "marshal", "mother") && !Has(n, "check in", "checking in", "inbound", "recovery"))   // R368: repeated call in holding -> Marshal repeats the assignment, stack and EAT stay
+        if (Stage == 1 && Has(n, "marshal", "mother", @"moms?\b") && !Has(n, "check in", "checking in", "inbound", "recovery"))   // R368: repeated call in holding -> Marshal repeats the assignment, stack and EAT stay
             return Instr(me, b);
-        if (Has(n, "marshal", "mother", "check in", "checking in", "inbound", "recovery", "state"))
+        if (Has(n, "marshal", "mother", @"moms?\b", "check in", "checking in", "inbound", "recovery", "state"))
         {
             state = FuelSlot(n) ?? double.NaN;
             if (Signal(me, b, "Marshal", false, state * 1000) is { } sg) return sg;   // R23: already below bingo at check-in
@@ -847,6 +852,8 @@ class Carrier
     // ======================================================================= Self-test
     public static void SelfTest(Action<bool, string> check)
     {
+        check(Needles("up and right") == (1, 1) && Needles("right and up") == (1, 1) && Needles("left and down") == (-1, -1) && Needles("on and left") == (0, -1)
+              && Needles("left and on") == (0, -1) && Needles("on and on") == (0, 0) && Needles("needles centered") == (0, 0) && Needles("on speed") == null, "#13 Needles in beiden Reihenfolgen");
         var b = new Boat("CVN-73", "CVN", "CVN_73", 0, 0, 0, 10, 2, 127.5, "73X", "11");   // sails north
         Boats = new() { b };
         var altOld = Alternate;
@@ -861,6 +868,8 @@ class Carrier
         var m2 = S(c2, "Enfield 1-2", "Marshal, Enfield 1-2, checking in", far, 10);
         check(m1 == "Marshal: Enfield one one, Marshal, case one recovery, expected BRC three five four, altimeter two niner niner two, hold angels 2, expected Charlie zero eight, report see me. | : Träger: Holding über dem Schiff in Angels 2, Linkskreise (ca. 5 NM Ø). Warten auf „signal Charlie“."
               && m2.Contains("hold angels 3, expected Charlie one zero") && c1.Wants(Normalize("Enfield 1-1, see you at 2")), $"Träger: Marshal -> {m1} | {m2}");
+        var rbC1 = S(c1, "Enfield 1-1", "Enfield 1-1, case one recovery, BRC 354, hold angels 2", far, 12);   // #27: Case I readback is no new check-in
+        check(rbC1.Contains("readback") && rbC1.Contains("correct") && c1.Stage == 1 && new Carrier().Wants(Normalize("Mom's 360 for 35, Enfield 1-1")), "#27 Träger: Case-I-Readback 'hold angels 2', Mom's -> " + rbC1);
         // #12/#13 (issues): board number instead of the call sign; check-in as in the CV NATOPS ("marking mom's 345 for 55, angels 17, low state 11.6")
         var c12 = new Carrier();
         var m12 = string.Join(" | ", c12.OnTranscript("Marshal, 103, marking mom's 345 for 55, angels 17, low state 11.6", M("Enfield 1-4", far) with { Modex = "103" }, 15).Select(x => $"{x.Station}: {x.Text}"));
@@ -1279,6 +1288,8 @@ class Carrier
         var (rbEat, rbAng) = (rbk.charlieAt, rbk.angels);
         var rbOk = S(rbk, "Enfield 1-9", $"Enfield 1-9, Marshal 165 radial, {rbAng + 15} DME, angels {rbAng}, time 07", far, 3110);
         var rbBad = S(rbk, "Enfield 1-9", $"Marshal, Enfield 1-9, 165 radial, {rbAng + 15} DME, angels {rbAng + 3}", far, 3120);
+        var rbC3 = S(rbk, "Enfield 1-9", $"Enfield 1-9, case three recovery, mother's 165 radial, {rbAng + 15} DME, angels {string.Join(" ", rbAng.ToString().ToCharArray())}", far, 3125);
+        check(rbC3.Contains("readback") && rbC3.Contains("correct") && rbk.charlieAt == rbEat, "#27 Träger: Readback mit 'case three recovery', Angels in Einzelziffern -> " + rbC3);
         rbk.Leave();
         check(rbOk == "Marshal: Enfield one niner, readback correct." && rbBad == $"Marshal: Enfield one niner, negative, angels {rbAng}." && rbk.charlieAt == rbEat, $"Träger R226: Readback -> {rbOk} | {rbBad}");
         // R368: "Marshal, …, say again" in holding repeats the assignment (EAT, angels), no new check-in (EAT and stack slot stay)

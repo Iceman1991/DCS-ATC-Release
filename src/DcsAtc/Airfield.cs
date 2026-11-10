@@ -70,8 +70,9 @@ public class Airfield
     public HashSet<string> Backtrack = new();                                  // Runways whose holding point leads only to the middle: backtrack on the runway
     public List<string> Notes = new();                                         // Airfield notes (English) from the chart
     public Dictionary<string, string> StandChart = new();                      // DCS stand (Term_Index) -> stand name on the chart, only where unambiguous
-    public record Route(string Name, string[] Rwy, string To, (string Fix, double X, double Z, double Ft, bool Above)[] Pts);
+    public record Route(string Name, string[] Rwy, string To, (string Fix, double X, double Z, double Ft, string Cross)[] Pts);   // Cross: "at or above", "at", "at or below" (Ft 0 = none)
     public Dictionary<string, Route> Routes = new();                           // Forum (Lt_Jaeger): named arrival chains (charts.jsonc "routes"), after the last point the CRP "to" = handover to Tower
+    public Dictionary<string, Route> Departures = new();                       // Forum: named departure chains (charts.jsonc "departures"), after the last fix own navigation (To unused)
     /// Chart point written in capitals ("CRAIG", "GASS_PEAK") = named fix, said by its name ("Gass Peak"); otherwise "C R P north".
     public static string Say(string k) => k.Any(char.IsLower) || !k.Any(char.IsLetter) ? "C R P " + k.Replace('_', ' ')
         : string.Join(' ', k.Replace('_', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w => w[0] + w[1..].ToLowerInvariant()));
@@ -308,21 +309,23 @@ public class Airfield
             }
         if (Entry.Values.SelectMany(e => e.Select(x => x.Crp)).Concat(Exit.Values.SelectMany(x => x)).FirstOrDefault(k => !Crp.ContainsKey(k)) is { } miss)
             throw new FormatException($"{Name}: entry/exit \"{miss}\" is not in \"crp\"");
-        if (a.TryGetProperty("routes", out var rts))
-            foreach (var r in rts.EnumerateObject())
-            {
-                var (to, rws) = (r.Value.GetProperty("to").GetString()!, r.Value.GetProperty("rwy").EnumerateArray().Select(v => v.GetString()!).ToArray());
-                var pts = r.Value.GetProperty("pts").EnumerateArray().Select(p =>
+        foreach (var (key, dep) in new[] { ("routes", false), ("departures", true) })
+            if (a.TryGetProperty(key, out var rts))
+                foreach (var r in rts.EnumerateObject())
                 {
-                    var (x, z) = Pos(p.GetProperty("pos"));
-                    bool above = p.TryGetProperty("above", out var ab);
-                    return (p.GetProperty("fix").GetString()!, x, z, above ? ab.GetDouble() : p.TryGetProperty("at", out var at) ? at.GetDouble() : 0, above);
-                }).ToArray();
-                if (pts.Length == 0) throw new FormatException($"{Name} route {r.Name}: \"pts\" is empty");
-                if (rws.FirstOrDefault(rw => !(Entry.TryGetValue(rw, out var en) && en.Any(e => e.Crp == to))) is { } bad)
-                    throw new FormatException($"{Name} route {r.Name}: \"to\": \"{to}\" is no entry of runway {bad}");
-                Routes[r.Name] = new(r.Name, rws, to, pts);
-            }
+                    var (to, rws) = (dep ? "" : r.Value.GetProperty("to").GetString()!, r.Value.GetProperty("rwy").EnumerateArray().Select(v => v.GetString()!).ToArray());
+                    var pts = r.Value.GetProperty("pts").EnumerateArray().Select(p =>
+                    {
+                        var (x, z) = Pos(p.GetProperty("pos"));
+                        var (cross, ft) = new[] { ("above", "at or above"), ("at", "at"), ("below", "at or below") }
+                            .Select(k => p.TryGetProperty(k.Item1, out var v) ? (k.Item2, v.GetDouble()) : default).FirstOrDefault(k => k.Item1 != null, ("", 0));
+                        return (p.GetProperty("fix").GetString()!, x, z, ft, cross);
+                    }).ToArray();
+                    if (pts.Length == 0) throw new FormatException($"{Name} {key} {r.Name}: \"pts\" is empty");
+                    if (!dep && rws.FirstOrDefault(rw => !(Entry.TryGetValue(rw, out var en) && en.Any(e => e.Crp == to))) is { } bad)
+                        throw new FormatException($"{Name} route {r.Name}: \"to\": \"{to}\" is no entry of runway {bad}");
+                    (dep ? Departures : Routes)[r.Name] = new(r.Name, rws, to, pts);
+                }
         if (a.TryGetProperty("ground", out var g) && g.TryGetProperty("holds", out var holds))
             foreach (var h in holds.EnumerateObject()) { var (x, z) = Pos(h.Value.GetProperty("pos")); Holds[h.Name] = (x, z, h.Value.GetProperty("rwy").EnumerateArray().Select(v => v.GetString()!).ToArray()); }
         if (a.TryGetProperty("ground", out g) && g.TryGetProperty("ramps", out var ramps))

@@ -1,5 +1,5 @@
 ﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe
-#define AppVer "0.20.2-alpha"
+#define AppVer "0.21.0-alpha"
 #define Src ".."
 
 [Setup]
@@ -42,8 +42,8 @@ de.IconReadme=Liesmich
 en.IconReadme=Readme
 de.IconUninstall=DCS-ATC deinstallieren
 en.IconUninstall=Uninstall DCS-ATC
-de.RunPatch=DCS: MissionScripting.lua anpassen (Admin-Abfrage) ...
-en.RunPatch=DCS: patching MissionScripting.lua (admin prompt) ...
+de.RunPatch=DCS: MissionScripting.lua und autoexec.lua anpassen (Admin-Abfrage) ...
+en.RunPatch=DCS: patching MissionScripting.lua and autoexec.lua (admin prompt) ...
 de.RunKeys=Tasten festlegen (Funkrad, Push-to-Talk – Tastatur oder HOTAS)
 en.RunKeys=Set keys (radio wheel, push-to-talk – keyboard or HOTAS)
 de.RunSettings=Einstellungen öffnen (neue Optionen ansehen)
@@ -122,6 +122,7 @@ Source: "{#Src}\tmp\ffmpeg\ffmpeg.exe"; DestDir: "{app}\tools\ffmpeg"; Flags: ig
 ; DCS part: hook (autostart, radio wheel for other players) and mission script (if only a dedicated server is on this PC: only there)
 Source: "{#Src}\mod\Scripts\Hooks\DcsAtcHook.lua"; DestDir: "{code:SavedGames}\Scripts\Hooks"; Check: HasClient; Flags: ignoreversion
 Source: "{#Src}\mod\Scripts\DcsAtc\DcsAtcMission.lua"; DestDir: "{code:SavedGames}\Scripts\DcsAtc"; Check: HasClient; Flags: ignoreversion
+Source: "{#Src}\mod\Scripts\DcsAtc\DcsAtcWing.lua"; DestDir: "{code:SavedGames}\Scripts\DcsAtc"; Check: HasClient; Flags: ignoreversion
 Source: "{#Src}\mod\Scripts\DcsAtc\DcsAtcOptions.lua"; DestDir: "{code:SavedGames}\Scripts\DcsAtc"; Check: HasClient; Flags: onlyifdoesntexist uninsneveruninstall
 ; Own-aircraft telemetry (AoA for the LSO); Export.lua includes it via pcall
 Source: "{#Src}\export\DcsAtcExport.lua"; DestDir: "{code:SavedGames}\Scripts"; Check: HasClient; Flags: ignoreversion

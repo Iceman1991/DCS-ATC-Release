@@ -449,6 +449,15 @@ public partial class Tower
                     return new();
                 }
             }
+            // charts.jsonc departure: the same from fix to fix, after the last fix own navigation (nav null, no more headings)
+            if (DRt is { } dp && depAt < dp.Pts.Length && navName == CrpSay(dp.Pts[depAt].Fix) &&
+                (d < 1.5 * NM || depAt + 1 < dp.Pts.Length && Dist(t.X, t.Z, dp.Pts[depAt + 1].X, dp.Pts[depAt + 1].Z) < Dist(goal.X, goal.Z, dp.Pts[depAt + 1].X, dp.Pts[depAt + 1].Z)))
+            {
+                if (++depAt < dp.Pts.Length) (nav, navName) = ((dp.Pts[depAt].X, dp.Pts[depAt].Z), CrpSay(dp.Pts[depAt].Fix));
+                else (nav, depRoute) = (null, null);
+                lastVector = now;
+                return new();
+            }
             bool crpLeg = !holding && entry != null && Rt == null && (Phase == Phase.Inbound || Phase == Phase.Entering && navName == CrpSay(entry!));
             // K22: Approach hands over so that the Tower is called about 2 minutes before the C R P (not yet at the point: that is the fallback below)
             if (crpLeg && Phase == Phase.Inbound && vec == null && navName == CrpSay(entry!) && !crpAsked && d > NM && d <= Math.Max(Gs(t), 40) * 120)
@@ -887,7 +896,7 @@ public partial class Tower
         var cl = ceil >= 1000 ? "" : $"{(vis == "" ? " Ceiling" : ", ceiling")} {Alt(Math.Max(0, Math.Round(ceil / 100) * 100))}";
         return $"{vis}{cl}.{(visM < 550 || ceil < 200 ? " Say intentions." : "")}";
     }
-    void Park() { wxTold = false; special = null; Phase = Phase.Parked; exitDir = null; entry = null; Separate = false; depClr = false; dest = null; Following = false; cenName = null; cenTo = null; lowTold = lowAck = false; Squawk = null; cruiseFt = 0; climbOut = null; iffTold = emSq = 0; }
+    void Park() { wxTold = false; special = null; Phase = Phase.Parked; exitDir = null; entry = null; Separate = false; depClr = false; dest = null; Following = false; cenName = null; cenTo = null; lowTold = lowAck = false; Squawk = null; cruiseFt = 0; climbOut = null; iffTold = emSq = 0; depRoute = null; }
 
     /// R128: identification by code (FAA JO 7110.65 5-3-3): "radar contact" only once the code is observed; idAt = time, idFf = flight following instead of departure report.
     double idAt = -1; bool idFf;
@@ -898,6 +907,7 @@ public partial class Tower
     string AirRc(Telemetry? t)
     {
         if (climbOut != null) return $"{Rc}{(t != null ? $", {Where(t)}" : "")}. {(climbOut == "tactical" ? "Continue spiral climb as cleared, then resume" : "Unrestricted climb approved, resume")} own navigation.";
+        if (DRt is { } dr && nav != null && t != null) return $"{Rc}, {Where(t)}. Continue {CrpSay(dr.Name)} departure{(zoneReport ? ", report leaving the control zone" : depClr ? $", then climb and maintain {Alt(Cruise)}" : "")}.";   // charts.jsonc departure being flown
         if (zoneReport && t != null) return $"{Rc}, {Where(t)}. Continue as cleared, report leaving the control zone.";   // R7: VFR still in the zone
         if (depClr && t != null && (dest != null ? (dest.X, dest.Z) : exitDir != null && Crp.TryGetValue(exitDir, out var xp) ? xp : ((double, double)?)null) is { } dg)
             return $"{Rc}, {Where(t)}. {Cap(Steer(t, dg, dest?.Name.Replace('-', ' ') ?? CrpSay(exitDir!)))}, climb and maintain {Alt(Cruise)}.";

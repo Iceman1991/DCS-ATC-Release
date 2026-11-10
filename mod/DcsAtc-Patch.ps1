@@ -1,4 +1,5 @@
-﻿# DCS-ATC: adds a line to <DCS>\Scripts\MissionScripting.lua that loads the mod's mission script (before os/io/lfs are sanitized).
+﻿# DCS-ATC: adds a line to <DCS>\Scripts\MissionScripting.lua that loads the mod's mission script (before os/io/lfs are sanitized),
+# and one at the end of <DCS>\Scripts\autoexec.lua that loads DcsAtcWing.lua (wingman commands by voice, game only).
 # Needs admin rights (Program Files). DCS updates reset the file -> DCS-ATC then asks again by itself.
 #   -Remove: remove the line again (uninstall)
 #   -Pause: wait for Enter at the end (start menu shortcut, shows the result)
@@ -10,6 +11,14 @@ $dirs = @($Dcs) + @(Get-Content "$env:TEMP\DcsAtc-DcsDir.txt" -EA 0) + @('DCS Wo
         @((Get-ItemProperty 'HKCU:\Software\DCS-ATC' -EA 0).ServerDcs)   # dedicated server (chosen in setup)
 try {
 foreach ($d in $dirs | Where-Object { $_ } | ForEach-Object { $_.Trim().TrimEnd('\') } | Select-Object -Unique) {
+    # wingmen by voice: the DCS radio menu lives in the main Lua state (autoexec.lua), not in the hook's GUI state. Game only (bin\DCS.exe), line appended, removed byte-exact
+    $f = Join-Path $d 'Scripts\autoexec.lua'
+    if ((Test-Path $f) -and (Test-Path (Join-Path $d 'bin\DCS.exe'))) {
+        $t = [IO.File]::ReadAllText($f)
+        $n = [regex]::Replace($t, '\r\n[^\r\n]*DcsAtcWing[^\r\n]*\r\n', '')
+        if (-not $Remove) { $n += "`r`npcall(function() local f = lfs.writedir() .. 'Scripts/DcsAtc/DcsAtcWing.lua' if lfs.attributes(f) then dofile(f) end end)   -- DCS-ATC (Mod)`r`n" }
+        if ($n -ne $t) { [IO.File]::WriteAllText($f, $n); "$f : angepasst / patched" }
+    }
     $f = Join-Path $d 'Scripts\MissionScripting.lua'
     if (-not (Test-Path $f)) { continue }
     $t = [IO.File]::ReadAllText($f)

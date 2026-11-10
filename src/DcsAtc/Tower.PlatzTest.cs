@@ -169,7 +169,7 @@ public partial class Tower
             (double X, double Z) P(double nm) => (c.X + nm * NM, c.Z);
             k.Crp["CRAIG"] = c;
             k.Entry["25"].Insert(0, ("CRAIG", "overhead", null));
-            k.Routes["MINTT"] = new("MINTT", new[] { "25" }, "CRAIG", new[] { ("MINTT", P(25).X, P(25).Z, 15000.0, true), ("GASS_PEAK", P(12).X, P(12).Z, 9000.0, true) });
+            k.Routes["MINTT"] = new("MINTT", new[] { "25" }, "CRAIG", new[] { ("MINTT", P(25).X, P(25).Z, 15000.0, "at or above"), ("GASS_PEAK", P(12).X, P(12).Z, 9000.0, "at or above") });
             var e25 = k.Ends.First(e => e.Name == "25");
             Telemetry At(double x) => new(k.Elev + 1000, 1000, 150 * Kt, Math.PI, x, c.Z, 0, 0, 760);
             Tower Fly(double x) { var w = new Tower(k, "Enfield 1-1") { FieldWind = (-e25.Dx * 5, -e25.Dz * 5) }; w.Tick(At(x), none, 0); w.Runway = "25"; return w; }
@@ -190,6 +190,42 @@ public partial class Tower
                 r2.Count == 1 && r2[0].Role == "Tower" && r2[0].Text.StartsWith("Enfield one one, proceed overhead") &&
                 r3.Count == 1 && r3[0].Text == "Enfield one one, roger, report Craig." && wf.navName == "Craig" && Airfield.Say("north") == "C R P north",
                 $"Route MINTT ({string.Join(",", seen)}, {w.Phase}): " + J(r1) + " / " + ho?.Text + " / " + J(r2) + " / " + J(r3) + $" ({wf.navName})");
+            n += 4;
+        }
+
+        // Forum: charts.jsonc departure on request ("ready for departure, Tiki departure"): takeoff clearance with the fixes and altitudes, silently from fix to fix,
+        // after the last fix own navigation; a departure for another runway is refused
+        {
+            var k = Airfield.Kutaisi();
+            var e = k.End("25");
+            var (pa, pb) = (e.At(-e.Len - 6 * NM, 0), e.At(-e.Len - 10 * NM, 4 * NM));
+            k.Departures["TIKI"] = new("TIKI", new[] { "25" }, "", new[] { ("ALPHA", pa.X, pa.Z, 3000.0, "at or below"), ("BRAVO", pb.X, pb.Z, 6000.0, "at or above") });
+            k.Departures["ZULU"] = new("ZULU", new[] { "07" }, "", new[] { ("ALPHA", pa.X, pa.Z, 0.0, "") });
+            var hp = e.At(150, 100);
+            Telemetry G0() => new(k.Elev, 0, 0, e.Hdg * Math.PI / 180, hp.X, hp.Z, 0, 0, 760);
+            Telemetry Air((double X, double Z) p, double hdg) => new(k.Elev + 500, 500, 150 * Kt, hdg * Math.PI / 180, p.X, p.Z, 0, 0, 760);
+            Tower Hold() { var w = new Tower(k, "Enfield 1-1") { FieldWind = (-e.Dx * 5, -e.Dz * 5) }; w.Tick(G0(), none, 0); (w.Phase, w.Runway, w.home) = (Phase.TaxiOut, "25", k.Ramps[0]); return w; }
+            var rz = Hold().OnTranscript("Kutaisi Tower, Enfield 11, ready for departure, zulu departure", G0(), none, 10);
+            var w = Hold(); w.Squawk = "4321";
+            var r1 = w.OnTranscript("Kutaisi Tower, Enfield 11, ready for departure, tiki departure", G0(), none, 10);
+            bool clr = r1.Any(m => m.Text.Contains("after departure Tiki departure, proceed direct Alpha, cross Alpha at or below 3000 feet, Bravo at or above 6000 feet, then own navigation")) && w.navName == "Alpha";
+            var seen = new List<string> { w.navName };
+            double s = 12;
+            var (start, msgs, ci) = (e.At(-e.Len, 0), new List<Msg>(), new List<Msg>());
+            foreach (var (from, to) in new[] { (start, pa), (pa, pb) })
+            {
+                double len = Dist(from.X, from.Z, to.X, to.Z), hd = Bearing(from.X, from.Z, to.X, to.Z);
+                for (double q = 0; q <= len && w.nav != null; q += 385)
+                {
+                    var at = Air((from.X + (to.X - from.X) * q / len, from.Z + (to.Z - from.Z) * q / len), hd);
+                    msgs.AddRange(w.Tick(at, none, s += 5));
+                    if (ci.Count == 0 && msgs.Any(m => m.Text.Contains("contact Kutaisi Approach"))) ci = w.OnTranscript("Kutaisi Approach, Enfield 11, airborne", at, none, s += 2);
+                    if (w.nav != null && seen[^1] != w.navName) seen.Add(w.navName);
+                }
+            }
+            Chk(rz.Count == 1 && rz[0].Text.Contains("negative, Zulu departure is for runway zero seven") && clr && ci.Any(m => m.Text.Contains("Continue Tiki departure")) &&
+                string.Join(",", seen) == "Alpha,Bravo" && w.nav == null && w.depRoute == null,
+                $"Abflug TIKI ({string.Join(",", seen)}, {w.Phase}, nav {w.nav != null}, dep {w.depRoute != null}, at {w.depAt}): " + J(rz) + " / " + J(r1) + " / " + J(ci) + " // " + J(msgs));
             n += 4;
         }
 

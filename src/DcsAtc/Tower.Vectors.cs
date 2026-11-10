@@ -10,7 +10,7 @@ public partial class Tower
     // centreline, turning in at 30°, and releases the descent in steps (~300 ft/NM down to the threshold).
     // Goal: initial (visual) or final (straight in / IFR). Aligned -> handover to the tower.
     List<(double X, double Z)>? vec;     // Waypoints up to the turn-in point, empty = turning in
-    static readonly string[] FieldSight = { "field in sight", "airfield in sight", "airport in sight", "runway in sight", "have the field", "have the airport", "have the runway", "field not in sight", "airport not in sight", "runway not in sight" };
+    static readonly string[] FieldSight = { "field in sight", "airfield in sight", "airport in sight", "runway in sight", "have the field", "have the airfield", "have the airport", "have the runway", "field not in sight", "airfield not in sight", "airport not in sight", "runway not in sight" };
     bool visAsk, visSeen;   // R115: visual approach waits for "field in sight" / airfield is reported
     bool vecFinal, wantStraight, wantVisual, optedOut;   // wantStraight: instrument approach wanted (also after holding), wantVisual: of which visual approach (P3-AP7)
     bool apprClr;   // R353: approach clearance already given with the turn-in vector (handover only)
@@ -348,7 +348,7 @@ public partial class Tower
     /// Slow types get lower values or 0 (= no speed instruction, no speed reminder); jets as above.
     int VecKt(Telemetry t)
     {
-        if (spdFree || altFree || Emergency || Dist(t.X, t.Z, CX, CZ) > 25 * NM) return 0;   // VFR far out (altitude at his discretion): speed too, the restriction comes with the descent; forum 0.13: emergency flies its own speed (bent flaps: "increase speed 300 knots")
+        if (spdFree || altFree || Emergency || Dist(t.X, t.Z, CX, CZ) > 25 * NM) return 0;   // VFR far out (altitude at his discretion): speed too, the restriction comes with the descent; forum 0.13: emergency flies its own speed (bent flaps: "increase speed to 300 knots")
         int tier = !vecFinal || Path(t).R > 20 * NM ? 0 : Path(t).R > 10 * NM ? 1 : 2;
         if (fromHold) tier = Math.Max(tier, 1);   // R319: from holding do not accelerate to 300 kt (FAA JO 7110.65 5-7-1)
         int kt = (Slow ?? new[] { 300, 250, 200 })[tier];
@@ -406,7 +406,7 @@ public partial class Tower
     /// Radio menu "Fahrt melden": displayed speed rounded to 10 kt ("340 knots").
     internal static string IasSay(Telemetry t) => FormattableString.Invariant($"{Math.Round(t.Ias / Kt / 10) * 10:0} knots");
     static string Spd(Telemetry? t, int kt) => t == null || Math.Abs(t.Ias / Kt - kt) <= 30 ? $"speed {kt} knots"
-                                             : $"{(t.Ias / Kt > kt ? "reduce" : "increase")} speed {kt} knots";
+                                             : $"{(t.Ias / Kt > kt ? "reduce" : "increase")} speed to {kt} knots";   // "reduce speed 300 knots" would mean by 300 (ICAO 4444 12.3.1.6)
 
     /// Landing sequence: aircraft near the airfield that are closer to the airfield. Only on change or every 90 s.
     string SeqNote(Telemetry t, IReadOnlyList<Traffic> traffic, double now)
@@ -633,7 +633,7 @@ public partial class Tower
         if (now - lastVecSaid >= 30 && Tight(t) && VecKt(t) is > 0 and var sk && sk < vecMemKt && t.Ias / Kt > sk + 10)   // R46: separation by speed (FAA JO 7110.65 5-7-1, ICAO Doc 4444 4.6)
         {
             lastVecSaid = now; vecMemKt = sk;
-            return Say($"{c}, reduce speed {sk} knots for spacing.", "Approach");
+            return Say($"{c}, reduce speed to {sk} knots for spacing.", "Approach");
         }
         if (now - lastVecSaid >= 30 && !soon && !(vec.Count > 0 && Dist(t.X, t.Z, vec[0].X, vec[0].Z) < vecLim + NM) && StepDown(t) is { } sd)   // Profile descent: gradually to handover altitude
         {

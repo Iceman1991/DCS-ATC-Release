@@ -1,18 +1,20 @@
--- DcsAtcHook.lua wingman commands against the real DCS radio menus (F-16C, FA-18C, Su-25T = LockOnAirplane, TF-51D = FighterWWII).
--- luae.exe tests\hooktest.lua mod\Scripts\Hooks\DcsAtcHook.lua "C:\Program Files\Eagle Dynamics\DCS World"
+-- DcsAtcWing.lua (wingman commands) against the real DCS radio menus (F-16C, FA-18C, Su-25T = LockOnAirplane, TF-51D = FighterWWII).
+-- luae.exe tests\wingtest.lua mod\Scripts\DcsAtc\DcsAtcWing.lua "C:\Program Files\Eagle Dynamics\DCS World"
 local hook, dcs = arg[1], arg[2]
 local tmp = os.getenv('TEMP') .. '\\DcsAtcHookTest'
 os.execute('mkdir "' .. tmp .. '" 2>nul')
 local getenv, clock = os.getenv, 0
 os.getenv = function(k) if k == 'TMP' or k == 'TEMP' then return tmp end return getenv(k) end
 os.clock = function() clock = clock + 1 return clock end
-local cb
+local tick
+timer = { getTime = function() return 0 end, scheduleFunction = function(f) tick = f return 1 end, removeFunction = function() end }
 lfs = { mkdir = function(d) os.execute('mkdir "' .. d .. '" 2>nul') end, attributes = function() return nil end, writedir = function() return tmp .. '\\' end, currentdir = function() return dcs end,
         dir = function() return function() end end }
 package.loaded.lfs = lfs
 net = { log = function() end }
-DCS = { setUserCallbacks = function(c) cb = c end, isServer = function() return false end, isMultiplayer = function() return false end }
 Message = setmetatable({}, { __index = function(t, k) return k:match('^wMsgLeader') and k or nil end })   -- ids = names; unknown names nil
+local started
+afterStart = function() started = true end   -- autoexec.lua
 dofile(hook)
 
 local fails, sent, tuned = 0, {}, nil
@@ -48,7 +50,7 @@ end
 local function wing(cmd)
   sent, tuned = {}, nil
   local f = io.open(tmp .. '\\DcsAtc-Wing.txt', 'w') f:write(cmd) f:close()
-  cb.onSimulationFrame()
+  tick()
   local res
   local p = io.popen('dir /b "' .. tmp .. '\\DcsAtc-Menu\\*.evt" 2>nul')
   for name in p:lines() do
@@ -96,6 +98,9 @@ load('Mods\\aircraft\\TF-51D\\comm.lua', 2)
 r, s = wing('1;wMsgLeaderJoinUp')
 check(r == 'ok' and s:find('^wMsgLeaderJoinUp%(1'), 'TF-51D (FighterWWII) Two rejoin -> ' .. tostring(r) .. ' ' .. s)
 
+tick = nil
+afterStart()
+check(started and tick ~= nil, 'Missionsstart: afterStart von DCS laeuft weiter, Abfrage neu gestartet')
 os.execute('rmdir /s /q "' .. tmp .. '" 2>nul')
 if fails > 0 then print('FAIL ' .. fails .. ' Fehler') os.exit(1) end
-print('hooktest OK')
+print("wingtest OK")

@@ -496,7 +496,8 @@ static partial class Program
     static bool? SharedChoice(Pilot p, double mhz, string text, Airfield field, string station)
     {
         var sn = Tower.Normalize(text);
-        bool toField = Called(text, p.Tel, null) == field || Tower.Has(sn, "ground", "tower", "approach", "departure") || FieldRole(sn) != null, toStation = Ops.RoleOf(sn, p.Callsign) == station;
+        bool toField = Called(text, p.Tel, null) == field || Tower.Has(sn, "ground", "tower", "approach", "departure") || FieldRole(sn) != null,
+             toStation = station == "Carrier" ? p.Boat.Wants(sn) : Ops.RoleOf(sn, p.Callsign) == station;   // #13: RoleOf knows no carrier stations (Marshal, Paddles …)
         if (toField != toStation) p.SharedPick = (mhz, toField);
         if (p.SharedPick is { } sp && Math.Abs(sp.Mhz - mhz) < 0.01) return sp.Field;
         Trace("SRS", $"{mhz:0.000} MHz {field.Name} und {station}: Station unklar, Rueckfrage: {text}");
@@ -623,7 +624,7 @@ static partial class Program
         var n = Tower.Normalize(spoken);
         var mine = Csar.Of(p.Unit);
         bool sig = mine != null && Regex.IsMatch(n, @"\b(?:smoke|flare)\b") && (to == "CSAR" || n.Contains("survivor") || n.Contains(mine.Cs.Split(' ')[0].ToLowerInvariant()));
-        if (!sig && !Regex.IsMatch(n, @"\b(?:will pick ?up|request csar|csar pick ?up|will rescue)\b")) return null;
+        if (!sig && !Regex.IsMatch(n, @"\b(?:will pick ?up|request csar|csar pick ?up|will rescue|pick (?:him|her|them) up|picking up (?:the )?(?:survivor|downed pilot|pilot)|(?:proceeding|en ?route|inbound) to (?:the )?(?:survivor|downed pilot|pick ?up))\b")) return null;
         if (p.Tel is not { } t) return new();
         var hc = Tower.SpokenCallsign(p.Callsign);
         if (sig)
@@ -839,7 +840,18 @@ static partial class Program
             if (!fromMenu && p == Host() && WingCmd(Tower.Normalize(spoken), p.Callsign) is { } wc)   // forum (jojojung): own AI wingmen, only on this PC (its DCS radio menu)
             {
                 Log($"[DCS] Wingman {(wc.Par == 5 ? "Flight" : (wc.Par + 1).ToString())}: {wc.Msg}");
-                try { File.WriteAllText(WingFile + ".tmp", $"{wc.Par};{wc.Msg}"); File.Move(WingFile + ".tmp", WingFile, true); }
+                try
+                {
+                    File.WriteAllText(WingFile + ".tmp", $"{wc.Par};{wc.Msg}"); File.Move(WingFile + ".tmp", WingFile, true);
+                    var gid = p.Gid;
+                    _ = Task.Delay(3000).ContinueWith(_ =>   // DcsAtcWing.lua polls every 0.3 s; still there = autoexec.lua not patched or DCS not restarted since
+                    {
+                        try { if (!File.Exists(WingFile)) return; File.Delete(WingFile); } catch (IOException) { return; }
+                        Log($"[DCS] Wingman-Befehl nicht abgeholt: DcsAtcWing.lua nicht geladen (autoexec.lua)");
+                        lock (TowerLock) SayQueue.Add(new Tx(L("Wingman: Befehl nicht angekommen. DCS nach der Installation neu starten, sonst Startmenü: DCS-ATC, Nach DCS-Update reparieren.",
+                                                               "Wingman: command not received. Restart DCS after installing, otherwise Start menu: DCS-ATC, Repair after DCS update."), "Info", "", gid));
+                    });
+                }
                 catch (IOException e) { Trace("FEHLER", $"Wingman-Befehl {wc.Msg}: {e.Message}"); }
                 return;
             }
@@ -1495,13 +1507,15 @@ static partial class Program
     static void CheckMissionScripting()
     {
         var f = Path.Combine(DcsDir(), "Scripts", "MissionScripting.lua");
+        var a = Path.Combine(DcsDir(), "Scripts", "autoexec.lua");   // wingmen by voice (DcsAtcWing.lua), game only
         var fix = Path.Combine(Root, "DcsAtc-Patch.ps1");
         try
         {
-            if (fixAsked || !File.Exists(f) || !File.Exists(fix) || File.ReadAllText(f).Contains("DcsAtcMission")) return;
+            if (fixAsked || !File.Exists(f) || !File.Exists(fix) || File.ReadAllText(f).Contains("DcsAtcMission")
+                && (!File.Exists(a) || !File.Exists(Path.Combine(DcsDir(), "bin", "DCS.exe")) || File.ReadAllText(a).Contains("DcsAtcWing"))) return;
             fixAsked = true;   // ask only once per app start
-            Log(L("[ATC] DCS-Update hat die DCS-ATC-Zeile in MissionScripting.lua entfernt -> Admin-Abfrage (UAC). Mission danach neu starten.",
-                  "[ATC] A DCS update removed the DCS-ATC line from MissionScripting.lua -> admin prompt (UAC). Restart the mission afterwards."));
+            Log(L("[ATC] DCS-ATC-Zeile in MissionScripting.lua oder autoexec.lua fehlt (DCS-Update, neue Version) -> Admin-Abfrage (UAC). DCS danach neu starten.",
+                  "[ATC] DCS-ATC line missing in MissionScripting.lua or autoexec.lua (DCS update, new version) -> admin prompt (UAC). Restart DCS afterwards."));
             Process.Start(new ProcessStartInfo("powershell", $"-NoProfile -ExecutionPolicy Bypass -File \"{fix}\" -Dcs \"{Path.GetDirectoryName(Path.GetDirectoryName(f))}\"")
                 { UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden });
         }
@@ -3221,7 +3235,8 @@ static partial class Program
         if (PromptPhrases.TryGetValue(role ?? "", out var ph)) return $"{ph} {string.Join(", ", names.Append(cs).Distinct())}.";
         string Fn(Airfield x) => x.Name.Replace('-', ' ') + (x.Name.Contains(x.Callsign) ? "" : $" ({x.Callsign})");   // "Mineralnye Vody (Minvody)"
         var crps = f.Charted ? string.Join(", ", f.Crp.Keys.Select(k => Airfield.Say(k).Replace("C R P", "CRP"))   // chart CRP names ("black sea", "river west"), named fixes ("Craig")
-            .Concat(f.Routes.Values.SelectMany(r => r.Pts.Select(p => Airfield.Say(p.Fix)).Prepend(Airfield.Say(r.Name) + " recovery"))).Distinct()) : "CRP South";
+            .Concat(f.Routes.Values.SelectMany(r => r.Pts.Select(p => Airfield.Say(p.Fix)).Prepend(Airfield.Say(r.Name) + " recovery")))
+            .Concat(f.Departures.Values.Select(r => Airfield.Say(r.Name) + " departure")).Distinct()) : "CRP South";
         return $"Request startup. Request taxi. Ready for departure runway 25. Airborne, switching to departure. Inbound, {crps}. " +
                "Initial 07, overhead, break, downwind. Final, touch and go. Request ILS approach. Runway vacated. Wilco. " +
                (role == null ? "Request picture. Request rejoin. " : "") +
@@ -3719,14 +3734,19 @@ static partial class Program
                                      $"No controller voice: SRS server on this PC (port {SrsPort}) not reachable. Check the SRS folder in the settings, start the server.");
     static (string stdout, int exit) Run(string exe, string? stdin, params string[] args) { var (o, x, _) = RunErr(exe, stdin, args); return (o, x); }
 
+    /// #20: SRS ExternalAudio (.NET) crashes when a GC collects its multimedia timer delegate (MMTimerProc) mid-transmission. That is a fail-fast, whose
+    /// "Unknown Hard Error" box SetErrorMode cannot suppress; with a 128 MB gen0 budget no GC runs during a transmission, so the crash does not happen.
+    static ProcessStartInfo StartInfo(string exe, bool stdin)
+    {
+        var psi = new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = stdin };
+        if (exe.Contains("ExternalAudio")) psi.Environment["DOTNET_GCgen0size"] = "0x8000000";
+        return psi;
+    }
+
     /// Run with stderr (GPU1: whisper's device list).
     static (string stdout, int exit, string stderr) RunErr(string exe, string? stdin, params string[] args)
     {
-        var psi = new ProcessStartInfo(exe)
-        {
-            UseShellExecute = false, CreateNoWindow = true,
-            RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = stdin != null,
-        };
+        var psi = StartInfo(exe, stdin != null);
         foreach (var a in args) psi.ArgumentList.Add(a);
         try
         {
@@ -4002,6 +4022,9 @@ static partial class Program
             if (!TcpPeers(new[] { Environment.ProcessId }).Contains(lp) || TcpPeers(new[] { -1 }).Count > 0) throw new Exception("SRS-Client-Verbindung (TCP-Tabelle)");
         }
         Console.WriteLine("OK   SRS-Layouts: Client\\/Server\\ (2.2+) und alles im Ordner (bis 2.1, SR-Server.exe), Pfad auf Unterordner/exe/mit Anführungszeichen, SERVER_PORT aus server.cfg, Auto-Connect \"127.0.0.1:5010\\n\" per UDP, Verbindung aus der TCP-Tabelle");
+        if (StartInfo(@"C:\SRS\ExternalAudio\DCS-SR-ExternalAudio.exe", false).Environment["DOTNET_GCgen0size"] != "0x8000000" || StartInfo(Ffmpeg, true).Environment.ContainsKey("DOTNET_GCgen0size"))
+            throw new Exception("#20 ExternalAudio ohne DOTNET_GCgen0size");
+        Console.WriteLine("OK   #20 ExternalAudio startet mit 128 MB Gen0-Budget (kein GC während der Sendung, kein MMTimerProc-Absturz), andere Programme ohne");
         // Dedicated server: process DCS_server without DCS, installation with bin\DCS_server.exe, server's Saved Games (hook, installer, default names)
         var sv = Directory.CreateTempSubdirectory("dcsatc-server").FullName;
         try
@@ -4657,6 +4680,14 @@ static partial class Program
             if (s1 != null || !ask.Contains("Senaki") || s2 != false || s3 != false || s4 != true || s5 != true || s6 != null)
                 throw new Exception($"Geteilte Frequenz: {s1} '{ask}' {s2} {s3} {s4} {s5} {s6}");
             Console.WriteLine("OK   Geteilte Frequenz (Platz = AWACS): Rückfrage ohne Stationsnamen, Name entscheidet und bleibt");
+            var boats13 = Carrier.Boats;   // #13: carrier frequency = airfield frequency (Nevatim 225.0): "Marshal" names the carrier
+            Carrier.Boats = new() { new Carrier.Boat("CVN-73", "CVN", "CVN_73", 0, 0, 0, 10, 2, 225, "73X", "11", Wx: 10) };
+            var pc = new Pilot { Unit = "C4", Callsign = "Uzi 1-1", Gid = 8, Id = 79, Tel = At(-12, Math.PI) };
+            var c13 = SharedChoice(pc, 225, "Marshal 010, marking MOMS 160443, Angel 31, state 14.7.", sen, "Carrier");
+            Carrier.Boats = boats13;
+            Take();
+            if (c13 != false) throw new Exception($"#13 geteilte Trägerfrequenz: Marshal -> {c13}");
+            Console.WriteLine("OK   #13 Geteilte Frequenz (Platz = Träger): \"Marshal ...\" geht an den Träger");
 
             // N2: watcher per DCS group: lead with controller contact 2 min ago -> wingman with own flow silent; armed after 5 min without contact; helicopters silent; seconds since takeoff at the player
             SimSec = 6000;

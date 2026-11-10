@@ -348,6 +348,8 @@ public partial class Tower
         r = twPop.OnTranscript("Kutaisi Approach, Enfield 1-1, 30 miles west, request IFR clearance to Batumi", w30, none, 1);
         // R219: first only the code (without "radar contact"), after observing (6 s) "radar contact" and the clearance
         Check(r.Count == 1 && r[0].Role == "Approach" && r[0].Contains("squawk") && !r[0].Contains("radar contact") && !r[0].Contains("leared") && twPop.Phase == Phase.Away, "R219 Pop-up IFR: erst der Code: " + r[0]);
+        var rb27 = twPop.OnTranscript($"Kutaisi Approach, squawk {Regex.Match(r[0].Text, @"squawk ((?:\w+ ){3}\w+)").Groups[1].Value}, Enfield 1-1", w30, none, 4);
+        Check(rb27.All(m => m.Text.EndsWith("readback correct.")), "#27 Squawk-Readback mit Station vorn ist kein neuer Anruf: " + rb27.FirstOrDefault()?.Text);
         r = twPop.Tick(w30, none, 8);
         Check(r.Count == 1 && r[0].Role == "Approach" && r[0].Contains("radar contact") && r[0].Contains("Cleared to Batumi via radar vectors, fly heading") &&
               r[0].Contains("climb and maintain") && !r[0].Contains("ILS") && !r[0].Contains("squawk") && twPop.Phase == Phase.Away, "R113 Pop-up IFR: " + r.FirstOrDefault()?.Text);
@@ -1087,7 +1089,7 @@ public partial class Tower
         twSp.altFree = false;   // R129: assigned altitude and speed (not at his discretion)
         for (int s = 2; s < 400; s++) spM.AddRange(twSp.Tick(At(-291000, 660000, twSp.vecFt * Ft - FieldElev, twSp.vecHdg, (twSp.VecKt(west) is > 0 and var sk ? sk + 80 : 380) * Kt), none, s).Select(m => m.Text));
         var spK = spM.Where(m => m.Contains("speed")).ToList();
-        Check(spK.Count == 3 && spK[0].Contains("speed 300 knots") && spK[1].Contains("say airspeed") && spK[2].Contains("resume normal speed") && twSp.VecKt(west) == 0,
+        Check(spK.Count == 3 && spK[0].Contains("reduce speed to 300 knots") && spK[1].Contains("say airspeed") && spK[2].Contains("resume normal speed") && twSp.VecKt(west) == 0,
               $"R129 Fahrtvorgabe nicht endlos: {spK.Count}x: " + string.Join(" | ", spK));
         // R129: into the vectoring at 450 kt, decelerates 2 kt/s toward 300: intermediate announcements (leg, heading) repeat the speed, no "say airspeed"/"resume normal speed"
         var twSl = new Tower("Enfield 1-1");
@@ -1101,7 +1103,7 @@ public partial class Tower
             if (s % 15 == 0) slM.Add(twSl.VecCall(ts, s));
         }
         Check(!slM.Any(m => m.Contains("say airspeed") || m.Contains("resume normal speed")) && twSl.VecKt(west) == 300, "R129 bremst: " + string.Join(" | ", slM));
-        // R129 forum Senaki (F/A-18): "reduce speed 300 knots", 32 s later next vector -> no "say airspeed" (time to comply), only after 90 s without decelerating;
+        // R129 forum Senaki (F/A-18): "reduce speed to 300 knots", 32 s later next vector -> no "say airspeed" (time to comply), only after 90 s without decelerating;
         // reply "340 knots" -> speed once, "310" (radio wheel) -> roger, "unable" -> resume normal speed, no reply 30 s -> resume normal speed
         (Tower Tw, List<(double S, string M)> L, Func<double, Telemetry> T, double Sa) SpdAsk()
         {
@@ -1117,11 +1119,11 @@ public partial class Tower
             return (tw, l, T, s);
         }
         var (twQa, laQa, tQa, saQa) = SpdAsk();
-        var spdQa = laQa.Where(x => x.M.Contains("reduce speed 300 knots")).Select(x => x.S).DefaultIfEmpty(-1).Max();
+        var spdQa = laQa.Where(x => x.M.Contains("reduce speed to 300 knots")).Select(x => x.S).DefaultIfEmpty(-1).Max();
         var askQa = laQa.Where(x => x.M.Contains("say airspeed")).Select(x => x.S).ToList();
         var sugQa = twQa.Suggest(tQa(380));
         var rQa = string.Join(" | ", twQa.OnTranscript("Kutaisi Approach Enfield one one 340 knots", tQa(380), none, saQa + 5).Select(m => m.Text));
-        Check(spdQa > 0 && askQa.Count == 1 && askQa[0] >= spdQa + 90 && sugQa == ("Approach", "report airspeed") && rQa == "Enfield one one, roger, reduce speed 300 knots.",
+        Check(spdQa > 0 && askQa.Count == 1 && askQa[0] >= spdQa + 90 && sugQa == ("Approach", "report airspeed") && rQa == "Enfield one one, roger, reduce speed to 300 knots.",
               $"R129 Zeit zur Umsetzung, Antwort 340: {string.Join(" | ", laQa.Select(x => $"{x.S}: {x.M}"))} -> {sugQa} -> {rQa}");
         var (twQb, _, tQb, saQb) = SpdAsk();
         var rQb = string.Join(" | ", twQb.OnTranscript("Approach: " + IasSay(tQb(312)), tQb(312), none, saQb + 5, true).Select(m => m.Text));
@@ -1343,6 +1345,8 @@ public partial class Tower
         tw3.Phase = Phase.Pattern;   // Break flown (tick switches to Pattern on downwind)
         r = tw3.OnTranscript("Kutaisi Tower, Enfield 11, final", onFinal, none, 4.5);
         Check(tw3.Phase == Phase.ClearedLand && r[0].Contains("cleared to land"), r[0]);
+        var rb23 = tw3.OnTranscript("Tower: Clear to land 25, ride Enfield 1-1.", onFinal, none, 4.6).Concat(tw3.OnTranscript("Tower: Clear the land, Enfield 1-1.", onFinal, none, 4.7)).Select(m => m.Text).ToList();
+        Check(rb23.Count == 0 && tw3.Phase == Phase.ClearedLand, "#23 Readback \"Clear to land 25, ride\" / \"Clear the land\" still: " + string.Join(" | ", rb23));
         r = tw3.Tick(At(CX, CZ, 0, 254, 20), none, 5);
         Check(r.Count == 1 && r[0].Role == "Info" && r[0].StartsWith("Landebewertung"), r.FirstOrDefault()?.Text ?? "Bewertung: -");
         r = tw3.Tick(At(CX, CZ, 0, 254, 20), none, 7);
@@ -1933,6 +1937,15 @@ public partial class Tower
         Check(RwySlot(Normalize("request runway three one")) == "31" && RwySlot(Normalize("runway 7, 4 miles")) == "07", "Zahlen: Bahn");
         Check(SameCallsign("Enfeld 1-1", "Enfield 1-1") && SameCallsign("Field 1-1", "Enfield 1-1") && !SameCallsign("Colt 1-1", "Enfield 1-1"), "Rufzeichen unscharf");
         Check(Normalize("Batumi Approach, Enfield 1-1, Enbound.") == "batumi approach enfield 1 1 inbound", "Verhörer: Enbound -> inbound");
+        {   // phraseology pass: realistic alternatives reach the same handler
+            var twAlt9 = new Tower("Enfield 1-1");
+            var ph = new[] { ("Kutaisi Approach, Enfield 1-1, request vectors", "inbound"), ("Kutaisi Approach, Enfield 1-1, request vectors to final", "straightin"), ("Kutaisi Tower, Enfield 1-1, request VFR straight in", "straightin"),
+                             ("Enfield 1-1, request the TACAN", "straightin"), ("Enfield 1-1, tally traffic", "traffic"), ("Enfield 1-1, negative visual", "traffic"), ("Enfield 1-1, short on fuel", "minfuel"),
+                             ("Panpan, panpan, panpan, Enfield 1-1, engine failure", "emergency") }
+                     .Select(p => (p.Item1, p.Item2, Got: twAlt9.Intent(Normalize(p.Item1), false))).Where(p => p.Got != p.Item2).Select(p => $"{p.Item1} -> {p.Got} statt {p.Item2}").ToList();
+            var rcPh = twAlt9.OnTranscript("Kutaisi Tower, Enfield 1-1, comm check", At(CX - 30 * NM, CZ, 3000, 90, 150), none, 0);
+            Check(ph.Count == 0 && rcPh.Count == 1 && Regex.IsMatch(rcPh[0].Text, "read you five|readability five|loud and clear"), "Funksprüche, Alternativen: " + string.Join(" | ", ph) + " / " + rcPh.FirstOrDefault()?.Text);
+        }
         var twCs = new Tower("Enfield 1-1");
         twCs.OnTranscript("Kutaisi Ground, Enfeld 1-1, request startup", parked, none, 0);
         Check(twCs.Callsign == "Enfield 1-1", "Verhörtes Rufzeichen bleibt -> " + twCs.Callsign);
@@ -3116,7 +3129,7 @@ public partial class Tower
         r = tw15.Tick(At(hx + 5 * NM, hz, ha, 90, 180), busyPattern, 93);   // Circle: no second heading correction on the side
         Check(r.Count == 0, "Warteschleife ohne Extra-Kurs: " + (r.FirstOrDefault()?.Text ?? "-"));
         r = tw15.Tick(At(hx + 5 * NM, hz, ha, 90, 180), busyPattern, 95);   // 350 kt: circle a good 6 NM, 5 NM away is still in the holding
-        Check(r.Count == 1 && r[0].Contains("reduce speed 230 knots") && !r[0].Contains("continue holding") && !r[0].Contains("expect"), "Warteschleife Fahrt daneben: nur die Fahrt: " + (r.FirstOrDefault()?.Text ?? "-"));
+        Check(r.Count == 1 && r[0].Contains("reduce speed to 230 knots") && !r[0].Contains("continue holding") && !r[0].Contains("expect"), "Warteschleife Fahrt daneben: nur die Fahrt: " + (r.FirstOrDefault()?.Text ?? "-"));
         for (double tt = 100; tt < 126; tt += 5) tw15.Tick(At(hx + 500, hz, ha, 90, 120), busyPattern, tt);
         r = tw15.Tick(At(hx + 500, hz, ha + 250, 90, 120) with { Vs = -5 }, busyPattern, 126);   // 800 ft above, already descending back
         Check(r.Count == 0, "Warteschleife: korrigiert -> still: " + (r.FirstOrDefault()?.Text ?? "-"));
@@ -4027,7 +4040,7 @@ public partial class Tower
             ts.AheadR = sp - 3 * NM;   // Preceding traffic only 3 NM of track ahead (too close at 250 kt)
             var sm = ts.Tick(Sp(ts.vecHdg, ts.vecFt, free), none, 40);
             ForceIfr = false;
-            Check(free > 0 && ts.VecKt(Sp(ts.vecHdg, ts.vecFt, free)) == (int)Math.Round(free * 0.85 / 10) * 10 && sm.Any(m => m.Text.Contains($"reduce speed {(int)Math.Round(free * 0.85 / 10) * 10} knots for spacing")),
+            Check(free > 0 && ts.VecKt(Sp(ts.vecHdg, ts.vecFt, free)) == (int)Math.Round(free * 0.85 / 10) * 10 && sm.Any(m => m.Text.Contains($"reduce speed to {(int)Math.Round(free * 0.85 / 10) * 10} knots for spacing")),
                   $"R46 zu dicht hinter dem Vordermann: {free} kt -> " + string.Join(" | ", sm.Select(m => m.Text)));
             // Preceding traffic just handed over (Established, gate 10 NM): 11 NM out turning in, 3000 ft -> remaining distance known (otherwise no separation up to 10 NM on the course)
             var te = new Tower(ks, "Enfield 1-1") { Phase = Phase.Entering, navName = "six mile final" };

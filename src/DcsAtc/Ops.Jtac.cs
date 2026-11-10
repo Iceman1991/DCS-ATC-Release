@@ -98,9 +98,9 @@ partial class Ops
         if (cas > 0 && l.Id != casL) CasEnd();
         List<Call> Say(string t) => new() { C(l, me, t) };
         var code = l.Code is { Length: > 0 } cd ? cd : "1688";
-        if (unsure || Has(n, "radio check", "how do you read")) return Say(unsure ? "say again" : OneOf("read you five", "loud and clear"));
+        if (unsure || Has(n, "radio check", "comm check", "how do you (?:read|hear|copy)", "how copy")) return Say(unsure ? "say again" : OneOf("read you five", "loud and clear"));
         var cur = Cur(l);
-        if (Has(n, "checking out", "check out", "off station", "signing off", "bingo", "rtb"))
+        if (Has(n, "checking out", "check out", "off station", "depart(?:ing)? station", "leaving station", "clear of station", "signing off", "bingo", "rtb"))
         {
             var tot = casTotal + casKills;
             CasEnd();
@@ -116,12 +116,13 @@ partial class Ops
             return Say("I say again 9-line. " + Nine() + (cas == 2 ? ". Read back lines 4, 6 and restrictions" : ""));
         if (cas >= 2 && Regex.Match(n, @"say again (?:the |your )?(?:line )?(\d)\b") is { Success: true } sl && int.Parse(sl.Groups[1].Value) is >= 1 and <= 9 and var ln && casLines[ln] != null)
             return Say(casLines[ln] == "" ? $"line {ln} not applicable" : $"line {ln}, {casLines[ln]}");
+        if (cas >= 2 && casLines[1] != null && Regex.IsMatch(n, @"\bsay again (?:the |your )?(?:remarks|restrictions)\b")) return Say($"remarks, {casLines[0]}");
         if (Has(n, "say again") && lastRole.TryGetValue("JTAC", out var lc)) return lc;
         if (Has(n, "laser code")) return Say($"laser code {Digits(code)}");
         if (Has(n, "threat", "air defense") && !Has(n, "readback", "read back")) return Say(Threats(l, cur) is { Length: > 0 } th ? th : OneOf("no threats observed", "no threats at this time"));
         if (cas == 0) return CheckIn(l, me, n, now);
         if (PlayOf(n) is > 0 and var pt) { casPlay = now + pt * 60; return Say($"copy playtime {Digits(pt.ToString())} minutes"); }   // new playtime
-        if (Has(n, "ready to copy", "ready for 9 line", "ready for nine line", "go ahead", "ready for tasking", "ready for next", "ready for re attack", "re attack", "reattack", "ready for the 9 line"))   // 9-line (also new target / re-attack)
+        if (Has(n, "ready to copy", "ready for 9 line", "ready for nine line", "go ahead", "tasking", "next target", "ready for next", "ready for re attack", "re attack", "reattack", "ready for the 9 line", "send (?:it|the 9 line|9 line)") || cas == 1 && Regex.IsMatch(n, @"(?<!not )\bready\b"))   // 9-line (also new target / re-attack)
         {
             if (casHold) return Say("stand by, hold as directed");
             if (cas is >= 3 and <= 5) return Say("9-line is out, say again which line");
@@ -136,7 +137,7 @@ partial class Ops
         {
             var digs = string.Concat(n.Where(char.IsDigit));
             if (digs.Length == 0) return Say("say again your readback");
-            bool ok4 = digs.Contains(casEl4), ok6 = digs.Contains(casLoc6), okI = !casDanger || n.Contains(Initials());   // danger close: ground commander's initials come back
+            bool ok4 = digs.Contains(casEl4), ok6 = digs.Contains(casLoc6), okI = !casDanger || Squash(n).Contains(Squash(Initials()));   // danger close: ground commander's initials come back
             if (ok4 && ok6 && okI) { cas = 3; return Say(OneOf("readback correct", "good readback") + (casType == 3 ? ", you are cleared to engage when ready" : ", push when ready, advise IN")); }
             return Say(string.Join(". ", new[] { !ok4 ? $"negative line 4, line 4 {casLines[4]}" : "", !ok6 ? $"negative line 6, line 6 {casLines[6]}" : "", !okI ? $"negative initials, ground commander's initials {Initials()}" : "" }.Where(s => s != "")) + ". Say again your readback");
         }
@@ -154,7 +155,7 @@ partial class Ops
         if (Has(n, "bombs away", "bomb away", "weapons away", "weapon away", "rifle", "guns", "rockets away", "missile away", "pickle", "pickled"))
             return Say(cas == 5 ? (casLaser ? OneOf("copy, lasing", "roger, lasing") : OneOf("copy", "roger")) : cas >= 3 ? "you were not cleared hot" : "say again");
         if (cas is >= 3 and <= 4 && Has(n, "ip inbound", "inbound", "push")) return Say(casTally || casType == 1 ? "continue, advise IN" : "continue, advise tally target");
-        if (Has(n, "request mark", "mark my target", "mark target", "smoke", "mark on request", "mark please", "request smoke", "ir pointer", "ir mark", "infrared", "sparkle", "illum") && !Has(n, "contact", "tally", "visual"))   // "contact smoke / sparkle" is the tally
+        if (Has(n, "request (?:a |the )?mark", "mark (?:my |the )?target", "mark with", "smoke", "mark on request", "mark please", "request smoke", "request wp", "willie", "ir pointer", "ir mark", "infrared", "sparkle", "illum") && !Has(n, "contact", "tally", "visual", "in sight", "eyes on", "(?:have|got) (?:the )?(?:smoke|sparkle|mark)"))   // "contact smoke / sparkle" is the tally
         {
             if (cas < 3 || cur == null) return Say(cas < 3 ? "negative, readback first" : "no target to mark");
             var (_, kind, delay) = CasKind[l.Kind];
@@ -171,7 +172,7 @@ partial class Ops
             (casMarkAt, casMarkTxt) = (delay > 0 ? now + delay : 0, kind switch { "wp" => "white phosphorus", "ir" => "sparkle", "illum" => "illumination", _ => kind.Replace("smoke_", "") + " smoke" });
             return Say(kind == "ir" ? "sparkle, advise contact sparkle" : delay > 0 ? $"mark on the way, {Digits(delay.ToString())} seconds" : $"rocket away, mark is {casMarkTxt}, advise contact");
         }
-        bool noTally = Regex.IsMatch(n, @"\b(?:negative|no|not|unable)\b.*\b(?:tally|visual|contact|target|mark)\b|\b(?:no joy|blind|talk on|describe the target|target description)\b");   // R419: "negative contact", "no tally", "no joy"; talk-on on request
+        bool noTally = Regex.IsMatch(n, @"\b(?:negative|no|not|unable)\b.*\b(?:tally|visual|contact|target|mark)\b|\b(?:no joy|not in sight|blind|talk on|describe the target|target description)\b");   // R419: "negative contact", "no tally", "no joy"; talk-on on request
         if (cas >= 3 && cas <= 5 && Regex.IsMatch(n, @"\bin\b") && !Has(n, "checking in", "check in") && !Regex.IsMatch(n, @"\bin (sight|trail)\b"))   // attack: IN from the west
         {
             if (noTally) casTally = false;
@@ -194,7 +195,7 @@ partial class Ops
             var where = l.Kind == "jtac" ? $"{Meters(Dist(l.X, l.Z, cur.X, cur.Z))} {Dir8(Bearing(l.X, l.Z, cur.X, cur.Z))} of my position" : $"line 6, {casLines[6]}";
             return Say($"{OneOf("copy no joy", "roger no joy")}. Target is {Desc(cur)}, {(cur.Moving ? "moving" : "stationary")}, {where}. Request mark if needed, advise tally");
         }
-        if (Has(n, "tally", "contact the mark", "contact mark", "have the mark", "visual", "have the target", "contact"))
+        if (Has(n, "tally", "contact the mark", "contact mark", "have the mark", "visual", "have the target", "contact", "in sight", "eyes on", "(?:have|got) (?:the )?(?:target|mark|smoke|sparkle)"))
         {
             if (cas < 3) return Say("stand by");
             casTally = true;
@@ -208,6 +209,7 @@ partial class Ops
         }
         if (Has(n, "bda", "battle damage", "status", "did i hit", "any hits", "hit anything", "effects", "results")) return Say(cas >= 4 ? Bda(cur, true) : "no attack yet");
         if (Has(n, "abort")) { if (cas >= 3) cas = 3; return Say(OneOf("copy abort, standing by", "roger abort, standing by")); }
+        if (Ack(n, me.Callsign, "JTAC")) return new();   // "roger" / "copy, Enfield 1-1" needs no answer
         return Say("say again");
     }
 
@@ -245,7 +247,7 @@ partial class Ops
         var fr = l.Kind == "faca" ? (double.IsNaN(t.Fx) ? "friendlies none known" : $"friendlies {Meters(Dist(t.Fx, t.Fz, t.X, t.Z))} {Dir8(Bearing(t.X, t.Z, t.Fx, t.Fz))} of the target") : "friendlies at my position";
         var where = l.Kind == "jtac" ? $", {Meters(Dist(l.X, l.Z, t.X, t.Z))} {Dir8(Bearing(l.X, l.Z, t.X, t.Z))} of my position" : "";
         var ctl = casType switch { 1 => "Type 1 control", 3 => "Type 3 control, cleared to engage in the target area", _ => "Type 2 control, bomb on target" };
-        return new() { C(l, me, pre + $"situation: enemy {Desc(t)} {(t.Moving ? "moving" : "stationary")}{where}{(t.Flak ? ", air defense present" : "")}, {fr}. {ctl}. {OneOf("Advise when ready for 9-line", "Advise ready for 9-line")}") };
+        return new() { C(l, me, pre + $"situation update, enemy {Desc(t)} {(t.Moving ? "moving" : "stationary")}{where}{(t.Flak ? ", air defense present" : "")}, {fr}. {ctl}. {OneOf("Advise when ready for 9-line", "Advise ready for 9-line")}") };
     }
 
     /// Line 6 spoken and the digits the readback must contain. E3: MGRS for A-10C / AH-64 / Ka-50, otherwise lat/long degrees and decimal minutes.
@@ -277,8 +279,8 @@ partial class Ops
         : $"{Noun(q)}, {Meters(Dist(q.X, q.Z, t.X, t.Z))} {Dir8(Bearing(t.X, t.Z, q.X, q.Z))} of the target"));
 
     /// Check-in ordnance ("4 GBU-12, 2 Mavericks, guns" -> "gbu 12|maverick|gun") and playtime in minutes (0 = none).
-    static string OrdOf(string n) => string.Join("|", Regex.Matches(n, @"\b(?:gbu \d+|mk \d+|cbu \d+|agm \d+|maverick|hellfire|apkws|rocket|jdam|gun)").Select(m => m.Value).Distinct());
-    static int PlayOf(string n) => Regex.Match(n, @"\bplay ?time (\d(?: ?\d){0,2})\b") is { Success: true } m ? int.Parse(m.Groups[1].Value.Replace(" ", "")) : 0;
+    static string OrdOf(string n) => string.Join("|", Regex.Matches(Regex.Replace(n, @"\bmark (?=\d)", "mk "), @"\b(?:gbu \d+|mk \d+|cbu \d+|agm \d+|maverick|hellfire|apkws|rocket|jdam|gun)").Select(m => m.Value).Distinct());
+    static int PlayOf(string n) => Regex.Match(n, @"\bplay ?time (\d(?: ?\d){0,2})\b|\b(\d(?: ?\d){0,2}) minutes? (?:of )?play ?time\b") is { Success: true } m ? int.Parse((m.Groups[1].Value + m.Groups[2].Value).Replace(" ", "")) : 0;   // "playtime 30" or "30 minutes playtime"
     static string WSay(string w) => w switch { "gun" => "guns", "rocket" => "rockets", "maverick" => "Maverick", "hellfire" => "Hellfire", "apkws" => "APKWS", "jdam" => "JDAM", _ => Regex.Replace(w.ToUpperInvariant(), "^MK", "Mark") };
     static bool Lgb(string? w) => w != null && Regex.IsMatch(w, @"^gbu (?:10|12|16|24|49|54)$");
     /// Weapon the JTAC asks for: bombs (laser first) on a stationary target, missile / rockets / guns against a mover.
@@ -289,6 +291,8 @@ partial class Ops
     }).FirstOrDefault();
     /// Danger close: initials of the ground commander who accepts the risk (fixed per target group, survives a restart).
     string Initials() { var s = casG.Sum(c => c); return $"{Nato[s % 26]} {Nato[s / 26 % 26]}"; }
+    /// "X-ray Alfa" as transcribed ("x ray alfa") against the app's spelling ("xray alpha").
+    static string Squash(string s) => s.Replace("alfa", "alpha").Replace("juliett", "juliet").Replace("whisky", "whiskey").Replace(" ", "");
 
     /// J7: 9-line from target, leader, IP (mission navigation point), friendlies and threats.
     List<Call> NineLine(Leader l, Me me)
@@ -438,6 +442,9 @@ partial class Ops
         check(rp.Contains("I say again 9-line. Line ") && rp.Contains("Line 4, elevation six six zero feet") && rp.Contains("Read back") && o.Cas == 2 && Say(o, m1, "JTAC: say again line 4", 1.6).Contains("line 4, elevation"), "9-Liner komplett wiederholen (nicht Zeile 9) -> " + rp);
         var wrong = Say(o, m1, "JTAC: readback line 4 one one zero zero line 6 " + o.casLines[6], 2);
         check(wrong.Contains("negative line 4, line 4 elevation six six zero") && !wrong.Contains("negative line 6") && o.Cas == 2, "J7: Readback mit falscher Zeile 4 -> nur Zeile 4 korrigiert -> " + wrong);
+        var (rmk, ack) = (Say(o, m1, "JTAC: say again remarks", 2.1), Say(o, m1, "JTAC: roger", 2.2));
+        check(rmk.Contains("remarks, final attack heading") && ack == "" && o.Cas == 2 && OrdOf("2 mark 82 guns") == "mk 82|gun" && PlayOf("4 gbu 12 30 minutes playtime") == 30 && PlayOf("playtime 45") == 45
+              && Squash("x ray alfa") == "xrayalpha", "JTAC: say again remarks, blankes roger still, Mark 82, Playtime nachgestellt, Initialen -> " + rmk + " / " + ack);
         var oR = new Ops(); oR.Load(System.Text.Json.JsonSerializer.Deserialize<State>(System.Text.Json.JsonSerializer.Serialize(o.Save()))!);   // app restart mid 9-line (session file)
         var rbR = Say(oR, m1, "JTAC: " + oR.CasWheel("readback") + ", threats: air defense at the target", 3); oR.CasEnd();   // restrictions with threats (Shilka) are no threat question
         check(rbR.StartsWith("Enfield one one, Axeman one one, readback correct"), "Sitzung: JTAC-Kontakt nach Neustart, Readback geht weiter -> " + rbR);
@@ -455,6 +462,8 @@ partial class Ops
         check(gs.Contains("mark on the way") && o.Cmds.Count(c => c.EndsWith(";smoke_green;30")) == 1 && cs.Contains("advise IN"), "Markierung auf Wunsch: JTAC gruener Rauch, contact smoke ist Tally -> " + gs + " / " + cs);
         var tk = Say(o, m1, "JTAC: request talk on", 5.9);
         check(tk.Contains("copy no joy. Target is four tanks"), "Talk-on auf Wunsch -> " + tk);
+        var (ns, es, sm) = (Say(o, m1, "JTAC: target not in sight", 5.92), Say(o, m1, "JTAC: eyes on the target", 5.94), Say(o, m1, "JTAC: smoke in sight", 5.96));
+        check(ns.Contains("no joy") && es.Contains("advise IN") && sm.Contains("advise IN"), "JTAC Tally-Varianten: not in sight / eyes on / smoke in sight -> " + ns + " / " + es + " / " + sm);
         var ty = Say(o, m1, "JTAC: tally target", 6);
         var hot = Say(o, m1, "JTAC: in from the south", 7);
         check(ty.Contains("advise IN") && hot.EndsWith("cleared hot") && o.Cas == 5, "J6: Tally, IN -> cleared hot -> " + ty + " / " + hot);
@@ -496,7 +505,7 @@ partial class Ops
         check(hold.Contains("hold at") && hold.Contains("angels 10") && o5.Cas == 1, "J6: zweiter Spieler -> hold, angels -> " + hold);
         Say(o3, m3, "JTAC: checking out", 33);
         var rel = string.Join(" | ", o5.JtacTick(m5, 34).Select(c => c.Text));
-        check(rel.Contains("situation: enemy") && o3.Cas == 0, "J6: erster fertig -> zweiter bekommt die Lage -> " + rel);
+        check(rel.Contains("situation update, enemy") && o3.Cas == 0, "J6: erster fertig -> zweiter bekommt die Lage -> " + rel);
         o5.Leave();
         // R417: "off" before the impact -> BDA only after the weapons arrived; R418: idle end, hold when both were checked in
         var (m7, o7) = (Mk("Enfield 7-1", "FA-18C_hornet", 3000), new Ops());

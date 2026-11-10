@@ -629,6 +629,7 @@ partial class Ops
                 HdgDiff(Bearing(t.X, t.Z, a.X, a.Z), int.Parse(sb) + MagVar) <= 30).MinBy(a => Dist(t.X, t.Z, a.X, a.Z));
             return new() { A($"{c}, {awName}, spike {Digits(sb)}, {(bud != null ? $"buddy spike, {Braa(t, bud)}" : sg == null ? "nothing known" : With($"{Nm(sg)} {Braa(t, sg.Lead)}", Fill(sg, true)))}.") };
         }
+        if (Regex.IsMatch(n, @"\bsorted\b") || Has(n, "magnum", "rifle", "pickle", "bombs away")) return new();   // own report (ATP 1-02.1 SORTED, weapon release): no reply, "sorted" is no "request sort"
         if ((Has(n, "sort", "request target") || Has(n, "targeting") && !Regex.IsMatch(n, @"\b(?:north|south|east|west|northeast|northwest|southeast|southwest|lead|trail|middle|single)\b")) && t != null)   // V20/R55: one group per element (section 1-1, 1-3 …), from left to right; callsign before the sender
         {
             if (groups.Count == 0) return new() { A($"{c}, {awName}, clean.") };
@@ -689,16 +690,16 @@ partial class Ops
         }
         if (Has(n, "merged") && (groups.FirstOrDefault(Own) ?? groups.FirstOrDefault()) is { } mg) { foreach (var id in mg.Ids!) mergeTold[id] = now; return new(); }   // LD3: if he said it himself, no "merged" from the AWACS
         if (tank == 1 && Has(n, "judy")) { vecEnd = true; return new() { A($"{c}, {awName}, roger.") }; }   // E1: radar contact with the tanker ends the AWACS join vectors
-        if (Has(n, "commit", "targeting", "targeted", "engaged", "engaging", "fox", "judy") && t != null)   // Confirm target: named group/direction, otherwise the assigned one, otherwise the nearest
+        if (Has(n, "commit", "targeting", "targeted", "engaged", "engaging", "fox", "pitbull", "judy") && t != null)   // Confirm target: named group/direction, otherwise the assigned one, otherwise the nearest
         {
             var dir = Regex.Match(n, @"\b(?:north|south|east|west)\b").Value;
             var gn = groups.FirstOrDefault(g => Said(g, groups, n));   // R54: name from the picture ("committing lead group")
             var gd = gn ?? (dir == "" ? null : groups.FirstOrDefault(g => Card(Bearing(t.X, t.Z, g.Lead.X, g.Lead.Z)).Contains(dir)));
-            if ((gd ?? groups.FirstOrDefault(Own) ?? groups.FirstOrDefault()) is not { } g) return Has(n, "fox") ? new() : new() { A($"{c}, {awName}, clean.") };
+            if ((gd ?? groups.FirstOrDefault(Own) ?? groups.FirstOrDefault()) is not { } g) return Has(n, "fox", "pitbull") ? new() : new() { A($"{c}, {awName}, clean.") };
             if (gn == null && gd != null && Stored(gd) == null && !named.ContainsValue(dir + " group")) foreach (var id in gd.Ids!) named[id] = dir + " group";   // LK3: the player names a nameless group first -> the name applies
             var pend = ask; ask = null;
             if (!Has(n, "commit")) judy.UnionWith(g.Ids!);   // LD3 (ATP 1-02.1 JUDY): he leads himself, the AWACS keeps the frequency clear
-            if (Has(n, "fox"))   // LD16: shot -> the group belongs to him (AI flights on it get skip it), no reply
+            if (Has(n, "fox", "pitbull"))   // LD16: shot -> the group belongs to him (AI flights on it get skip it), no reply
             {
                 Abm.Claim(side, Flight(me), g.Ids!, Nm(g), g.Count, now); committed.UnionWith(g.Ids!); mine.UnionWith(g.Ids!);
                 return new();
@@ -1157,6 +1158,7 @@ partial class Ops
             return dc;
         }
         if (Regex.IsMatch(n, @"\b(?:mov\w*|proceeding|going)\b") && Has(n, "right", "left", "observation", "pre contact", "precontact")) return new();   // LA16 (log) · K1 (#5): "moving to the right / pre-contact / left observation" reads back, the report follows once there
+        if (Regex.IsMatch(n, @"\bcleared\b") && !Has(n, "ready", "request", "confirm", "am i")) return new();   // readback "cleared pre-contact" / "cleared to join, left observation" is no position report (otherwise "cleared contact" at once)
         if (Has(n, "right wing"))   // back on the right wing: no clearance, continue with "pre contact" or "complete"
             return T($"{c}, {tk.Name}, {OneOf("roger", "copy")}, report complete or request more.");
         // R56: confirm join/pre-contact only if the receiver is close enough to the tanker (ATP-56(C)), otherwise state the situation
@@ -1185,7 +1187,8 @@ partial class Ops
             tank = 3; disc = false;
             return T($"{c}, cleared contact, {(Boom(tk.A) ? "boom" : "basket")} ready.");
         }
-        if (tank < 2 && Has(n, "judy", "radar contact")) { vecEnd = true; return T($"{c}, {tk.Name}, {OneOf("roger", "copy")}, report visual."); }   // TP3: radar contact ends the vectors, the join needs "visual"
+        if (tank < 2 && (Has(n, "judy", "radar contact") || Regex.IsMatch(n, @"\b(?:negative|no|not) (?:visual|tally|joy|contact)\b|\bnot in sight\b|\bblind\b"))) {   // "negative visual" is no "visual" (vectors go on)
+            vecEnd |= Has(n, "judy", "radar contact"); return T($"{c}, {tk.Name}, {OneOf("roger", "copy")}, report visual."); }   // TP3: radar contact ends the vectors, the join needs "visual"
         if (tank < 2 && Has(n, "visual", "tally", "in sight"))
             return dTk > 20 * NM ? T($"{c}, {tk.Name}, continue, {MilesTxt(dTk)}, report visual.") : Join("");   // R117: "visual" releases the join (2-5 NM as in TankVec); LA16 (log: "visual" at 16, 13, 8 NM rejected): up to 20 NM (TickLive discards over 25 NM); R286: continue with "visual", the tanker understands that
         if (Has(n, "observation", "left wing", "visual", "tally", "in sight", "joined"))
@@ -1520,6 +1523,10 @@ partial class Ops
         var ol = new Ops();   // checked in low after takeoff (handover "leaving control zone, contact Overlord" below 900 m): no second one while climbing
         int rl = ol.OnTranscript("AWACS", "Overlord, Enfield 1-1, checking in", me with { Tel = me.Tel! with { Agl = 300 } }, air, f, 0).Concat(ol.Tick(me, air, 1)).Count(x => x.Text.Contains("adar contact"));
         check(rc == 1 && rl == 1 && bc is ["Enfield one one, Overlord, clean."], $"R50: Check-in {rc}x/tief {rl}x radar contact, bogey dope -> {string.Join(" | ", bc)}");
+        var b27 = new[] { "Overload, Enfield 1-1, Bogeydope.", "Overload. Enfield 1-1. Request bogie-dope." }.Select(s => new Ops().OnTranscript("AWACS", s, me, blue, f, 0).FirstOrDefault()?.Text).ToList();
+        check(b27.All(x => x == "Enfield one one, Overlord, clean."), "#27: Overload/Bogeydope wie Whisper -> " + string.Join(" | ", b27));
+        var srt = new Ops().OnTranscript("AWACS", "Overlord, Enfield 1-1, sorted", me, blue, f, 0).Select(x => x.Text).ToList();
+        check(srt.Count == 0 && Tower.Normalize("Dark Star, Enfield 1-1, picture").StartsWith("darkstar "), "AWACS: 'sorted' still, Dark Star -> darkstar -> " + string.Join(" | ", srt));
         var ifc0 = Tower.IffCheck;   // FI1 I5: IffCheck and Mode 4 off -> "parrot sour" with the radar contact; Mode 4 on, unknown or without IffCheck nothing
         try
         {
@@ -2439,6 +2446,9 @@ partial class Ops
             var (v45, v20) = (K(rv, m45, "Texaco, Enfield 1-1, visual"), K(rw, m20, "Texaco, Enfield 1-1, visual"));
             check(v45.Contains("cleared to join, left observation, number 1.") && v20 == "Enfield one one, Texaco one one, continue, 26 miles, report visual." && rw.tank == 1,
                   $"Tanker R117: visual aus 4,5 NM Join, aus 26 NM nicht -> {v45} | {v20}");
+            var rn = new Ops(); K(rn, m45, "Texaco, Enfield 1-1, request rejoin");
+            var nv = K(rn, m45, "Texaco, Enfield 1-1, negative visual");
+            check(nv.EndsWith("report visual.") && !nv.Contains("cleared to join") && rn.tank == 1, "Tanker: negative visual ist kein visual -> " + nv);
             line.Clear();
             var r16 = new Ops(); var m16 = me with { Tel = me.Tel! with { Z = 14 * NM } };   // LA16 (log): "visual" at 16 NM
             K(r16, m16, "Texaco, Enfield 1-1, request rejoin");
@@ -2450,6 +2460,8 @@ partial class Ops
             line.Clear();
             var kph = new Ops();   // K1 (#5): "moving to …" reads back (silent), "stabilized left observation" is the observation report, not pre-contact
             K(kph, nr1, "Texaco, Enfield 1-1, request rejoin"); K(kph, nr1, "Texaco, Enfield 1-1, visual");
+            var rbJ = K(kph, nr1, "Enfield 1-1, cleared to join, left observation");
+            check(rbJ == "", "Tanker: Readback 'cleared to join, left observation' still -> " + rbJ);
             var (mvO, stO, mvP, rdP) = (K(kph, nr1, "Enfield 1-1, moving into left observation"), K(kph, nr1, "Texaco, Enfield 1-1, stabilized left observation"),
                                         K(kph, nr1, "Texaco, Enfield 1-1, moving to pre-contact"), K(kph, nr1, "Texaco, Enfield 1-1, stabilized pre-contact"));
             check(mvO == "" && stO.Contains("cleared pre-contact") && mvP == "" && rdP.Contains("cleared contact"), $"K1 Tanker-Phrasen -> {mvO} | {stO} | {mvP} | {rdP}");

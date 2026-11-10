@@ -156,6 +156,8 @@ sealed class Wheel : Form
     {
         foreach (var (name, n) in All.Where(i => i.Sub != null).SelectMany(i => i.Sub!.Where(s => s.Sub != null).Select(s => ($"{i.Label}/{s.Label}", s.Sub!.Length)).Prepend((i.Label, i.Sub!.Length))).Prepend(("Top", All.Length)))
             check(n <= 9 || name is "Approach" or "Carrier" or "Top", $"Funkrad {name}: {n} Einträge (max. 9)");   // R307: Approach has 12, visible at most 9 (Vis); Top 10 with JTAC (only shown with a leader)
+        int b32 = 1 << 31;
+        check(!Pressed(null, b32, b32) && !Pressed(b32, b32, b32) && Pressed(0, b32, b32) && !Pressed(b32, 0, b32), "#25 Funkrad: Joystick-Taste beim Start schon gedrückt öffnet nicht, erst ein neuer Druck");
         var oj = Jtacs; Jtacs = () => new[] { "Axeman 1-1", "Pontiac 1-1" };
         var jp = JtacPick(new("Check in", "JTAC: checking in"));
         check(jp?.Length == 2 && jp[1].Text == "JTAC: Pontiac 1-1, checking in" && JtacPick(new("In", "JTAC: in")) == null, "Funkrad: zwei JTAC -> Check in fragt welcher");
@@ -668,14 +670,16 @@ sealed class Wheel : Form
     }
 
     // ------------------------------------------------------------ HOTAS
-    int lastButtons, lastPov = 65535;
+    int? lastButtons;
+    int lastPov = 65535;
+    /// #25: only a press seen while the app runs; a button already down at the first reading (app starts with the mission, switch or stale state) does not open the wheel
+    static bool Pressed(int? last, int now, int bit) => last is { } l && (now & bit) != 0 && (l & bit) == 0;
 
     void PollJoystick()
     {
         if (cfg.WheelJoystick < 0) return;
         var (b, pov) = Program.Joy(cfg.WheelJoystick);
-        int bit = 1 << (cfg.WheelButton - 1);
-        if ((b & bit) != 0 && (lastButtons & bit) == 0) { if (Visible) Close2(); else if (DcsInFront()) Open(); }
+        if (Pressed(lastButtons, b, 1 << (cfg.WheelButton - 1))) { if (Visible) Close2(); else if (DcsInFront()) Open(); }
         lastButtons = b;
         if (Visible && pov != lastPov && pov != 65535)
         {

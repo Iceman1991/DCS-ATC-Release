@@ -75,6 +75,13 @@ public partial class Tower
             return climbOut == "tactical" ? $"{c}, after departure spiral climb overhead, remain within 3 miles, unrestricted{top}, then own navigation, {clr}"
                                           : $"{c}, after departure unrestricted climb{top}, own navigation, {clr}";
         }
+        if (depRoute is { } dr && dr.Rwy.Contains(Runway) && !IsHeli)   // charts.jsonc departure: fixes with altitudes, then own navigation (IFR: climb to the cleared altitude)
+        {
+            (depAt, nav, navName) = (0, (dr.Pts[0].X, dr.Pts[0].Z), CrpSay(dr.Pts[0].Fix));
+            var cross = CrossTxt(dr);
+            return $"{c}, after departure {CrpSay(dr.Name)} departure, proceed direct {CrpSay(dr.Pts[0].Fix)}{(cross != "" ? ", cross " + cross : "")}, " +
+                   $"then {(depClr ? $"climb and maintain {Alt(depFt)}" : "own navigation")}, {clr}";
+        }
         if (depClr)
         {
             nav = null;

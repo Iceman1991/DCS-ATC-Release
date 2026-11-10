@@ -234,6 +234,8 @@ public partial class Tower
         ["six"] = "6", ["seven"] = "7", ["eight"] = "8", ["nine"] = "9", ["niner"] = "9",
         ["tree"] = "3", ["fower"] = "4", ["fife"] = "5", ["decimal"] = "point",   // ICAO pronunciation
         ["enbound"] = "inbound", ["embound"] = "inbound",
+        ["overload"] = "overlord", ["bogeydope"] = "bogey dope", ["bogie"] = "bogey", ["bogy"] = "bogey", ["boogie"] = "bogey", ["overlard"] = "overlord",   // #27
+        ["panpan"] = "pan pan", ["pam"] = "pan",   // "PAN PAN" as transcribed
     };
     static readonly HashSet<string> NotCallsign = new()
     {
@@ -263,6 +265,8 @@ public partial class Tower
         s = Regex.Replace(s, @"(?<=\d)\.(?=\d)", " point ");    // 6.2 -> 6 point 2
         s = Regex.Replace(s, @"[^a-z0-9 ]", " ");
         s = Regex.Replace(s, @"\bmay +day\b", "mayday");     // R360: transcription splits the word
+        s = Regex.Replace(s, @"\bdark +star\b", "darkstar");   // AWACS callsign as transcribed
+        s = Regex.Replace(s, @"\bclear(?= +(?:to|the|for) +(?:land|take ?off)\b)", "cleared");   // #23: readback "clear to land"/"clear the land" as transcribed
         return string.Join(" ", s.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                                  .Select(w => Words.TryGetValue(w, out var d) ? d : w));
     }
@@ -296,6 +300,8 @@ public partial class Tower
     Airfield.Route? RouteOf(string n) => F.Routes.Values.FirstOrDefault(r => Regex.IsMatch(Sq(n), $@"\b{Sq(Rx(r.Name))}\b"));
     /// Index of the fix of the route being flown that the pilot reports, -1 = none.
     int RouteFix(string n) => Rt is { } r ? Array.FindIndex(r.Pts, p => Regex.IsMatch(Sq(n), $@"\b{Sq(Rx(p.Fix))}\b")) : -1;
+    /// Departure of the chart (charts.jsonc "departures") named in the transmission ("FLEX departure").
+    Airfield.Route? DepOf(string n) => F.Departures.Values.FirstOrDefault(r => Regex.IsMatch(Sq(n), $@"\b{Sq(Rx(r.Name))}\b"));
 
     /// Chart text (English) as speech: digit strings spelled out, "CRP" as letters.
     static string SayChart(string s) => Regex.Replace(Regex.Replace(s.Replace("CRP", "C R P"), @"(?<=[A-Za-z])(?=\d)", " "), @"\d+", m => Digits(m.Value));   // "W1" -> "W one"

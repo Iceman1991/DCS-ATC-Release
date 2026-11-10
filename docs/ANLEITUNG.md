@@ -58,9 +58,9 @@ Setup installiert nach `%LOCALAPPDATA%\Programs\DCS-ATC` und legt diese Startmen
 | Tasten festlegen (Funkrad, Push-to-Talk) | Öffnet die Tastenabfrage aus Schritt 4. |
 | Einstellungen (Rufzeichen, Lautstärke, Funk) | Öffnet das Einstellungsfenster. |
 | Bodenpersonal (Standard) | Öffnet `DcsAtcOptions.lua` im Editor. |
-| Nach DCS-Update reparieren | Passt `MissionScripting.lua` erneut an (Admin-Abfrage). |
+| Nach DCS-Update reparieren | Passt `MissionScripting.lua` und `autoexec.lua` erneut an (Admin-Abfrage). |
 | Liesmich | Öffnet die kurze Liesmich-Datei. |
-| DCS-ATC deinstallieren | Entfernt DCS-ATC, auch die Zeilen, die es in `MissionScripting.lua` und `Export.lua` eingefügt hat. |
+| DCS-ATC deinstallieren | Entfernt DCS-ATC, auch die Zeilen, die es in `MissionScripting.lua`, `autoexec.lua` und `Export.lua` eingefügt hat. |
 
 #### Module wählen
 
@@ -87,7 +87,7 @@ Ein abgewähltes Modul schweigt, DCS-ATC hört seine Frequenz nicht ab, und es f
 - `Saved Games\DCS\Scripts\Hooks\DcsAtcHook.lua` startet DCS-ATC mit jeder Mission und reicht Funkrad-Anfragen anderer Spieler an den Host weiter.
 - `Saved Games\DCS\Scripts\DcsAtc\` enthält das Missionsskript, die Standardoptionen (`DcsAtcOptions.lua`), die Sprachdatei und die Modulliste (`DcsAtcModules.txt`).
 - `Saved Games\DCS\Scripts\DcsAtcExport.lua` plus eine Zeile am Ende von `Export.lua` schickt die Daten deines eigenen Flugzeugs an DCS-ATC. Andere Export-Skripte wie SRS oder Tacview bleiben unberührt.
-- Eine Zeile in `<DCS-Ordner>\Scripts\MissionScripting.lua` (siehe Schritt 3).
+- Eine Zeile in `<DCS-Ordner>\Scripts\MissionScripting.lua` (siehe Schritt 3) und eine am Ende von `<DCS-Ordner>\Scripts\autoexec.lua` (Rottenflieger-Befehle per Sprache).
 
 Ist dein Saved-Games-Ordner verschoben, etwa auf ein anderes Laufwerk, findet Setup ihn trotzdem. Findet Setup `Saved Games\DCS` gar nicht, fragt es nach deinem DCS-Ordner in Saved Games, also dem Ordner mit `Config` und `Scripts`. Gibt es nur `Saved Games\DCS.openbeta`, nimmt Setup diesen.
 
@@ -1107,13 +1107,13 @@ Approach führt dich zum **Initial**: etwa 2 NM (4000 m) vor der Schwelle auf de
   | A-10, L-39, C-101 | 250 / 200 / 160 kt |
   | Hubschrauber | Keine Fahrtvorgaben |
 
-  Bist du zu dicht hinter dem Vordermann (3 NM, hinter Heavy 5 NM): „reduce speed 170 knots for spacing.“ Nahe am Gate: „reduce to final approach speed“.
+  Bist du zu dicht hinter dem Vordermann (3 NM, hinter Heavy 5 NM): „reduce speed to 170 knots for spacing.“ Nahe am Gate: „reduce to final approach speed“.
 - **Say airspeed:** nach einer Fahrtvorgabe hast du 90 s Zeit. Bist du dann noch mehr als 60 kt daneben und wirst nicht langsamer, fragt Approach „say airspeed.“ Antworte mit deiner Fahrt: „Kutaisi Approach, Enfield 1-1, 340 knots“, oder Rad **Approach → Fahrt melden**, oder Enter.
 
   | Deine Antwort | Approach |
   |---|---|
   | Innerhalb 30 kt der Vorgabe | „roger.“ |
-  | Weiter daneben | „roger, reduce speed 300 knots.“ (einmal) |
+  | Weiter daneben | „roger, reduce speed to 300 knots.“ (einmal) |
   | „unable“ | „roger, resume normal speed.“ |
   | Keine Antwort in 30 s | „resume normal speed.“ |
 
@@ -1358,7 +1358,7 @@ Mit **Transponder prüfen** in den Einstellungen (`"IffCheck": true`, Standard a
 | Zweiter Notruf während dein Notfall läuft | „roger mayday, continue as cleared.“ |
 | „high key“ / „flameout, high key“ im eigenen Notfall (echter Flameout, auch im IMC) | „report low key.“ Bei „low key, gear down“: „runway two five, wind …, cleared to land.“ (SFO-Übung: nur VMC und ohne anderen Notfall) |
 | „cancel emergency“ | Unter Radarführung: „roger, emergency cancelled, continue as cleared.“ Mit Landefreigabe: „roger, emergency cancelled, runway two five, cleared to land.“ Aus Initial oder Platzrunde: „Join left hand downwind, 2000 feet, report base.“ Sonst (weit draußen, kein Notfall) nur „roger.“ |
-| „minimum fuel“, „low fuel“, „bingo“ | „roger minimum fuel, number 2, expect approach in 3 minutes.“ oder „…, expect no delay.“ Kein Vorrang |
+| „minimum fuel“, „low fuel“, „fuel critical“, „bingo“ | „roger minimum fuel, number 2, expect approach in 3 minutes.“ oder „…, expect no delay.“ Kein Vorrang |
 
 - **Rad und F10:** **Notfall → MAYDAY / PAN PAN →** Triebwerksausfall, Treibstoff (nur MAYDAY), Hydraulik, Gefechtsschaden, Medizinisch, Vogelschlag.
 - **Welcher Platz:** hast du keinen Platz genannt oder gewählt und bist auf keinen gerastet, geht der Notfall an den nächsten geeigneten eigenen oder neutralen Platz. Bahnen ab 1800 m werden bevorzugt.
@@ -1467,7 +1467,7 @@ Schlüsselwörter werden überall im Spruch erkannt. Beginne mit „<Platz> <Lot
 | „leaving the control zone“ | Approach, nach Aufforderung | Abgemeldet, squawk 7000 |
 | „inbound (for landing)“, „landing“, „recovery“, „rejoin“, „full stop“ | Approach (Tower innerhalb 4 NM) | Radarführung, Holding oder Einflug in die Platzrunde |
 | „inbound for pattern work, touch and go“ | Approach | Führung, dann Platzrunden |
-| „request straight in“, „ILS“, „instrument“, „TACAN/VOR/PAR approach“, „radar approach“, „IFR“ | Approach | Geradeaus- oder Instrumentenanflug |
+| „request straight in“, „VFR straight in“, „request vectors to final“, „ILS“, „instrument“, „TACAN/VOR/PAR approach“, „radar approach“, „IFR“ | Approach | Geradeaus- oder Instrumentenanflug |
 | „request visual approach“ / „field in sight“, „runway in sight“, „have the field“ | Approach | Sichtanflug, sobald der Platz gemeldet ist |
 | „VFR“, „cancel IFR“, „visual recovery“ | Approach | Overhead bzw. Initial statt Instrumentenanflug (nur VFR-Wetter) |
 | „request runway 07“ / „runway 30 left“ | Alle | Bahnwunsch (bis 10 kt Rückenwind) |
@@ -1486,16 +1486,16 @@ Schlüsselwörter werden überall im Spruch erkannt. Beginne mit „<Platz> <Lot
 | „request zone transit“, „crossing“, „overflight“, „pass through“ / „clear of the zone“ | Approach (Tower innerhalb 5 NM) | Durchflugfreigabe / abgemeldet |
 | „request checkride“ / „cancel checkride“ (beliebige Frequenz) | Fluglehrer (Bordfunk) | Prüfflug-Aufgaben / beendet |
 | „request flight following“, „radar service“, „traffic advisories“ / „cancel flight following“, „leaving frequency“ | Approach | Flight Following an / aus |
-| „traffic in sight“, „tally“, „looking“, „negative contact“, „no joy“ | Approach/Tower | „roger“, Hinweisstatus vermerkt |
+| „traffic in sight“, „tally“, „looking“, „negative contact“, „no joy“, „blind“ | Approach/Tower | „roger“, Hinweisstatus vermerkt |
 | „terrain in sight“ | Approach | Geländewarnung quittiert |
 | „request separate landing“, „split“, „radar trail“ | Approach (Rotten) | Jedes Mitglied meldet einzeln |
 | „runway vacated“, „clear of runway“, „taxi to parking“ | Ground nach der Landung | Rollen zum Parkplatz |
 | „mayday“, „pan pan“ / „cancel emergency“ | Alle | Notfallverfahren / Notfall beendet |
-| „minimum fuel“, „low fuel“, „bingo“ | Approach/Tower | Quittiert, Reihenfolge und Verzögerung |
+| „minimum fuel“, „low fuel“, „fuel critical“, „bingo“ | Approach/Tower | Quittiert, Reihenfolge und Verzögerung |
 | „unable“ | Alle | „roger, say intentions“ (am Boden: „hold position“) |
 | „say again“, „repeat“, „say last“, „didn't copy“ | Alle | Letzter Spruch wiederholt bzw. aktualisiert |
 | „confirm …“, „verify …“ | Alle | „affirm …“ / „negative …“ oder Wiederholung |
-| „radio check“, „how do you read“ | Alle | „read you five“ |
+| „radio check“, „comm check“, „how do you read“ | Alle | „read you five“ |
 | „request weather“, „QNH“, „wind“, „which runway“, „runway in use“ | Alle | Wind, QNH, aktive Bahn |
 | „good day“, „thanks“, „bye“ | Alle | „good day“ |
 | „roger“, „wilco“, „copy“, „start up approved“, nur das Rufzeichen, Readback von Zahlen | Alle | Keine Antwort |
@@ -1541,7 +1541,7 @@ Stationen ohne Eintrag bleiben auf der Trägerfrequenz. Jede Station sendet dann
 Mit SRS geht alles, was du auf einer Trägerfrequenz sendest, an den Träger. Ohne SRS (nur Sprechtaste) schickt DCS-ATC einen Spruch an den Träger, wenn:
 
 - er *Marshal*, *mother*, *Paddles*, *ball*, *Clara*, *carrier* oder *pigeons* enthält, oder
-- du schon eingecheckt bist und er *initial*, *see you at*, *commencing*, *Charlie*, *platform*, *needles*, *up and …*, *down and …* oder *on and on* enthält.
+- du schon eingecheckt bist und er *initial*, *see you at*, *commencing*, *Charlie*, *platform*, *state*, *radial*, *DME*, *needles*, *up and …*, *down and …* oder *on and on* enthält.
 
 Du kannst den Träger auch unter Funkrad → Allgemein → **Platz wählen** auswählen. Sprüche ohne Stationsnamen gehen dann bis zur Landung an den Träger.
 
@@ -1840,7 +1840,7 @@ Andere Abflugmeldungen unterwegs („passing 2.5“, „arcing“, „establishe
 | Case-I-Initial | (zip lip; „initial“ gibt nur einen Texthinweis) | – (vor Charlie: "negative, not Charlie, hold angels 2, expected Charlie …") |
 | Case II/III | "commencing, angels 6, state 5.2" | Marshal: "radar contact, final bearing …, switch Approach" |
 | Case II/III | "platform" | Approach: "Approach, radar contact, N miles" (danach: "roger") |
-| Case II/III | "up and on" / "down and left" / "on and on" … | Approach: "concur" oder "disregard needles, …" |
+| Case II/III | "up and on" / "down and left" / "on and on" / "needles centered" … | Approach: "concur" oder "disregard needles, …" |
 | Case II | "see you at ten" | Approach: "roger, switch Tower" |
 | Groove | "Hornet ball, 5.2" (*ball*) | Paddles: "Roger ball." (Case III: "Roger ball, 25 knots, axial.") |
 | Groove | "Clara" (*Clara / Clarence*) | Paddles: "roger Clara, keep it coming." |
@@ -1974,7 +1974,7 @@ Solange du beim AWACS eingecheckt bist, überwacht die Zonenwache des Platzes nu
 | **splash** / **splash 2** / **kill** | *„Overlord copies splash two, west group. East group remains.“* (die abgeschossene Gruppe, dann was bleibt: ein oder zwei Gruppennamen oder *„3 groups remain“*), oder *„Overlord copies splash two, picture clean.“*, wenn nichts mehr da ist. Das *picture clean* wiederholt danach niemand, auch nicht nach dem *„Overlord copies, splash, picture clean.“* eines eigenen KI-Jägers. |
 | **winchester**, **RTB**, **tally** | *„Overlord copies.“* | winchester gibt außerdem deine Zuweisung frei.
 | **unable** (mit Grund: *„unable, winchester / bingo / defensive“*) | *„copy.“* Die Gruppe geht an den nächsten freien Flug; bei winchester oder bingo wirst du nicht mehr verplant. Antwortest du auf ein commit nicht, fragt das AWACS nach 10 s einmal nach (*„commit north group, how copy?“*) und gibt die Gruppe nach 25 s dem nächsten Flug; nach zwei unbeantworteten commits wirst du nicht mehr verplant, bis du wieder sprichst. Eine kurze Quittung (*„Enfield one one.“*, *„resetting“*, *„copy“*) auf eine Weisung bekommt keine Antwort, *„committing“* direkt nach dem commit auch nicht (kein Echo). |
-| **fox one/two/three** (optional mit Gruppe) | Keine Antwort. Die Gruppe gehört dir: Ein eigener KI-Flug darauf hört *„Ford one, Overlord, skip it, north group Enfield one targeted.“* |
+| **fox one/two/three**, **pitbull** (optional mit Gruppe) | Keine Antwort. Die Gruppe gehört dir: Ein eigener KI-Flug darauf hört *„Ford one, Overlord, skip it, north group Enfield one targeted.“* |
 | **defensive** / **defending** / **missile** | Keine Antwort; deine Gruppe bekommt einen zweiten Flug. |
 | **request support** (optional mit Gruppe) | *„copy, north group.“* und ein zweiter Flug wird angesetzt. |
 | **judy** (oder *„targeted north group“*) | *judy*: keine Antwort. Danach keine Entfernungs-Updates mehr zu dieser Gruppe – du führst den Abfang selbst, das AWACS hält die Frequenz frei. |
@@ -2075,7 +2075,7 @@ DCS bedient Korb bzw. Boom aber nur über seinen eigenen Tankerdialog im F-Menü
 | **say altitude** / *angels* / *block*, **say speed** / *airspeed* / *knots*, **say track** / *heading* / *course*, **say TACAN** (auch mit *request*, *confirm*, *what*) | Nur das Gefragte, mehreres in einem Spruch: *„Enfield one one, Texaco, angels 22, 280 knots.“* Ohne Bake: *„negative TACAN“*. Ändert nichts am Ablauf, geht in jedem Zustand. |
 | **say position** / *status* / *bearing* / *range* / *where* | Alles: *„bearing 084, 18 miles, angels 22, track north, 280 knots, TACAN 52 X-ray.“* Funkrad: Tanker → Say position. |
 | **request vector** (während des Treffens) | Sofort ein neuer Vektor mit Kurs. |
-| **judy** / *radar contact* | *„roger, report visual.“* Die Join-Führung endet, der Join selbst braucht weiter „visual“. |
+| **judy** / *radar contact* | *„roger, report visual.“* Die Join-Führung endet, der Join selbst braucht weiter „visual“. *negative visual* oder *no joy* bekommt dieselbe Antwort, die Führung läuft weiter. |
 | **visual** (*tally*, *in sight*), mehr als 8 NM weg | *„continue, 20 miles, report visual.“* |
 | **visual**, innerhalb 8 NM | *„cleared to join, observation left wing, number 1.“* Warten mehrere: *„number 2. Enfield one two first, then Enfield one one.“* Vor der 3-9-Linie des Tankers (mehr als 0,5 NM vor ihm): *„negative, rejoin from astern, Texaco 6 o'clock, 2 miles, report visual.“* Angeschlossen wird nur von hinten. |
 | **moving to …** (*moving to pre-contact*, *moving into left observation*, *moving to the right wing*) | Keine Antwort. Das ist deine Rücklesung, melde dich, wenn du dort bist. |
@@ -2224,16 +2224,16 @@ Nenne das Rufzeichen des Lotsen (*Axeman one one*) oder *JTAC* / *FAC A* im Spru
 
 | Du sagst (erkannte Wörter) | JTAC / FAC(A) antwortet |
 |---|---|
-| **checking in** (jeder erste Spruch; mit Bewaffnung und Playtime, z. B. *„checking in, 4 GBU-12, 2 Mavericks, playtime 30 minutes“*) | Mit Bewaffnung und Playtime bestätigt die Leitstelle beides zuerst (*„copy GBU 12, Maverick, playtime three zero minutes.“*), wählt die Waffe für den 9-Liner (Bomben, lasergelenkte zuerst, auf ein stehendes Ziel; Flugkörper, Raketen oder Bordkanone auf ein fahrendes; Bemerkung *„ordnance GBU 12“*, Zeile 7 Laser) und meldet *„your playtime is up, say intentions“*, wenn sie abläuft. *„playtime 20“* setzt später eine neue. *„Enfield one one, Axeman one one, situation: enemy four tanks stationary, three zero zero zero meters east of my position, friendlies at my position. Type 2 control, bomb on target. Advise when ready for 9-line.“* Ein FAC(A) nennt stattdessen den Abstand der eigenen Truppen zum Ziel oder *„friendlies none known“*. Ohne Ziel: *„no enemy observed at this time, stand by. I'll call when I have a target.“* |
-| **ready to copy** (*go ahead*, *ready for 9 line*, *ready for tasking*, *ready for next*, *ready for re-attack*) | Der 9-Liner (unten). *request re-attack* auf dasselbe Ziel nach dem BDA: *„re-attack approved, same 9-line, final attack heading …, advise IN“*, ohne neuen 9-Liner. Solange du in der Warteschleife bist: *„stand by, hold as directed.“* |
+| **checking in** (jeder erste Spruch; mit Bewaffnung und Playtime, z. B. *„checking in, 4 GBU-12, 2 Mavericks, playtime 30 minutes“*) | Mit Bewaffnung und Playtime bestätigt die Leitstelle beides zuerst (*„copy GBU 12, Maverick, playtime three zero minutes.“*), wählt die Waffe für den 9-Liner (Bomben, lasergelenkte zuerst, auf ein stehendes Ziel; Flugkörper, Raketen oder Bordkanone auf ein fahrendes; Bemerkung *„ordnance GBU 12“*, Zeile 7 Laser) und meldet *„your playtime is up, say intentions“*, wenn sie abläuft. *„playtime 20“* setzt später eine neue. *„Enfield one one, Axeman one one, situation update, enemy four tanks stationary, three zero zero zero meters east of my position, friendlies at my position. Type 2 control, bomb on target. Advise when ready for 9-line.“* Ein FAC(A) nennt stattdessen den Abstand der eigenen Truppen zum Ziel oder *„friendlies none known“*. Ohne Ziel: *„no enemy observed at this time, stand by. I'll call when I have a target.“* |
+| **ready to copy** (*go ahead*, *ready for 9 line*, *ready for tasking*, *ready for next*, *next target*, *send it*, *ready for re-attack*) | Der 9-Liner (unten). *request re-attack* auf dasselbe Ziel nach dem BDA: *„re-attack approved, same 9-line, final attack heading …, advise IN“*, ohne neuen 9-Liner. Solange du in der Warteschleife bist: *„stand by, hold as directed.“* |
 | **readback** (Zeilen 4 und 6 und die Einschränkungen) | *„readback correct, push when ready, advise IN.“* Bei *danger close* nennen die Bemerkungen das Kürzel des Bodenkommandeurs (*„danger close, ground commander's initials whiskey golf“*); es muss im Readback zurückkommen (das Funkrad ergänzt es), sonst *„negative initials, ...“*. Eine falsche Zeile wird einzeln berichtigt: *„negative line 4, line 4 elevation six six zero feet. Say again your readback.“* |
 | **say again 9-line** (*repeat the 9-line*, *say again all*) | Der ganze 9-Liner noch einmal, beim Readback mit der Readback-Aufforderung. |
-| **say again line 6** (jede Zeile 1 bis 9) | Die Zeile noch einmal. *„say again in MGRS“* oder *„in lat long“* gibt Zeile 6 in diesem Format. |
+| **say again line 6** (jede Zeile 1 bis 9) | Die Zeile noch einmal; *„say again remarks“* gibt die Remarks. *„say again in MGRS“* oder *„in lat long“* gibt Zeile 6 in diesem Format. |
 | **laser code** | *„laser code one six eight eight.“* |
 | **threats** (*air defense*) | Die bekannte Luftabwehr oder *„no threats observed.“* |
-| **request mark** (*mark my target*, *smoke*, *request smoke*) | JTAC: *„mark on the way, three zero seconds.“*, danach *„mark is red smoke, advise contact.“* FAC(A): bei laserfähigem Flugzeug (Hornet, F-16, A-10, Harrier, Apache …) oder lasergelenkten Bomben *„laser mark, code one six eight eight, advise spot.“* (auch Zeile 7 ist dann der Laser), sonst oder auf *request smoke* *„rocket away, mark is white phosphorus.“* Wunsch: *request green smoke* (red, green, white, orange, blue; nur JTAC), *request illum* (Leuchtgranate, JTAC), *request sparkle* oder *IR pointer* (sofort: *„sparkle, advise contact sparkle“*). *„contact smoke“* / *„contact sparkle“* ist das Tally. Vor dem Readback: *„negative, readback first.“* |
+| **request mark** (*mark the target*, *smoke*, *request smoke*, *request WP*) | JTAC: *„mark on the way, three zero seconds.“*, danach *„mark is red smoke, advise contact.“* FAC(A): bei laserfähigem Flugzeug (Hornet, F-16, A-10, Harrier, Apache …) oder lasergelenkten Bomben *„laser mark, code one six eight eight, advise spot.“* (auch Zeile 7 ist dann der Laser), sonst oder auf *request smoke* *„rocket away, mark is white phosphorus.“* Wunsch: *request green smoke* (red, green, white, orange, blue; nur JTAC), *request illum* (Leuchtgranate, JTAC), *request sparkle* oder *IR pointer* (sofort: *„sparkle, advise contact sparkle“*). *„contact smoke“* / *„contact sparkle“* ist das Tally. Vor dem Readback: *„negative, readback first.“* |
 | **laser on** (*request laser*) / **laser off** (*terminate*) | *„lasing, code one six eight eight.“* / *„laser off.“* Verliert der Lotse das Ziel: *„lost the target, laser off.“* |
-| **tally** (*visual*, *contact the mark*, *have the target*) | *„roger, advise IN.“* |
+| **tally** (*visual*, *target in sight*, *eyes on*, *contact the mark*, *have the target*) | *„roger, advise IN.“* |
 | **in from the west** (*in*, *in from the south* …) | Cleared hot, continue oder abort (unten). |
 | **IP inbound** (*inbound*, *pushing*) | *„continue, advise IN“* (oder *„advise tally target“*). |
 | **in from the south, dry** | *„continue dry“*, ein Übungsanflug ohne Freigabe. Liest du *„cleared hot“* zurück, kommt keine Antwort. |
@@ -2242,7 +2242,7 @@ Nenne das Rufzeichen des Lotsen (*Axeman one one*) oder *JTAC* / *FAC A* im Spru
 | **off** (*off north*, *winchester*, *complete*) | Die Wirkungsmeldung (unten). |
 | **bda** (*status*, *did I hit*) | Die Wirkungsmeldung oder *„no attack yet.“* |
 | **abort** | *„copy abort, standing by.“* |
-| **checking out** (*off station*, *signing off*, *bingo*, *RTB*) | *„copy checking out, 3 destroyed in total. Good work.“* |
+| **checking out** (*off station*, *departing station*, *signing off*, *bingo*, *RTB*) | *„copy checking out, 3 destroyed in total. Good work.“* |
 | **radio check** | *„read you five.“* |
 | alles andere | *„say again.“* |
 
@@ -2293,7 +2293,7 @@ Ist die Zielgruppe zerstört oder nach *off*, kommt die Meldung: *„good hits, 
 
 ```
 Du:     Axeman one one, Enfield 1-1, checking in.
-JTAC:   Enfield one one, Axeman one one, situation: enemy four tanks stationary, three zero zero zero
+JTAC:   Enfield one one, Axeman one one, situation update, enemy four tanks stationary, three zero zero zero
         meters east of my position, friendlies at my position. Type 2 control, bomb on target.
         Advise when ready for 9-line.
 Du:     Axeman one one, Enfield 1-1, ready to copy.
@@ -2358,6 +2358,8 @@ Damit die Frequenz brauchbar bleibt, gehen je Frequenz höchstens 10 niedrig pri
 
 Deine KI-Rottenflieger nehmen Befehle per Sprache an, wie im DCS-Funkmenü (Wingman / Flight). Fang mit der Nummer des Rottenfliegers oder „Flight“ an, wahlweise mit dem Rufzeichen deines Flugs davor: *„Two, go trail.“* · *„Enfield one three, rejoin.“* · *„Flight, engage bandits.“* DCS-ATC wählt dann genau diesen Punkt im DCS-Funkmenü für dich. Es drückt keine Tasten, deshalb geht das auch mit Easy Communication aus, in jedem Flugzeug und in jeder DCS-Sprache. Den Befehl und die Antwort des Rottenfliegers spricht DCS selbst, wie beim Menü.
 
+**Voraussetzung: eine Zeile in `autoexec.lua`.** Das Funkmenü liegt in der Skriptumgebung der Simulation, nicht in der des DCS-ATC-Hooks. Setup fügt deshalb bei der Admin-Abfrage auch eine Zeile ans Ende von `<DCS-Ordner>\Scripts\autoexec.lua` an, die nur `Scripts\DcsAtc\DcsAtcWing.lua` aus Saved Games lädt. DCS liest diese Datei nur beim Start: nach der Installation DCS einmal neu starten. Kommt der Befehl nicht an, sagt DCS-ATC *„Wingman: Befehl nicht angekommen …“*; dann **Startmenü → DCS-ATC → Nach DCS-Update reparieren** und DCS neu starten. Deinstallieren entfernt die Zeile wieder.
+
 | Sag | Befehl im DCS-Menü |
 |---|---|
 | *rejoin* · *join up* | Rejoin Formation |
@@ -2381,7 +2383,7 @@ Steigt ein Pilot deiner Seite über Land aus, kann ein Hubschrauber-Spieler ihn 
 
 - **Überlebender:** dort, wo der Fallschirm gelandet ist (DCS-Ereignis), sonst am Ausstiegspunkt. Aus dem Wasser gibt es keine Rettung.
 - **Ruf an die Hubschrauber:** Sobald ein Hubschrauber-Spieler dieser Seite in der Mission ist, ruft das AWACS auf Guard: „Any helicopter, Overlord, downed pilot Enfield one two, bullseye two seven zero, 25 miles.“
-- **Übernehmen:** „Overlord, Pedro 1-1, will pick up“ (oder „request CSAR“, oder Rad/F10 **Notfall → CSAR übernehmen**). Du bekommst den nächsten Überlebenden deiner Seite innerhalb 100 NM: „Pedro one one, Overlord, copy, downed pilot Enfield one two, bearing two seven zero, 12 miles. Contact him on guard.“ Ohne AWACS antwortet der Überlebende selbst.
+- **Übernehmen:** „Overlord, Pedro 1-1, will pick up“ (oder „request CSAR“, „en route to the survivor“, oder Rad/F10 **Notfall → CSAR übernehmen**). Du bekommst den nächsten Überlebenden deiner Seite innerhalb 100 NM: „Pedro one one, Overlord, copy, downed pilot Enfield one two, bearing two seven zero, 12 miles. Contact him on guard.“ Ohne AWACS antwortet der Überlebende selbst.
 - **Auf Guard:** Ab 3 NM hört er dich: „Pedro one one, Enfield one two, I hear you, you are north of me.“ Ein Signal forderst du mit seinem Rufzeichen an, „Enfield 1-2, Pedro, pop smoke“, oder mit **Notfall → CSAR Rauch/Leuchtkugel**. Tagsüber kommt orangefarbener Rauch, nachts eine rote Leuchtkugel, wenn du höchstens 5 NM entfernt bist, und höchstens einmal pro Minute.
 - **Aufnehmen:** höchstens 50 m neben ihm landen und 30 s am Boden bleiben. Die Besatzung meldet auf dem Bordfunk „Survivor in sight, he's coming to us.“, dann „Survivor on board, door closed. Clear to lift.“ Landest du 50–300 m entfernt, sagt sie dir, wo er ist.
 - **Gerettet:** mindestens 3 NM vom Aufnahmepunkt wieder landen (Platz, FARP, Schiff) und 10 s stehen: „Survivor delivered.“ Im Debriefing steht `CSAR: Enfield one two gerettet, 25 min nach dem Ausstieg`, das Logbuch zählt es.
@@ -2673,8 +2675,25 @@ Eine Route ist eine Kette benannter Fixes, die an einem Meldepunkt endet, etwa d
 
 - `"rwy"`: die Bahnen, für die die Route gilt. Fragst du sie an, während eine andere Bahn in Betrieb ist, nennt Approach die passenden Bahnen.
 - `"to"`: der Meldepunkt am Ende. Er muss für jede dieser Bahnen ein `entry` sein.
-- `"pts"`: die Fixes der Reihe nach. `"above"` = in oder über, `"at"` = in dieser Höhe in Fuß. Beides darf fehlen.
-- Abflugrouten gibt es noch nicht.
+- `"pts"`: die Fixes der Reihe nach. `"above"` = in oder über, `"at"` = in dieser Höhe, `"below"` = in oder unter, jeweils in Fuß. Alles darf fehlen.
+
+#### Abflugrouten
+
+Eine Abflugroute ist eine Kette von Fixes, die du nach dem Start abfliegst, danach eigene Navigation. Du nennst sie mit der Rollanfrage („request taxi, FLEX departure“) oder mit „ready for departure, FLEX departure“.
+
+- Die Startfreigabe enthält sie: „after departure Flex departure, proceed direct Flex, cross Flex at or below 5000 feet, Apex at or above 9000 feet, then own navigation, runway zero three left, wind …, cleared for takeoff.“ Mit IFR-Freigabe endet sie stattdessen mit „then climb and maintain …“.
+- Beim Check-in bei Departure lautet die Antwort „Continue Flex departure“. Departure verfolgt dich von Fix zu Fix, nach dem letzten Fix fliegst du eigene Navigation.
+- Fragst du sie an, während eine andere Bahn in Betrieb ist, nennt der Tower die passenden Bahnen.
+
+```jsonc
+"departures": {
+  "FLEX": { "rwy": ["03L", "03R"], "pts": [
+    { "fix": "FLEX", "pos": "36°18.238'N 115°02.218'W", "below": 5000 },
+    { "fix": "APEX", "pos": "36°21.57'N 114°54.34'W",  "above": 9000 } ] }
+}
+```
+
+`"departures"` steht im Eintrag des Platzes neben `"routes"`. `"rwy"` und `"pts"` funktionieren wie bei Anflugrouten, ein `"to"` gibt es nicht.
 
 ### Kneeboard-Seiten
 

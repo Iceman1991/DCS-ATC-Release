@@ -74,6 +74,10 @@ public partial class Tower
     Airfield.Route? arrRoute; int routeAt;   // charts.jsonc route being flown, index of the next fix; only valid while entry is its "to" (Rt)
     Airfield.Route? Rt => arrRoute != null && entry == arrRoute.To && Phase == Phase.Inbound ? arrRoute : null;
     static string CrpSay(string k) => Airfield.Say(k);
+    Airfield.Route? depRoute; int depAt;   // charts.jsonc departure (on request with taxi or ready), index of the next fix; until the last fix (DRt)
+    Airfield.Route? DRt => depRoute != null && (Phase is Phase.TaxiOut or Phase.HoldShort || Phase is Phase.ClearedTakeoff or Phase.Departing or Phase.Away && nav != null) ? depRoute : null;   // released (nav null): no longer flown
+    /// Crossing altitudes of a route as said: "Mintt at or above 15000 feet, Simns at 5500 feet".
+    static string CrossTxt(Airfield.Route r) => string.Join(", ", r.Pts.Where(p => p.Ft > 0).Select(p => $"{CrpSay(p.Fix)} {p.Cross} {Alt(p.Ft)}"));
     public static IReadOnlyList<Airfield> All = new List<Airfield>();   // all airfields (Program): destination of the en-route clearance
     Airfield? dest; bool depClr; double depFt;   // V14: route clearance (Clearance Delivery) -> departure vector
     string? climbOut; double climbFt;   // requested departure: "free" (unrestricted climb) / "tactical" (spiral climb overhead), climbFt = requested altitude, 0 = none
