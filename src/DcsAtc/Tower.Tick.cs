@@ -438,15 +438,26 @@ public partial class Tower
                 (nav, navName, kneeTo) = (kn, kneeName, null);
                 return Say($"{c}, {Steer(t, kn, kneeName)}, {MilesTxt(Dist(t.X, t.Z, kn.X, kn.Z))} to {kneeName}.");
             }
-            bool crpLeg = !holding && entry != null && (Phase == Phase.Inbound || Phase == Phase.Entering && navName == $"C R P {entry}");
+            // charts.jsonc route: at the fix or once closer to the next fix than this one is, on to the next, after the last to the C R P (silent: the pilot flies the chart)
+            if (Rt is { } rt && routeAt < rt.Pts.Length && navName == CrpSay(rt.Pts[routeAt].Fix))
+            {
+                var nx = routeAt + 1 < rt.Pts.Length ? (rt.Pts[routeAt + 1].X, rt.Pts[routeAt + 1].Z) : Crp[rt.To];
+                if (d < 1.5 * NM || Dist(t.X, t.Z, nx.Item1, nx.Item2) < Dist(goal.X, goal.Z, nx.Item1, nx.Item2))
+                {
+                    (nav, navName, lastVector) = (nx, ++routeAt < rt.Pts.Length ? CrpSay(rt.Pts[routeAt].Fix) : CrpSay(rt.To), now);
+                    if (routeAt >= rt.Pts.Length) arrRoute = null;
+                    return new();
+                }
+            }
+            bool crpLeg = !holding && entry != null && Rt == null && (Phase == Phase.Inbound || Phase == Phase.Entering && navName == CrpSay(entry!));
             // K22: Approach hands over so that the Tower is called about 2 minutes before the C R P (not yet at the point: that is the fallback below)
-            if (crpLeg && Phase == Phase.Inbound && vec == null && navName == $"C R P {entry}" && !crpAsked && d > NM && d <= Math.Max(Gs(t), 40) * 120)
+            if (crpLeg && Phase == Phase.Inbound && vec == null && navName == CrpSay(entry!) && !crpAsked && d > NM && d <= Math.Max(Gs(t), 40) * 120)
             {
                 Phase = Phase.Entering; handoffAt = now; towerDue = true; towerNag = false;
-                return Say($"{c}, contact {Contact("Tower")}, report C R P {entry}.", "Approach");
+                return Say($"{c}, contact {Contact("Tower")}, report {CrpSay(entry!)}.", "Approach");
             }
             // Reporting obligation C R P: handoff only on the call "C R P north" (case crp); at the point without call once "report C R P", 2 NM later once "say position", no handoff
-            if (crpLeg && d < NM && !crpAsked) { crpAsked = true; return Say(Phase == Phase.Entering ? $"{c}, {F.StationOf("Tower")}, report C R P {entry}." : $"{c}, report C R P {entry}.", Owner()); }
+            if (crpLeg && d < NM && !crpAsked) { crpAsked = true; return Say(Phase == Phase.Entering ? $"{c}, {F.StationOf("Tower")}, report {CrpSay(entry!)}." : $"{c}, report {CrpSay(entry!)}.", Owner()); }
             if (crpLeg && crpAsked && !crpWaved && d > 2 * NM)
             {
                 crpWaved = true; nav = null; (keepAt, keepRef, keepTold) = (now, Dist(goal.X, goal.Z, CX, CZ), false);
@@ -476,7 +487,7 @@ public partial class Tower
         // (3 NM, under pattern + 1000 ft) or further in the zone than the C R P: once redirect with violation (debriefing, "possible pilot deviation", FAA JO 7110.65 2-1-26) like the zone watch
         if (!ground && !keepTold && now - keepAt > 45 && Dist(t.X, t.Z, CX, CZ) is var kd &&
             (ovhWaved && Phase == Phase.Entering && navName == "overhead" && kd < 3 * NM && IndFt(t) < PatternFt + 1000 ||
-             crpWaved && !holding && entry != null && (Phase == Phase.Inbound || Phase == Phase.Entering && navName == $"C R P {entry}") && kd < Math.Min(CtrM, keepRef - NM)))
+             crpWaved && !holding && entry != null && (Phase == Phase.Inbound || Phase == Phase.Entering && navName == CrpSay(entry!)) && kd < Math.Min(CtrM, keepRef - NM)))
         {
             keepTold = true;
             return ovhWaved ? Dev($"{c}, you are not cleared to join, leave the pattern immediately, say intentions.", $"Platzrunde ohne Freigabe {F.Name}", $"pattern entry without clearance {F.Name}", "Tower")
@@ -889,7 +900,7 @@ public partial class Tower
         if (climbOut != null) return $"{Rc}{(t != null ? $", {Where(t)}" : "")}. {(climbOut == "tactical" ? "Continue spiral climb as cleared, then resume" : "Unrestricted climb approved, resume")} own navigation.";
         if (zoneReport && t != null) return $"{Rc}, {Where(t)}. Continue as cleared, report leaving the control zone.";   // R7: VFR still in the zone
         if (depClr && t != null && (dest != null ? (dest.X, dest.Z) : exitDir != null && Crp.TryGetValue(exitDir, out var xp) ? xp : ((double, double)?)null) is { } dg)
-            return $"{Rc}, {Where(t)}. {Cap(Steer(t, dg, dest?.Name.Replace('-', ' ') ?? $"C R P {exitDir}"))}, climb and maintain {Alt(Cruise)}.";
+            return $"{Rc}, {Where(t)}. {Cap(Steer(t, dg, dest?.Name.Replace('-', ' ') ?? CrpSay(exitDir!)))}, climb and maintain {Alt(Cruise)}.";
         return depClr ? $"{Rc}{(t != null ? $", {Where(t)}" : "")}. Climb and maintain {Alt(Cruise)}, resume own navigation."
                       : $"{Rc}{(t != null ? $", {Where(t)}" : "")}. Resume own navigation, maintain VFR.";   // Visual: do not prescribe an altitude
     }

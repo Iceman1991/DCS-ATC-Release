@@ -285,11 +285,17 @@ public partial class Tower
     string? Direction(string n)
     {
         var keys = (F.Crp.Count > 0 ? F.Crp.Keys.ToArray() : new[] { "north", "south", "east", "west" }).OrderByDescending(k => k.Length).ToArray();
-        string Rx(string k) => Regex.Escape(k.Replace('-', ' ')).Replace("\\ ", " ?");
         var own = Normalize(F.Name).Split(' ').ToHashSet();
         return keys.FirstOrDefault(k => Regex.IsMatch(n, $@"\bc ?r ?p {Rx(k)}\b"))
-            ?? keys.Where(k => !own.Contains(k)).FirstOrDefault(k => Regex.IsMatch(n, $@"\b{Rx(k)}\b"));
+            ?? keys.Where(k => !own.Contains(k.ToLowerInvariant())).FirstOrDefault(k => Regex.IsMatch(n, $@"\b{Rx(k)}\b"));
     }
+    static string Rx(string k) => Regex.Escape(k.ToLowerInvariant().Replace('-', ' ').Replace('_', ' ')).Replace("\\ ", " ?");   // "GASS_PEAK" -> "gass ?peak"
+
+    /// Route of the chart (charts.jsonc "routes") named in the transmission; doubled letters count once (Whisper hears "Mint" for MINTT).
+    static string Sq(string s) => Regex.Replace(s, @"([a-z])\1+", "$1");
+    Airfield.Route? RouteOf(string n) => F.Routes.Values.FirstOrDefault(r => Regex.IsMatch(Sq(n), $@"\b{Sq(Rx(r.Name))}\b"));
+    /// Index of the fix of the route being flown that the pilot reports, -1 = none.
+    int RouteFix(string n) => Rt is { } r ? Array.FindIndex(r.Pts, p => Regex.IsMatch(Sq(n), $@"\b{Sq(Rx(p.Fix))}\b")) : -1;
 
     /// Chart text (English) as speech: digit strings spelled out, "CRP" as letters.
     static string SayChart(string s) => Regex.Replace(Regex.Replace(s.Replace("CRP", "C R P"), @"(?<=[A-Za-z])(?=\d)", " "), @"\d+", m => Digits(m.Value));   // "W1" -> "W one"

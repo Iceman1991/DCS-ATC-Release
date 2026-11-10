@@ -1522,6 +1522,25 @@ static partial class Program
     internal static bool TestRun;
     static bool MissionFields => !TestRun && File.Exists(AirfieldFile);
 
+    /// #28: charts.jsonc name -> DCS airfield of this map: same name (case, spaces, hyphens irrelevant), else the only airfield whose name contains it or is contained in it
+    /// ("Nellis AFB" = "Nellis"). Result DCS name -> charts.jsonc name; notes: renamed, ambiguous, not on this map (for the log).
+    internal static Dictionary<string, string> ChartAlias(IEnumerable<string> keys, IEnumerable<string> names, List<string> notes)
+    {
+        static string N(string s) => Regex.Replace(s.ToLowerInvariant(), "[^a-z0-9]", "");
+        var (map, all, off) = (new Dictionary<string, string>(), names.Distinct().ToList(), new List<string>());
+        foreach (var k in keys)
+        {
+            var hit = all.Where(n => N(n) == N(k)).ToList();
+            if (hit.Count == 0) hit = all.Where(n => N(n).Length >= 4 && N(k).Length >= 4 && (N(n).Contains(N(k)) || N(k).Contains(N(n)))).ToList();
+            if (hit.Count == 1) { map[hit[0]] = k; if (hit[0] != k) notes.Add(L($"[Karten] charts.jsonc: \"{k}\" = DCS-Platz \"{hit[0]}\"", $"[Charts] charts.jsonc: \"{k}\" = DCS airfield \"{hit[0]}\"")); }
+            else if (hit.Count > 1) notes.Add(L($"[Karten] charts.jsonc: \"{k}\" nicht eindeutig ({string.Join(", ", hit)}), Namen wie in DCS schreiben – ignoriert",
+                                                $"[Charts] charts.jsonc: \"{k}\" is ambiguous ({string.Join(", ", hit)}), write the name as in DCS – ignored"));
+            else off.Add(k);
+        }
+        if (off.Count > 0) notes.Add(L($"[Karten] charts.jsonc: nicht auf dieser Karte ({Airfield.Theatre}): {string.Join(", ", off)}", $"[Charts] charts.jsonc: not on this map ({Airfield.Theatre}): {string.Join(", ", off)}"));
+        return map;
+    }
+
     /// Forum 0.15: own procedures in charts.jsonc (DCS-ATC folder), format like the built-in charts/caucasus.jsonc; an airfield in there replaces the built-in entry.
     /// Faulty file: message, the built-in data stay.
     internal static JsonElement? OwnChart(string path)
@@ -1580,6 +1599,12 @@ static partial class Program
         var file = MissionFields ? AirfieldFile : copy;
         if (File.Exists(file) && File.ReadLines(file).FirstOrDefault() is { } m && m.StartsWith("M;")) Airfield.Theatre = m[2..];   // charts.jsonc check with the projection of this map
         if (!TestRun) Airfield.OwnChart = OwnChart(Path.Combine(Root, "charts.jsonc"));
+        if (Airfield.OwnChart is { } oc && File.Exists(file))   // #28: charts.jsonc names like "Nellis AFB" for the DCS airfield "Nellis"
+        {
+            var notes = new List<string>();
+            Airfield.OwnAlias = ChartAlias(oc.EnumerateObject().Select(a => a.Name), File.ReadLines(file).Where(l => l.StartsWith("A;")).Select(l => l.Split(';')[1]), notes);
+            foreach (var n in notes) Log(n);
+        }
         Fields = Airfield.Load(file);
         standStamp = default;   // new airfield objects: stand names again (TickAll)
         Tower.All = Fields;
@@ -3195,7 +3220,8 @@ static partial class Program
     {
         if (PromptPhrases.TryGetValue(role ?? "", out var ph)) return $"{ph} {string.Join(", ", names.Append(cs).Distinct())}.";
         string Fn(Airfield x) => x.Name.Replace('-', ' ') + (x.Name.Contains(x.Callsign) ? "" : $" ({x.Callsign})");   // "Mineralnye Vody (Minvody)"
-        var crps = f.Charted ? string.Join(", ", f.Crp.Keys.Select(k => "CRP " + k)) : "CRP South";   // chart CRP names ("black sea", "river west")
+        var crps = f.Charted ? string.Join(", ", f.Crp.Keys.Select(k => Airfield.Say(k).Replace("C R P", "CRP"))   // chart CRP names ("black sea", "river west"), named fixes ("Craig")
+            .Concat(f.Routes.Values.SelectMany(r => r.Pts.Select(p => Airfield.Say(p.Fix)).Prepend(Airfield.Say(r.Name) + " recovery"))).Distinct()) : "CRP South";
         return $"Request startup. Request taxi. Ready for departure runway 25. Airborne, switching to departure. Inbound, {crps}. " +
                "Initial 07, overhead, break, downwind. Final, touch and go. Request ILS approach. Runway vacated. Wilco. " +
                (role == null ? "Request picture. Request rejoin. " : "") +
@@ -4256,6 +4282,14 @@ static partial class Program
             if (!sy.Charted || sy.CtrTopFt != 3500 || Math.Abs(sy.CtrNm - 4.8) > 0.1 || bat.Charted)
                 throw new Exception($"charts.jsonc Syrien: {sy.Charted} {sy.CtrTopFt} {sy.CtrNm:F2} {bat.Charted}");
             Console.WriteLine($"OK   charts.jsonc auf Syrien: Kontrollzone {sy.CtrNm:F1} NM bis {sy.CtrTopFt} ft aus eigenem CRP, Kaukasus-Daten nicht übernommen");
+            // #28: "Nellis AFB" = DCS "Nellis", exact name before partial ("Tonopah Test Range" not also "Tonopah"), other maps listed; typo in "via" = faulty file
+            var notes = new List<string>();
+            var al = ChartAlias(new[] { "Nellis AFB", "Tonopah Test Range", "Buechel AB" }, new[] { "Nellis", "North Las Vegas", "Tonopah", "Tonopah Test Range", "Creech" }, notes);
+            File.WriteAllText(ownF, "{ \"Banias\": { \"crp\": { \"n\": [1, 2] }, \"rwy\": { \"09\": { \"entry\": { \"n\": { \"crs\": 90, \"via\": \"inital\" } } } } } }");
+            var typo = OwnChart(ownF);
+            if (al.Count != 2 || al.GetValueOrDefault("Nellis") != "Nellis AFB" || al.GetValueOrDefault("Tonopah Test Range") != "Tonopah Test Range" || !notes.Any(x => x.Contains("Buechel AB")) || typo != null)
+                throw new Exception($"charts.jsonc Namen/Prüfung: {string.Join(", ", al)} | {string.Join(" | ", notes)} | {typo != null}");
+            Console.WriteLine("OK   charts.jsonc: \"Nellis AFB\" = DCS \"Nellis\", fremde Karten gemeldet, Tippfehler in \"via\" erkannt");
         }
         finally { (Airfield.OwnChart, Airfield.Theatre) = (null, th); File.Delete(ownF); }
     }

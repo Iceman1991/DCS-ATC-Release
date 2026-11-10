@@ -161,6 +161,38 @@ public partial class Tower
             n += 3;
         }
 
+        // Forum (Lt_Jaeger, Nellis MINTT): charts.jsonc route on request ("Mint" = MINTT), fixes with altitudes, points in capitals said by name, silently on from fix to fix,
+        // handover before the last point as at a C R P, the point reported to the Tower; a fix report goes on to the next point
+        {
+            var k = Airfield.Kutaisi();
+            var c = k.Crp["north"];
+            (double X, double Z) P(double nm) => (c.X + nm * NM, c.Z);
+            k.Crp["CRAIG"] = c;
+            k.Entry["25"].Insert(0, ("CRAIG", "overhead", null));
+            k.Routes["MINTT"] = new("MINTT", new[] { "25" }, "CRAIG", new[] { ("MINTT", P(25).X, P(25).Z, 15000.0, true), ("GASS_PEAK", P(12).X, P(12).Z, 9000.0, true) });
+            var e25 = k.Ends.First(e => e.Name == "25");
+            Telemetry At(double x) => new(k.Elev + 1000, 1000, 150 * Kt, Math.PI, x, c.Z, 0, 0, 760);
+            Tower Fly(double x) { var w = new Tower(k, "Enfield 1-1") { FieldWind = (-e25.Dx * 5, -e25.Dz * 5) }; w.Tick(At(x), none, 0); w.Runway = "25"; return w; }
+            double x = c.X + 30 * NM, s = 2;
+            var w = Fly(x);
+            var r1 = w.OnTranscript("Kutaisi Approach, Enfield 11, inbound via mint", At(x), none, s);
+            bool clr = r1.Count == 1 && r1[0].Role == "Approach" && r1[0].Text.Contains("cleared Mintt recovery runway two five, proceed direct Mintt") &&
+                       r1[0].Text.Contains("cross Mintt at or above 15000 feet, Gass Peak at or above 9000 feet, report Craig.") && w.navName == "Mintt";
+            var (seen, msgs) = (new List<string> { w.navName }, new List<Msg>());
+            for (; w.Phase == Phase.Inbound && x > c.X; x -= 385) { msgs.AddRange(w.Tick(At(x), none, s += 5)); if (seen[^1] != w.navName) seen.Add(w.navName); }
+            var ho = msgs.FirstOrDefault(m => m.Role == "Approach");
+            for (; x > c.X + 0.3 * NM; x -= 385) msgs.AddRange(w.Tick(At(x), none, s += 5));
+            var r2 = w.OnTranscript("Kutaisi Tower, Enfield 11, Craig", At(x), none, s += 2);
+            var wf = Fly(c.X + 14 * NM);
+            wf.OnTranscript("Kutaisi Approach, Enfield 11, request mintt recovery", At(c.X + 14 * NM), none, 2);
+            var r3 = wf.OnTranscript("Kutaisi Approach, Enfield 11, gass peak", At(c.X + 12 * NM), none, 20);
+            Chk(clr && string.Join(",", seen) == "Mintt,Gass Peak,Craig" && ho != null && ho.Text.Contains("contact Kutaisi Tower") && ho.Text.EndsWith("report Craig.") &&
+                r2.Count == 1 && r2[0].Role == "Tower" && r2[0].Text.StartsWith("Enfield one one, proceed overhead") &&
+                r3.Count == 1 && r3[0].Text == "Enfield one one, roger, report Craig." && wf.navName == "Craig" && Airfield.Say("north") == "C R P north",
+                $"Route MINTT ({string.Join(",", seen)}, {w.Phase}): " + J(r1) + " / " + ho?.Text + " / " + J(r2) + " / " + J(r3) + $" ({wf.navName})");
+            n += 4;
+        }
+
         // Etappe 4 (K29/K33/K34/K36): taxi, holding point, vacate and return route from the data, every apron x every runway of all airfields (and via radio from the apron)
         int nTaxi = 0;
         foreach (var f in all.Where(a => a.Ramps.Length > 0))

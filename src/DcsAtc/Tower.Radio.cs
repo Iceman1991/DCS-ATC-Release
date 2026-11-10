@@ -165,7 +165,7 @@ public partial class Tower
         bool rwNew = false;   // Runway request changed the runway (A46: re-plan under radar vectoring)
         sayTail = "";
         bool gwish = ground && intent is "taxi" or "startup" or "clearance" && Phase is Phase.Parked or Phase.StartupApproved or Phase.TaxiOut;
-        if (t != null && (gwish || !ground && intent is "inbound" or "straightin" or "runway" && Phase is Phase.Away or Phase.Departing or Phase.Inbound) && RwySlot(n) is { } ws && ws + RwySide(n) is var wr)
+        if (t != null && (gwish || !ground && intent is "inbound" or "straightin" or "runway" or "route" && Phase is Phase.Away or Phase.Departing or Phase.Inbound) && RwySlot(n) is { } ws && ws + RwySide(n) is var wr)
         {
             // "runway 30 left" -> 30L; without a (matching) side: the runway with that number, the active one first
             var we = F.Ends.FirstOrDefault(e => e.Name == wr) ?? F.Ends.Where(e => e.Name.StartsWith(ws)).OrderBy(e => e.Name != rw).FirstOrDefault();
@@ -387,7 +387,7 @@ public partial class Tower
             case "ready":
             {
                 if (F.Charted && dir != null && !F.Exit[rw].Contains(dir))   // K20: entry-only CRP is no exit of this runway on the chart
-                    return Neg($"{c}, negative, no departure via C R P {dir} from runway {RwSay(rw)}. Exit via C R P {string.Join(", ", F.Exit[rw])}, report ready for departure.");
+                    return Neg($"{c}, negative, no departure via {CrpSay(dir!)} from runway {RwSay(rw)}. Exit via {string.Join(", ", F.Exit[rw].Select(CrpSay))}, report ready for departure.");
                 exitDir = F.Charted ? dir ?? (exitDir != null && F.Exit[rw].Contains(exitDir) ? exitDir : F.Exit[rw][0]) : dir ?? exitDir;   // A92: without a map the named direction stays as the departure direction (no CRP)
                 if (Has(n, "unrestricted", "spiral", "tactical departure", "combat departure"))   // kept until the takeoff clearance (also while still taxiing)
                     (climbOut, climbFt) = (Has(n, "spiral", "tactical", "combat") ? "tactical" : "free", AltSlot(n) ?? 0);
@@ -661,8 +661,30 @@ public partial class Tower
                 return Say(no > 1 ? $"{c}, {pw}number {no}, follow the {Follow(lead!, rw)}, report base." : $"{c}, {pw}number one, report base.");
             }
 
+            case "route":   // charts.jsonc route on request: fixes with altitudes, then report the C R P "to" (handover to Tower like a C R P entry)
+            {
+                var ro = RouteOf(n)!;
+                if (!ro.Rwy.Contains(rw))
+                    return Neg($"{hdr}, negative, {CrpSay(ro.Name)} recovery is for runway {string.Join(" and ", ro.Rwy.Select(RwSay))}, runway {RwSay(rw)} in use.");
+                (arrRoute, routeAt, entry, Phase, vec, holding, crpAsked, crpWaved, Expected) = (ro, 0, ro.To, Phase.Inbound, null, false, false, false, false);
+                var p0 = ro.Pts[0];
+                var cross = string.Join(", ", ro.Pts.Where(p => p.Ft > 0).Select(p => $"{CrpSay(p.Fix)} {(p.Above ? "at or above" : "at")} {Alt(p.Ft)}"));
+                return Say($"{hdr}, {Qnh(t)}, cleared {CrpSay(ro.Name)} recovery runway {RwSay(rw)}, proceed direct {CrpSay(p0.Fix)}{SteerTo(t, (p0.X, p0.Z), CrpSay(p0.Fix))}" +
+                           $"{(cross != "" ? ", cross " + cross : "")}, report {CrpSay(ro.To)}.{TrafficNote(traffic, rw)}", "Approach");
+            }
+
+            case "fix":   // fix of the route reported: on to the next one
+            {
+                var r = Rt!;
+                routeAt = RouteFix(n) + 1;
+                (nav, navName) = routeAt < r.Pts.Length ? ((r.Pts[routeAt].X, r.Pts[routeAt].Z), CrpSay(r.Pts[routeAt].Fix)) : (Crp[r.To], CrpSay(r.To));
+                if (routeAt >= r.Pts.Length) arrRoute = null;
+                return Say($"{c}, roger, report {CrpSay(r.To)}.", "Approach");
+            }
+
             case "crp":
             {
+                arrRoute = null;
                 vec = null; crpAsked = crpWaved = false;   // new attempt to C R P: reporting obligation from the start
                 if (!F.Charted)   // without map: radar vectoring by terrain
                 {
@@ -677,21 +699,21 @@ public partial class Tower
                 if (!Allowed(rw).Contains(at))
                 {
                     entry = AssignEntry(t, rw, null);
-                    if (Phase == Phase.Entering && navName.StartsWith("C R P ")) (nav, navName) = (Crp[entry], $"C R P {entry}");   // K22
+                    if (Phase == Phase.Entering && F.Crp.Keys.Any(k => CrpSay(k) == navName)) (nav, navName) = (Crp[entry], CrpSay(entry!));   // K22
                     else Phase = Phase.Inbound;
-                    return Neg($"{c}, negative, C R P {at} is not available for runway {RwSay(rw)}. " +
-                               $"Enter via C R P {entry}{SteerTo(t, Crp[entry], $"C R P {entry}")}, report C R P {entry}.");
+                    return Neg($"{c}, negative, {CrpSay(at!)} is not available for runway {RwSay(rw)}. " +
+                               $"Enter via {CrpSay(entry!)}{SteerTo(t, Crp[entry], CrpSay(entry!))}, report {CrpSay(entry!)}.");
                 }
                 if (t != null && Dist(t.X, t.Z, Crp[at].X, Crp[at].Z) > 2.5 * NM)
                 {
                     entry = at;
-                    if (Phase == Phase.Entering && navName.StartsWith("C R P ")) (nav, navName) = (Crp[at], $"C R P {at}");   // K22: handed over early, stays with the Tower
+                    if (Phase == Phase.Entering && F.Crp.Keys.Any(k => CrpSay(k) == navName)) (nav, navName) = (Crp[at], CrpSay(at!));   // K22: handed over early, stays with the Tower
                     else Phase = Phase.Inbound;
-                    return Neg($"{c}, negative, you are {MilesTxt(Dist(t.X, t.Z, Crp[at].X, Crp[at].Z))} from C R P {at}. " +
-                               $"{Cap(Steer(t, Crp[at], $"C R P {at}"))}, report C R P {at}.");
+                    return Neg($"{c}, negative, you are {MilesTxt(Dist(t.X, t.Z, Crp[at].X, Crp[at].Z))} from {CrpSay(at!)}. " +
+                               $"{Cap(Steer(t, Crp[at], CrpSay(at!)))}, report {CrpSay(at!)}.");
                 }
                 entry = at;
-                if (holding) { holdFt = HoldFtAt(Crp[at]); holdArrived = false; lastHoldInfo = now; Phase = Phase.Inbound; nav = Crp[at]; navName = $"C R P {at}"; return Say($"{c}, hold at C R P {at}, {Alt(holdFt)}{HoldSpd(null)}, {OneOf("I will call you", "I will advise")}."); }
+                if (holding) { holdFt = HoldFtAt(Crp[at]); holdArrived = false; lastHoldInfo = now; Phase = Phase.Inbound; nav = Crp[at]; navName = CrpSay(at!); return Say($"{c}, hold at {CrpSay(at!)}, {Alt(holdFt)}{HoldSpd(null)}, {OneOf("I will call you", "I will advise")}."); }
                 return AtCrp(at);
             }
 
@@ -699,8 +721,8 @@ public partial class Tower
             {
                 Expected = false;
                 if (Phase == Phase.Entering && role == "Tower" && t != null && navName == "circle") return CircleJoin(t, traffic, hdr);   // R212
-                if (Phase == Phase.Entering && role == "Tower" && t != null && entry != null && navName == $"C R P {entry}")   // K22: handed over 2 minutes before the C R P
-                    return Say($"{hdr}, {Wind(t)}, {Qnh(t)}, report C R P {entry}." + TrafficNote(traffic, rw));
+                if (Phase == Phase.Entering && role == "Tower" && t != null && entry != null && navName == CrpSay(entry!))   // K22: handed over 2 minutes before the C R P
+                    return Say($"{hdr}, {Wind(t)}, {Qnh(t)}, report {CrpSay(entry!)}." + TrafficNote(traffic, rw));
                 if (Phase == Phase.Entering && role == "Tower" && t != null)   // First call after handover from Approach (also close to the airfield: continue as handed over)
                     return Say($"{hdr}, {Wind(t)}, {Qnh(t)}, " + (navName == "six mile final" ? "continue approach, report four mile final."
                                : $"{(lastAltFt >= 0 ? "" : AltTo(t, PatternFt) + ", ")}report {(navName == "overhead" ? "overhead" : $"initial runway {RwSay(rw)}")}.") + TrafficNote(traffic, rw));   // R256: altitude already instructed by Approach (lastAltFt), Tower does not repeat it
@@ -765,7 +787,7 @@ public partial class Tower
                 }
                 entry = AssignEntry(t, rw, dir); crpAsked = crpWaved = false;
                 Phase = Phase.Inbound;
-                return Say(info + $"Enter via C R P {entry}{SteerTo(t, Crp[entry], $"C R P {entry}")}, not above {Alt(MaxFt)}, report C R P {entry}.{TrafficNote(traffic, rw)}");
+                return Say(info + $"Enter via {CrpSay(entry!)}{SteerTo(t, Crp[entry], CrpSay(entry!))}, not above {Alt(MaxFt)}, report {CrpSay(entry!)}.{TrafficNote(traffic, rw)}");
             }
 
             case "runway":   // "request runway 31" (request checked above)
@@ -970,8 +992,10 @@ public partial class Tower
             if (Has(n, "initial")) return "initial";
             if (Has(n, "overhead")) return "overhead";
             if (Has(n, "downwind", "base", "break")) return "pattern";
+            if (!ground && RouteFix(n) >= 0) return "fix";   // charts.jsonc route: fix passed ("Gass Peak")
+            if (!ground && Rt == null && RouteOf(n) != null && Phase is Phase.Away or Phase.Departing or Phase.Inbound) return "route";   // "inbound via MINTT", "request MINTT recovery"
             if (Has(n, "crp", "c r p", "reporting point", "entry point") ||
-                (Phase == Phase.Inbound && Direction(n) != null && !Has(n, "inbound", "landing"))) return "crp";
+                ((Phase == Phase.Inbound || Phase == Phase.Entering && entry != null && navName == CrpSay(entry)) && Direction(n) != null && !Has(n, "inbound", "landing"))) return "crp";   // K22: named point ("Craig") also to the Tower
             if (req && RwySlot(n) != null && !Has(n, "inbound", "landing", "recovery", "full stop", "rejoin")) return "runway";   // before "approach" (call name)
             if (Has(n, "in sight", "looking", "negative contact", "no joy") && !Has(n, "field", "runway", "airport")) return "traffic";   // Reply to traffic advisory
             if (Has(n, "inbound", "landing", "recovery", "full stop", "rejoin")) return "inbound";
@@ -1014,7 +1038,7 @@ public partial class Tower
         "fieldinsight" => visAsk ? "Approach" : null,   // R115: only the requested visual report belongs to Approach, otherwise the station called acknowledges (on final the Tower)
         "centercheck" => "Center",
         "crp" when Phase == Phase.Entering => "Tower",   // K22: handed over 2 minutes before the point
-        "straightin" or "crp" or "airborne" or "ff" or "ffoff" or "leavezone" => "Approach",
+        "straightin" or "crp" or "airborne" or "ff" or "ffoff" or "leavezone" or "route" or "fix" => "Approach",
         "transit" => t != null && Dist(t.X, t.Z, CX, CZ) < 5 * NM ? "Tower" : "Approach",   // N3: without a station called (OnTranscript otherwise takes the one called)
         "transitoff" => transitBy,
         "inbound" when Phase == Phase.Inbound && vec != null && !holding => "Approach",   // under radar vectoring, also close to the field
@@ -1135,7 +1159,7 @@ public partial class Tower
             => ("Tower", $"{Miles(Approach(t.X, t.Z, Runway).along)} mile final, gear down, {option ?? "full stop"}"),   // R314: first call on the long final with distance ("9 mile final, gear down, full stop")
         Phase.Entering when towerDue || t != null && (navName == "six mile final" ? !OnFinalLoose(t, Runway) : nav is { } np && Dist(t.X, t.Z, np.X, np.Z) > 2.5 * NM)
             => ("Tower", "inbound"),   // handed over or still far away: first call to Tower instead of "negative, you are 8 miles from initial"
-        Phase.Entering when entry != null && navName == $"C R P {entry}" => ("Tower", "crp"),   // K22
+        Phase.Entering when entry != null && navName == CrpSay(entry!) => ("Tower", "crp"),   // K22
         Phase.Entering => ("Tower", navName switch { "overhead" => "overhead", "six mile final" => "four mile final, gear down", "high key" => "high key", "low key" => "low key, gear down", "circle" => "inbound", _ => "initial" }),   // R212: Circling: first call
         Phase.Initial => t == null || !OnFinalLoose(t, Runway) && Dist(t.X, t.Z, CX, CZ) < 5 * NM ? ("Tower", $"base, gear down, {option ?? "full stop"}") : null,   // on initial nothing (wait for break, "final" would give the landing clearance), then "base"
         Phase.Pattern => t == null || OnFinalLoose(t, Runway) ? ("Tower", option is "touch and go" or "low approach" or "low pass" or "the option" ? $"final, {option}" : "final, gear down, full stop")

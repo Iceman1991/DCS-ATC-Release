@@ -71,6 +71,9 @@ public partial class Tower
     string lastIntent = "";
     double lastAt = -999, callAt;   // lastAt: time of the last controller call (readback window), callAt: time of the current call (Tick/OnTranscript)
     string? exitDir, entry;
+    Airfield.Route? arrRoute; int routeAt;   // charts.jsonc route being flown, index of the next fix; only valid while entry is its "to" (Rt)
+    Airfield.Route? Rt => arrRoute != null && entry == arrRoute.To && Phase == Phase.Inbound ? arrRoute : null;
+    static string CrpSay(string k) => Airfield.Say(k);
     public static IReadOnlyList<Airfield> All = new List<Airfield>();   // all airfields (Program): destination of the en-route clearance
     Airfield? dest; bool depClr; double depFt;   // V14: route clearance (Clearance Delivery) -> departure vector
     string? climbOut; double climbFt;   // requested departure: "free" (unrestricted climb) / "tactical" (spiral climb overhead), climbFt = requested altitude, 0 = none

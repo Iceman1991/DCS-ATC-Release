@@ -2611,7 +2611,9 @@ Die Platzverfahren im Kaukasus (CRPs, Ein- und Ausflug je Bahn, Platzrundenhöhe
 
 - Ein Platz in `charts.jsonc` ersetzt den eingebauten Eintrag ganz. Plätze, die nicht drinstehen, behalten die eingebauten Verfahren.
 - Vorlage ist `charts\caucasus.jsonc` im DCS-ATC-Ordner, die eingebauten Daten aller Plätze mit Erklärungen. Am einfachsten kopierst du den Eintrag eines Platzes in deine `charts.jsonc` und änderst ihn dort. Die Vorlage selbst wird bei jedem Update überschrieben.
-- Platzname wie in DCS (`Kutaisi`, `Sochi-Adler`, `Senaki-Kolkhi`).
+- Platzname wie in DCS (`Kutaisi`, `Sochi-Adler`, `Senaki-Kolkhi`). Ein Name, der den DCS-Namen enthält oder in ihm steckt, geht auch, solange er genau einen Platz trifft (`Nellis AFB` für `Nellis`). Das DCS-ATC-Fenster zeigt, welchem DCS-Platz jeder Eintrag zugeordnet wurde, und nennt die Einträge, die nicht auf der aktuellen Karte liegen.
+- Meldepunkte in Kleinbuchstaben heißen CRP („report CRP north“). Schreibst du einen Punkt in Großbuchstaben (`CRAIG`, `GASS_PEAK`), sagt der Lotse stattdessen seinen Namen („report Craig“, „Gass Peak“). Der Unterstrich steht für ein Leerzeichen.
+- `"via"` ist `"overhead"` oder `"initial"`, `"hand"` ist `"left"` oder `"right"`. Alles andere, oder ein Ein- oder Ausflugpunkt, der in `"crp"` fehlt, macht die Datei fehlerhaft, und das DCS-ATC-Fenster nennt die Stelle.
 - Koordinaten wie auf der Karte gedruckt (`"42°15.924'N 042°30.086'E"`) oder als DCS-Koordinaten `[x, z]`. Kurse in Grad missweisend.
 - Gelesen wird die Datei bei jedem Missionsstart. Ist sie fehlerhaft, meldet das DCS-ATC-Fenster den Fehler, und es gelten die eingebauten Verfahren.
 - Gilt auf jeder Karte. Eingebaute Verfahren hat nur der Kaukasus, auf anderen Karten hat ein Platz nur welche, wenn er in `charts.jsonc` steht. Breite/Länge braucht dort die installierte Karte, weil DCS-ATC die Kartenprojektion aus ihren Funkfeuerdaten nimmt. DCS-Koordinaten `[x, z]` gehen immer.
@@ -2641,6 +2643,38 @@ Beispiel: Kutaisi mit Platzrunde 1500 ft und nur zwei CRPs.
 ```
 
 Ohne Abschnitt `ground` gibt es für den Platz keine Rollwegnamen und Warteplätze aus der Karte. Willst du sie behalten, kopiere `ground` aus der Vorlage mit.
+
+#### Anflugrouten (Recoveries)
+
+Eine Route ist eine Kette benannter Fixes, die an einem Meldepunkt endet, etwa die MINTT-Recovery auf Nellis Bahn 03 (MINTT, GASS PEAK, SIMNS, dann CRAIG an den Tower melden). Du forderst sie mit Namen an: „Nellis Approach, Enfield 1-1, inbound via MINTT“ oder „request MINTT recovery“. Eine Bahn kannst du dazusagen („inbound runway 03R via MINTT“).
+
+- Approach antwortet „cleared Mintt recovery runway zero three right, proceed direct Mintt, cross Mintt at or above 15000 feet, Gass Peak at or above 9000 feet, Simns at 5500 feet, report Craig.“ Du fliegst die Route wie auf der Karte.
+- Die Fixes darfst du melden („Gass Peak“), Approach antwortet „roger, report Craig“. Meldest du nicht, verfolgt Approach dich trotzdem von Fix zu Fix.
+- Etwa zwei Minuten vor dem letzten Punkt übergibt Approach an den Tower, wie bei jedem Meldepunkt. Dort meldest du den Punkt („Craig“) und bekommst Overhead oder Initial.
+- Eine Route gibt es nur auf Anfrage. Ohne sie bekommt ein „inbound“ wie bisher Radarführung.
+
+```jsonc
+"Nellis": {
+  "crp": { "CRAIG": "36°15.25'N 115°08.27'W" },
+  "rwy": {
+    "03L": { "hand": "left", "side": "northwest", "initial_nm": 3,
+             "entry": { "CRAIG": { "crs": 120, "via": "overhead" } }, "exit": { "CRAIG": { "crs": 300 } } },
+    "03R": { "hand": "right", "side": "southeast", "initial_nm": 3,
+             "entry": { "CRAIG": { "crs": 120, "via": "overhead" } }, "exit": { "CRAIG": { "crs": 300 } } }
+  },
+  "routes": {
+    "MINTT": { "rwy": ["03L", "03R"], "to": "CRAIG", "pts": [
+      { "fix": "MINTT",     "pos": "36°42.74'N 115°06.29'W", "above": 15000 },
+      { "fix": "GASS_PEAK", "pos": "36°24.14'N 115°10.66'W", "above": 9000 },
+      { "fix": "SIMNS",     "pos": "36°17.34'N 115°10.75'W", "at": 5500 } ] }
+  }
+}
+```
+
+- `"rwy"`: die Bahnen, für die die Route gilt. Fragst du sie an, während eine andere Bahn in Betrieb ist, nennt Approach die passenden Bahnen.
+- `"to"`: der Meldepunkt am Ende. Er muss für jede dieser Bahnen ein `entry` sein.
+- `"pts"`: die Fixes der Reihe nach. `"above"` = in oder über, `"at"` = in dieser Höhe in Fuß. Beides darf fehlen.
+- Abflugrouten gibt es noch nicht.
 
 ### Kneeboard-Seiten
 

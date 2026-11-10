@@ -2609,7 +2609,9 @@ The Caucasus airfield procedures (CRPs, entry and exit per runway, pattern altit
 
 - An airfield in `charts.jsonc` replaces the built-in entry completely. Airfields not in the file keep the built-in procedures.
 - The template is `charts\caucasus.jsonc` in the DCS-ATC folder: the built-in data of all airfields with explanations. The easiest way is to copy one airfield's entry into your `charts.jsonc` and change it there. The template itself is overwritten by every update.
-- Airfield names as in DCS (`Kutaisi`, `Sochi-Adler`, `Senaki-Kolkhi`).
+- Airfield names as in DCS (`Kutaisi`, `Sochi-Adler`, `Senaki-Kolkhi`). A name that only contains the DCS name or is part of it also works, as long as it fits exactly one airfield (`Nellis AFB` for `Nellis`). The DCS-ATC window shows which DCS airfield each entry went to, and lists the entries that are not on the current map.
+- Reporting points in lower case are called CRPs ("report CRP north"). Write a point in capitals (`CRAIG`, `GASS_PEAK`) and the controller says its name instead ("report Craig", "Gass Peak"). The underscore stands for a space.
+- `"via"` is `"overhead"` or `"initial"`, `"hand"` is `"left"` or `"right"`. Anything else, or an entry or exit point missing from `"crp"`, makes the file faulty, and the DCS-ATC window names the place.
 - Coordinates as printed on the chart (`"42°15.924'N 042°30.086'E"`) or as DCS coordinates `[x, z]`. Courses in degrees magnetic.
 - The file is read at every mission start. If it is faulty, the DCS-ATC window shows the error and the built-in procedures apply.
 - Works on every map. Only the Caucasus has procedures built in; on other maps an airfield has them only if it is in `charts.jsonc`. Latitude/longitude there needs the map installed, because DCS-ATC takes the map projection from its beacon data. DCS coordinates `[x, z]` always work.
@@ -2639,6 +2641,38 @@ Example: Kutaisi with a 1500 ft pattern and only two CRPs.
 ```
 
 Without a `ground` section the airfield has no taxiway names and holding points from the chart. To keep them, copy `ground` from the template as well.
+
+#### Arrival routes (recoveries)
+
+A route is a chain of named fixes that ends at a reporting point, like the MINTT recovery to Nellis runway 03 (MINTT, GASS PEAK, SIMNS, then report CRAIG to the tower). You ask for it by name: "Nellis Approach, Enfield 1-1, inbound via MINTT" or "request MINTT recovery". You can add a runway ("inbound runway 03R via MINTT").
+
+- Approach answers "cleared Mintt recovery runway zero three right, proceed direct Mintt, cross Mintt at or above 15000 feet, Gass Peak at or above 9000 feet, Simns at 5500 feet, report Craig." You fly the route as on the chart.
+- You may report the fixes ("Gass Peak"); Approach answers "roger, report Craig". If you don't, Approach follows you from fix to fix by itself.
+- About two minutes before the last point Approach hands you to the tower, as with every reporting point. There you report the point ("Craig") and get the overhead or initial.
+- A route only exists on request. Without one, an inbound call gets radar vectors as before.
+
+```jsonc
+"Nellis": {
+  "crp": { "CRAIG": "36°15.25'N 115°08.27'W" },
+  "rwy": {
+    "03L": { "hand": "left", "side": "northwest", "initial_nm": 3,
+             "entry": { "CRAIG": { "crs": 120, "via": "overhead" } }, "exit": { "CRAIG": { "crs": 300 } } },
+    "03R": { "hand": "right", "side": "southeast", "initial_nm": 3,
+             "entry": { "CRAIG": { "crs": 120, "via": "overhead" } }, "exit": { "CRAIG": { "crs": 300 } } }
+  },
+  "routes": {
+    "MINTT": { "rwy": ["03L", "03R"], "to": "CRAIG", "pts": [
+      { "fix": "MINTT",     "pos": "36°42.74'N 115°06.29'W", "above": 15000 },
+      { "fix": "GASS_PEAK", "pos": "36°24.14'N 115°10.66'W", "above": 9000 },
+      { "fix": "SIMNS",     "pos": "36°17.34'N 115°10.75'W", "at": 5500 } ] }
+  }
+}
+```
+
+- `"rwy"`: the runways the route serves. Asked for with another runway in use, Approach says which runways it is for.
+- `"to"`: the reporting point at the end. It has to be an `entry` of each of these runways.
+- `"pts"`: the fixes in order. `"above"` = at or above, `"at"` = at that altitude in feet. Both can be left out.
+- Departure routes don't exist yet.
 
 ### Kneeboard pages
 

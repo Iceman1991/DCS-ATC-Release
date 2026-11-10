@@ -70,6 +70,11 @@ public class Airfield
     public HashSet<string> Backtrack = new();                                  // Runways whose holding point leads only to the middle: backtrack on the runway
     public List<string> Notes = new();                                         // Airfield notes (English) from the chart
     public Dictionary<string, string> StandChart = new();                      // DCS stand (Term_Index) -> stand name on the chart, only where unambiguous
+    public record Route(string Name, string[] Rwy, string To, (string Fix, double X, double Z, double Ft, bool Above)[] Pts);
+    public Dictionary<string, Route> Routes = new();                           // Forum (Lt_Jaeger): named arrival chains (charts.jsonc "routes"), after the last point the CRP "to" = handover to Tower
+    /// Chart point written in capitals ("CRAIG", "GASS_PEAK") = named fix, said by its name ("Gass Peak"); otherwise "C R P north".
+    public static string Say(string k) => k.Any(char.IsLower) || !k.Any(char.IsLetter) ? "C R P " + k.Replace('_', ' ')
+        : string.Join(' ', k.Replace('_', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w => w[0] + w[1..].ToLowerInvariant()));
     double? ctrTopFt;
     public List<(double X, double Z, int Num, int Type)> Spots = new();   // Parking positions from DCS (Airbase:getParking): Term_Index, Term_Type (16 runway, 40 helicopter)
     public bool Charted => Crp.Count > 0;     // procedures per DCS kneeboard chart (charts/caucasus.jsonc)
@@ -266,6 +271,7 @@ public class Airfield
     static JsonDocument? chart;
     internal static string? ChartFile;   // --charttest <file>
     internal static JsonElement? OwnChart;   // forum 0.15: charts.jsonc in the DCS-ATC folder, an airfield in there replaces the built-in entry (own procedures)
+    internal static Dictionary<string, string> OwnAlias = new();   // #28: DCS name -> charts.jsonc name ("Nellis AFB" for DCS "Nellis"), Program.ChartAlias
     internal static readonly JsonDocumentOptions ChartOpts = new() { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
     internal static JsonElement Chart => (chart ??= JsonDocument.Parse(ChartFile != null ? File.OpenRead(ChartFile) : typeof(Airfield).Assembly.GetManifestResourceStream("caucasus.jsonc")!,
         ChartOpts)).RootElement;
@@ -274,7 +280,7 @@ public class Airfield
     public Airfield ApplyChart()
     {
         JsonElement a = default;
-        if (OwnChart?.TryGetProperty(Name, out a) != true && (Theatre != "Caucasus" || !Chart.TryGetProperty(Name, out a))) return this;
+        if (OwnChart?.TryGetProperty(OwnAlias.GetValueOrDefault(Name, Name), out a) != true && (Theatre != "Caucasus" || !Chart.TryGetProperty(Name, out a))) return this;
         static Dictionary<string, string> Strs(JsonElement e, string key) =>
             e.TryGetProperty(key, out var v) ? v.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString()!) : new();
         if (a.TryGetProperty("pattern_ft", out var p)) PatternFt = p.GetDouble();
@@ -286,17 +292,36 @@ public class Airfield
         if (a.TryGetProperty("rwy", out var rwy))
             foreach (var r in rwy.EnumerateObject())
             {
-                if (r.Value.TryGetProperty("hand", out var h)) HandOf[r.Name] = h.GetString() + " hand";
+                if (r.Value.TryGetProperty("hand", out var h)) HandOf[r.Name] = h.GetString() is "left" or "right" ? h.GetString() + " hand" : throw new FormatException($"{Name} {r.Name}: \"hand\": \"{h.GetString()}\" (left or right)");
                 if (r.Value.TryGetProperty("side", out var sd)) SideOf[r.Name] = sd.GetString()!;
                 if (r.Value.TryGetProperty("initial_nm", out var ini)) InitialNm[r.Name] = ini.GetDouble();
                 if (r.Value.TryGetProperty("backtrack", out var bt) && bt.GetBoolean()) Backtrack.Add(r.Name);
                 if (r.Value.TryGetProperty("entry", out var en))
-                    Entry[r.Name] = en.EnumerateObject().Select(e => (e.Name, e.Value.GetProperty("via").GetString()!, e.Value.TryGetProperty("wp", out var wp) ? Pos(wp) : ((double X, double Z)?)null)).ToList();
+                    Entry[r.Name] = en.EnumerateObject().Select(e => (e.Name, e.Value.GetProperty("via").GetString() is var v && v is "overhead" or "initial" ? v!
+                        : throw new FormatException($"{Name} {r.Name} entry {e.Name}: \"via\": \"{v}\" (overhead or initial)"),
+                        e.Value.TryGetProperty("wp", out var wp) ? Pos(wp) : ((double X, double Z)?)null)).ToList();
                 if (r.Value.TryGetProperty("exit", out var ex))
                 {
                     Exit[r.Name] = ex.EnumerateObject().Select(e => e.Name).ToList();
                     foreach (var e in ex.EnumerateObject()) if (e.Value.TryGetProperty("note", out var nn)) ExitNote[(r.Name, e.Name)] = nn.GetString()!;
                 }
+            }
+        if (Entry.Values.SelectMany(e => e.Select(x => x.Crp)).Concat(Exit.Values.SelectMany(x => x)).FirstOrDefault(k => !Crp.ContainsKey(k)) is { } miss)
+            throw new FormatException($"{Name}: entry/exit \"{miss}\" is not in \"crp\"");
+        if (a.TryGetProperty("routes", out var rts))
+            foreach (var r in rts.EnumerateObject())
+            {
+                var (to, rws) = (r.Value.GetProperty("to").GetString()!, r.Value.GetProperty("rwy").EnumerateArray().Select(v => v.GetString()!).ToArray());
+                var pts = r.Value.GetProperty("pts").EnumerateArray().Select(p =>
+                {
+                    var (x, z) = Pos(p.GetProperty("pos"));
+                    bool above = p.TryGetProperty("above", out var ab);
+                    return (p.GetProperty("fix").GetString()!, x, z, above ? ab.GetDouble() : p.TryGetProperty("at", out var at) ? at.GetDouble() : 0, above);
+                }).ToArray();
+                if (pts.Length == 0) throw new FormatException($"{Name} route {r.Name}: \"pts\" is empty");
+                if (rws.FirstOrDefault(rw => !(Entry.TryGetValue(rw, out var en) && en.Any(e => e.Crp == to))) is { } bad)
+                    throw new FormatException($"{Name} route {r.Name}: \"to\": \"{to}\" is no entry of runway {bad}");
+                Routes[r.Name] = new(r.Name, rws, to, pts);
             }
         if (a.TryGetProperty("ground", out var g) && g.TryGetProperty("holds", out var holds))
             foreach (var h in holds.EnumerateObject()) { var (x, z) = Pos(h.Value.GetProperty("pos")); Holds[h.Name] = (x, z, h.Value.GetProperty("rwy").EnumerateArray().Select(v => v.GetString()!).ToArray()); }

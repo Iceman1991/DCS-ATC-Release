@@ -91,9 +91,9 @@ public partial class Tower
             return $"{c}, after departure own navigation, not above {Alt(MaxFt)} until leaving the control zone, {clr}";
         }
         nav = Crp[exitDir];
-        navName = $"C R P {exitDir}";
+        navName = CrpSay(exitDir!);
         var xn = F.ExitNote.TryGetValue((Runway, exitDir), out var note) ? ", " + SayChart(note) : "";   // K24: hint of the chart ("then 354 to the C R P")
-        return $"{c}, after departure exit via C R P {exitDir}{xn}, not above {Alt(MaxFt)} until leaving the control zone, {clr}";
+        return $"{c}, after departure exit via {CrpSay(exitDir!)}{xn}, not above {Alt(MaxFt)} until leaving the control zone, {clr}";
     }
 
     /// Takeoff clearance, otherwise wait: emergency / landing traffic up to 4 NM -> hold short, runway occupied -> line up and wait (only behind a rolling aircraft with no approach traffic within 6 NM, A10),

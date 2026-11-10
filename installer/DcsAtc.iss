@@ -1,5 +1,5 @@
 ﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe
-#define AppVer "0.20.1-alpha"
+#define AppVer "0.20.2-alpha"
 #define Src ".."
 
 [Setup]
