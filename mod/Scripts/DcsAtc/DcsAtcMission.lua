@@ -1217,7 +1217,8 @@ local function start()
             local types = GC[side] or GC[2]
             if not c and spd < 0.5 then
               local atSpot = false
-              for _, s in ipairs(f.spots) do if d2(s, pos.p) < 30 ^ 2 then atSpot = true break end end
+              -- #26: Term_Type 16 = spawn point on the runway (takeoff from runway), no crew there: the soldiers stood in front of the wing
+              for _, s in ipairs(f.spots) do if s.t ~= 16 and d2(s, pos.p) < 30 ^ 2 then atSpot = true break end end
               still[name] = atSpot and (still[name] or now) or nil
               if atSpot and now - still[name] >= 10 then   -- 10 s standstill: parked, not just briefly stopped
                 still[name] = nil

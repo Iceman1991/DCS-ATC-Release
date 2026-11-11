@@ -358,7 +358,7 @@ static partial class Program
             {
                 tx.Aired?.Invoke();
                 if (!info) lock (RadioLog) { RadioLog.Add((Clock, label.TrimStart('>', ' ').TrimEnd(' ', ':'), text, tx.Gid, tx.Pilot)); if (RadioLog.Count > 30) RadioLog.RemoveAt(0); }   // FI7 map
-                if (tx.Gid < 0 || !Cfg.RadioText && !info && freq != 0) return;   // #6: RadioText off = speech only
+                if (tx.Gid < 0 || !Cfg.RadioText && !info && freq != 0 || info && !Cfg.HintText) return;   // #6: RadioText off = speech only; #27: HintText off = notes only in the log
                 var dur = ShowSec(tx, label);
                 foreach (var gid in ShowTo(tx.Gid, info ? 0 : freq, freq2, tx.Side))
                     try

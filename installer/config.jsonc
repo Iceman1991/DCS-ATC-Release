@@ -58,6 +58,7 @@
 
   "RadioFx": true,   // Funkklang: Bandpass, leises Rauschen, Squelch am Ende
   "RadioText": true,   // Funksprüche auch als Text im Spiel; false = nur Stimme (Hinweise bleiben Text)
+  "HintText": true,   // Hinweise von DCS-ATC als Text im Spiel (Fehler, Landebewertung, Verstöße, "ATC: jetzt ..."); false = nur in atc-log.txt und im Debriefing (VR ohne Texte im Bild)
   "Volume": 0.6,     // Lautstärke der Lotsen in SRS (0–1), zu laut/schmerzhaft -> kleiner
   "AiFlightComms": "voll",   // KI-Flights im Funk (Fox, Splash, Defending, Bingo …): voll / taktisch / aus
   "AiFollowAwacs": true,   // KI-Jäger fliegen die Gruppe an, die ihnen das AWACS zuweist, das AWACS weicht Bedrohungen aus; false: KI fliegt die Mission, der Funk folgt ihr

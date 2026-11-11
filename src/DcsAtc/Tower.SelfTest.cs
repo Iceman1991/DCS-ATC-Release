@@ -827,6 +827,12 @@ public partial class Tower
             Check(trC.Count == 1 && trC[0].Role == "Center" && trC[0].Contains("traffic, "), "Center A2: Verkehrshinweis als Center: " + string.Join(" | ", trC.Select(m => $"{m.Role}: {m.Text}")));
             var drC = dpC.OnTranscript("Los Angeles Center, Enfield 11, request direct Senaki", posC, none, 55);
             Check(drC.Count == 1 && drC[0].Role == "Center" && drC[0].Contains("cleared direct Senaki"), "Center A4: request direct: " + string.Join(" | ", drC.Select(m => $"{m.Role}: {m.Text}")));
+            // #29 (log): "Tbilisi Control, Hornet 1-1. Request direct. Batumi." was cleared direct Krasnodar-Center
+            var all29 = All;
+            All = All.Prepend(new Airfield { Name = "Krasnodar-Center", X = CX - 200 * NM, Z = CZ }).ToList();
+            var d29 = CenC().OnTranscript("Center: Los Angeles Center, Enfield 11. Request direct. Batumi.", posC, none, 56).Concat(CenC().OnTranscript("Center: Request direct Batumi.", posC, none, 56)).ToList();
+            All = all29;
+            Check(d29.Count == 2 && d29.All(m => m.Contains("cleared direct Batumi")), "#29 Center: request direct Batumi: " + string.Join(" | ", d29.Select(m => m.Text)));
             var lvC = dpC.OnTranscript("Los Angeles Center, Enfield 11, leaving frequency", posC, none, 60);
             Check(lvC.Count == 1 && lvC[0].Contains("radar service terminated") && lvC[0].Contains("frequency change approved") && !dpC.Center && !dpC.Following, "Center A4: leaving frequency: " + string.Join(" | ", lvC.Select(m => m.Text)));
             var bt = All[1]; double bux = CX - bt.X, buz = CZ - bt.Z, bul = Math.Sqrt(bux * bux + buz * buz);

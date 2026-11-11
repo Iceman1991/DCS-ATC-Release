@@ -25,7 +25,8 @@ static partial class Program
     /// ("Nellis AFB" = "Nellis"). Result DCS name -> charts.jsonc name; notes: renamed, ambiguous, not on this map (for the log).
     internal static Dictionary<string, string> ChartAlias(IEnumerable<string> keys, IEnumerable<string> names, List<string> notes)
     {
-        static string N(string s) => Regex.Replace(s.ToLowerInvariant(), "[^a-z0-9]", "");
+        // #28 (log): "Buechel AB" is the DCS airfield "Buchel": ü/ue, ö/oe, ä/ae and ß/ss count as u, o, a, s on both sides
+        static string N(string s) => Regex.Replace(Regex.Replace(s.ToLowerInvariant().Replace("ü", "u").Replace("ö", "o").Replace("ä", "a").Replace("ß", "s"), "([uoa])e", "$1").Replace("ss", "s"), "[^a-z0-9]", "");
         var (map, all, off) = (new Dictionary<string, string>(), names.Distinct().ToList(), new List<string>());
         foreach (var k in keys)
         {
@@ -135,7 +136,8 @@ static partial class Program
     internal static List<string> ApplyFreqs(List<Airfield> fields, Dictionary<string, JsonElement>? cfg)
     {
         var bad = new List<string>();
-        static string N(string s) => Regex.Replace(s.ToLowerInvariant(), "[^a-z0-9]", "");
+        // #28 (log): "Buechel AB" is the DCS airfield "Buchel": ü/ue, ö/oe, ä/ae and ß/ss count as u, o, a, s on both sides
+        static string N(string s) => Regex.Replace(Regex.Replace(s.ToLowerInvariant().Replace("ü", "u").Replace("ö", "o").Replace("ä", "a").Replace("ß", "s"), "([uoa])e", "$1").Replace("ss", "s"), "[^a-z0-9]", "");
         foreach (var f in fields) f.Own.Clear();
         Carrier.StationFreqs.Clear();
         OwnSectors = new();

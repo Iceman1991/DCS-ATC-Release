@@ -2775,6 +2775,7 @@ Pick the page on the left: General, Voices, Radio & traffic, AWACS, Frequencies,
 | **Pause between calls** | 0–5 s | `ReplyPause` |
 | **Radio effect (noise, squelch)** | on/off | `RadioFx` |
 | **Radio calls also as text in the game** | on/off | `RadioText` |
+| **Notes from DCS-ATC as text in the game** | on/off. Off: hints, error notes, landing grade and deviations no longer appear on screen (for VR without text in view). They stay in `atc-log.txt` and in the debriefing. | `HintText` |
 | **Pilot voice (speaks your wheel requests)** | Pick a voice or *off*. Off sets the pilot voice to empty. | `PilotVoice` |
 | **AWACS picture as bullseye (instead of BRAA)** | on/off | `AwacsBullseye` |
 | **AWACS calls new groups within** | 40–200 NM | `AwacsNewGroupNm` |
@@ -2872,6 +2873,7 @@ Own frequencies per airfield and controller are not in `config.jsonc` but in the
 | `PilotVoice` | `"en_US-joe-medium"` | Speaks your wheel and F10 requests before the answer. `""` = off. |
 | `RadioFx` | `true` | Radio sound: band-pass, light noise, squelch tail. |
 | `RadioText` | `true` | Radio calls also as DCS text on screen. `false` = speech only. |
+| `HintText` | `true` | Notes from DCS-ATC (hints, errors, landing grade, deviations) as DCS text on screen. `false` = only in `atc-log.txt` and the debriefing. |
 | `Volume` | `0.6` | Controller volume in SRS (0–1). |
 | `SpeechRate` | `0.85` | Speech pace: 1 = Piper standard, smaller = faster. |
 | `ReplyPause` | `1.5` | Seconds between two calls on the same frequency. |

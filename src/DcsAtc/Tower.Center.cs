@@ -71,7 +71,9 @@ public partial class Tower
     public static bool IsCenterCall(string text) =>
         Regex.IsMatch(Regex.Replace(text.ToLowerInvariant(), "[^a-z ]", " "), $@"^(?:(?!contact\b)\w+\W+){{0,3}}(?:{CenterRx}|cent(?:er|re)\b(?!\W+(?:ground|tower|approach|departure|radar)\b))");
     /// Text without Center names ("Tbilisi Control, request direct Batumi": Tbilisi is not a destination).
-    internal static string NoCenter(string n) => Regex.Replace(n, $@"\b(?:{CenterRx})\b", " ");
+    /// Without the Center's name and without the "center" a call on the Center frequency starts with ("Center: request direct Batumi"):
+    /// #29 that word alone was taken for the airfield Krasnodar-Center.
+    internal static string NoCenter(string n) => Regex.Replace(n, $@"^\s*center\b|\b(?:{CenterRx})\b", " ");
     static string CenterRx => string.Join("|", new[] { CenterName(1), CenterName(2) }.Concat(CenterSectors.Where(s => !s.Gci).Select(s => s.Name)).Where(s => !string.IsNullOrEmpty(s)).Select(s => Regex.Escape(s!.ToLowerInvariant())).Distinct().DefaultIfEmpty("(?!)"));
 
     string? cenName; double cenFreq; Airfield? cenTo; bool ffIn;   // Center service: name/frequency (sector at check-in), destination named by the pilot; ffIn = flight following started at the field

@@ -370,9 +370,11 @@ static partial class Program
             var al = ChartAlias(new[] { "Nellis AFB", "Tonopah Test Range", "Buechel AB" }, new[] { "Nellis", "North Las Vegas", "Tonopah", "Tonopah Test Range", "Creech" }, notes);
             File.WriteAllText(ownF, "{ \"Banias\": { \"crp\": { \"n\": [1, 2] }, \"rwy\": { \"09\": { \"entry\": { \"n\": { \"crs\": 90, \"via\": \"inital\" } } } } } }");
             var typo = OwnChart(ownF);
-            if (al.Count != 2 || al.GetValueOrDefault("Nellis") != "Nellis AFB" || al.GetValueOrDefault("Tonopah Test Range") != "Tonopah Test Range" || !notes.Any(x => x.Contains("Buechel AB")) || typo != null)
-                throw new Exception($"charts.jsonc Namen/Prüfung: {string.Join(", ", al)} | {string.Join(" | ", notes)} | {typo != null}");
-            Console.WriteLine("OK   charts.jsonc: \"Nellis AFB\" = DCS \"Nellis\", fremde Karten gemeldet, Tippfehler in \"via\" erkannt");
+            var de = ChartAlias(new[] { "Buechel AB", "Nörvenich", "Fassberg" }, new[] { "Buchel", "Norvenich", "Faßberg", "Bruggen" }, new());
+            if (al.Count != 2 || al.GetValueOrDefault("Nellis") != "Nellis AFB" || al.GetValueOrDefault("Tonopah Test Range") != "Tonopah Test Range" || !notes.Any(x => x.Contains("Buechel AB")) || typo != null
+                || de.Count != 3 || de.GetValueOrDefault("Buchel") != "Buechel AB" || de.GetValueOrDefault("Norvenich") != "Nörvenich" || de.GetValueOrDefault("Faßberg") != "Fassberg")
+                throw new Exception($"charts.jsonc Namen/Prüfung: {string.Join(", ", al)} | {string.Join(" | ", notes)} | {typo != null} | {string.Join(", ", de)}");
+            Console.WriteLine("OK   charts.jsonc: \"Nellis AFB\" = DCS \"Nellis\", \"Buechel AB\" = DCS \"Buchel\", fremde Karten gemeldet, Tippfehler in \"via\" erkannt");
             // Forum (Lt_Jaeger): one route name with a variant per runway ("STRYK": [ {...}, {...} ])
             File.WriteAllText(ownF, """
                 { "Banias": { "land_rwy": "27", "dep_rwy": "09", "crp": { "north": [1, 2], "APEX": [3, 4] }, "rwy": { "09": { "entry": { "north": { "via": "overhead" } } }, "27": { "entry": { "APEX": { "via": "initial" } } } },

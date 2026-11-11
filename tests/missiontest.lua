@@ -59,6 +59,7 @@ abSilent = {}
 local function airbase(name, id, x, z)
   local spots = {}
   for i = 1, 6 do spots[i] = { vTerminalPos = vec(x, z + (i - 1) * 50), Term_Index = i, Term_Type = (i == 6) and 104 or 72 } end
+  spots[7] = { vTerminalPos = vec(x + 1500, z), Term_Index = 7, Term_Type = 16 }   -- #26: spawn point on the runway
   return { getName = function() return name end, getID = function() return id end, getPoint = function() return vec(x, z) end,
            getDesc = function() return { category = 0 } end, getRunways = function() return {} end, getCoalition = function() return 2 end,
            getParking = function() return spots end, setRadioSilentMode = function(_, s) abSilent[name] = s end }
@@ -190,6 +191,7 @@ assert(DCSATC, "DCSATC fehlt")
 
 -- Player stands on Kutaisi parking spot 1 (player slot, taboo for AI)
 local p1 = plane("P1", 0, 0, "Player1")
+plane("RwyStart", 1500, 0)   -- #26: stands on the runway spawn point, gets no ground crew (the count below stays 1)
 assert(cvSilent == nil); run(18); assert(cvSilent == true, "DCS-ATC des Trägers nicht stumm"); assert(#find("ATC GC") == 1 and has("C;P1;crew"), "Crew P1 fehlt: GC=" .. #find("ATC GC") .. " ev=" .. table.concat(events, ","))
 
 assert(#find("ATC Senaki ARR") == 2, "Startanflüge Senaki: " .. #find("ATC Senaki ARR"))

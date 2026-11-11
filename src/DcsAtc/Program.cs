@@ -38,7 +38,8 @@ public class Config
     };
     public string PilotVoice { get; set; } = "en_US-joe-medium";   // speaks your menu/wheel requests, "" = off
     public bool RadioFx { get; set; } = true;          // Radio sound: bandpass, noise, squelch
-    public bool RadioText { get; set; } = true;        // #6 (issue): radio calls also as DCS text on screen; false = speech only (notes and calls without SRS unit ID stay text)
+    public bool HintText { get; set; } = true;         // #27: notes of DCS-ATC (hints, errors, landing grade, deviations, "ATC: now ...") as text in the game; false = only in atc-log.txt and the debriefing
+    public bool RadioText { get; set; } = true;       // #6 (issue): radio calls also as DCS text on screen; false = speech only (notes and calls without SRS unit ID stay text)
     public double Volume { get; set; } = 0.6;          // controller volume in SRS (0–1)
     public string RunwayLights { get; set; } = "silent";   // runway lighting via the DCS-ATC menu: silent (airfield stays mute), dcs (DCS controller audible 15 s), off
     public string AltimeterUnit { get; set; } = "auto";   // altimeter setting on the radio: auto (by own type: western inHg/altimeter, otherwise hPa/QNH; ATIS both), hpa, inhg
@@ -776,10 +777,12 @@ static partial class Program
     }
 
     /// Buttons (bitmask) and coolie hat (hundredths of a degree, 0 = front, 65535 = center) of a joystick.
-    public static (int Buttons, int Pov) Joy(int id)
+    public static (int Buttons, int Pov) Joy(int id) => JoyState(id) ?? (0, 65535);
+    /// null = the device did not answer (not ready yet, unplugged): not the same as "no button pressed".
+    public static (int Buttons, int Pov)? JoyState(int id)
     {
         var j = new JOYINFOEX { dwSize = Marshal.SizeOf<JOYINFOEX>(), dwFlags = 0x80 | 0x40 };   // JOY_RETURNBUTTONS | JOY_RETURNPOV
-        return joyGetPosEx(id, ref j) == 0 ? (j.dwButtons, j.dwPOV) : (0, 65535);
+        return joyGetPosEx(id, ref j) == 0 ? (j.dwButtons, j.dwPOV) : null;
     }
 
     static bool PttDown() =>
@@ -863,6 +866,7 @@ static partial class Program
         Cfg = old;
         (Cfg.MyCallsign, Cfg.Volume, Cfg.SpeechRate, Cfg.ReplyPause, Cfg.RadioFx, Cfg.RadioText, Cfg.PilotVoice, Cfg.AiChatter, Cfg.AiFlightComms, Cfg.Atis, Cfg.AltimeterUnit, Cfg.WheelInGame, Cfg.AirspaceWatch, Cfg.RunwayLights, Cfg.CallsignFromUnit) =   // R392: RunwayLights is read per call (line ~995), applies immediately
             (n.MyCallsign, n.Volume, n.SpeechRate, n.ReplyPause, n.RadioFx, n.RadioText, n.PilotVoice, n.AiChatter, n.AiFlightComms, n.Atis, n.AltimeterUnit, n.WheelInGame, n.AirspaceWatch, n.RunwayLights, n.CallsignFromUnit);
+        Cfg.HintText = n.HintText;
         (Cfg.IffCheck, Cfg.StationPositions) = (n.IffCheck, n.StationPositions);   // Tower.IffCheck is set by LoadConfig, StationPositions is read per transmission
         (Cfg.RandomNotams, Cfg.Notams) = (n.RandomNotams, n.Notams);
         SetNotams();
