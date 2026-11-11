@@ -1,4 +1,4 @@
-DCS-ATC 0.21.0 ALPHA – sprechende Flugsicherung für DCS World (alle Karten, getestet im Kaukasus)
+DCS-ATC 0.21.1 ALPHA – sprechende Flugsicherung für DCS World (alle Karten, getestet im Kaukasus)
 =====================================================================
 
 !! ALPHA-VERSION !!
@@ -109,6 +109,9 @@ Bekannte Grenzen
   - Genaue An- und Abflugverfahren nur für Kutaisi; alle anderen Plätze generisch (Bahnen, Höhe, Gelände aus DCS).
   - Mehrspieler nur, wenn du die Mission hostest.
   - Die Spracherkennung versteht nicht alles – im Zweifel Funkrad oder F10-Menü.
+
+Unterstützen
+  DCS-ATC ist kostenlos und bleibt es. Wer es trotzdem unterstützen möchte: https://ko-fi.com/christianwagner
 
 Lizenzen
   DCS-ATC: GNU GPL 3.0 (LICENSE.txt), Quellcode: https://github.com/Iceman1991/DCS-ATC-Release

@@ -4313,6 +4313,17 @@ static partial class Program
             if (al.Count != 2 || al.GetValueOrDefault("Nellis") != "Nellis AFB" || al.GetValueOrDefault("Tonopah Test Range") != "Tonopah Test Range" || !notes.Any(x => x.Contains("Buechel AB")) || typo != null)
                 throw new Exception($"charts.jsonc Namen/Prüfung: {string.Join(", ", al)} | {string.Join(" | ", notes)} | {typo != null}");
             Console.WriteLine("OK   charts.jsonc: \"Nellis AFB\" = DCS \"Nellis\", fremde Karten gemeldet, Tippfehler in \"via\" erkannt");
+            // Forum (Lt_Jaeger): one route name with a variant per runway ("STRYK": [ {...}, {...} ])
+            File.WriteAllText(ownF, """
+                { "Banias": { "crp": { "north": [1, 2], "APEX": [3, 4] }, "rwy": { "09": { "entry": { "north": { "via": "overhead" } } }, "27": { "entry": { "APEX": { "via": "initial" } } } },
+                  "routes": { "STRYK": [ { "rwy": ["09"], "to": "north", "pts": [ { "fix": "STRYK", "pos": [5, 6], "above": 9500 } ] },
+                                         { "rwy": ["27"], "to": "APEX", "pts": [ { "fix": "STRYK", "pos": [5, 6] }, { "fix": "GASS_PEAK", "pos": [7, 8], "above": 8500 } ] } ] } } }
+                """);
+            Airfield.OwnChart = OwnChart(ownF);
+            var st = Airfield.FromDcs("Banias", 22735.7, 5935.4, 8, rw).ApplyChart().Routes.Values.Where(r => r.Name == "STRYK").ToList();
+            if (st.Count != 2 || st[0].Rwy[0] != "09" || st[0].To != "north" || st[1].Rwy[0] != "27" || st[1].To != "APEX" || st[1].Pts.Length != 2)
+                throw new Exception($"charts.jsonc Routenvarianten: {string.Join(" | ", st.Select(r => $"{r.Name} {string.Join(",", r.Rwy)} {r.To} {r.Pts.Length}"))}");
+            Console.WriteLine("OK   charts.jsonc: Route STRYK mit je einer Variante für 09 und 27");
         }
         finally { (Airfield.OwnChart, Airfield.Theatre) = (null, th); File.Delete(ownF); }
     }

@@ -1,4 +1,4 @@
-DCS-ATC 0.21.0 ALPHA – talking air traffic control for DCS World (all maps, tested on Caucasus)
+DCS-ATC 0.21.1 ALPHA – talking air traffic control for DCS World (all maps, tested on Caucasus)
 ========================================================================
 
 !! ALPHA VERSION !!
@@ -107,6 +107,9 @@ Known limitations
   - Detailed arrival and departure procedures only for Kutaisi; all other airfields generic (runways, altitude, terrain from DCS).
   - Multiplayer only if you host the mission.
   - Speech recognition does not understand everything – if in doubt, use the radio wheel or F10 menu.
+
+Support
+  DCS-ATC is free and will always stay free. If you want to support it anyway: https://ko-fi.com/christianwagner
 
 Licenses
   DCS-ATC: GNU GPL 3.0 (LICENSE.txt), source code: https://github.com/Iceman1991/DCS-ATC-Release

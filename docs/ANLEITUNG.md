@@ -2677,6 +2677,22 @@ Eine Route ist eine Kette benannter Fixes, die an einem Meldepunkt endet, etwa d
 - `"to"`: der Meldepunkt am Ende. Er muss für jede dieser Bahnen ein `entry` sein.
 - `"pts"`: die Fixes der Reihe nach. `"above"` = in oder über, `"at"` = in dieser Höhe, `"below"` = in oder unter, jeweils in Fuß. Alles darf fehlen.
 
+Ein Name für mehrere Bahnen: statt einer Route eine Liste von Varianten. Du fragst wie gewohnt nach „STRYK“, DCS-ATC nimmt die Variante für die Bahn in Betrieb.
+
+```jsonc
+"routes": {
+  "STRYK": [
+    { "rwy": ["03L", "03R"], "to": "CRAIG", "pts": [
+      { "fix": "STRYK",     "pos": "36°31.420'N 115°32.110'W", "above": 9500 },
+      { "fix": "GASS_PEAK", "pos": "36°24.14'N 115°10.66'W",   "above": 8500 },
+      { "fix": "SIMNS",     "pos": "36°17.34'N 115°10.75'W",   "at": 5500 } ] },
+    { "rwy": ["21L", "21R"], "to": "APEX", "pts": [
+      { "fix": "STRYK",     "pos": "36°31.420'N 115°32.110'W", "above": 9500 },
+      { "fix": "GASS_PEAK", "pos": "36°24.14'N 115°10.66'W",   "above": 8500 } ] }
+  ]
+}
+```
+
 #### Abflugrouten
 
 Eine Abflugroute ist eine Kette von Fixes, die du nach dem Start abfliegst, danach eigene Navigation. Du nennst sie mit der Rollanfrage („request taxi, FLEX departure“) oder mit „ready for departure, FLEX departure“.
@@ -2693,7 +2709,7 @@ Eine Abflugroute ist eine Kette von Fixes, die du nach dem Start abfliegst, dana
 }
 ```
 
-`"departures"` steht im Eintrag des Platzes neben `"routes"`. `"rwy"` und `"pts"` funktionieren wie bei Anflugrouten, ein `"to"` gibt es nicht.
+`"departures"` steht im Eintrag des Platzes neben `"routes"`. `"rwy"` und `"pts"` funktionieren wie bei Anflugrouten, ebenso eine Liste von Varianten unter einem Namen; ein `"to"` gibt es nicht.
 
 ### Kneeboard-Seiten
 

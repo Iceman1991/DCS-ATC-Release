@@ -297,11 +297,14 @@ public partial class Tower
 
     /// Route of the chart (charts.jsonc "routes") named in the transmission; doubled letters count once (Whisper hears "Mint" for MINTT).
     static string Sq(string s) => Regex.Replace(s, @"([a-z])\1+", "$1");
-    Airfield.Route? RouteOf(string n) => F.Routes.Values.FirstOrDefault(r => Regex.IsMatch(Sq(n), $@"\b{Sq(Rx(r.Name))}\b"));
+    Airfield.Route? RouteOf(string n) => Named(F.Routes, n);
+    /// Route named in the transmission; several variants under one name (charts.jsonc array): the one for the runway in use first.
+    Airfield.Route? Named(Dictionary<string, Airfield.Route> d, string n) =>
+        d.Values.Where(r => Regex.IsMatch(Sq(n), $@"\b{Sq(Rx(r.Name))}\b")).OrderByDescending(r => r.Rwy.Contains(Runway)).FirstOrDefault();
     /// Index of the fix of the route being flown that the pilot reports, -1 = none.
     int RouteFix(string n) => Rt is { } r ? Array.FindIndex(r.Pts, p => Regex.IsMatch(Sq(n), $@"\b{Sq(Rx(p.Fix))}\b")) : -1;
     /// Departure of the chart (charts.jsonc "departures") named in the transmission ("FLEX departure").
-    Airfield.Route? DepOf(string n) => F.Departures.Values.FirstOrDefault(r => Regex.IsMatch(Sq(n), $@"\b{Sq(Rx(r.Name))}\b"));
+    Airfield.Route? DepOf(string n) => Named(F.Departures, n);
 
     /// Chart text (English) as speech: digit strings spelled out, "CRP" as letters.
     static string SayChart(string s) => Regex.Replace(Regex.Replace(s.Replace("CRP", "C R P"), @"(?<=[A-Za-z])(?=\d)", " "), @"\d+", m => Digits(m.Value));   // "W1" -> "W one"

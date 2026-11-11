@@ -2675,6 +2675,22 @@ A route is a chain of named fixes that ends at a reporting point, like the MINTT
 - `"to"`: the reporting point at the end. It has to be an `entry` of each of these runways.
 - `"pts"`: the fixes in order. `"above"` = at or above, `"at"` = at that altitude, `"below"` = at or below, in feet. All can be left out.
 
+One name for several runways: write a list of variants instead of a single route. You ask for "STRYK" as usual, and DCS-ATC takes the variant for the runway in use.
+
+```jsonc
+"routes": {
+  "STRYK": [
+    { "rwy": ["03L", "03R"], "to": "CRAIG", "pts": [
+      { "fix": "STRYK",     "pos": "36°31.420'N 115°32.110'W", "above": 9500 },
+      { "fix": "GASS_PEAK", "pos": "36°24.14'N 115°10.66'W",   "above": 8500 },
+      { "fix": "SIMNS",     "pos": "36°17.34'N 115°10.75'W",   "at": 5500 } ] },
+    { "rwy": ["21L", "21R"], "to": "APEX", "pts": [
+      { "fix": "STRYK",     "pos": "36°31.420'N 115°32.110'W", "above": 9500 },
+      { "fix": "GASS_PEAK", "pos": "36°24.14'N 115°10.66'W",   "above": 8500 } ] }
+  ]
+}
+```
+
 #### Departure routes
 
 A departure route is a chain of fixes you fly after takeoff, then own navigation. Name it with the taxi request ("request taxi, FLEX departure") or with "ready for departure, FLEX departure".
@@ -2691,7 +2707,7 @@ A departure route is a chain of fixes you fly after takeoff, then own navigation
 }
 ```
 
-`"departures"` sits next to `"routes"` in the airfield's entry. `"rwy"` and `"pts"` work as for arrival routes; there is no `"to"`.
+`"departures"` sits next to `"routes"` in the airfield's entry. `"rwy"` and `"pts"` work as for arrival routes, and so does a list of variants under one name; there is no `"to"`.
 
 ### Kneeboard pages
 

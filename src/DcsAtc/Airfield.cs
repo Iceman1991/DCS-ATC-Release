@@ -312,9 +312,10 @@ public class Airfield
         foreach (var (key, dep) in new[] { ("routes", false), ("departures", true) })
             if (a.TryGetProperty(key, out var rts))
                 foreach (var r in rts.EnumerateObject())
+                foreach (var (rv, vi) in (r.Value.ValueKind == JsonValueKind.Array ? r.Value.EnumerateArray().ToArray() : new[] { r.Value }).Select((v, i) => (v, i)))   // Forum (Lt_Jaeger): "STRYK": [ {...}, {...} ] = one name, one variant per runway
                 {
-                    var (to, rws) = (dep ? "" : r.Value.GetProperty("to").GetString()!, r.Value.GetProperty("rwy").EnumerateArray().Select(v => v.GetString()!).ToArray());
-                    var pts = r.Value.GetProperty("pts").EnumerateArray().Select(p =>
+                    var (to, rws) = (dep ? "" : rv.GetProperty("to").GetString()!, rv.GetProperty("rwy").EnumerateArray().Select(v => v.GetString()!).ToArray());
+                    var pts = rv.GetProperty("pts").EnumerateArray().Select(p =>
                     {
                         var (x, z) = Pos(p.GetProperty("pos"));
                         var (cross, ft) = new[] { ("above", "at or above"), ("at", "at"), ("below", "at or below") }
@@ -324,7 +325,7 @@ public class Airfield
                     if (pts.Length == 0) throw new FormatException($"{Name} {key} {r.Name}: \"pts\" is empty");
                     if (!dep && rws.FirstOrDefault(rw => !(Entry.TryGetValue(rw, out var en) && en.Any(e => e.Crp == to))) is { } bad)
                         throw new FormatException($"{Name} route {r.Name}: \"to\": \"{to}\" is no entry of runway {bad}");
-                    (dep ? Departures : Routes)[r.Name] = new(r.Name, rws, to, pts);
+                    (dep ? Departures : Routes)[vi == 0 ? r.Name : $"{r.Name}#{vi}"] = new(r.Name, rws, to, pts);
                 }
         if (a.TryGetProperty("ground", out var g) && g.TryGetProperty("holds", out var holds))
             foreach (var h in holds.EnumerateObject()) { var (x, z) = Pos(h.Value.GetProperty("pos")); Holds[h.Name] = (x, z, h.Value.GetProperty("rwy").EnumerateArray().Select(v => v.GetString()!).ToArray()); }

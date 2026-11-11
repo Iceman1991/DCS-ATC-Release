@@ -169,6 +169,7 @@ public partial class Tower
             (double X, double Z) P(double nm) => (c.X + nm * NM, c.Z);
             k.Crp["CRAIG"] = c;
             k.Entry["25"].Insert(0, ("CRAIG", "overhead", null));
+            k.Routes["MINTT#1"] = new("MINTT", new[] { "07" }, "CRAIG", new[] { ("YANKEE", P(20).X, P(20).Z, 0.0, "") });   // variant for the other runway listed first: 25 in use takes the 25 one
             k.Routes["MINTT"] = new("MINTT", new[] { "25" }, "CRAIG", new[] { ("MINTT", P(25).X, P(25).Z, 15000.0, "at or above"), ("GASS_PEAK", P(12).X, P(12).Z, 9000.0, "at or above") });
             var e25 = k.Ends.First(e => e.Name == "25");
             Telemetry At(double x) => new(k.Elev + 1000, 1000, 150 * Kt, Math.PI, x, c.Z, 0, 0, 760);
@@ -199,6 +200,7 @@ public partial class Tower
             var k = Airfield.Kutaisi();
             var e = k.End("25");
             var (pa, pb) = (e.At(-e.Len - 6 * NM, 0), e.At(-e.Len - 10 * NM, 4 * NM));
+            k.Departures["TIKI#1"] = new("TIKI", new[] { "07" }, "", new[] { ("YANKEE", pb.X, pb.Z, 0.0, "") });   // variant for the other runway listed first: 25 in use takes the 25 one
             k.Departures["TIKI"] = new("TIKI", new[] { "25" }, "", new[] { ("ALPHA", pa.X, pa.Z, 3000.0, "at or below"), ("BRAVO", pb.X, pb.Z, 6000.0, "at or above") });
             k.Departures["ZULU"] = new("ZULU", new[] { "07" }, "", new[] { ("ALPHA", pa.X, pa.Z, 0.0, "") });
             var hp = e.At(150, 100);
