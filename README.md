@@ -12,12 +12,14 @@ Manual: [English](docs/MANUAL.md) · [Deutsch](docs/ANLEITUNG.md) (installation,
 
 ## Supporters
 
-DCS-ATC is free and stays free. These people keep it going with a coffee on Ko-fi:
+A big thank you to
 
 | **Heling** | **buur** | **Pascali Alessandro** |
 |:---:|:---:|:---:|
 
-Thank you. Your names are also in the settings window of the app.
+You bought me a coffee on Ko-fi without getting anything extra for it, and that means a lot to me. I build DCS-ATC in my free time, and knowing that someone likes it enough to give something back is what keeps me at it on the long evenings. Your names are in the settings window of the app, on every page, where they belong.
+
+DCS-ATC is free and stays free. If you want to join them:
 
 [![Buy me a coffee on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/christianwagner)
 
@@ -116,6 +118,6 @@ If you want to support the project anyway, there is a small Ko-fi page:
 
 [![Buy me a coffee on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/christianwagner)
 
-Supporters so far: **Heling**, **buur**, **Pascali Alessandro**. Thank you. The names are also shown in the settings window of the app.
+**Heling**, **buur** and **Pascali Alessandro** have already done that. Thank you, all three of you. I did not expect it and I was honestly happy about every single one. You are named at the top of this page and in the settings window of the app.
 
 There is no obligation. That said, I appreciate every tip, big or small. Bug reports, logs and ideas help the project just as much. Either way, I will keep working on making our shared hobby a bit better.
