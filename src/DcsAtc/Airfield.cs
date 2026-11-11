@@ -146,13 +146,16 @@ public class Airfield
     /// wx, wz: wind vector at the airfield (toward, m/s).
     /// Parallel runways: landing is on the runway matching the main runway (Main or its reciprocal, Program learns it from the AI), otherwise the first from getRunways.
     /// FI5: closed runways (NOTAM) are skipped; dcs = as the DCS AI picks it, it ignores NOTAMs.
-    public string BestRunway(double wx, double wz, bool dcs = false)
+    /// Forum (Lt_Jaeger): charts.jsonc land_rwy/dep_rwy picks the parallel runway (the strip, either end) for landing/departure, not for the AI (dcs).
+    public string BestRunway(double wx, double wz, bool dcs = false, bool dep = false)
     {
         var open = dcs || Ends.All(e => Closed.Contains(e.Name)) ? Ends : Ends.Where(e => !Closed.Contains(e.Name)).ToList();
         var m = open.FirstOrDefault(e => e.Name == Main);
         var b = Math.Sqrt(wx * wx + wz * wz) < 3.5 && m != null ? m : open.MaxBy(e => -(wx * e.Dx + wz * e.Dz))!;
-        return open.Where(e => Diff(e.Hdg, b.Hdg) < 10).OrderBy(e => m != null && e.CX == m.CX && e.CZ == m.CZ ? 0 : 1).First().Name;
+        var pref = (dcs ? null : Ends.FirstOrDefault(e => e.Name == (dep ? DepRwy : LandRwy))) ?? m;
+        return open.Where(e => Diff(e.Hdg, b.Hdg) < 10).OrderBy(e => pref != null && e.CX == pref.CX && e.CZ == pref.CZ ? 0 : 1).First().Name;
     }
+    public string LandRwy = "", DepRwy = "";
     /// DCS main runway = named direction from Airbase:getRunways (correct at all test airfields). Program corrects it
     /// when an AI takes off/lands differently in light wind.
     public string Main = "";
@@ -290,6 +293,9 @@ public class Airfield
         if (a.TryGetProperty("crp", out var crp)) foreach (var c in crp.EnumerateObject()) Crp[c.Name] = Pos(c.Value);
         if (a.TryGetProperty("exit_only", out var eo)) ExitOnly = eo.EnumerateArray().Select(v => v.GetString()!).ToHashSet();
         if (a.TryGetProperty("notes", out var nt)) Notes = nt.EnumerateArray().Select(v => v.GetString()!).ToList();
+        foreach (var (key, set) in new (string, Action<string>)[] { ("land_rwy", v => LandRwy = v), ("dep_rwy", v => DepRwy = v) })
+            if (a.TryGetProperty(key, out var pr))
+                set(Ends.Count == 0 || Ends.Any(e => e.Name == pr.GetString()) ? pr.GetString()! : throw new FormatException($"{Name}: \"{key}\": \"{pr.GetString()}\" ({string.Join(", ", Ends.Select(e => e.Name))})"));
         if (a.TryGetProperty("rwy", out var rwy))
             foreach (var r in rwy.EnumerateObject())
             {

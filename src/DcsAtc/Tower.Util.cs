@@ -157,7 +157,7 @@ public partial class Tower
 
     /// Runway as DCS-ATC (Airfield.BestRunway) with the wind at the airfield, not the one at flight level.
     public (double X, double Z)? FieldWind;   // Program: mission weather at the airfield (10 m)
-    string WindRunway(Telemetry t) => FieldWind is { } w ? F.BestRunway(w.X, w.Z) : F.BestRunway(t.WindX, t.WindZ);
+    string WindRunway(Telemetry t, bool dep = false) => FieldWind is { } w ? F.BestRunway(w.X, w.Z, dep: dep) : F.BestRunway(t.WindX, t.WindZ, dep: dep);
 
     /// "25" -> "two five", "13L" -> "one three left"
     public static string RwSay(string rw) => Digits(rw) + (rw.EndsWith('L') ? " left" : rw.EndsWith('R') ? " right" : rw.EndsWith('C') ? " center" : "");

@@ -2619,6 +2619,7 @@ The Caucasus airfield procedures (CRPs, entry and exit per runway, pattern altit
 - The file is read at every mission start. If it is faulty, the DCS-ATC window shows the error and the built-in procedures apply.
 - Works on every map. Only the Caucasus has procedures built in; on other maps an airfield has them only if it is in `charts.jsonc`. Latitude/longitude there needs the map installed, because DCS-ATC takes the map projection from its beacon data. DCS coordinates `[x, z]` always work.
 - The control zone reaches 0.5 NM beyond the farthest CRP and up to `ctr_top_ft` (without CRPs: 5 NM around the airfield, 3000 ft above it). This is the airspace DCS-ATC watches for deviations.
+- Parallel runways: `"land_rwy": "21L"` picks the one you land on, `"dep_rwy": "21R"` the one you take off from. You name the runway itself, the direction still follows the wind: with wind from the north, `"21L"` means 03R. Without these keys DCS-ATC uses the one the DCS AI uses. The AI keeps its runway, and "request runway 21 left" still works for a single flight. With different runways the ATIS says "landing runway 21L, departure runway 21R".
 - DCS-ATC has no real SIDs and STARs with waypoint sequences; this is about the visual procedures.
 
 Example: Kutaisi with a 1500 ft pattern and only two CRPs.
@@ -2760,7 +2761,7 @@ The generated lines in `frequencies.jsonc` already contain the airfield names. T
 
 Open it from **Start menu → DCS-ATC → Settings** or from **Radio wheel → General → Settings**. **Save** writes your changes to `config.jsonc` and keeps the comments in that file. In the window, `Enter` saves and `Esc` cancels. Fields marked `*` take effect the next time DCS-ATC starts. The other fields take effect while DCS-ATC is running.
 
-Pick the page on the left: General, Voices, Radio & traffic, AWACS, Frequencies, Keys & radio wheel, SRS, Modules, Advanced. The search field above it jumps to the page with the field you are looking for and highlights it.
+Pick the page on the left: General, Voices, Radio & traffic, AWACS, Frequencies, Keys & radio wheel, SRS, Modules, Advanced, Thanks (the people who support DCS-ATC). The search field above it jumps to the page with the field you are looking for and highlights it.
 
 | Field | Values | config.jsonc key |
 |---|---|---|

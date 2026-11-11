@@ -2621,6 +2621,7 @@ Die Platzverfahren im Kaukasus (CRPs, Ein- und Ausflug je Bahn, Platzrundenhöhe
 - Gelesen wird die Datei bei jedem Missionsstart. Ist sie fehlerhaft, meldet das DCS-ATC-Fenster den Fehler, und es gelten die eingebauten Verfahren.
 - Gilt auf jeder Karte. Eingebaute Verfahren hat nur der Kaukasus, auf anderen Karten hat ein Platz nur welche, wenn er in `charts.jsonc` steht. Breite/Länge braucht dort die installierte Karte, weil DCS-ATC die Kartenprojektion aus ihren Funkfeuerdaten nimmt. DCS-Koordinaten `[x, z]` gehen immer.
 - Die Kontrollzone reicht 0,5 NM über den entferntesten CRP hinaus und bis `ctr_top_ft` (ohne CRPs: 5 NM um den Platz, bis 3000 ft darüber). Diesen Luftraum überwacht DCS-ATC auf Verstöße.
+- Parallelbahnen: `"land_rwy": "21L"` legt fest, auf welcher du landest, `"dep_rwy": "21R"`, von welcher du startest. Du nennst die Bahn selbst, die Richtung richtet sich weiter nach dem Wind: bei Nordwind heißt `"21L"` dann 03R. Ohne diese Schlüssel nimmt DCS-ATC die Bahn der DCS-KI. Die KI behält ihre Bahn, und „request runway 21 left“ geht für einen einzelnen Flug weiterhin. Bei verschiedenen Bahnen sagt die ATIS „landing runway 21L, departure runway 21R“.
 - Echte SIDs und STARs mit Wegpunktfolgen kennt DCS-ATC nicht, es geht um die Sichtflugverfahren.
 
 Beispiel: Kutaisi mit Platzrunde 1500 ft und nur zwei CRPs.
@@ -2762,7 +2763,7 @@ Die erzeugten Zeilen in `frequencies.jsonc` enthalten die Platznamen schon. Sons
 
 Öffnen über **Startmenü → DCS-ATC → Einstellungen** oder **Funkrad → Allgemein → Einstellungen**. **Speichern** schreibt deine Änderungen in `config.jsonc` und behält die Kommentare der Datei. Im Fenster speichert `Enter`, `Esc` bricht ab. Mit `*` markierte Felder gelten ab dem nächsten Start von DCS-ATC, alle anderen schon während es läuft.
 
-Links wählst du die Seite: Allgemein, Stimmen, Funk & Verkehr, AWACS, Frequenzen, Tasten & Funkrad, SRS, Module, Erweitert. Das Suchfeld darüber springt zur Seite mit dem gesuchten Feld und hebt es hervor.
+Links wählst du die Seite: Allgemein, Stimmen, Funk & Verkehr, AWACS, Frequenzen, Tasten & Funkrad, SRS, Module, Erweitert, Danke (die Unterstützer von DCS-ATC). Das Suchfeld darüber springt zur Seite mit dem gesuchten Feld und hebt es hervor.
 
 | Feld | Werte | config.jsonc-Schlüssel |
 |---|---|---|

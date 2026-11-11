@@ -25,12 +25,13 @@ public partial class Tower
         var word = Phonetic(letter);
         var zulu = clock < 0 || Airfield.UtcOffset is not { } off ? "" : $", time {Digits(TimeSpan.FromSeconds((clock - off * 3600 + 86400) % 86400).ToString("hhmm"))} Zulu";   // R125: Zulu per map, unknown map without time
         var rw = WindRunway(w);
+        var inUse = WindRunway(w, true) is var dr && dr != rw ? $"Landing runway {RwSay(rw)}, departure runway {RwSay(dr)}" : $"Runway {RwSay(rw)} in use";   // land_rwy/dep_rwy differ
         // R208: visibility obstruction per ICAO Annex 3 (FG under 1000 m, BR up to 5000 m)
         var vis = visM >= 9500 ? "visibility one zero kilometers or more" : visM < 1000 ? $"visibility {Math.Round(visM / 50) * 50} meters, fog"
                 : $"visibility {Digits(Math.Max(1, Math.Round(visM / 1000)).ToString())} kilometers{(visM < 5000 ? ", mist" : "")}";
         var sky = clouds ? $"clouds {Math.Round(Math.Max(0, baseM - F.Elev) / Ft / 100) * 100:0} feet" : "sky clear";   // A34: ceiling above airfield (AGL), not above MSL
         var temp = (tempC < -0.5 ? "minus " : "") + Digits(Math.Abs(Math.Round(tempC)).ToString());
-        return $"{F.Name.Replace('-', ' ')} information {word}{zulu}. Runway {RwSay(rw)} in use, {Hand(rw)} pattern, {Alt(PatternFt)}. " +
+        return $"{F.Name.Replace('-', ' ')} information {word}{zulu}. {inUse}, {Hand(rw)} pattern, {Alt(PatternFt)}. " +
                $"{Cap(Wind(w))}. {Cap(vis)}, {sky}. Temperature {temp}. {Cap(AtisQnh(w))}. " +
                (F.FreqsOf("Tower") is { } tf ? (tf.Any(x => x < 200) && tf.Any(x => x >= 200) ? $"Tower {FreqSay(tf.First(x => x < 200))}, UHF {FreqSay(tf.First(x => x >= 200))}. " : $"Tower {FreqSay(tf[0])}. ")   // K5: map frequency (VHF) first; own (AirfieldFrequencies) likewise
                           : $"Ground {FreqSay(Freqs["Ground"])}, tower {FreqSay(Freqs["Tower"])}, approach {FreqSay(Freqs["Approach"])}. ") +

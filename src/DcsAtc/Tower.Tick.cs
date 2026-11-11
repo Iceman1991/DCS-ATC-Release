@@ -68,7 +68,7 @@ public partial class Tower
         }
 
         // Change active runway only outside ongoing procedures
-        if (Phase is Phase.Parked or Phase.Away) Runway = wantRw ?? WindRunway(t);
+        if (Phase is Phase.Parked or Phase.Away) Runway = wantRw ?? WindRunway(t, Phase == Phase.Parked);
         var rw = Runway;
 
         // Runway occupied (also other takeoff clearance, A9) or opposite traffic on final: never, not even after 3 min. A10: on the runway (LUAW) with approach at 2.5-6 NM "immediate",
@@ -1306,7 +1306,7 @@ public partial class Tower
         wasAir = airborne;
         glide.Clear();
         PatternReset();
-        Runway = WindRunway(t);
+        Runway = WindRunway(t, !airborne);
         // R110: on the runway with speed or after landing (airfield change, app restart during rollout): rollout, no takeoff clearance.
         // At standstill (spawn on runway): line up and wait without clearance (no "hold position"), takeoff clearance only on "ready for departure" (holdSince -1)
         // Forum 0.13 (Sinai Hatzerim): also on a DCS runway spawn point (getParking Term_Type 16) when getRunways is a few meters/degrees off; runway = the one he stands on (28L, not the wind runway 28R)

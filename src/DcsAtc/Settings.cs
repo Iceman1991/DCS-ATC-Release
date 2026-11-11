@@ -11,6 +11,9 @@ namespace DcsAtc;
 /// The running app applies callsign, volume, pace and radio options immediately (Program.ReloadLive).
 static class Settings
 {
+    /// Ko-fi supporters, named on the "Thanks" page (only with their OK, under the name they want)
+    static readonly string[] Supporters = { "Heling" };
+
     [DllImport("kernel32.dll")] static extern bool FreeConsole();
     [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
@@ -394,6 +397,17 @@ static class Settings
         raw.Click += (_, _) => Notepad(Program.ConfigPath);
         Row(L("Alle Optionen als Textdatei", "All options as a text file"), raw);
         Note(L("Nur dort: Center-Namen und -Sektoren, eigene NOTAMs, ATIS-Frequenz je Platz, On-speed-AoA.", "Only there: center names and sectors, own NOTAMs, ATIS frequency per airfield, on-speed AoA."));
+
+        Page(L("Danke", "Thanks"));
+        Group(L("Spender", "Supporters"));   // uppercase Ü loses its dots in the heading font
+        Note(L("DCS-ATC ist kostenlos und bleibt es. Danke an alle, die es trotzdem mit einer Spende unterstützen", "DCS-ATC is free and will always stay free. Thanks to everyone who supports it anyway with a tip")
+             + (Supporters.Length > 0 ? ":" : "."));
+        foreach (var n in Supporters)
+            Wide(new Label { Text = n, AutoSize = true, ForeColor = Wheel.Accent, Font = Wheel.F(Wheel.Font1, 12f, FontStyle.Bold), Margin = new Padding(0, 4, 0, 4), UseMnemonic = false });
+        var kofi = Btn("ko-fi.com/christianwagner", false);
+        kofi.Click += (_, _) => Process.Start(new ProcessStartInfo("https://ko-fi.com/christianwagner") { UseShellExecute = true });
+        kofi.Margin = new Padding(0, 10, 0, 4);
+        Wide(kofi);
 
         // bottom: hint left, Save/Cancel right
         var bar = new Panel { Dock = DockStyle.Bottom, Height = 60 };

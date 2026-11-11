@@ -2588,6 +2588,13 @@ public partial class Tower
               Lat(dxb.Ends[0], dxb.Ends[3]) > 300 && Lat(dhf.Ends[0], dhf.Ends[3]) < -1000 && dxb.Main == "30R" && RwSay("30L") == "three zero left" && RwSay("13R") == "one three right" &&
               dxb.BestRunway(0, 0) == "30R" && dxb.BestRunway(5 * dxb.Ends[3].Dx, 5 * dxb.Ends[3].Dz) == "12L" && dxb.BestRunway(-5 * dxb.Ends[0].Dx, -5 * dxb.Ends[0].Dz) == "30R",
               $"Parallelbahnen L/R: {string.Join(",", dxb.Ends.Select(e => e.Name))} / {string.Join(",", dhf.Ends.Select(e => e.Name))} Main {dxb.Main}");
+        dxb.LandRwy = "12R";   // forum (Lt_Jaeger): preferred strip for landing, named by either end; departure and AI keep the main runway
+        var dxPref = new Tower(dxb, "");
+        var dxAtis = dxPref.AtisText("A", new Telemetry(7, 0, 0, 0, dxb.X, dxb.Z, 0, 0, 101325), 20, false, 0, 10000);
+        Check(dxb.BestRunway(0, 0) == "30L" && dxb.BestRunway(5 * dxb.Ends[3].Dx, 5 * dxb.Ends[3].Dz) == "12R" && dxb.BestRunway(0, 0, dep: true) == "30R" && dxb.BestRunway(0, 0, dcs: true) == "30R"
+              && dxAtis.Contains("Landing runway three zero left, departure runway three zero right,"),
+              $"Vorzugsbahn land_rwy: {dxb.BestRunway(0, 0)} {dxb.BestRunway(5 * dxb.Ends[3].Dx, 5 * dxb.Ends[3].Dz)} {dxb.BestRunway(0, 0, dep: true)} / {dxAtis}");
+        dxb.LandRwy = "";
         // Duplicate runway from DCS (Abu Dhabi, real data): second "31" with 3032 m on the centerline of the "31" with 3907 m -> one runway (the longer, also in reverse
         // order), the parallel 2 km beside it remains; before: six ends, twice 31L/13R
         (string, double, double, double, double) a13 = ("13", -2.24720, -188457.5, -162031.0, 3907.0), a31 = ("31", 0.89450, -190960.8, -162107.0, 3907.0), a31d = ("31", -2.24700, -189781.3, -163576.8, 3032.0);
