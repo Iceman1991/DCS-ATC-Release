@@ -2798,6 +2798,8 @@ Links wählst du die Seite: Allgemein, Stimmen, Funk & Verkehr, AWACS, Frequenze
 | **DCS-ATC aktiv** | an/aus. Aus: DCS-ATC startet ab der nächsten Mission nicht mehr, ohne Deinstallieren. Kein Funkrad, kein F10-Menü, der KI-Funk von DCS läuft wie ohne DCS-ATC. Wieder an: Haken setzen. | (`DcsAtcOff.txt`) |
 
 | **Kneeboard-Seiten bei Missionsstart schreiben** `*` | an/aus | `KneeboardPages` |
+| **Update** | Zeigt die installierte Version. *Nach Updates suchen* fragt GitHub nach dem neuesten Release. Gibt es ein neueres, wird der Knopf zu *Jetzt aktualisieren*: lädt das Release (rund 850 MB), prüft Größe und Prüfsumme, führt das Setup aus und öffnet dieses Fenster wieder. Nicht, solange DCS läuft. `config.jsonc` und Tasten bleiben erhalten. | |
+| **Beim Start nach einer neuen Version suchen** | an/aus. An: eine Anfrage an GitHub beim Start von DCS-ATC und beim Öffnen dieses Fensters. Eine neuere Version wird nur gemeldet (Zeile im Log, dieses Fenster), geladen wird nichts ohne den Knopf. | `UpdateCheck` |
 | **Stimme je Station** `*` | Je Station: *Zufällig* (bei jedem Start eine der installierten Stimmen, ohne die Pilotenstimme) oder eine feste Stimme aus dem Ordner `models` mit Tonhöhe (1.00 = unverändert, kleiner = tiefer). Mit einer zweiten Stimme wechseln sich die Plätze ab. Der Knopf rechts spricht eine Probe über die PC-Lautsprecher. *Alle zufällig* und *Standard* setzen alle Zeilen. Drei und mehr Stimmen aus der Datei bleiben ein Textfeld. | `Voices` |
 | **KI-Funk nur im Umkreis eigener Spieler** | 10–200 NM | `AiFlightRadiusNm` |
 | **Eigene KI-Wingmen funken mit** | an/aus | `AiOwnWingmen` |
@@ -2908,6 +2910,7 @@ Eigene Frequenzen je Platz und Lotse stehen nicht in `config.jsonc`, sondern in 
 | `AsrApiUrl` | `""` | Spracherkennung über einen OpenAI-kompatiblen Dienst statt des lokalen Whisper, z. B. `"https://api.openai.com/v1/audio/transcriptions"` oder ein Whisper-Server auf einem anderen PC mit Grafikkarte. `""` = lokal. Fällt der Dienst aus, wird dieser Spruch lokal erkannt; nach drei Fehlern in Folge läuft der Rest der Sitzung lokal. Alles, was auf den abgehörten Frequenzen gesprochen wird, geht an diesen Dienst. |
 | `AsrApiKey` | `""` | Schlüssel für `AsrApiUrl` (als `Bearer`). Leer für einen Server ohne Schlüssel. |
 | `AsrApiModel` | `"whisper-1"` | Modellname bei `AsrApiUrl`, z. B. `"whisper-1"` oder `"gpt-4o-mini-transcribe"`. |
+| `UpdateCheck` | `true` | Beim Start einmal bei GitHub nach einem neueren Release fragen (nur Hinweis, geladen wird aus dem Einstellungsfenster). `false` für Dedicated Server oder PC ohne Internet. |
 | `KneeboardPages` | `true` | Kneeboard-Seiten bei Missionsstart nach `Saved Games\DCS\Kneeboard` (nur Kaukasus, deutsch), siehe [Kneeboard-Seiten](#kneeboard-seiten). |
 
 **Optionen je Mission.** Bodenpersonal (Tank-/Munitionswagen, Feuerwehr) ist eine Missionsoption, nicht Teil von `config.jsonc`:

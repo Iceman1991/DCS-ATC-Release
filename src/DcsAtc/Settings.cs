@@ -27,7 +27,7 @@ static class Settings
     public static void Show(Config cfg)
     {
         FreeConsole();   // window only, no console window beside it (start menu)
-        Sta(() => Application.Run(Build(cfg)));
+        Sta(() => Application.Run(Build(cfg, true)));
     }
 
     /// Preview as PNG (DcsAtc --settings-png datei.png [de|en] [page]): draw the window off-screen.
@@ -68,7 +68,8 @@ static class Settings
     internal static string VoiceText(IEnumerable<(string Model, string Pitch)> parts) =>
         string.Join("|", parts.Select(x => x.Model + (x.Pitch == "1.00" ? "" : "@" + x.Pitch.TrimEnd('0').TrimEnd('.'))));
 
-    static Form Build(Config cfg)
+    /// live: the real window (asks GitHub for a newer version when shown), not the off-screen preview.
+    static Form Build(Config cfg, bool live = false)
     {
         var wa = Screen.PrimaryScreen!.WorkingArea.Size;
         var f = new Form
@@ -198,6 +199,59 @@ static class Settings
         var unit = Combo(new[] { L("automatisch (nach Flugzeugtyp)", "automatic (by aircraft type)"), "hPa (QNH)", "inHg (altimeter)" }, Math.Max(0, Array.IndexOf(units, cfg.AltimeterUnit.ToLowerInvariant())));
         Row(L("Höhenmesser-Einstellung", "Altimeter setting"), unit);
         var knee = Check(L("Kneeboard-Seiten bei Missionsstart schreiben (nur Kaukasus, deutsch) *", "Write kneeboard pages at mission start (Caucasus only, German) *"), cfg.KneeboardPages);
+        // Update from the GitHub releases: look when the window opens (Config.UpdateCheck) or on the button; download and setup only on the button
+        Group("Update");
+        var updState = new Label { Text = L($"Installiert: {Update.Own}", $"Installed: {Update.Own}"), AutoSize = true, MaximumSize = new Size(285, 0), UseMnemonic = false };
+        Row("Version", updState);
+        var updBtn = Btn(L("Nach Updates suchen", "Check for updates"), false);
+        Row("Update", updBtn);
+        var updAuto = Check(L("Beim Start nach einer neuen Version suchen", "Look for a new version at start"), cfg.UpdateCheck);
+        Update.Release? upd = null;
+        bool updBusy = false;
+        void UpdUi(Action a) { if (f.IsHandleCreated && !f.IsDisposed) f.BeginInvoke(a); }
+        void UpdCheck()
+        {
+            if (updBusy) return;
+            updBusy = true;
+            updState.Text = L("Suche nach Updates …", "Checking for updates …");
+            Task.Run(() =>
+            {
+                var r = Update.Check();
+                UpdUi(() =>
+                {
+                    (updBusy, upd) = (false, r);
+                    updState.Text = r == null ? L($"Installiert: {Update.Own}. Nichts Neueres gefunden.", $"Installed: {Update.Own}. Nothing newer found.")
+                                              : L($"Installiert: {Update.Own}. Neu: {r.Version} ({r.Size / 1048576} MB).", $"Installed: {Update.Own}. New: {r.Version} ({r.Size / 1048576} MB).");
+                    if (r != null) (updBtn.Text, updBtn.BackColor, updBtn.ForeColor) = (L("Jetzt aktualisieren", "Update now"), Wheel.Accent, Wheel.Dark);
+                });
+            });
+        }
+        updBtn.Click += (_, _) =>
+        {
+            if (updBusy) return;
+            if (upd is not { } r) { UpdCheck(); return; }
+            if (Program.DcsProcs.Any(n => Process.GetProcessesByName(n).Length > 0))   // setup replaces the running app and may ask for admin rights: not during a flight
+            {
+                updState.Text = L("DCS läuft. Erst DCS beenden, dann aktualisieren.", "DCS is running. Close DCS first, then update.");
+                return;
+            }
+            updBusy = true;
+            Task.Run(() =>
+            {
+                try
+                {
+                    int last = -1;
+                    var setup = Update.Download(r, p => { int pc = (int)(p * 100); if (pc != last) { last = pc; UpdUi(() => updState.Text = L($"Lade {r.Version}: {pc} %", $"Downloading {r.Version}: {pc} %")); } });
+                    Update.Install(setup);
+                    Environment.Exit(0);   // setup replaces this exe and opens the settings window again
+                }
+                catch (Exception e) when (e is IOException or HttpRequestException or TaskCanceledException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+                {
+                    UpdUi(() => { updBusy = false; updState.Text = L($"Update fehlgeschlagen: {e.Message}", $"Update failed: {e.Message}"); });
+                }
+            });
+        };
+        if (live && cfg.UpdateCheck) f.Shown += (_, _) => UpdCheck();
 
         Page(L("Stimmen", "Voices"));
         Group(L("Lotsen-Stimmen", "Controller voices"));
@@ -460,7 +514,7 @@ static class Settings
                 ("AiFollowAwacs", J(follow.Checked), "AiFlightComms"), ("Modulation", J(modu.Text), "AwacsNewGroupNm"), ("Coalition", side.SelectedIndex == 1 ? "1" : "2", "Modulation"),
                 ("WheelSize", D(wsize.Value / 100), "WheelButton"), ("SrsListen", J(listen.Checked), "AiChatter"), ("SrsAutoConnect", J(auto.Checked), "SrsListen"),
                 ("AsrGpu", J(gpu.Checked), "DebugLog"), ("AsrApiUrl", J(apiUrl.Text.Trim()), "AsrGpu"), ("AsrApiKey", J(apiKey.Text.Trim()), "AsrApiUrl"), ("AsrApiModel", J(apiModel.Text.Trim()), "AsrApiKey"),
-                ("MapPort", mapPort.ToString(), "DebugLog"), ("MapLan", J(lan.Checked), "MapPort"),
+                ("MapPort", mapPort.ToString(), "DebugLog"), ("MapLan", J(lan.Checked), "MapPort"), ("UpdateCheck", J(updAuto.Checked), "DebugLog"),
             };
             var was = JsonSerializer.SerializeToElement(cfg);   // write only what changed: the file keeps its shape, and a value another window wrote meanwhile (wheel size) stays
             try

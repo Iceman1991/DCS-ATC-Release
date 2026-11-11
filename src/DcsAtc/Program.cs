@@ -55,6 +55,7 @@ public class Config
     public string AsrApiUrl { get; set; } = "";        // #11: speech recognition over an OpenAI-compatible endpoint (.../v1/audio/transcriptions: cloud or a whisper server on another PC), "" = local whisper; on errors local
     public string AsrApiKey { get; set; } = "";        // #11: Bearer key for AsrApiUrl ("" = none, e.g. own server)
     public string AsrApiModel { get; set; } = "whisper-1";   // #11: model name at AsrApiUrl
+    public bool UpdateCheck { get; set; } = true;      // ask GitHub at start whether a newer release exists (log line, button in the settings window); nothing is downloaded without the button
     public bool KneeboardPages { get; set; } = true;   // kneeboard pages into Saved Games\DCS\Kneeboard on mission start (Caucasus, German)
     public Dictionary<string, double> AtisFreqs { get; set; } = new();   // A35: own ATIS frequency per airfield (airfield name -> MHz), if the airfield is missing: Frequencies["ATIS"]; only after restart
     public int WheelKey { get; set; } = 0xDE;          // selection wheel: key (0xDE = Ä), 0 = off
@@ -153,12 +154,13 @@ static partial class Program
         TestRun = args.Any(a => a is "--selftest" or "--anflugtest" or "--mptest" or "--asr-test" or "--srs-test" or "--platztest");
         if (args.Length >= 1 && args[0] == "--charttest") { if (args.Length > 1) Airfield.ChartFile = args[1]; ChartTest(); return 0; }   // chart data check, optionally a file instead of the embedded one
         if (args.Contains("--platztest")) { Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); return 0; }
-        if (args.Contains("--selftest")) { RadioTest(); ChartTest(); Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); AtisTest(); CrewTest(); ExpectTest(); PromptTest(); GpuTest(); return Tower.SelfTest(); }
+        if (args.Contains("--selftest")) { RadioTest(); ChartTest(); Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); Update.Test(); AtisTest(); CrewTest(); ExpectTest(); PromptTest(); GpuTest(); return Tower.SelfTest(); }
         LoadConfig();
         if (args.Length == 2 && args[0] == "--preview") { Preview(args[1]); return 0; }   // Test: DcsAtc --preview random (PC speakers, as the play button in the settings)
         if (args.Contains("--settings")) { Dedicated = DedicatedNow(); Settings.Show(Cfg); return 0; }   // language then also in the server's Saved Games
         if (args.Contains("--buttons")) { ShowButtons(); return 0; }
         if (args.Contains("--keys")) { SetupKeys(); return 0; }
+        if (args.Contains("--updatetest")) return Update.NetTest();
         if (args.Contains("--frequencies")) { LoadFields(); Console.WriteLine(FreqPath); return 0; }   // create/extend frequencies.jsonc without DCS (e.g. server admin)
         if (args.Length >= 1 && args[0] == "--asr-test") return AsrTest(args.Length > 1 ? args[1] : Path.Combine(Root, "debrief", "asr"));
         if (args.Length >= 2 && args[0] == "--wheel-png") { Wheel.Snapshot(Cfg, args[1], args.ElementAtOrDefault(2)); return 0; }   // Preview: --wheel-png file.png ["role: suggestion"]
@@ -185,6 +187,13 @@ static partial class Program
             Console.ReadKey(true);
             return 1;
         }
+        new Thread(() =>   // in the background: GitHub may be slow or unreachable
+            {
+                Update.Clean();
+                if (Cfg.UpdateCheck && Update.Check() is { } up)
+                    Log(L($"[ATC] Neue Version {up.Version} verfügbar (installiert: {Update.Own}). Einstellungen -> Allgemein -> \"Jetzt aktualisieren\".",
+                          $"[ATC] New version {up.Version} available (installed: {Update.Own}). Settings -> General -> \"Update now\"."));
+            }) { IsBackground = true }.Start();
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);   // radio wheel error: no WinForms dialog, but crash -> restart
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Crash(e.ExceptionObject as Exception, args);
         if (auto)
