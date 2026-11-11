@@ -12,12 +12,12 @@ Manual: [English](docs/MANUAL.md) · [Deutsch](docs/ANLEITUNG.md) (installation,
 
 ## Supporters
 
-A big thank you to
+Special thanks to my supporters:
 
 | **Heling** | **buur** | **Pascali Alessandro** |
 |:---:|:---:|:---:|
 
-Thank you for your support on Ko-fi. People like you keep this project going. Your names are also shown in the settings window of the app.
+Your names are also shown in the settings window of the app.
 
 DCS-ATC is free and stays free. If you want to support it too:
 
@@ -118,6 +118,6 @@ If you want to support the project anyway, there is a small Ko-fi page:
 
 [![Buy me a coffee on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/christianwagner)
 
-**Heling**, **buur** and **Pascali Alessandro** have already done that. Thank you, you keep the project going.
+**Heling**, **buur** and **Pascali Alessandro** have already done that. Special thanks to you.
 
 There is no obligation. That said, I appreciate every tip, big or small. Bug reports, logs and ideas help the project just as much. Either way, I will keep working on making our shared hobby a bit better.
