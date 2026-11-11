@@ -17,8 +17,6 @@ Special thanks to my supporters:
 | **Heling** | **buur** | **Pascali Alessandro** |
 |:---:|:---:|:---:|
 
-Your names are also shown in the settings window of the app.
-
 DCS-ATC is free and stays free. If you want to support it too:
 
 [![Buy me a coffee on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/christianwagner)
