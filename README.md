@@ -10,6 +10,8 @@ The goal is to replace the built-in DCS radio (airfield ATC, AWACS, tankers, Sup
 
 Manual: [English](docs/MANUAL.md) · [Deutsch](docs/ANLEITUNG.md) (installation, first flight, all radio calls, carrier, AWACS/tankers, multiplayer, dedicated server, own frequencies, other maps)
 
+Thanks to the supporters on Ko-fi: **Heling**, **buur**, **Pascali Alessandro**. DCS-ATC is free and stays free, see [Support](#support).
+
 ## Features
 
 - Every airfield on the map, each on its own frequency. Tune it and that airfield answers (ATIS, Ground, Tower, Departure, Approach). Runway by wind and terrain, ILS where available. Own frequencies per airfield go in `frequencies.jsonc`, which is created automatically.
@@ -88,5 +90,7 @@ Unofficial fan project, not affiliated with Eagle Dynamics or the SRS project.
 DCS-ATC is free and will always stay free. No paid version, no features behind a paywall.
 
 If you want to support the project anyway, there is a small Ko-fi page: [ko-fi.com/christianwagner](https://ko-fi.com/christianwagner)
+
+Supporters so far: Heling, buur, Pascali Alessandro. Thank you. The names are also shown in the settings window of the app.
 
 There is no obligation. That said, I appreciate every tip, big or small. Bug reports, logs and ideas help the project just as much. Either way, I will keep working on making our shared hobby a bit better.
