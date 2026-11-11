@@ -14,8 +14,7 @@ Manual: [English](docs/MANUAL.md) · [Deutsch](docs/ANLEITUNG.md) (installation,
 
 Special thanks to my supporters:
 
-| **Heling** | **buur** | **Pascali Alessandro** |
-|:---:|:---:|:---:|
+![Heling](https://img.shields.io/badge/Heling-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white) ![buur](https://img.shields.io/badge/buur-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white) ![Pascali Alessandro](https://img.shields.io/badge/Pascali%20Alessandro-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white)
 
 DCS-ATC is free and stays free. If you want to support it too:
 
