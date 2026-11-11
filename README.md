@@ -56,10 +56,6 @@ Manual: [English](docs/MANUAL.md) · [Deutsch](docs/ANLEITUNG.md) (installation,
 
 Open an [issue](../../issues) with time, airfield, a short description and `atc-log.txt` plus `atc-debug.txt` from `%LOCALAPPDATA%\Programs\DCS-ATC`. A short video with SRS audio helps a lot.
 
-## Support
-
-DCS-ATC is free and stays free. If you want to buy me a coffee: [ko-fi.com/christianwagner](https://ko-fi.com/christianwagner)
-
 ## Technology
 
 Two models are used while running, both locally on the CPU:
@@ -86,3 +82,11 @@ The app is C# (.NET 8, `src/DcsAtc`), the DCS hook and mission scripts are Lua (
 
 GNU GPL 3.0, see [LICENSE](LICENSE). Bundled third-party software keeps its own license (Whisper/whisper.cpp, Piper and the piper-voices, FFmpeg, espeak-ng, NAudio), see `installer/THIRD-PARTY-NOTICES.txt`.
 Unofficial fan project, not affiliated with Eagle Dynamics or the SRS project.
+
+## Support
+
+DCS-ATC is free and will always stay free. No paid version, no features behind a paywall.
+
+If you want to support the project anyway, there is a small Ko-fi page: [ko-fi.com/christianwagner](https://ko-fi.com/christianwagner)
+
+There is no obligation. That said, I appreciate every tip, big or small. Bug reports, logs and ideas help the project just as much. Either way, I will keep working on making our shared hobby a bit better.
