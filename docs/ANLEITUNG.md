@@ -675,10 +675,11 @@ So funktionieren die Werte:
 
 - **`@` setzt die Tonhöhe:** `@0.88` = tiefer, `@1.05` = höher.
 - **`|` nennt mehrere Stimmen:** jede Station (etwa „Kolkhi Tower“) behält eine davon, benachbarte Plätze klingen verschieden.
+- **`"random"` nimmt eine zufällige Stimme:** jede Station bekommt bei jedem Start eine der installierten Stimmen (ohne die Pilotenstimme) und behält sie, solange DCS-ATC läuft. Im Einstellungsfenster: *Zufällig*.
 - **Fehlende Stimmen:** fehlt eine Stimmdatei, wird eine vorhandene genommen (sonst `en_US-ryan-medium`). Mehr Stimmen: huggingface.co/rhasspy/piper-voices.
 - **Crew:** der Crew Chief am Parkplatz, der über deine Bordsprechanlage spricht.
 - **Carrier:** nicht in der Vorlage; der Standard `"en_US-ryan-medium@0.97|en_GB-alan-medium@1.02"` wird automatisch ergänzt.
-- **`PilotVoice`:** spricht deine Rad-, F10- und Chat-Sprüche vor der Antwort. Jeder Spieler bekommt eine leicht andere Tonhöhe. `""` = aus, wie das Abwählen von Einstellungsfenster → *Eigene Anfragen vorsprechen (Pilotenstimme)*.
+- **`PilotVoice`:** spricht deine Rad-, F10- und Chat-Sprüche vor der Antwort. Jeder Spieler bekommt eine leicht andere Tonhöhe. `""` = aus, wie *aus* bei Einstellungsfenster → *Pilotenstimme*.
 
 | Einstellung | Standard | Bedeutung |
 |---|---|---|
@@ -2761,6 +2762,8 @@ Die erzeugten Zeilen in `frequencies.jsonc` enthalten die Platznamen schon. Sons
 
 Öffnen über **Startmenü → DCS-ATC → Einstellungen** oder **Funkrad → Allgemein → Einstellungen**. **Speichern** schreibt deine Änderungen in `config.jsonc` und behält die Kommentare der Datei. Im Fenster speichert `Enter`, `Esc` bricht ab. Mit `*` markierte Felder gelten ab dem nächsten Start von DCS-ATC, alle anderen schon während es läuft.
 
+Links wählst du die Seite: Allgemein, Stimmen, Funk & Verkehr, AWACS, Frequenzen, Tasten & Funkrad, SRS, Module, Erweitert. Das Suchfeld darüber springt zur Seite mit dem gesuchten Feld und hebt es hervor.
+
 | Feld | Werte | config.jsonc-Schlüssel |
 |---|---|---|
 | **Eigenes Rufzeichen** | Leer = Rufzeichen aus dem DCS-Slot. Sonst Name und zwei Ziffern, etwa `Viper 1-1` (`viper11` wird angenommen und vereinheitlicht). | `MyCallsign` |
@@ -2771,7 +2774,7 @@ Die erzeugten Zeilen in `frequencies.jsonc` enthalten die Platznamen schon. Sons
 | **Pause zwischen Funksprüchen** | 0–5 s | `ReplyPause` |
 | **Funkklang (Rauschen, Squelch)** | an/aus | `RadioFx` |
 | **Funksprüche auch als Text im Spiel** | an/aus | `RadioText` |
-| **Eigene Anfragen vorsprechen (Pilotenstimme)** | an/aus. Aus setzt die Pilotenstimme auf leer. | `PilotVoice` |
+| **Pilotenstimme (spricht eigene Anfragen vor)** | Stimme wählen oder *aus*. Aus setzt die Pilotenstimme auf leer. | `PilotVoice` |
 | **AWACS-Picture als Bullseye (statt BRAA)** | an/aus | `AwacsBullseye` |
 | **AWACS meldet neue Gruppen bis** | 40–200 NM | `AwacsNewGroupNm` |
 | **KI-Verkehr funkt hörbar mit** | an/aus | `AiChatter` |
@@ -2791,7 +2794,21 @@ Die erzeugten Zeilen in `frequencies.jsonc` enthalten die Platznamen schon. Sons
 | **Module** | Ein Kästchen pro Modul, wie im [Setup](#module-wählen). Das F10-Menü ändert sich ab der nächsten Mission. | (`modules.txt`, `DcsAtcModules.txt`) |
 | **DCS-ATC aktiv** | an/aus. Aus: DCS-ATC startet ab der nächsten Mission nicht mehr, ohne Deinstallieren. Kein Funkrad, kein F10-Menü, der KI-Funk von DCS läuft wie ohne DCS-ATC. Wieder an: Haken setzen. | (`DcsAtcOff.txt`) |
 
-**Alle Optionen (config.jsonc) …** öffnet die Datei im Editor.
+| **Kneeboard-Seiten bei Missionsstart schreiben** `*` | an/aus | `KneeboardPages` |
+| **Stimme je Station** `*` | Je Station: *Zufällig* (bei jedem Start eine der installierten Stimmen, ohne die Pilotenstimme) oder eine feste Stimme aus dem Ordner `models` mit Tonhöhe (1.00 = unverändert, kleiner = tiefer). Mit einer zweiten Stimme wechseln sich die Plätze ab. Der Knopf rechts spricht eine Probe über die PC-Lautsprecher. *Alle zufällig* und *Standard* setzen alle Zeilen. Drei und mehr Stimmen aus der Datei bleiben ein Textfeld. | `Voices` |
+| **KI-Funk nur im Umkreis eigener Spieler** | 10–200 NM | `AiFlightRadiusNm` |
+| **Eigene KI-Wingmen funken mit** | an/aus | `AiOwnWingmen` |
+| **Tanker führt selbst zum Join** | an/aus | `TankerVectors` |
+| **KI-Jäger fliegen die AWACS-Zuweisung** | an/aus. Aus: nur Funk. | `AiFollowAwacs` |
+| **Funktionsfrequenzen in MHz** `*` | Je Station eine Frequenz, 30–400 MHz | `Frequencies` |
+| **Modulation** `*`, **SRS-Seite für Stationen ohne eigene Seite** `*` | AM / FM, blau / rot | `Modulation`, `Coalition` |
+| **frequencies.jsonc …** | Öffnet die Datei mit den eigenen Frequenzen je Platz. | (`frequencies.jsonc`) |
+| **Größe des Funkrads** `*` | 25–95 % der Fensterhöhe | `WheelSize` |
+| **Über SRS auf der Lotsen-Frequenz sprechen** `*`, **SRS-Client beim Start verbinden** `*` | an/aus | `SrsListen`, `SrsAutoConnect` |
+| **Spracherkennung** `*` | Grafikkarte an/aus, API-Adresse, API-Schlüssel, API-Modell | `AsrGpu`, `AsrApiUrl`, `AsrApiKey`, `AsrApiModel` |
+| **Lagekarte im Browser** `*` | Port (0 = aus), auch aus dem Netzwerk an/aus | `MapPort`, `MapLan` |
+
+Auf der Seite *Erweitert* öffnet **config.jsonc …** die Datei im Editor. Nur dort stehen Center-Namen und -Sektoren, eigene NOTAMs, die ATIS-Frequenz je Platz und der On-speed-AoA.
 
 ### config.jsonc-Referenz
 
@@ -2953,6 +2970,7 @@ Für einen Fehlerbericht: Uhrzeit, Platz, kurze Beschreibung, `atc-log.txt` und 
 **Nach einem DCS-Update**
 - **Warum es nicht mehr geht.** DCS-Updates setzen `Scripts\MissionScripting.lua` zurück.
 - **Automatische Reparatur.** DCS-ATC prüft die Datei im Betrieb und fragt einmal nach Adminrechten („DCS-Update hat die DCS-ATC-Zeile in MissionScripting.lua entfernt -> Admin-Abfrage (UAC). Mission danach neu starten.“).
+- **DCS Retribution / DCS Liberation.** Solange ihr Programm offen ist, ersetzen sie `MissionScripting.lua` durch eine eigene Fassung (`resourcesscriptsMissionScripting.lua` in ihrem Ordner) und spielen beim Schließen das Original zurück. DCS-ATC trägt seine Zeile auch in diese Fassung ein. Beim ersten Mal kommt trotzdem einmal die Admin-Abfrage; danach die Mission neu starten. Danach keine Abfrage mehr, bis du eine neue Retribution-Version installierst.
 - **Von Hand.** Startmenü → DCS-ATC → **Nach DCS-Update reparieren**. Das Fenster zeigt, welche Dateien angepasst wurden.
 - **Datei selbst ändern.** `<DCS-Ordner>\Scripts\MissionScripting.lua` als Administrator öffnen (Dedicated Server: Installationsordner des Servers). Direkt über `local function sanitizeModule` diese Zeile einfügen:
   ```lua

@@ -673,10 +673,11 @@ How the voice values work:
 
 - **`@` sets the pitch:** `@0.88` = lower, `@1.05` = higher.
 - **`|` lists several voices:** each station (for example "Kolkhi Tower") keeps one of them, so neighbouring airfields sound different.
+- **`"random"` takes a random voice:** at each start every station gets one of the installed voices (not the pilot voice) and keeps it while DCS-ATC runs. In the settings window: *Random*.
 - **Missing voices:** if a voice file is missing, an available voice is used instead (otherwise `en_US-ryan-medium`). More voices: huggingface.co/rhasspy/piper-voices.
 - **Crew:** the crew chief at your parking spot, who speaks on your intercom.
 - **Carrier:** not in the template; the default `"en_US-ryan-medium@0.97|en_GB-alan-medium@1.02"` is added automatically.
-- **`PilotVoice`:** speaks your wheel, F10 and chat calls before the answer. Each player gets a slightly different pitch. `""` = off, which is the same as unticking the settings window → *Speak your wheel requests (pilot voice)*.
+- **`PilotVoice`:** speaks your wheel, F10 and chat calls before the answer. Each player gets a slightly different pitch. `""` = off, which is the same as *off* in the settings window → *Pilot voice*.
 
 | Setting | Default | Meaning |
 |---|---|---|
@@ -2759,6 +2760,8 @@ The generated lines in `frequencies.jsonc` already contain the airfield names. T
 
 Open it from **Start menu → DCS-ATC → Settings** or from **Radio wheel → General → Settings**. **Save** writes your changes to `config.jsonc` and keeps the comments in that file. In the window, `Enter` saves and `Esc` cancels. Fields marked `*` take effect the next time DCS-ATC starts. The other fields take effect while DCS-ATC is running.
 
+Pick the page on the left: General, Voices, Radio & traffic, AWACS, Frequencies, Keys & radio wheel, SRS, Modules, Advanced. The search field above it jumps to the page with the field you are looking for and highlights it.
+
 | Field | Values | config.jsonc key |
 |---|---|---|
 | **Your callsign** | Empty uses the callsign from your DCS slot. Otherwise a name and two digits, e.g. `Viper 1-1` (`viper11` is accepted and normalised). | `MyCallsign` |
@@ -2769,7 +2772,7 @@ Open it from **Start menu → DCS-ATC → Settings** or from **Radio wheel → G
 | **Pause between calls** | 0–5 s | `ReplyPause` |
 | **Radio effect (noise, squelch)** | on/off | `RadioFx` |
 | **Radio calls also as text in the game** | on/off | `RadioText` |
-| **Speak your wheel requests (pilot voice)** | on/off. Off sets the pilot voice to empty. | `PilotVoice` |
+| **Pilot voice (speaks your wheel requests)** | Pick a voice or *off*. Off sets the pilot voice to empty. | `PilotVoice` |
 | **AWACS picture as bullseye (instead of BRAA)** | on/off | `AwacsBullseye` |
 | **AWACS calls new groups within** | 40–200 NM | `AwacsNewGroupNm` |
 | **Hear AI traffic on frequency** | on/off | `AiChatter` |
@@ -2789,7 +2792,21 @@ Open it from **Start menu → DCS-ATC → Settings** or from **Radio wheel → G
 | **Modules** | One box per module, as in [setup](#choosing-modules). The F10 menu changes with the next mission. | (`modules.txt`, `DcsAtcModules.txt`) |
 | **DCS-ATC active** | on/off. Off: DCS-ATC no longer starts from the next mission, without uninstalling. No radio wheel, no F10 menu, the DCS AI radio works as without DCS-ATC. Back on: tick the box. | (`DcsAtcOff.txt`) |
 
-**All options (config.jsonc) …** opens the file in Notepad.
+| **Write kneeboard pages at mission start** `*` | on/off | `KneeboardPages` |
+| **Voice per station** `*` | Per station: *Random* (one of the installed voices at each start, not the pilot voice) or a fixed voice from the `models` folder with its pitch (1.00 = unchanged, lower = deeper). With a second voice the airfields alternate. The button on the right plays a sample on the PC speakers. *All random* and *Defaults* set every row. Three or more voices from the file stay a text field. | `Voices` |
+| **AI radio only within this range of players** | 10–200 NM | `AiFlightRadiusNm` |
+| **Your AI wingmen transmit too** | on/off | `AiOwnWingmen` |
+| **Tanker guides you to the join itself** | on/off | `TankerVectors` |
+| **AI fighters fly the AWACS assignment** | on/off. Off: radio only. | `AiFollowAwacs` |
+| **Station frequencies in MHz** `*` | One frequency per station, 30–400 MHz | `Frequencies` |
+| **Modulation** `*`, **SRS side for stations without their own** `*` | AM / FM, blue / red | `Modulation`, `Coalition` |
+| **frequencies.jsonc …** | Opens the file with your own frequencies per airfield. | (`frequencies.jsonc`) |
+| **Radio wheel size** `*` | 25–95 % of the window height | `WheelSize` |
+| **Talk via SRS on the controller frequency** `*`, **Connect the SRS client on start** `*` | on/off | `SrsListen`, `SrsAutoConnect` |
+| **Speech recognition** `*` | Graphics card on/off, API URL, API key, API model | `AsrGpu`, `AsrApiUrl`, `AsrApiKey`, `AsrApiModel` |
+| **Situation map in the browser** `*` | Port (0 = off), also from the network on/off | `MapPort`, `MapLan` |
+
+On the *Advanced* page, **config.jsonc …** opens the file in Notepad. Center names and sectors, your own NOTAMs, the ATIS frequency per airfield and the on-speed AoA are only in that file.
 
 ### config.jsonc reference
 
@@ -2951,6 +2968,7 @@ When you report a bug, include the time, the airfield, a short description, `atc
 **After a DCS update**
 - **Why it breaks.** DCS updates reset `Scripts\MissionScripting.lua`.
 - **Automatic fix.** DCS-ATC checks the file while running and asks once for admin rights to fix it ("A DCS update removed the DCS-ATC line from MissionScripting.lua -> admin prompt (UAC). Restart the mission afterwards.").
+- **DCS Retribution / DCS Liberation.** While their app is open, they replace `MissionScripting.lua` with their own copy (`resourcesscriptsMissionScripting.lua` in their folder) and put the original back when you close them. DCS-ATC adds its line to that copy too. The first time, it still asks for the admin prompt once; restart the mission afterwards. After that, no more prompts, until you install a new Retribution version.
 - **Manual fix.** Use Start menu → DCS-ATC → **Repair after DCS update**. The window shows which files were patched.
 - **Edit the file yourself.** Open `<DCS folder>\Scripts\MissionScripting.lua` as administrator (dedicated server: the server's install folder). Add this line directly above `local function sanitizeModule`:
   ```lua

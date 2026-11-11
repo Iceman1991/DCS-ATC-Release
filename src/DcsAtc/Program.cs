@@ -154,13 +154,14 @@ static partial class Program
         if (args.Contains("--platztest")) { Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); return 0; }
         if (args.Contains("--selftest")) { RadioTest(); ChartTest(); Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); AtisTest(); CrewTest(); ExpectTest(); PromptTest(); GpuTest(); return Tower.SelfTest(); }
         LoadConfig();
+        if (args.Length == 2 && args[0] == "--preview") { Preview(args[1]); return 0; }   // Test: DcsAtc --preview random (PC speakers, as the play button in the settings)
         if (args.Contains("--settings")) { Dedicated = DedicatedNow(); Settings.Show(Cfg); return 0; }   // language then also in the server's Saved Games
         if (args.Contains("--buttons")) { ShowButtons(); return 0; }
         if (args.Contains("--keys")) { SetupKeys(); return 0; }
         if (args.Contains("--frequencies")) { LoadFields(); Console.WriteLine(FreqPath); return 0; }   // create/extend frequencies.jsonc without DCS (e.g. server admin)
         if (args.Length >= 1 && args[0] == "--asr-test") return AsrTest(args.Length > 1 ? args[1] : Path.Combine(Root, "debrief", "asr"));
         if (args.Length >= 2 && args[0] == "--wheel-png") { Wheel.Snapshot(Cfg, args[1], args.ElementAtOrDefault(2)); return 0; }   // Preview: --wheel-png file.png ["role: suggestion"]
-        if (args.Length >= 2 && args[0] == "--settings-png") { if (args.Length > 2) Ui.En = args[2] == "en"; Settings.Snapshot(Cfg, args[1]); return 0; }   // Preview: --settings-png file.png [de|en]
+        if (args.Length >= 2 && args[0] == "--settings-png") { if (args.Length > 2) Ui.En = args[2] == "en"; Settings.Snapshot(Cfg, args[1], args.Length > 3 ? int.Parse(args[3]) : 0); return 0; }   // Preview: --settings-png file.png [de|en]
         if (args.Length == 2 && args[0] == "--wheel-live") { Wheel.LiveShot(Cfg, args[1]); return 0; }
         if (args.Length >= 1 && args[0] == "--kneeboard")   // DcsAtc --kneeboard <folder>
         {
@@ -601,8 +602,28 @@ static partial class Program
     /// If the model is missing (install without en_GB-alan), only those present apply, otherwise ryan: better another voice than a mute AWACS.
     static string PickVoice(string voices, string station)
     {
-        var v = voices.Split('|').Where(x => File.Exists(Path.Combine(Root, "models", x.Split('@')[0] + ".onnx"))).DefaultIfEmpty("en_US-ryan-medium").ToArray();
-        return v[station.Sum(ch => ch) % v.Length];
+        installed ??= Directory.Exists(Path.Combine(Root, "models")) ? Directory.GetFiles(Path.Combine(Root, "models"), "*.onnx").Select(m => Path.GetFileNameWithoutExtension(m)).ToArray() : Array.Empty<string>();
+        var v = VoicePool(voices, installed, Cfg.PilotVoice.Split('@')[0]);
+        return v[(station.Sum(ch => ch) + (voices.Contains("random") ? VoiceSeed : 0)) % v.Length];
+    }
+    static string[]? installed;
+    static readonly int VoiceSeed = Random.Shared.Next(1000);   // "random": another draw each start, fixed per station while the app runs
+    /// "random" (also "random@0.95") stands for every installed voice except the pilot's, so controller and pilot stay apart.
+    internal static string[] VoicePool(string voices, string[] installed, string pilot) =>
+        voices.Split('|').SelectMany(x => x.Split('@')[0] == "random" ? installed.Where(m => m != pilot || installed.Length == 1).Select(m => m + x[6..]) : new[] { x })
+              .Where(x => installed.Contains(x.Split('@')[0], StringComparer.OrdinalIgnoreCase)).DefaultIfEmpty("en_US-ryan-medium").ToArray();
+
+    /// Settings window: speak a sample with this voice ("a|b@0.9", "random") on the PC speakers, without SRS.
+    internal static void Preview(string voices)
+    {
+        Directory.CreateDirectory(Path.Combine(Root, "tmp"));
+        var mp3 = Path.Combine(Root, "tmp", "probe.mp3");
+        Synth("Kutaisi Tower, radio check, read you five by five.", PickVoice(voices, Random.Shared.Next(99).ToString()), mp3);
+        lock (Pipers) { foreach (var p in Pipers.Values) try { p.P.Kill(); } catch (Exception) { } Pipers.Clear(); }   // the settings window leaves no warm Piper behind
+        using var r = new Mp3FileReaderBase(mp3, wf => new AcmMp3FrameDecompressor(wf));
+        using var o = new WaveOutEvent();
+        o.Init(r); o.Play();
+        while (o.PlaybackState == PlaybackState.Playing) Thread.Sleep(50);
     }
 
     /// FI4: "request checkride" (speech; wheel/F10 "checkride" toggles) starts it at the active airfield within 10 NM, "cancel checkride" ends it; instructor on the intercom.
@@ -1504,8 +1525,35 @@ static partial class Program
 
     internal static string? ShellFolder(string? v) => string.IsNullOrWhiteSpace(v) ? null : Environment.ExpandEnvironmentVariables(v);   // REG_EXPAND_SZ: %USERPROFILE%\…
 
+    // Retribution/Liberation copy their own MissionScripting.lua (resources\scripts) over DCS's while their app is open, the original comes back on exit:
+    // add the line to their copy too (no admin), so the mission keeps DCS-ATC. Their copy has sanitizing commented out -> line at the end.
+    const string MissionLine = "pcall(function() local f = lfs.writedir() .. 'Scripts/DcsAtc/DcsAtcMission.lua' if lfs.attributes(f) then dofile(f) end end)   -- DCS-ATC (Mod)";
+    internal static string? WithMissionLine(string t) => t.Contains("DcsAtcMission") ? null : t.TrimEnd() + $"\r\n\r\n{MissionLine}\r\n";
+    static bool campaignErr;
+    static void PatchCampaignTool()
+    {
+        foreach (var p in Process.GetProcessesByName("retribution_main").Concat(Process.GetProcessesByName("liberation_main")))
+            try
+            {
+                var f = Path.Combine(Path.GetDirectoryName(p.MainModule!.FileName)!, "resources", "scripts", "MissionScripting.lua");
+                if (File.Exists(f) && WithMissionLine(File.ReadAllText(f)) is { } n)
+                {
+                    File.WriteAllText(f, n);
+                    Log(L($"[ATC] DCS-ATC-Zeile in {f} eingetragen (Retribution/Liberation ersetzt damit MissionScripting.lua)",
+                          $"[ATC] DCS-ATC line added to {f} (Retribution/Liberation replaces MissionScripting.lua with it)"));
+                }
+            }
+            catch (Exception e) when (!campaignErr)
+            {
+                campaignErr = true;
+                Log(L($"[ATC] Retribution/Liberation: Vorlage nicht angepasst ({e.Message})", $"[ATC] Retribution/Liberation: template not patched ({e.Message})"));
+            }
+            catch (Exception) { }
+    }
+
     static void CheckMissionScripting()
     {
+        PatchCampaignTool();
         var f = Path.Combine(DcsDir(), "Scripts", "MissionScripting.lua");
         var a = Path.Combine(DcsDir(), "Scripts", "autoexec.lua");   // wingmen by voice (DcsAtcWing.lua), game only
         var fix = Path.Combine(Root, "DcsAtc-Patch.ps1");
@@ -3105,7 +3153,7 @@ static partial class Program
             if (a.Mp3 == "")
             {
                 var mp3 = Path.Combine(Root, "tmp", "atis-" + Regex.Replace(name, "[^A-Za-z]", "") + ".mp3");
-                a.Sec = Synth(a.Text, Cfg.Voices.GetValueOrDefault("ATIS", "en_US-ryan-medium@0.94"), mp3);
+                a.Sec = Synth(a.Text, PickVoice(Cfg.Voices.GetValueOrDefault("ATIS", "en_US-ryan-medium@0.94"), name), mp3);   // "a|b" and "random" as for the other stations
                 a.Mp3 = mp3;
             }
             var sw = Stopwatch.StartNew();
@@ -3971,6 +4019,11 @@ static partial class Program
             WithConfigValue("{\n}", "RunwayLights", "\"dcs\"", "Fehlt") != "{\n  \"RunwayLights\": \"dcs\",\n}" || JsonSerializer.Deserialize<Config>("{ \"WheelStyle\": \"hud\" }") == null || NormCallsign("viper11") != "Viper 1-1" || NormCallsign("Viper") != null ||
             UnitCallsign("VICTORY 9-1") != "Victory 9-1" || UnitCallsign("WOLF-2-1") != "Wolf 2-1" || UnitCallsign("Aerial-1-1") != null || UnitCallsign("F-4E ADVERSARIES NELLIS 1-1") != null)
             throw new Exception("Einstellungen: " + c);
+        var nest = "{\n  \"Frequencies\": { \"Tower\": 265.0, \"ATIS\": 263.5 },\n  \"Voices\": {\n    \"Tower\": \"ryan\",   // fest\n    \"ATIS\": \"amy\"\n  }\n}";   // Tower in both blocks: only the named one changes
+        var nested = Settings.WithNested(Settings.WithNested(nest, "Voices", new[] { ("Tower", "\"alan|joe\"") }, ""), "Frequencies", new[] { ("Tower", "251.5"), ("Range", "267.5") }, "");
+        if (!nested.Contains("\"Range\": 267.5, \"Tower\": 251.5, \"ATIS\": 263.5 }") || !nested.Contains("\"Tower\": \"alan|joe\",   // fest") || Settings.WithNested(nest, "Voices", Array.Empty<(string, string)>(), "") != nest ||
+            Settings.WithNested("{\n}", "Voices", new[] { ("Tower", "\"x\"") }, "{\"Tower\":\"x\"}") != "{\n  \"Voices\": {\"Tower\":\"x\"},\n}")
+            throw new Exception("Einstellungen (Block): " + nested);
         Console.WriteLine("OK   Einstellungen: config.jsonc-Werte setzen (Kommentare bleiben), alte Option WheelStyle stört nicht, Rufzeichen \"viper11\" -> \"Viper 1-1\", Unitname \"VICTORY 9-1\" -> \"Victory 9-1\"");
         var live = Path.Combine(Path.GetTempPath(), $"DcsAtc-LiveTest-{Environment.ProcessId}.jsonc");   // R392: Bahnbefeuerung gilt nach dem Speichern sofort
         File.WriteAllText(live, "{ \"RunwayLights\": \"off\" }");
@@ -4159,6 +4212,10 @@ static partial class Program
             || string.Join("|", libs) != @"C:\Program Files (x86)\Steam|D:\SteamLibrary")
             throw new Exception($"Pfade: {ShellFolder(@"%USERPROFILE%\Saved Games")} / {string.Join("|", libs)}");
         Console.WriteLine($"OK   Pfade: %USERPROFILE%\\Saved Games -> {home}\\Saved Games, Steam-Bibliotheken {string.Join(", ", libs)}");
+        var ret = "dofile('Scripts/ScriptingSystem.lua')\n\n-- local function sanitizeModule(name)\n-- do\n-- \tsanitizeModule('os')\n-- end\n";
+        if (WithMissionLine(ret) is not { } rp || !rp.EndsWith(MissionLine + "\r\n") || !rp.StartsWith(ret.TrimEnd()) || WithMissionLine(rp) != null)
+            throw new Exception("Retribution-Vorlage: Zeile nicht am Ende oder doppelt");
+        Console.WriteLine("OK   Retribution/Liberation-Vorlage: DCS-ATC-Zeile am Ende, kein zweites Mal");
         var kut = new Airfield { Name = "Kutaisi", Id = 25 };
         Airfield.LoadRadio(new[] { kut }, DcsDir());
         if (!File.Exists(Path.Combine(DcsDir(), "Mods", "terrains", "Caucasus", "Radio.lua"))) { Console.WriteLine("--   Radio.lua: DCS nicht gefunden"); return; }
@@ -4425,6 +4482,10 @@ static partial class Program
         if (aiVoices.Length < 2 || va1 == vb1 || va1 == va2 || va1 != AiVoiceFor("a1") || vb1 != AiVoiceFor("b1") || (aiVoices.Length > 2 && new[] { va1, vb1, vc1 }.Distinct().Count() < 3)
             || new[] { va1, va2, vb1, vc1 }.Any(v => v.Contains('@') || v.StartsWith("en_GB-alan")) || aiVoices[0] == Cfg.PilotVoice.Split('@')[0])
             throw new Exception($"KI-Stimmen je Flight: {string.Join(", ", aiVoices)} / {va1} {va2} {vb1} {vc1}");
+        var inst = new[] { "a", "b", "joe" };   // "random": all installed without the pilot's voice, pitch kept; unknown models drop out; settings window writes voices back as they were
+        if (string.Join(",", VoicePool("random@0.9", inst, "joe")) != "a@0.9,b@0.9" || string.Join(",", VoicePool("b|x|random", inst, "")) != "b,a,b,joe" || VoicePool("x", inst, "")[0] != "en_US-ryan-medium"
+            || new Config().Voices.Values.Append("random").Append("a@1.1|b@0.9").Any(v => Settings.VoiceText(Settings.VoiceParts(v)) != v))
+            throw new Exception("Stimmen: random / Hin- und Rueckweg");
         (aiVoices, Flights.Units) = (keepVoices, keepUnits); aiSlot.Clear();
         Tx ki(string t, string role = "Tower", int prio = 2) => new(t, role, "Kutaisi Tower", 0, Prio: prio);   // A134: display duration in the .out line
         int d1 = ShowSec(ki("Enfield one one, cleared to land."), ""), d2 = ShowSec(ki(new string('x', 100)), ""), d3 = ShowSec(ki(new string('x', 52), "Flight", 1), ""),

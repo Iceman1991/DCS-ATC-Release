@@ -40,7 +40,7 @@
 
   // Piper-Stimmen aus dem Ordner models, "@0.88" = tiefer (weitere: huggingface.co/rhasspy/piper-voices)
   "Voices": {
-    "Tower": "en_US-ryan-medium|en_US-ljspeech-medium",   // mit | mehrere: je Platz/Station fest eine, abwechselnd
+    "Tower": "en_US-ryan-medium|en_US-ljspeech-medium",   // mit | mehrere: je Platz/Station fest eine, abwechselnd; "random": je Start eine zufällige der installierten
     "Ground": "en_US-bryce-medium",
     "Approach": "en_US-ryan-medium@1.05",
     "ATIS": "en_US-ryan-medium@0.94",
