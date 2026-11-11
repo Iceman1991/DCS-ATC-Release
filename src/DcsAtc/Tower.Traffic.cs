@@ -47,6 +47,13 @@ public partial class Tower
         landedRw = rw;
         return home != null && home.Vacate.TryGetValue(rw, out var v) ? $"Vacate {v}." : OneOf("Vacate runway when able.", "Vacate the runway when able.");
     }
+
+    /// Helicopter: landing clearance at the ramp, without runway (FAA JO 7110.65 3-11-6); first: first call (then with the QNH).
+    List<Msg> HeliClear(Telemetry t, string hdr, bool first)
+    {
+        heliArr = 2;
+        return Say($"{hdr}, {Wind(t)}, {(first ? Qnh(t) + ", " : "")}cleared to land at the ramp.", "Tower");
+    }
     string landedRw = "";
 
     /// Ground: taxiway to the apron after vacating the runway.

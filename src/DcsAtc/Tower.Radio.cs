@@ -197,6 +197,21 @@ public partial class Tower
                 break;
             }
 
+        // Helicopter arrival (VFR): direct to the field and "cleared to land at the ramp" (FAA JO 7110.65 3-11-6), no runway, pattern or landing sequence;
+        // a named runway, an option (touch and go ...), instrument weather or an emergency keep the airplane flow
+        if (IsHeli && !ground && t != null && !Ifr && !Emergency && opt is null or "full stop" &&
+            (heliArr > 0 ? intent is "inbound" or "final" or "base" or "fieldinsight" : intent == "inbound" && Phase == Phase.Away && RwySlot(n) == null))
+        {
+            Expected = false;
+            double hd = Dist(t.X, t.Z, CX, CZ);
+            if (heliArr == 0 && hd > 5 * NM)
+            {
+                (heliArr, heliNm) = (1, hd);
+                return Say($"{hdr}, {Position(t)}, {Wind(t)}, {Qnh(t)}.{AtisNote(n)} Proceed direct to the field, contact {Contact("Tower")}, report two miles.");
+            }
+            return HeliClear(t, hdr, heliArr == 0);
+        }
+
         switch (intent)
         {
             case "goaround":
@@ -315,7 +330,7 @@ public partial class Tower
                 if (special is { } sp) { special = null; lastParkCall = -1; return Say($"{c}, taxi to the {sp}."); }   // R251: once de-arm area instead of parking position (afterwards "request taxi to parking" normal), no taxi guidance to the old parking spot
                 if (!again && t != null && FreeSpot(t, traffic) is { } fs) { spot = (fs.X, fs.Z); parkNum = fs.Num; home = NearestRamp(t with { X = fs.X, Z = fs.Z }); }   // named ramp = that of the parking spot
                 var park = parkNum > 0 ? $"parking spot {StandName(parkNum)}" : "parking";
-                var route = home != null ? $"taxi to {home.Name}{ParkRoute()}{(parkNum > 0 ? ", " + park : "")}" : $"taxi to {park}";
+                var route = (IsHeli ? "air " : "") + (home != null ? $"taxi to {home.Name}{ParkRoute()}{(parkNum > 0 ? ", " + park : "")}" : $"taxi to {park}");   // R347: helicopter air taxi
                 var where = F.Net == null && t != null && ParkDir(t) is { } pd ? (parkNum > 0 ? $", {pd}" : $", your parking position {pd}") : "";   // DCS network: no clock direction (wrong way only)
                 (crossOk, crossWait) = (null, null);
                 var hxi = t != null && CrossIn(t) is { } xi ? $", hold short runway {RwSay(xi)}" : "";   // LA06 (log Nellis): runway on the way to the parking position, crossing on report
@@ -1174,6 +1189,8 @@ public partial class Tower
         Phase.Initial => t == null || !OnFinalLoose(t, Runway) && Dist(t.X, t.Z, CX, CZ) < 5 * NM ? ("Tower", $"base, gear down, {option ?? "full stop"}") : null,   // on initial nothing (wait for break, "final" would give the landing clearance), then "base"
         Phase.Pattern => t == null || OnFinalLoose(t, Runway) ? ("Tower", option is "touch and go" or "low approach" or "low pass" or "the option" ? $"final, {option}" : "final, gear down, full stop")
                        : option == "low pass" ? null : ("Tower", $"base, gear down, {option ?? "full stop"}"),   // A47: low pass without pattern; R200: landing report base with gear
+        Phase.Away when heliArr > 0 => heliArr == 1 ? ("Tower", "two miles, inbound for landing") : null,   // helicopter: report two miles; cleared to land: nothing to say
+        Phase.TaxiIn when !taxiInTold && IsHeli && t != null && !OnRunwayPos(t.X, t.Z) => ("Ground", "on the ground, request air taxi to parking"),   // landed beside the runway
         Phase.Away when intr is 1 or 2 && transitFt == null && t != null && !OnGround(t) => ("Tower", "request zone transit"),   // N2: called in the zone without contact, legal way (N3)
         Phase.Departing => ("Approach", "airborne, climbing"),
         Phase.TaxiIn when taxiInTold && t != null && CrossIn(t) is { } ci && NearRwy(t, ci) => ci == crossOk || ci == crossWait ? null : ("Ground", $"holding short runway {RwSay(ci)}, request crossing"),   // LA06: runway on the way to parking

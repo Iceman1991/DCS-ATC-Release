@@ -857,7 +857,9 @@ Liegt die Sicht unter 5 km oder die Wolkenuntergrenze unter 1000 ft, ergänzt de
 
 **Standardmäßig geradeaus**
 
-**Nachts** (Sonne mehr als 6° unter dem Horizont) und für Typen ohne Overhead Break gibt „inbound“ einen Geradeaus- oder Instrumentenanflug. Das sind Hubschrauber, C-130/C-17, C-47, An-/Il-/Tu-, B-1/B-52, KC-Tanker, E-2/E-3 und S-3. Mit „overhead“, „VFR“ oder „cancel IFR“ gibt es trotzdem den Overhead Break. („request visual approach“ gibt einen Sichtanflug geradeaus.)
+**Nachts** (Sonne mehr als 6° unter dem Horizont) und für Typen ohne Overhead Break gibt „inbound“ einen Geradeaus- oder Instrumentenanflug. Das sind C-130/C-17, C-47, An-/Il-/Tu-, B-1/B-52, KC-Tanker, E-2/E-3 und S-3. Mit „overhead“, „VFR“ oder „cancel IFR“ gibt es trotzdem den Overhead Break. („request visual approach“ gibt einen Sichtanflug geradeaus.)
+
+**Hubschrauber** fliegen keine Platzrunde an der Bahn. Auf „inbound for landing“ kommt *„proceed direct to the field, report two miles“*, danach *„wind calm, cleared to land at the ramp“*. Die Freigabe kommt bei zwei Meilen auch ohne Meldung und sofort, wenn du innerhalb von 5 NM rufst. Du stehst nicht in der Landereihenfolge und niemand sagt dir, die Bahn zu verlassen. Am Boden bei Ground *„air taxi to parking“* anfragen oder dort abstellen, wo du stehst. Für einen Anflug auf die Bahn oder Platzrunden die Bahn oder den Anflug nennen („inbound for landing runway 25“, „request straight in“, „touch and go“). Bei Instrumentenwetter und im Notfall wird ein Hubschrauber wie ein Flugzeug geführt.
 
 ### Ground
 
@@ -1509,7 +1511,7 @@ DCS-ATC übernimmt den Funk für jeden eigenen Träger in der Mission: Marshal, 
 
 ### Unterstützte Träger
 
-Erkannt wird jede Schiffsgruppe, deren erste Einheit ein Supercarrier oder Träger ist: Nimitz-Klasse / CVN, Stennis, Forrestal, Kuznetsov und Tarawa. Bei Schrägdeck-Trägern liegt das Final Bearing etwa 9° links vom Schiffskurs (BRC). Die Tarawa hat ein gerades Deck, ihr Final Bearing ist gleich dem BRC.
+Erkannt wird jede Schiffsgruppe, deren erste Einheit ein Supercarrier oder Träger ist: Nimitz-Klasse / CVN, Stennis, Forrestal, Kuznetsov und Tarawa. Bei Schrägdeck-Trägern liegt das Final Bearing links vom Schiffskurs (BRC): etwa 9° bei Nimitz-Klasse und Forrestal, etwa 8° bei der Kuznetsov. Jede Klasse hat für den LSO ihre eigene Deckhöhe, Seilpositionen und ihren Gleitwinkel (Kuznetsov 4°). Die Tarawa hat ein gerades Deck und keine Seile, ihr Final Bearing ist gleich dem BRC und die Note nennt kein Seil.
 
 Die Seite **Carrier** im Funkrad erscheint nur, wenn die Mission einen Träger enthält.
 
@@ -1722,10 +1724,10 @@ Paddles beobachtet deinen Groove ab etwa ¾ NM, solange du mit waagerechten Flä
 **Fahrt-Rufe** („slow“/„fast“) brauchen den On-Speed-AoA deines Typs und Anstellwinkeldaten, die es nur für das Flugzeug auf dem PC mit DCS-ATC gibt. Einstellung in `config.jsonc`:
 
 ```jsonc
-"OnSpeedAoa": { "FA-18": 8.1 },   // Grad je Typ-Präfix; andere Typen bekommen keine Fahrt-Rufe
+"OnSpeedAoa": { "F-14": 10.6 },   // Grad je Typ-Präfix; ergänzt die eingebauten Werte oder ersetzt einen
 ```
 
-Für einen anderen Typ ein paar Anflüge fliegen und den Wert aus der Logzeile `[LSO] … AoA im Mittel …` ablesen.
+Eingebaut: FA-18 8.1, F-14 10.4, T-45 8.5, A-4E 8.75, AV8B 10.0. Nur der Hornet-Wert ist im Spiel gemessen, die anderen sind Buchwerte. Andere Typen bekommen keine Fahrt-Rufe. Um einen Wert zu korrigieren oder einen Typ zu ergänzen: ein paar Anflüge fliegen und den Wert aus der Logzeile `[LSO] … AoA im Mittel …` ablesen.
 
 ### Wave-off und Bolter
 
@@ -2886,7 +2888,7 @@ Eigene Frequenzen je Platz und Lotse stehen nicht in `config.jsonc`, sondern in 
 | `AwacsBullseye` | `true` | Picture und Updates an alle im Bullseye-Format; `false` = alles BRAA von dir. |
 | `AwacsNewGroupNm` | `200` | AWACS meldet neue Gruppen (und „picture clean“) bis zu dieser Entfernung, 40–200 NM. |
 | `TankerVectors` | `false` | `true` = der Tanker führt dich selbst zum Join (Kurs, Entfernung, Höhe), bis du „visual“ meldest. `false` = nur die erste Peilung, Vektoren vom AWACS oder auf „request vector“. |
-| `OnSpeedAoa` | `{ "FA-18": 8.1 }` | LSO: On-Speed-Anstellwinkel in Grad je Typ-Präfix für „you're fast/slow“. Andere Typen bekommen keine Fahrt-Rufe. Werte aus der Logzeile `[LSO] AoA im Mittel` ableiten. |
+| `OnSpeedAoa` | `{ }` | LSO: On-Speed-Anstellwinkel in Grad je Typ-Präfix für „you're fast/slow“. Ergänzt die eingebauten Werte (FA-18 8.1, F-14 10.4, T-45 8.5, A-4E 8.75, AV8B 10.0) oder ersetzt einen. Andere Typen bekommen keine Fahrt-Rufe. Werte aus der Logzeile `[LSO] AoA im Mittel` ableiten. |
 
 **Platzverhalten und Logs**
 

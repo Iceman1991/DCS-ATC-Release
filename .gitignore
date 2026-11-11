@@ -6,6 +6,7 @@ dist/
 tmp/
 debrief/
 atc-log.txt
+atc-debug.txt
 .vs/
 *.user
 

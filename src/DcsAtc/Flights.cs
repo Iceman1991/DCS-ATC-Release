@@ -549,7 +549,7 @@ static class Flights
         if (aw is { } ac && !station.ContainsKey(grp) && Once("checkin:" + grp, now, 1e9))
         {
             var fl1 = Units.Values.Where(u => u.Group == grp && u.InAir).ToList();
-            int play = (int)Math.Max(0, (fl1.Min(u => u.Fuel) - 0.22) * 100) / 5 * 5;   // ponytail: 1 % fuel per minute (cruise), real burn rate if needed
+            int play = (int)Math.Max(0, (fl1.Min(u => u.Fuel) - 0.22) * Ops.Endurance(lead.Type)) / 5 * 5;   // down to 22 % (bingo), minutes on a full tank per type (Ops.FullTankMin)
             Say(now, Reaction(), "checkin", lead, $"{ac.Name}, {fl}, checking in as fragged, flight of {Count(fl1.Count)}, {Ops.Angels(lead.Alt)}, playtime {play}.", tac, 2, 20);
             SayAwacs(now, 4 + Rnd(), "checkin", lead.Side, ac.Name, $"{fl}, {ac.Name}, radar contact.", tac, 2);
         }
@@ -873,7 +873,7 @@ static class Flights
         Run(4990);
         Units = new() { ["F11"] = F("F11", "Ford11", 35 * NM, 0, 20000 * ft), ["F12"] = F("F12", "Ford12", 35 * NM, 1000, 20000 * ft) };
         a = Run(5000); a.AddRange(Run(5010));   // LD7/R377: check-in on first contact once ours, no altitude gate (8000 ft)
-        check(All(a) == "251.0:Overlord, Ford one, checking in as fragged, flight of two, angels 8, playtime 55. | 251.0:Ford one, Overlord, radar contact.", "LD7/R377 check-in beim ersten Kontakt, auch unter 10000 ft: " + All(a));
+        check(All(a) == "251.0:Overlord, Ford one, checking in as fragged, flight of two, angels 8, playtime 45. | 251.0:Ford one, Overlord, radar contact.", "LD7/R377 check-in beim ersten Kontakt, auch unter 10000 ft: " + All(a));
         Units["F11"] = F("F11", "Ford11", 35 * NM, 0, 25000 * ft); Units["F12"] = F("F12", "Ford12", 35 * NM, 1000, 25000 * ft);   // still climbing
         a = Run(5030); a.AddRange(Run(5062));
         check(a.Count == 0, "KI-Funk on station: erst nach 60 s auf derselben Höhe: " + All(a));

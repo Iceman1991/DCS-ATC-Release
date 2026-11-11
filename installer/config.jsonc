@@ -63,7 +63,7 @@
   "AiFollowAwacs": true,   // KI-Jäger fliegen die Gruppe an, die ihnen das AWACS zuweist, das AWACS weicht Bedrohungen aus; false: KI fliegt die Mission, der Funk folgt ihr
   "AiFlightRadiusNm": 60,     // nur KI im Umkreis eigener Spieler
   "AiOwnWingmen": false,      // eigene KI-Wingmen mitfunken lassen (DCS spricht sie schon selbst)
-  "OnSpeedAoa": { "FA-18": 8.1 },   // LSO: On-speed-AoA in Grad je Typ-Anfang (Paddles: You're fast/slow); anderer Typ = keine Speed-Calls, Wert aus dem Log "[LSO] AoA im Mittel" ableiten
+  "OnSpeedAoa": { },   // LSO: On-speed-AoA in Grad je Typ-Anfang (Paddles: You're fast/slow), z. B. { "F-14": 10.6 }; eingebaut: FA-18 8.1, F-14 10.4, T-45 8.5, A-4E 8.75, AV8B 10.0; Wert aus dem Log "[LSO] AoA im Mittel" ableiten
   "TankerVectors": false,    // true = Tanker führt selbst zum Join mit Steuerkurs/Entfernung/Höhe bis "visual" (false = nur erste Peilung, Vektoren vom AWACS oder auf "request vector")
   "SpeechRate": 0.85,   // Sprechtempo der Lotsen: 1 = Piper-Standard, kleiner = schneller
   "ReplyPause": 1.5,   // Sekunden Pause zwischen zwei Funksprüchen auf einer Frequenz (Pilot -> Lotse -> Rücklesen)

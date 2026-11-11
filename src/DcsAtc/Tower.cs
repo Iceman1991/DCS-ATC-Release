@@ -118,6 +118,7 @@ public partial class Tower
     public int HoldAhead;               // R341: other players holding short who reported ready earlier (Program; departure order by report time)
     public bool Heli;                   // R347: helicopter (mission category, Program); also by type without mission data
     bool IsHeli => Heli || Regex.IsMatch(AcType, @"^(UH-|Mi-|Ka-|AH-|CH-|OH|SA342|AS532|MH-60)");
+    int heliArr; double heliNm;         // helicopter arrival (HeliArrive): 1 = direct to the field, report two miles (heliNm: distance at the call), 2 = cleared to land at the ramp; phase stays Away (no runway, pattern or landing sequence)
     // Traffic patterns, emergency, holding, landing assessment
     string? option;                     // "touch and go" / "low approach" / "full stop"
     bool stayPattern, holding, wasAir, graded;   // graded: landing graded, free again only above 30 m (bounce = one landing)
@@ -256,7 +257,7 @@ public partial class Tower
     public double CallFreq;  // LA11: SRS frequency of the current call (Program.Request), 0 = menu/unknown
     public string? AwacsContact;   // "Overlord two five one decimal zero": own AWACS/GCI of the mission, handoff after departure (Program), null = none
     public bool Following;   // V15: flight following (radar service en route), moves along on airfield change (Program)
-    public bool Radar => handedOff || depClr || Following || transitFt != null;   // R47: Departure, Flight Following or transit (N3) still looks after the flight (Program.Pick keeps the airfield)
+    public bool Radar => handedOff || depClr || Following || transitFt != null || heliArr > 0;   // R47: Departure, Flight Following or transit (N3) still looks after the flight (Program.Pick keeps the airfield)
     double? transitFt; bool transitIn; string transitDir = "", transitBy = "Approach";   // N3: transit cleared (minimum altitude) / already in the zone / direction / releasing controller
     public readonly HashSet<string> TransitTold = new();   // N3: players in the pattern who have been informed of the transit (Program)
     public string? TransitInfo => transitFt is { } f ? $"crossing overhead {transitDir}bound, {Alt(f)}" : null;   // N3: transit in progress (Program: traffic info, guard silent)

@@ -516,6 +516,18 @@ partial class Ops
     };
     internal static string TypeSay(string type) => TypeNames.FirstOrDefault(n => Regex.IsMatch(type, n.Re)).Name
         ?? Regex.Replace(type.Split('_')[0], @"(?<=[A-Za-z])-?(?=\d)", " ");
+    /// Minutes of flight on a full internal tank at cruise, per type (emergency call "25 minutes fuel", playtime of the AI flights); unknown type 90.
+    /// ponytail: book values rounded, no external tanks, no altitude or power setting; a burn rate from the mission if a type is clearly off
+    static readonly (string Re, int Min)[] FullTankMin =
+    {
+        (@"^A-10", 180), (@"^F-16", 85), (@"^F/?A-18|^EA-18", 105), (@"^F-15", 95), (@"^F-14", 125), (@"^AV8B", 95), (@"^F-4E", 75), (@"^A-4", 90), (@"^T-45|^Su-25", 90),
+        (@"^F-5|^MiG-19|^MiG-21", 45), (@"^MiG-15|^MiG-29|^Mirage-F1|^AJS37", 60), (@"^M-2000", 65), (@"^F-86", 70), (@"^JF-17", 75), (@"^Su-27|^Su-33|^J-11", 150),
+        (@"^L-39", 100), (@"^MB-339|^Hawk", 110), (@"^C-101|^Yak-52", 150),
+        (@"^UH-1|^Ka-50", 140), (@"^Mi-8", 130), (@"^Mi-24|^OH-?58", 120), (@"^AH-64|^SA342|^CH-47|^UH-60", 150),
+        (@"^P-51|^TF-51|^Mosquito", 240), (@"^F4U", 180), (@"^P-47", 120), (@"^Spitfire|^FW-190", 80), (@"^Bf-109", 70), (@"^I-16|^La-7", 60),
+        (@"^C-130|^KC-?1|^E-[23]|^S-3|^B-52|^B-1|^Tu-|^IL-|^A-50|^An-", 480),
+    };
+    internal static int Endurance(string type) => FullTankMin.FirstOrDefault(n => Regex.IsMatch(type, n.Re)) is { Min: > 0 } e ? e.Min : 90;
     internal static string Card(double trueDeg) =>
         new[] { "north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest" }[(int)Math.Round(((trueDeg % 360) + 360) % 360 / 45) % 8];
 
@@ -1525,6 +1537,10 @@ partial class Ops
         check(rc == 1 && rl == 1 && bc is ["Enfield one one, Overlord, clean."], $"R50: Check-in {rc}x/tief {rl}x radar contact, bogey dope -> {string.Join(" | ", bc)}");
         var b27 = new[] { "Overload, Enfield 1-1, Bogeydope.", "Overload. Enfield 1-1. Request bogie-dope." }.Select(s => new Ops().OnTranscript("AWACS", s, me, blue, f, 0).FirstOrDefault()?.Text).ToList();
         check(b27.All(x => x == "Enfield one one, Overlord, clean."), "#27: Overload/Bogeydope wie Whisper -> " + string.Join(" | ", b27));
+        // Names one letter off become the expected name (airfields, call names); exact names, short words, two candidates and other words stay; mishearings from the log
+        var fx = Tower.FixNames("Overlard, Enfield 1-1, inbound Kutaissi, request picture, Vaziani, Kobulet, Texico", new[] { "Overlord", "Kutaisi", "Vaziani", "Enfield 1-1", "Kobuleti", "Kobulets", "Texaco", "Shell" });
+        check(fx == "Overlord, Enfield 1-1, inbound Kutaisi, request picture, Vaziani, Kobulet, Texaco" && Tower.Normalize("Enboard for landing.") == "inbound for landing"
+              && Tower.Normalize("See you again.") == "say again" && Tower.Normalize("See you at 10") == "see you at 10", "Spracherkennung: Namen einen Buchstaben daneben, Verhörer aus dem Log -> " + fx);
         var srt = new Ops().OnTranscript("AWACS", "Overlord, Enfield 1-1, sorted", me, blue, f, 0).Select(x => x.Text).ToList();
         check(srt.Count == 0 && Tower.Normalize("Dark Star, Enfield 1-1, picture").StartsWith("darkstar "), "AWACS: 'sorted' still, Dark Star -> darkstar -> " + string.Join(" | ", srt));
         var ifc0 = Tower.IffCheck;   // FI1 I5: IffCheck and Mode 4 off -> "parrot sour" with the radar contact; Mode 4 on, unknown or without IffCheck nothing

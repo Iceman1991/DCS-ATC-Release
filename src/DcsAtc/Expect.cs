@@ -263,7 +263,7 @@ static partial class Program
         if (S(Expected(p, p.Active.Suggest(taxi))) is var rt && rt != "-") throw new Exception("Funkrad-Vorschlag beim Rollen: " + rt);
         p.Active = null;
         var souls = H("Colt three two, Kutaisi Approach, roger mayday, all traffic is holding. Turn left heading two seven zero. Runway two five available, QNH one zero one three, say souls on board and fuel remaining.", "Approach");
-        if (souls != "Approach: 45 minutes fuel, one soul on board") throw new Exception("Funkrad-Vorschlag R300 souls/fuel: " + souls);
+        if (souls != "Approach: 50 minutes fuel, one soul on board") throw new Exception("Funkrad-Vorschlag R300 souls/fuel: " + souls);
         Pilots.Remove(p.Unit); Pilots.Remove(o.Unit); tracedReq.Remove(p.Unit);
         var all = string.Join(" | ", res) + $" | {again} | {cap} | {intent} | {dep} | {old}";
         if (all != "Approach: inbound for landing | Approach: 250 knots | Approach: 250 knots | Carrier: Hornet ball, 5.4 | Tower: initial | Range: in hot | Range: in hot | Tanker: pre contact | Tower: ready for departure | " +

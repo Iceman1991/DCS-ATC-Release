@@ -568,6 +568,10 @@ public partial class Tower
         }
 
         if (Phase != Phase.Away || Dist(t.X, t.Z, CX, CZ) > CtrM + NM) intr = 0;
+        // Helicopter arrival: two miles out without the report -> landing clearance anyway; flown away again (5 NM farther than at the call, cleared: beyond 6 NM) -> over
+        if (heliArr > 0 && (Phase != Phase.Away || !ground && Dist(t.X, t.Z, CX, CZ) > (heliArr == 2 ? 6 * NM : heliNm + 5 * NM))) heliArr = 0;
+        if (heliArr == 1 && !ground && Dist(t.X, t.Z, CX, CZ) < 2 * NM) return HeliClear(t, c, false);
+        if (heliArr > 0 && !ground) return new();   // no airspace watch, no runway or final calls
         if (!ground && Phase == Phase.Away && transitFt == null && Watch && !Exempt && !Emergency && HostileNm > 20 && Aloft > 60 && IndFt(t) < F.CtrTopFt && WatchTick(t, traffic, now) is { } wm) { WatchSaid = true; return wm; }   // R294: announced emergency (AWACS, Announce) is not sent away
 
         // Final: landing clearance after the landing report, go-around with occupied runway or without report, glide path calls
@@ -701,7 +705,8 @@ public partial class Tower
         if (airborne && ground && now - touchAt >= 2 && kt < (option is "touch and go" or "the option" ? 50 : 100) && Dist(t.X, t.Z, CX, CZ) < 3000)
         {
             airborne = false;
-            bool unclr = Phase != Phase.ClearedLand && !Emergency, ga = wentAround;   // N4: without landing clearance (emergency allowed)
+            bool unclr = Phase != Phase.ClearedLand && heliArr != 2 && !Emergency, ga = wentAround;   // N4: without landing clearance (emergency allowed)
+            heliArr = 0;
             Phase = Phase.TaxiIn;
             landedAt = now;
             rwyBusyTold = Emergency = stayPattern = taxiInTold = wxTold = wentAround = false;
@@ -710,6 +715,8 @@ public partial class Tower
             PatternReset();
             devTold.Clear();   // new flight: violations individually again
             var landed = landRw = RwyOf(t);
+            if (IsHeli && !OnRunwayPos(t.X, t.Z))   // helicopter beside the runway: nothing to vacate; cleared: silent (Ground on request), otherwise only the violation
+                return unclr ? Dev($"{c}, {F.StationOf("Tower")}, you landed without a clearance.", $"Landung ohne Freigabe {F.Name}", $"landing without clearance {F.Name}", "Tower") : new();
             // Following traffic within 3 NM on final for the same runway: vacate promptly (ICAO Doc 4444 12.3.4), once per landing
             var follow = Follower(traffic, landed, Gs(t), now);   // R331: over ground (headwind shows IAS at standstill)
             if (follow != null) expFor = now;
@@ -1297,7 +1304,7 @@ public partial class Tower
         exitDir = entry = null;
         vec = null; missAt = -1; zoneReport = false;
         stoppedSince = -1;
-        lineUp = stayPattern = holding = graded = called = wentAround = false;
+        lineUp = stayPattern = holding = graded = called = wentAround = false; heliArr = 0;
         devTold.Clear(); devPend = false; special = null; intr = 0; transitFt = null;
         Emergency = false;
         option = wantRw = null;

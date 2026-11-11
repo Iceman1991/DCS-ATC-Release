@@ -855,7 +855,9 @@ If the visibility is below 5 km or the ceiling is below 1,000 ft, the controller
 
 **Straight-in by default**
 
-At **night** (sun more than 6° below the horizon), and for types that don't fly an overhead break, "inbound" gets a straight-in or instrument approach. These types are helicopters, C-130/C-17, C-47, An-/Il-/Tu-, B-1/B-52, KC tankers, E-2/E-3 and S-3. Say "overhead", "VFR" or "cancel IFR" to get the overhead break anyway. ("request visual approach" gives you a visual straight-in approach.)
+At **night** (sun more than 6° below the horizon), and for types that don't fly an overhead break, "inbound" gets a straight-in or instrument approach. These types are C-130/C-17, C-47, An-/Il-/Tu-, B-1/B-52, KC tankers, E-2/E-3 and S-3. Say "overhead", "VFR" or "cancel IFR" to get the overhead break anyway. ("request visual approach" gives you a visual straight-in approach.)
+
+**Helicopters** do not fly the runway pattern. "Inbound for landing" gets *"proceed direct to the field, report two miles"*, then *"wind calm, cleared to land at the ramp"*. The clearance also comes at two miles without the report, and right away if you call inside 5 NM. You are not part of the landing sequence and nobody tells you to vacate. On the ground, ask Ground for *"air taxi to parking"* or shut down where you are. For a runway approach or pattern, name the runway or the approach ("inbound for landing runway 25", "request straight in", "touch and go"). In instrument weather and in an emergency a helicopter is handled like an airplane.
 
 ### Ground
 
@@ -1507,7 +1509,7 @@ DCS-ATC handles the radio for every friendly carrier placed in the mission. It p
 
 ### Which carriers are supported
 
-Any ship group whose first unit is a supercarrier or carrier is recognised: Nimitz class / CVN, Stennis, Forrestal, Kuznetsov and Tarawa. On angled-deck carriers, the final bearing is about 9° left of the ship's heading (the BRC). The Tarawa has a straight deck, so its final bearing equals the BRC.
+Any ship group whose first unit is a supercarrier or carrier is recognised: Nimitz class / CVN, Stennis, Forrestal, Kuznetsov and Tarawa. On angled-deck carriers, the final bearing is left of the ship's heading (the BRC): about 9° on the Nimitz class and the Forrestal, about 8° on the Kuznetsov. Each class has its own deck height, wire positions and glide slope (Kuznetsov 4°) for the LSO. The Tarawa has a straight deck and no wires, so its final bearing equals the BRC and the grade names no wire.
 
 The **Carrier** page of the radio wheel appears only if the mission contains a carrier.
 
@@ -1720,10 +1722,10 @@ Paddles watches your groove from about ¾ NM while you are wings level, within 1
 **Speed calls** ("slow"/"fast") need the on-speed AoA for your aircraft type. They also need angle-of-attack data, which is available only for the aircraft flown on the PC running DCS-ATC. The setting in `config.jsonc`:
 
 ```jsonc
-"OnSpeedAoa": { "FA-18": 8.1 },   // degrees per type prefix; other types get no speed calls
+"OnSpeedAoa": { "F-14": 10.6 },   // degrees per type prefix; adds to the built-in values or replaces one
 ```
 
-For another type, fly a few passes and read the line `[LSO] … AoA im Mittel …` in the log to find the value.
+Built in: FA-18 8.1, F-14 10.4, T-45 8.5, A-4E 8.75, AV8B 10.0. Only the Hornet value is measured in the game, the others are book values. Other types get no speed calls. To correct a value or add a type, fly a few passes and read the line `[LSO] … AoA im Mittel …` in the log.
 
 ### Wave-off and bolter
 
@@ -2884,7 +2886,7 @@ Own frequencies per airfield and controller are not in `config.jsonc` but in the
 | `AwacsBullseye` | `true` | Picture and updates to everyone in bullseye format; `false` = everything in BRAA from you. |
 | `AwacsNewGroupNm` | `200` | AWACS calls new groups (and "picture clean") within this range, 40–200 NM. |
 | `TankerVectors` | `false` | `true` = the tanker itself gives join vectors (heading, distance, altitude) until you call "visual". `false` = only the first bearing, vectors from AWACS or on "request vector". |
-| `OnSpeedAoa` | `{ "FA-18": 8.1 }` | LSO: on-speed angle of attack in degrees per aircraft type prefix, used for "you're fast/slow". Other types get no speed calls. Derive values from the log line `[LSO] AoA im Mittel`. |
+| `OnSpeedAoa` | `{ }` | LSO: on-speed angle of attack in degrees per aircraft type prefix, used for "you're fast/slow". Adds to the built-in values (FA-18 8.1, F-14 10.4, T-45 8.5, A-4E 8.75, AV8B 10.0) or replaces one. Other types get no speed calls. Derive values from the log line `[LSO] AoA im Mittel`. |
 
 **Airfield behaviour and logging**
 

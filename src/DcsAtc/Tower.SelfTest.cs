@@ -1052,7 +1052,7 @@ public partial class Tower
         // Helicopter: no speed given under radar vectoring, no admonition at 140 kt either; A-10 slower than jet
         var twHeli = new Tower("Enfield 1-1") { AcType = "UH-1H" };
         twHeli.Tick(west, none, 0);
-        var heliV = twHeli.OnTranscript("Kutaisi Approach Enfield one one inbound for landing", west, none, 1);
+        var heliV = twHeli.OnTranscript("Kutaisi Approach Enfield one one inbound for landing runway 25", west, none, 1);   // named runway: airplane flow (without it: direct to the ramp, HeliArrive)
         var heliCalm = At(-291000, 660000, twHeli.vecFt * Ft - FieldElev + 120, twHeli.vecHdg + 6, 140 * Kt);
         var heliNag = Enumerable.Range(2, 120).SelectMany(s => twHeli.Tick(heliCalm, none, s)).Select(m => m.Text).ToList();
         Check(twHeli.VecKt(west) == 0 && heliV.All(m => !m.Text.Contains("knots")) && heliNag.All(m => !m.Contains("speed")), "Hubschrauber ohne Fahrtangabe: " + string.Join(" | ", heliV.Select(m => m.Text).Concat(heliNag)));
@@ -2383,6 +2383,35 @@ public partial class Tower
         var clr347 = tw347.OnTranscript("Enfield 11 ready for departure", hold, none, 3);
         Check(taxi347.Count == 1 && taxi347[0].Contains("air taxi") && taxi347[0].Contains("to holding point runway two five") && clr347.Count == 1 &&
               clr347[0].Contains("cleared for takeoff from present position") && !clr347[0].Contains("runway"), "R347 Hubschrauber: " + string.Join(" | ", taxi347.Concat(clr347).Select(m => m.Text)));
+        // Helicopter arrival: beyond 5 NM "proceed direct to the field, report two miles", then (two miles in the tick or a report) "cleared to land at the ramp" without runway; no vectors, pattern or
+        // final calls on the way; landing on the ramp: no vacate call, no violation, wheel "on the ground, request air taxi to parking", Ground "air taxi"; first call inside 5 NM: cleared right away with the altimeter setting;
+        // landing without any call: violation without vacate call
+        string Hj(IEnumerable<Msg> m) => string.Join(" | ", m.Select(x => x.Text));
+        List<Msg> HLand(Tower h, double from) => new[] { (At(parked.X, parked.Z, 40, 0, 20), 0.0), (parked, 1.0), (parked, 4.0) }.SelectMany(s => h.Tick(s.Item1, none, from + s.Item2)).ToList();
+        var twHl = new Tower("Enfield 1-1") { AcType = "UH-1H" };
+        var hFar = At(CX - 10 * NM, CZ, 300, 0, 50);
+        twHl.Tick(hFar, none, 0);
+        var hl1 = Hj(twHl.OnTranscript("Kutaisi Approach, Enfield 11, inbound for landing", hFar, none, 1));
+        var hlWay = Hj(Enumerable.Range(2, 30).SelectMany(s => twHl.Tick(At(CX - 4 * NM, CZ, 300, 0, 50), none, s)));
+        var hlSug = twHl.Suggest(At(CX - 4 * NM, CZ, 300, 0, 50));
+        var hNear = At(CX - 1.5 * NM, CZ, 150, 0, 40);
+        var hl2 = Hj(twHl.Tick(hNear, none, 40));
+        var hl3 = Hj(twHl.OnTranscript("Kutaisi Tower, Enfield 11, final", hNear, none, 41));
+        var hl4 = Hj(HLand(twHl, 50));
+        var hlSug2 = twHl.Suggest(parked);
+        var hl5 = Hj(twHl.OnTranscript("Enfield 11 on the ground, request air taxi to parking", parked, none, 60));
+        var twHc = new Tower("Enfield 1-1") { AcType = "UH-1H" };
+        twHc.Tick(At(CX - 3 * NM, CZ, 300, 0, 50), none, 0);
+        var hc = Hj(twHc.OnTranscript("Kutaisi Tower, Enfield 11, inbound for landing", At(CX - 3 * NM, CZ, 300, 0, 50), none, 1));
+        var twHu = new Tower("Enfield 1-1") { AcType = "UH-1H" };
+        twHu.Tick(At(CX - 3 * NM, CZ, 300, 0, 50), none, 0);
+        var hu = Hj(HLand(twHu, 10));
+        Check(hl1.Contains("Proceed direct to the field") && hl1.EndsWith("report two miles.") && !hl1.Contains("runway") && hlWay == "" && hlSug == ("Tower", "two miles, inbound for landing")
+              && hl2 == "Enfield one one, wind calm, cleared to land at the ramp." && hl3 == "Enfield one one, Kutaisi Tower, wind calm, cleared to land at the ramp." && twHl.Phase == Phase.TaxiIn && hl4 == ""
+              && hlSug2 == ("Ground", "on the ground, request air taxi to parking") && hl5.Contains(", air taxi to ") && !hl5.Contains("acate")
+              && hc.Contains("altimeter") && hc.EndsWith("cleared to land at the ramp.") && !hc.Contains("runway")
+              && hu.Contains("you landed without a clearance") && !hu.Contains("acate"),
+              $"Hubschrauber-Landung: {hl1} / unterwegs '{hlWay}' {hlSug} / {hl2} / {hl3} / gelandet '{hl4}' {twHl.Phase} {hlSug2} / {hl5} / nah: {hc} / ohne Ruf: {hu}");
         // R100: rejected takeoff clears the takeoff clearance; vacate the runway without "hold position", new clearance only on "ready for departure"
         foreach (var call in new[] { "Kutaisi Tower, Enfield 1-1, aborting takeoff", "Enfield 1-1, stopping", "Enfield 1-1, rejecting takeoff", "Kutaisi Tower, Enfield 1-1, cancel my takeoff", "Kutaisi Tower, Enfield 1-1, aborting, bird strike" })
         {
@@ -3178,7 +3207,7 @@ public partial class Tower
         // Helicopter in holding: no speed instruction, no speed reminder at 100 kt (R45)
         var twHh = new Tower("Enfield 1-1") { AcType = "UH-1H" };
         twHh.Tick(west, busyPattern, 0);
-        var hh = twHh.OnTranscript("Kutaisi Approach, Enfield 11, inbound for landing", west, busyPattern, 1).Select(m => m.Text).ToList();
+        var hh = twHh.OnTranscript("Kutaisi Approach, Enfield 11, inbound for landing runway 25", west, busyPattern, 1).Select(m => m.Text).ToList();
         var (hhx, hhz, hhFt) = twHh.HoldInfo!.Value;
         var hhOrbit = At(hhx + 500, hhz, hhFt * Ft - FieldElev, 90, 50);
         hh.AddRange(Enumerable.Range(2, 400).SelectMany(s => twHh.Tick(hhOrbit, busyPattern, s)).Select(m => m.Text));

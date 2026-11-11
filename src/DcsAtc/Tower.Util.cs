@@ -233,7 +233,7 @@ public partial class Tower
         ["zero"] = "0", ["one"] = "1", ["two"] = "2", ["three"] = "3", ["four"] = "4", ["five"] = "5",
         ["six"] = "6", ["seven"] = "7", ["eight"] = "8", ["nine"] = "9", ["niner"] = "9",
         ["tree"] = "3", ["fower"] = "4", ["fife"] = "5", ["decimal"] = "point",   // ICAO pronunciation
-        ["enbound"] = "inbound", ["embound"] = "inbound",
+        ["enbound"] = "inbound", ["embound"] = "inbound", ["enboard"] = "inbound",   // as transcribed (log)
         ["overload"] = "overlord", ["bogeydope"] = "bogey dope", ["bogie"] = "bogey", ["bogy"] = "bogey", ["boogie"] = "bogey", ["overlard"] = "overlord",   // #27
         ["panpan"] = "pan pan", ["pam"] = "pan",   // "PAN PAN" as transcribed
     };
@@ -266,9 +266,31 @@ public partial class Tower
         s = Regex.Replace(s, @"[^a-z0-9 ]", " ");
         s = Regex.Replace(s, @"\bmay +day\b", "mayday");     // R360: transcription splits the word
         s = Regex.Replace(s, @"\bdark +star\b", "darkstar");   // AWACS callsign as transcribed
+        s = Regex.Replace(s, @"\bsee you again\b", "say again");   // "say again" as transcribed (log); "see you at 10" (carrier) stays
         s = Regex.Replace(s, @"\bclear(?= +(?:to|the|for) +(?:land|take ?off)\b)", "cleared");   // #23: readback "clear to land"/"clear the land" as transcribed
         return string.Join(" ", s.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                                  .Select(w => Words.TryGetValue(w, out var d) ? d : w));
+    }
+
+    /// Mishearing of a name: a word of 6+ letters that is one letter off (replaced, added, dropped) from exactly one name word expected on the frequency
+    /// (airfields, call names of the mission) becomes that word ("Overlard" -> "Overlord", "Kutaissi" -> "Kutaisi"); same first letter, digits and short words stay.
+    internal static string FixNames(string text, IEnumerable<string> names)
+    {
+        var vocab = names.SelectMany(n => Regex.Split(n, "[^A-Za-z]+")).Where(w => w.Length >= 6).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        static bool OneOff(string a, string b)
+        {
+            int i = 0, j = 0, n = Math.Min(a.Length, b.Length);
+            while (i < n && a[i] == b[i]) i++;
+            while (j < n - i && a[^(j + 1)] == b[^(j + 1)]) j++;
+            return Math.Max(a.Length, b.Length) - i - j <= 1;
+        }
+        return Regex.Replace(text, "[A-Za-z]{6,}", m =>
+        {
+            var w = m.Value.ToLowerInvariant();
+            if (vocab.Contains(w, StringComparer.OrdinalIgnoreCase)) return m.Value;
+            var hit = vocab.Where(v => char.ToLowerInvariant(v[0]) == w[0] && OneOff(v.ToLowerInvariant(), w)).ToList();
+            return hit.Count == 1 ? hit[0] : m.Value;
+        });
     }
 
     /// Callsign at the start of the call (at most 4 words of station before it) or at the end ("…, Enfield 1-1"); digits in the middle of the call are values ("squawk 4 3 2 1").
