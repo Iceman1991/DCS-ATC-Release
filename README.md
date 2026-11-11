@@ -17,9 +17,9 @@ A big thank you to
 | **Heling** | **buur** | **Pascali Alessandro** |
 |:---:|:---:|:---:|
 
-You bought me a coffee on Ko-fi without getting anything extra for it, and that means a lot to me. I build DCS-ATC in my free time, and knowing that someone likes it enough to give something back is what keeps me at it on the long evenings. Your names are in the settings window of the app, on every page, where they belong.
+Thank you for your support on Ko-fi. People like you keep this project going. Your names are also shown in the settings window of the app.
 
-DCS-ATC is free and stays free. If you want to join them:
+DCS-ATC is free and stays free. If you want to support it too:
 
 [![Buy me a coffee on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/christianwagner)
 
@@ -118,6 +118,6 @@ If you want to support the project anyway, there is a small Ko-fi page:
 
 [![Buy me a coffee on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/christianwagner)
 
-**Heling**, **buur** and **Pascali Alessandro** have already done that. Thank you, all three of you. I did not expect it and I was honestly happy about every single one. You are named at the top of this page and in the settings window of the app.
+**Heling**, **buur** and **Pascali Alessandro** have already done that. Thank you, you keep the project going.
 
 There is no obligation. That said, I appreciate every tip, big or small. Bug reports, logs and ideas help the project just as much. Either way, I will keep working on making our shared hobby a bit better.
