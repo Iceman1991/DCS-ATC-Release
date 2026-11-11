@@ -56,6 +56,10 @@ Manual: [English](docs/MANUAL.md) · [Deutsch](docs/ANLEITUNG.md) (installation,
 
 Open an [issue](../../issues) with time, airfield, a short description and `atc-log.txt` plus `atc-debug.txt` from `%LOCALAPPDATA%\Programs\DCS-ATC`. A short video with SRS audio helps a lot.
 
+## Support
+
+DCS-ATC is free and stays free. If you want to buy me a coffee: [ko-fi.com/christianwagner](https://ko-fi.com/christianwagner)
+
 ## Technology
 
 Two models are used while running, both locally on the CPU:
