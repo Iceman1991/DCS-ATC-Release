@@ -1,6 +1,7 @@
 ﻿# DCS-ATC: adds a line to <DCS>\Scripts\MissionScripting.lua that loads the mod's mission script (before os/io/lfs are sanitized),
 # and one at the end of <DCS>\Scripts\autoexec.lua that loads DcsAtcWing.lua (wingman commands by voice, game only).
 # Needs admin rights (Program Files). DCS updates reset the file -> DCS-ATC then asks again by itself.
+# While DCS Retribution or DCS Liberation is open, the MissionScripting.lua they copy over DCS's gets the line too.
 #   -Remove: remove the line again (uninstall)
 #   -Pause: wait for Enter at the end (start menu shortcut, shows the result)
 #   No write access (started without admin rights): starts itself again with admin prompt (UAC).
@@ -19,7 +20,16 @@ foreach ($d in $dirs | Where-Object { $_ } | ForEach-Object { $_.Trim().TrimEnd(
         if (-not $Remove) { $n += "`r`npcall(function() local f = lfs.writedir() .. 'Scripts/DcsAtc/DcsAtcWing.lua' if lfs.attributes(f) then dofile(f) end end)   -- DCS-ATC (Mod)`r`n" }
         if ($n -ne $t) { [IO.File]::WriteAllText($f, $n); "$f : angepasst / patched" }
     }
-    $f = Join-Path $d 'Scripts\MissionScripting.lua'
+}
+# DCS Retribution/Liberation copy their own MissionScripting.lua (resources\scripts next to their exe) over DCS's while their app is open:
+# the line goes into that copy too, otherwise it is gone with their next start. The app tries this itself without admin rights;
+# here it also works when their program runs as admin or sits in a protected folder.
+$files = @($dirs | Where-Object { $_ } | ForEach-Object { Join-Path $_.Trim().TrimEnd('\') 'Scripts\MissionScripting.lua' } | Select-Object -Unique)
+foreach ($p in Get-Process retribution_main, liberation_main -EA 0) {
+    if (-not $p.Path) { throw 'Retribution/Liberation runs as admin' }   # path not readable without admin rights -> again with UAC (catch below)
+    $files += Join-Path (Split-Path $p.Path) 'resources\scripts\MissionScripting.lua'
+}
+foreach ($f in $files) {
     if (-not (Test-Path $f)) { continue }
     $t = [IO.File]::ReadAllText($f)
     $clean = [regex]::Replace($t, '(?m)^.*DcsAtcMission.*\r?\n(\r?\n)?', '')

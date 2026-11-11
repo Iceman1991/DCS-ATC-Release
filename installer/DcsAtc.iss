@@ -1,5 +1,7 @@
-﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe
-#define AppVer "0.22.1-alpha"
+﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe und (ISCC /DSmall) dist\DCS-ATC-Update-Setup.exe
+; Small: update setup without the big files (models, tools) for the update from the app; only over an existing installation.
+; installer\manifest.ps1 reads the big files from the block "#ifndef Small" in [Files].
+#define AppVer "0.22.2-alpha"
 #define Src ".."
 
 [Setup]
@@ -12,7 +14,11 @@ DefaultGroupName=DCS-ATC
 PrivilegesRequired=lowest
 DisableProgramGroupPage=yes
 OutputDir={#Src}\dist
+#ifdef Small
+OutputBaseFilename=DCS-ATC-Update-Setup
+#else
 OutputBaseFilename=DCS-ATC-Setup
+#endif
 Compression=lzma2/max
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible
@@ -50,6 +56,8 @@ de.RunSettings=Einstellungen öffnen (neue Optionen ansehen)
 en.RunSettings=Open settings (see the new options)
 de.RunSettings=Einstellungen öffnen (Rufzeichen, Stimmen, Funk, VR, Höhenmesser)
 en.RunSettings=Open settings (callsign, voices, radio, VR, altimeter)
+de.NoBase=Dieses Update-Setup enthält keine Sprachmodelle und Stimmen und braucht eine vorhandene DCS-ATC-Installation. Bitte DCS-ATC-Setup.exe aus DCS-ATC.zip verwenden.
+en.NoBase=This update setup has no speech models and voices and needs an existing DCS-ATC installation. Please use DCS-ATC-Setup.exe from DCS-ATC.zip.
 de.NoDcs=Saved Games\DCS wurde nicht gefunden. Bitte deinen DCS-Ordner in Saved Games wählen (enthält Config und Scripts):
 en.NoDcs=Saved Games\DCS was not found. Please select your DCS folder in Saved Games (contains Config and Scripts):
 de.TaskServer=Dedicated Server (DCS_server.exe auf diesem PC): Hook und Missionsskript auch in dessen Saved-Games-Ordner, MissionScripting.lua des Servers anpassen
@@ -110,6 +118,7 @@ Source: "{#Src}\charts\caucasus.jsonc"; DestDir: "{app}\charts"; Flags: ignoreve
 Source: "{#Src}\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 Source: "{#Src}\mod\DcsAtc-Patch.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Src}\airfields.txt"; DestDir: "{app}"; Flags: ignoreversion
+#ifndef Small
 Source: "{#Src}\models\ggml-small.en.bin"; DestDir: "{app}\models"; Flags: ignoreversion
 Source: "{#Src}\models\en_US-ryan-medium.onnx*"; DestDir: "{app}\models"; Flags: ignoreversion
 Source: "{#Src}\models\en_US-joe-medium.onnx*"; DestDir: "{app}\models"; Flags: ignoreversion
@@ -119,6 +128,7 @@ Source: "{#Src}\models\en_US-bryce-medium.onnx*"; DestDir: "{app}\models"; Flags
 Source: "{#Src}\tools\piper\*"; DestDir: "{app}\tools\piper"; Flags: ignoreversion recursesubdirs
 Source: "{#Src}\tools\whisper\Release\*"; DestDir: "{app}\tools\whisper\Release"; Flags: ignoreversion recursesubdirs
 Source: "{#Src}\tmp\ffmpeg\ffmpeg.exe"; DestDir: "{app}\tools\ffmpeg"; Flags: ignoreversion
+#endif
 ; DCS part: hook (autostart, radio wheel for other players) and mission script (if only a dedicated server is on this PC: only there)
 Source: "{#Src}\mod\Scripts\Hooks\DcsAtcHook.lua"; DestDir: "{code:SavedGames}\Scripts\Hooks"; Check: HasClient; Flags: ignoreversion
 Source: "{#Src}\mod\Scripts\DcsAtc\DcsAtcMission.lua"; DestDir: "{code:SavedGames}\Scripts\DcsAtc"; Check: HasClient; Flags: ignoreversion
@@ -281,6 +291,15 @@ function InitializeSetup(): Boolean;
 var Dir: String;
 begin
   Result := True;
+#ifdef Small
+  { update setup: the big files must be there from the full setup (folder of the last setup from Inno's uninstall key) }
+  if not (RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{6B7E2C1A-4D2F-4E8B-9A11-DC5A7C0A7C01}_is1', 'Inno Setup: App Path', Dir)
+          and FileExists(Dir + '\models\ggml-small.en.bin')) then begin
+    MsgBox(CustomMessage('NoBase'), mbError, MB_OK);
+    Result := False;
+    Exit;
+  end;
+#endif
   ServerOnly := not DirExists(SavedGames('')) and DirExists(ServerSaved(''));
   if not DirExists(SavedGames('')) and not ServerOnly then begin
     Dir := ExpandConstant('{usersavedgames}');

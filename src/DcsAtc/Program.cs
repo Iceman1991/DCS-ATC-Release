@@ -556,13 +556,31 @@ static partial class Program
     // add the line to their copy too (no admin), so the mission keeps DCS-ATC. Their copy has sanitizing commented out -> line at the end.
     const string MissionLine = "pcall(function() local f = lfs.writedir() .. 'Scripts/DcsAtc/DcsAtcMission.lua' if lfs.attributes(f) then dofile(f) end end)   -- DCS-ATC (Mod)";
     internal static string? WithMissionLine(string t) => t.Contains("DcsAtcMission") ? null : t.TrimEnd() + $"\r\n\r\n{MissionLine}\r\n";
+    [DllImport("kernel32.dll", SetLastError = true)] static extern IntPtr OpenProcess(int access, bool inherit, int pid);
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] static extern bool QueryFullProcessImageName(IntPtr h, int flags, System.Text.StringBuilder name, ref int size);
+    [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
+    /// Path of a running exe. Process.MainModule fails with "access denied" when the other program runs as admin (Retribution/Liberation often do,
+    /// they write into the DCS folder); the limited query right is enough for the path.
+    internal static string ExePath(int pid)
+    {
+        var h = OpenProcess(0x1000, false, pid);   // PROCESS_QUERY_LIMITED_INFORMATION
+        if (h == IntPtr.Zero) throw new System.ComponentModel.Win32Exception();
+        try
+        {
+            var sb = new System.Text.StringBuilder(1024);
+            int n = sb.Capacity;
+            return QueryFullProcessImageName(h, 0, sb, ref n) ? sb.ToString(0, n) : throw new System.ComponentModel.Win32Exception();
+        }
+        finally { CloseHandle(h); }
+    }
+
     static bool campaignErr;
     static void PatchCampaignTool()
     {
         foreach (var p in Process.GetProcessesByName("retribution_main").Concat(Process.GetProcessesByName("liberation_main")))
             try
             {
-                var f = Path.Combine(Path.GetDirectoryName(p.MainModule!.FileName)!, "resources", "scripts", "MissionScripting.lua");
+                var f = Path.Combine(Path.GetDirectoryName(ExePath(p.Id))!, "resources", "scripts", "MissionScripting.lua");
                 if (File.Exists(f) && WithMissionLine(File.ReadAllText(f)) is { } n)
                 {
                     File.WriteAllText(f, n);

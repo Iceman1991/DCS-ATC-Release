@@ -217,7 +217,8 @@ static partial class Program
         var ret = "dofile('Scripts/ScriptingSystem.lua')\n\n-- local function sanitizeModule(name)\n-- do\n-- \tsanitizeModule('os')\n-- end\n";
         if (WithMissionLine(ret) is not { } rp || !rp.EndsWith(MissionLine + "\r\n") || !rp.StartsWith(ret.TrimEnd()) || WithMissionLine(rp) != null)
             throw new Exception("Retribution-Vorlage: Zeile nicht am Ende oder doppelt");
-        Console.WriteLine("OK   Retribution/Liberation-Vorlage: DCS-ATC-Zeile am Ende, kein zweites Mal");
+        if (!string.Equals(ExePath(Environment.ProcessId), Environment.ProcessPath, StringComparison.OrdinalIgnoreCase)) throw new Exception($"ExePath: {ExePath(Environment.ProcessId)}");
+        Console.WriteLine("OK   Retribution/Liberation-Vorlage: DCS-ATC-Zeile am Ende, kein zweites Mal; Exe-Pfad über die eingeschränkte Abfrage");
         var kut = new Airfield { Name = "Kutaisi", Id = 25 };
         Airfield.LoadRadio(new[] { kut }, DcsDir());
         if (!File.Exists(Path.Combine(DcsDir(), "Mods", "terrains", "Caucasus", "Radio.lua"))) { Console.WriteLine("--   Radio.lua: DCS nicht gefunden"); return; }

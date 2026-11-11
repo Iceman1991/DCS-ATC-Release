@@ -12,7 +12,7 @@ namespace DcsAtc;
 static class Settings
 {
     /// Ko-fi supporters, named on the "Thanks" page (only with their OK, under the name they want)
-    static readonly string[] Supporters = { "Heling" };
+    static readonly string[] Supporters = { "Heling", "buur", "Pascali Alessandro" };
 
     [DllImport("kernel32.dll")] static extern bool FreeConsole();
     [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
@@ -462,6 +462,12 @@ static class Settings
         kofi.Click += (_, _) => Process.Start(new ProcessStartInfo("https://ko-fi.com/christianwagner") { UseShellExecute = true });
         kofi.Margin = new Padding(0, 10, 0, 4);
         Wide(kofi);
+        // supporters also in the sidebar below the page buttons: in view on every page
+        if (Supporters.Length > 0)
+        {
+            nav.Controls.Add(new Label { Text = L("DANKE AN", "THANKS TO"), Font = Wheel.F(Wheel.Font1, 9f, FontStyle.Bold), ForeColor = Wheel.Grey, AutoSize = true, Margin = new Padding(8, 26, 0, 4), UseMnemonic = false });
+            nav.Controls.Add(new Label { Text = string.Join("\n", Supporters), Font = Wheel.F(Wheel.Font1, 10f, FontStyle.Bold), ForeColor = Wheel.Accent, AutoSize = true, MaximumSize = new Size(166, 0), Margin = new Padding(8, 0, 0, 0), UseMnemonic = false });
+        }
 
         // bottom: hint left, Save/Cancel right
         var bar = new Panel { Dock = DockStyle.Bottom, Height = 60 };
