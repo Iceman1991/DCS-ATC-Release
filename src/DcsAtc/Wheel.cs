@@ -228,8 +228,10 @@ sealed class Wheel : Form
         InGame = sent.Add;
         w.sug = ("Tower", "ready for departure"); w.Choose(Array.FindIndex(Top, i => i.Label == "Tower")); w.mark = 1;
         var vt = w.VrText();
+        var png = Web = w.Png();
         w.Close2();
         InGame = ig;
+        check(png.Length > 5000 && png.AsSpan(0, 4).SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47 }) && Web == null, $"#30 Funkrad als PNG für /wheel ({png.Length} Bytes), Schließen leert es");
         check(vt.StartsWith("ENTER ▸ Tower: ready for departure\nDCS-ATC – Tower\n") && vt.Contains("\n> 2 Ready, closed pattern") && vt.Contains("\n   1 Ready for departure")
               && !vt.Contains("Suggested") && !vt.Contains("Vorschlag") && sent.SequenceEqual(new[] { "" }),
               "Funkrad VR-Text: " + vt.Replace("\n", " | ") + " / Schließen: " + string.Join(",", sent.Select(x => $"\"{x}\"")));
@@ -349,7 +351,24 @@ sealed class Wheel : Form
     }
     public static Action<double> SaveSize = _ => { };   // Program writes config.jsonc
 
-    void Close2() { Hide(); items = Top; InGame(""); }
+    void Close2() { Hide(); items = Top; InGame(""); Web = null; }
+    /// #30: the open wheel as PNG for the page /wheel of the map server (OpenKneeboard web dashboard tab in VR, tablet); null = closed
+    public static volatile byte[]? Web;
+    Bitmap Paint(int s)
+    {
+        var bmp = new Bitmap(s, s, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        bmp.SetResolution(96, 96);   // otherwise the bitmap takes the screen DPI (125 %) and the font becomes larger than planned
+        using var g = Graphics.FromImage(bmp);
+        g.ScaleTransform(s / 560f, s / 560f); Draw(g, 560);
+        return bmp;
+    }
+    byte[] Png()
+    {
+        using var bmp = Paint(840);   // fixed size: the DCS mirror window in VR is often small
+        using var ms = new MemoryStream();
+        bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+        return ms.ToArray();
+    }
     public static Action<string> InGame = _ => { };   // VR: wheel as text in the game (Program sets it), "" = clear
 
     /// Print key with the wheel open: screen of the wheel including the wheel (layered window is in the screenshot) as PNG to Pictures\DCS-ATC, wheel stays open.
@@ -426,10 +445,9 @@ sealed class Wheel : Form
     {
         if (!Visible) return;
         InGame(VrText());
+        if (cfg.MapPort > 0) Web = Png();
         int s = Width;
-        using var bmp = new Bitmap(s, s, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-        bmp.SetResolution(96, 96);   // otherwise the bitmap takes the screen DPI (125 %) and the font becomes larger than planned
-        using (var g = Graphics.FromImage(bmp)) { g.ScaleTransform(s / 560f, s / 560f); Draw(g, 560); }
+        using var bmp = Paint(s);
         IntPtr screen = GetDC(IntPtr.Zero), mem = CreateCompatibleDC(screen), hb = bmp.GetHbitmap(Color.FromArgb(0)), old = SelectObject(mem, hb);
         var size = new SIZE { cx = s, cy = s };
         var src = new POINT();

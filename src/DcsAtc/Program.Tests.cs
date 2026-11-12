@@ -761,6 +761,10 @@ static partial class Program
             Take();
             if (s1 != null || !ask.Contains("Senaki") || s2 != false || s3 != false || s4 != true || s5 != true || s6 != null)
                 throw new Exception($"Geteilte Frequenz: {s1} '{ask}' {s2} {s3} {s4} {s5} {s6}");
+            // #23: Platz auf seiner Frequenz beim Namen gerufen -> Platz, auch mit Tankernamen im Spruch (ARCOE-Recovery); ohne Platznamen oder ohne Platzfrequenz wie bisher nach Inhalt
+            var o23 = new[] { OpsByContent(ps, "Senaki Approach, Enfield 3-1 inbound. Full landing. Request Arco.", sen), OpsByContent(ps, "Senaki Approach, Enfield 3-1 inbound. Full landing. Request Arco.", null),
+                              OpsByContent(ps, "Arco, Enfield 3-1, request rejoin", sen), OpsByContent(ps, "Enfield 3-1, request picture", sen) };
+            if (!o23.SequenceEqual(new[] { null, "Tanker", "Tanker", "AWACS" })) throw new Exception("#23 Station nach Inhalt auf Platzfrequenz: " + string.Join(",", o23.Select(x => x ?? "Platz")));
             Console.WriteLine("OK   Geteilte Frequenz (Platz = AWACS): Rückfrage ohne Stationsnamen, Name entscheidet und bleibt");
             var boats13 = Carrier.Boats;   // #13: carrier frequency = airfield frequency (Nevatim 225.0): "Marshal" names the carrier
             Carrier.Boats = new() { new Carrier.Boat("CVN-73", "CVN", "CVN_73", 0, 0, 0, 10, 2, 225, "73X", "11", Wx: 10) };

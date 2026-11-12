@@ -37,8 +37,10 @@ static class Lagebild
                 var path = (r.ReadLine() ?? "").Split(' ').ElementAtOrDefault(1) ?? "/";   // "GET /state HTTP/1.1"
                 while (!string.IsNullOrEmpty(r.ReadLine())) { }   // headers unread would reset the connection on close
                 var (type, body) = path.StartsWith("/state") ? ("application/json", JsonSerializer.SerializeToUtf8Bytes(State()))
+                                 : path.StartsWith("/wheel.png") ? ("image/png", Wheel.Web ?? Array.Empty<byte>())   // #30: empty = wheel closed (204)
+                                 : path == "/wheel" || path.StartsWith("/wheel?") ? ("text/html; charset=utf-8", Encoding.UTF8.GetBytes(WheelPage))
                                  : path == "/" || path.StartsWith("/?") ? ("text/html; charset=utf-8", Encoding.UTF8.GetBytes(Page)) : ("text/plain", "not found"u8.ToArray());
-                var status = type == "text/plain" ? "404 Not Found" : "200 OK";
+                var status = type == "text/plain" ? "404 Not Found" : body.Length == 0 ? "204 No Content" : "200 OK";
                 s.Write(Encoding.ASCII.GetBytes($"HTTP/1.1 {status}\r\nContent-Type: {type}\r\nContent-Length: {body.Length}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"));
                 s.Write(body);
             }
@@ -65,10 +67,43 @@ static class Lagebild
             var page = Get("/"); var st = Get("/state"); var nf = Get("/x");
             if (!page.StartsWith("HTTP/1.1 200 OK") || !page.Contains("<canvas") || !st.Contains("application/json") || !st.EndsWith("{\"me\":{\"cs\":\"Enfield 1-1\",\"x\":1.5}}") || !nf.StartsWith("HTTP/1.1 404"))
                 throw new Exception("Lagebild: " + page[..Math.Min(80, page.Length)] + " | " + st + " | " + nf);
+            Wheel.Web = null; var closed = Get("/wheel.png");
+            Wheel.Web = "PNGx"u8.ToArray(); var open = Get("/wheel.png"); var wp = Get("/wheel");
+            Wheel.Web = null;
+            if (!closed.StartsWith("HTTP/1.1 204") || !open.StartsWith("HTTP/1.1 200 OK") || !open.Contains("image/png") || !open.EndsWith("PNGx") || !wp.StartsWith("HTTP/1.1 200 OK") || !wp.Contains("/wheel.png"))
+                throw new Exception("Lagebild /wheel: " + closed + " | " + open + " | " + wp[..Math.Min(80, wp.Length)]);
         }
         finally { l.Stop(); State = keep; }
-        Console.WriteLine("OK   FI7 Lagebild: Seite, /state als JSON, 404, nur localhost");
+        Console.WriteLine("OK   FI7 Lagebild: Seite, /state als JSON, 404, nur localhost; #30 /wheel: Seite, Rad als PNG, zu = 204");
     }
+
+    /// #30: the radio wheel for an OpenKneeboard "Web Dashboard" tab (VR) or a tablet: transparent page, shows the wheel picture while the wheel is open.
+    /// ponytail: the page loads the whole PNG five times a second while the wheel is open (about 100 KB each); a version number in the request if that ever hurts over a network.
+    const string WheelPage = """
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DCS-ATC radio wheel</title>
+<style>
+html, body { margin:0; height:100%; background:transparent; overflow:hidden; }
+img { display:block; width:100vmin; height:100vmin; margin:0 auto; }
+</style></head><body>
+<img id="w" alt="" hidden>
+<script>
+const w = document.getElementById("w");
+let old;
+w.onload = () => { if (old) URL.revokeObjectURL(old); old = w.src; };
+try { window.OpenKneeboard?.SetPreferredPixelSize?.(840, 840)?.catch?.(() => {}); } catch (e) {}   // square page in OpenKneeboard
+async function poll() {
+  try {
+    const r = await fetch("/wheel.png", { cache: "no-store" });
+    if (r.status == 200) { w.src = URL.createObjectURL(await r.blob()); w.hidden = false; }
+    else w.hidden = true;
+  } catch (e) { w.hidden = true; }
+  setTimeout(poll, 200);
+}
+poll();
+</script></body></html>
+""";
 
     const string Page = """
 <!doctype html>

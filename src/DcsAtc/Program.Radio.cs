@@ -61,6 +61,11 @@ static partial class Program
         return null;
     }
 
+    /// Station by a name or keyword in a call without prefix. #23 (log 12.11.: "Nellis Approach, … inbound. Request Arco." on the Approach frequency was answered by
+    /// the tanker Arco, ARCOE is a recovery there): a call on an airfield's own frequency that names this airfield goes to the airfield, whatever word follows.
+    internal static string? OpsByContent(Pilot p, string text, Airfield? via) =>
+        via != null && Called(text, p.Tel, via) == via ? null : Ops.RoleOf(Tower.Normalize(text), p.Callsign);
+
     /// Issue #3: AWACS and tanker on one frequency (Instant Action, mission or config): the station name in the call decides and is remembered for unnamed calls; never named -> role of the frequency.
     internal static string OpsPick(Pilot p, double mhz, string text, string role)
     {
@@ -476,7 +481,7 @@ static partial class Program
                 return;
             }
             // Range / AWACS / tanker: frequency or menu ("Range: ...") or name in the radio call
-            var opsRole = to is "Range" or "AWACS" or "Tanker" or "JTAC" ? to : to == null ? Ops.RoleOf(Tower.Normalize(text), p.Callsign) : null;
+            var opsRole = to is "Range" or "AWACS" or "Tanker" or "JTAC" ? to : to == null ? OpsByContent(p, text, via) : null;
             if (opsRole == null && to == null && p.LastOps is { } lo && Now() - lo.At < 300 && Ops.BareSayAgain(sn, p.Callsign)) opsRole = lo.Role;   // R393: the controller who spoke last repeats
             if (opsRole != null && Off(opsRole.ToLowerInvariant(), text)) return;
             if (opsRole != null)
@@ -545,7 +550,7 @@ static partial class Program
             p.LastOps = null;   // R393: the airfield spoke last
             tw.CallFreq = src == "SRS" ? p.CalledOn : 0;   // LA11: the controller of this frequency answers
             var intent = tw.IntentOf(text, q.Tel);   // Debug log
-            if (conf < MinConf && tw.Plain(text)) conf = MinConf;   // "copied"/"say again": closed phrase, no ask-back
+            if (conf < MinConf && (tw.Plain(text) || conf >= ExpConf && tw.ReadbackOnly(text, q.Tel))) conf = MinConf;   // "copied"/"say again": closed phrase, no ask-back; #23: a readback needs no action, no ask-back either
             // LA10 (log Nellis): intent = the expected next call (radio wheel Enter: answer to the open question, otherwise the procedure) -> accepted from 0.50 ("Overhead." 0.60)
             if (conf is < MinConf and >= ExpConf && intent != "unknown")
             {

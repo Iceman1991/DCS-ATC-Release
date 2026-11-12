@@ -193,7 +193,7 @@ public partial class Tower
                 $"Route MINTT ({string.Join(",", seen)}, {w.Phase}): " + J(r1) + " / " + ho?.Text + " / " + J(r2) + " / " + J(r3) + $" ({wf.navName})");
             // #28 (log): Whisper writes "strike" for the route STRYK; "striker" and other words stay different
             bool Snd(string said, string name) => System.Text.RegularExpressions.Regex.IsMatch(Sq(said), $@"\b{Sq(Rx(name))}\b");
-            Chk(Snd("request strike recovery", "STRYK") && Snd("request stryk 21 recovery", "STRYK") && Snd("inbound via mint", "MINTT") && Snd("gass peak", "GASS_PEAK") && Snd("sin city", "SIN_CITY")
+            Chk(Snd("inbound request arco", "ARCOE") && Snd("request strike recovery", "STRYK") &&Snd("request stryk 21 recovery", "STRYK") && Snd("inbound via mint", "MINTT") && Snd("gass peak", "GASS_PEAK") && Snd("sin city", "SIN_CITY")
                 && !Snd("request striker recovery", "STRYK") && !Snd("request straight in", "STRYK") && !Snd("request minute", "MINTT"), "Route nach Klang: strike = STRYK");
             n++;
             n += 4;

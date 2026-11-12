@@ -1608,6 +1608,18 @@ public partial class Tower
         for (int s = 15; s <= 50; s += 5) twAp.Tick(At(twyX - 820 * Uz, twyZ + 820 * Ux), none, s);
         Check(pkTwy && twPk.Phase == Phase.Parked && eoTwy && twEo.Phase == Phase.Parked && apEo && twAp.Phase == Phase.Parked,
               $"R6/N25 geparkt: Rollweg {pkTwy}, Parkposition {twPk.Phase}, Triebwerk aus Rollweg {eoTwy}/Stand {twEo.Phase}, Vorfeld sofort {apEo}/30 s {twAp.Phase}");
+        // #23 (log 12.11.): parking spot assigned by Ground: 40 s standing 80 m from another spot is not parked, 40 s at the assigned one is
+        var twAs = Landed();
+        twAs.F.Spots.Add((twyX - 2000 * Uz, twyZ + 2000 * Ux, 4, 73));
+        twAs.OnTranscript("Kutaisi Ground, Enfield 11, runway vacated, request taxi to parking", At(twyX, twyZ), none, 9);
+        var own23 = twAs.spot ?? (0, 0);
+        twAs.F.Spots.Add((twyX - 80 * Uz, twyZ + 80 * Ux, 4, 74));
+        for (int s = 10; s <= 50; s += 5) twAs.Tick(At(twyX, twyZ), none, s);
+        bool far23 = twAs.Phase == Phase.TaxiIn && Dist(own23.Item1, own23.Item2, twyX, twyZ) > 150;
+        twAs.Tick(At((twyX + own23.Item1) / 2, (twyZ + own23.Item2) / 2, 0, 0, 5), none, 52);
+        for (int s = 55; s <= 95; s += 5) twAs.Tick(At(own23.Item1 + 30 * Uz, own23.Item2 - 30 * Ux), none, s);
+        twAs.F.Spots.RemoveRange(twAs.F.Spots.Count - 2, 2);
+        Check(far23 && twAs.Phase == Phase.Parked, $"#23 zugewiesene Parkposition: neben fremdem Stand nicht geparkt {far23}, am eigenen {twAs.Phase}");
         // R263: 30 s standstill at the spot with 10 kt headwind (export IAS shows the wind) = parked
         var tw263 = Landed();
         tw263.F.Spots.Add((twyX - 900 * Uz, twyZ + 900 * Ux, 4, 72));
@@ -2284,6 +2296,10 @@ public partial class Tower
             var p05 = t05.OnTranscript("Kutaisi Ground, Enfield 11, runway vacated, request taxi to parking", offRwy, none, 20);
             var a05 = t05.OnTranscript("Enfield 1-1, taxi.", offRwy, none, 36);
             var ph05 = t05.Phase;
+            // #23: the readback is no ask-back case at weak recognition, a request is; "say again" with the station in front is a closed phrase
+            Check(t05.ReadbackOnly("Taxi via Alpha, Enfield 1-1.", offRwy) && !t05.ReadbackOnly("Kutaisi Ground, Enfield 11, request taxi", offRwy) && !t05.ReadbackOnly("Enfield 1-1, request taxi to the active", offRwy)
+                  && t05.Plain("Kutaisi Ground, say again.") && t05.Plain("Say again, Enfield 1-1.") && !t05.Plain("Kutaisi Ground, say again taxi route."),
+                  "#23 Rücklesung/Say again mit Station bei schwacher Erkennung: keine Rückfrage");
             var q05 = t05.OnTranscript("Kutaisi Ground, Enfield 11, request taxi", offRwy, none, 50);   // a request stays a request (start again)
             var t05b = new Tower("Enfield 1-1");
             t05b.Tick(parked, none, 0);

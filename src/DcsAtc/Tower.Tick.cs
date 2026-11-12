@@ -876,7 +876,9 @@ public partial class Tower
         if (Phase == Phase.TaxiIn && ground && gkt < 1)
         {
             if (stoppedSince < 0 || holdFor != null) stoppedSince = now;
-            else if (now - stoppedSince > 30 && AtSpot(t, 100)) Park();
+            // #23 (log 12.11.): with a parking spot assigned by Ground only near that one; 30 s standing beside the runway near another spot (reading back the taxi clearance)
+            // counted as parked, the flight was closed and the next readback taken as a taxi request for departure. Engine off at any stand still parks (EngineOff).
+            else if (now - stoppedSince > 30 && (taxiInTold && spot is { } own ? !OnRunwayPos(t.X, t.Z) && Dist(t.X, t.Z, own.X, own.Z) < 100 : AtSpot(t, 100))) Park();
         }
         else stoppedSince = -1;
 

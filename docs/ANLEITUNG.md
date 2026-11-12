@@ -602,6 +602,8 @@ DCS-ATC – Tower
 
 Dieselbe Wahl im Einstellungsfenster → *Funkrad im Spiel (VR)*: automatisch / immer / aus.
 
+**Das grafische Rad in VR (OpenKneeboard).** Die Seite `http://localhost:18600/wheel` zeigt dasselbe Rad wie das Desktop-Overlay, solange es offen ist, auf durchsichtigem Hintergrund, und nichts, solange es zu ist. In OpenKneeboard einen Tab vom Typ „Web Dashboard“ mit dieser Adresse anlegen. Bedient wird das Rad mit denselben Tasten bzw. HOTAS wie bisher. Wer es nutzt, kann *Funkrad im Spiel (VR)* auf aus stellen. Die Seite kommt vom Server des [Lagebilds](#lagebild-im-browser), `MapPort` darf also nicht 0 sein. Mit OpenKneeboard noch nicht getestet, Rückmeldungen sind willkommen.
+
 ### F10-Menü
 
 In jeder Mission mit DCS-ATC bekommt jede Spielergruppe **F10 Andere → ATC**. Teilen sich mehrere Spieler eine Gruppe, bekommt jeder ein eigenes Untermenü mit seinem Rufzeichen. Die Menüsprache folgt deiner Wahl im Setup (Deutsch oder Englisch).
@@ -923,7 +925,7 @@ Als Anlassanfrage zählen: „request startup“, „start up“, „request eng
 - **Kein Anruf:** rufst du 30 s nach dem Abrollen nicht, erinnert Tower einmal: „contact Kutaisi Ground.“
 - **Parkplatz:** dein eigener, wenn frei, sonst der nächste freie. Plätze anderer Spieler werden übersprungen. Ground gibt die Richtung einmal und erneut nur, wenn du abdriftest (oder mit „progressive“ bei jeder Halbierung der Entfernung).
 - **Auf deinem Platz:** „you are on your parking position, shut down at your discretion.“
-- **Wann du als geparkt giltst:** nach 30 s Stillstand auf dem Vorfeld oder wenn du auf einem Parkplatz die Triebwerke abstellst. Das beendet den Flug und schreibt das Debriefing.
+- **Wann du als geparkt giltst:** nach 30 s Stillstand auf dem Vorfeld oder wenn du auf einem Parkplatz die Triebwerke abstellst. Das beendet den Flug und schreibt das Debriefing. Hat Ground dir einen Parkplatz genannt, zählt der Stillstand nur im Umkreis von 100 m um diesen Platz.
 
 ### Tower: Abflug
 
@@ -2928,6 +2930,7 @@ Eigene Frequenzen je Platz und Lotse stehen nicht in `config.jsonc`, sondern in 
 - **Tablet oder anderer PC:** `"MapLan": true` setzen und DCS-ATC neu starten. Windows fragt einmal, ob der Netzzugriff erlaubt ist. Dann `http://<Name oder IP des PCs>:18600/` öffnen.
 - **Anderer Port oder aus:** `"MapPort"` in der `config.jsonc` (0 = aus). Ist der Port belegt, sagt das DCS-ATC-Fenster das, und es gibt kein Lagebild.
 - Die Seite liest nur. Über sie lässt sich in DCS-ATC und in der Mission nichts ändern. In VR gibt es dafür die Kneeboard-Seiten.
+- **Funkrad:** `http://localhost:18600/wheel` zeigt das offene Funkrad als Bild, für einen OpenKneeboard-Tab in VR oder ein Tablet (siehe [Funkrad als Text im Spiel (VR)](#funkrad-als-text-im-spiel-vr)).
 
 ### Logdateien
 

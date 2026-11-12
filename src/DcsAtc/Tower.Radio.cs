@@ -15,7 +15,13 @@ public partial class Tower
         return new() { new Msg(Dep(role), $"{Cs()}, {Station}, say again.") };
     }
     /// Low confidence on a bare acknowledgement or "say again": the phrase is clear anyway -> process normally instead of asking back ("Copied." -> "say again")
-    public bool Plain(string text) => Normalize(text) is var n && (AckOnly(n) || Ops.BareSayAgain(n, callsign));
+    /// #23 (log 12.11.): also with the station in front ("Nellis Approach, say again." 0.62 was answered with "say again")
+    public bool Plain(string text) => Normalize(text) is var n && (AckOnly(n) || Ops.BareSayAgain(Regex.Replace(n, StationRx, " "), callsign));
+    string StationRx => @"\b(?:ground|tower|approach|departure|radar|" + string.Join("|", $"{F.Name}-{F.Callsign}".ToLowerInvariant().Split('-', ' ', StringSplitOptions.RemoveEmptyEntries).Select(Regex.Escape)) + @")\b";
+    /// #23 (log 12.11.: "Taxi via Alpha, Vulture 1-1." 0.61 after the taxi clearance to parking -> "say again"): a readback of the controller's last
+    /// transmission without a request in it needs no action, so a weak recognition (Program: from 0.50) is not asked back.
+    public bool ReadbackOnly(string text, Telemetry? t) => Normalize(text) is var n && Addressed(n) == null
+        && !Has(n, "request", "requesting", "again", "confirm", "verify", "still", "say") && ReadsBack(n, Intent(n, t == null || OnGround(t)));
     /// Program: the transmission has actually gone out (radio queue) -> nag windows count from its end, not from queueing (vector repeated before the first call aired)
     public void Aired(double now, string text) => lastVecSaid = Math.Max(lastVecSaid, now + text.Split(' ').Length / 2.5);
 

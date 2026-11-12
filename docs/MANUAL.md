@@ -600,6 +600,8 @@ DCS-ATC – Tower
 
 The same choice is in the settings window → *Radio wheel in game (VR)*: automatic / always / off.
 
+**The graphical wheel in VR (OpenKneeboard).** The page `http://localhost:18600/wheel` shows the same wheel as the desktop overlay while it is open, on a transparent background, and nothing while it is closed. In OpenKneeboard, add a tab of the type "Web Dashboard" with this address. You operate the wheel with the same keys or HOTAS controls as before. If you use it, you can set *Radio wheel in game (VR)* to off. The page comes from the [situation map](#situation-map-in-the-browser) server, so `MapPort` must not be 0. Not tested with OpenKneeboard yet, reports are welcome.
+
 ### F10 menu
 
 In every mission with DCS-ATC, each player group gets **F10 Other → ATC**. If several players share a group, each of them gets their own submenu named after their callsign. The menu language follows your installer choice (German or English).
@@ -921,7 +923,7 @@ These phrases count as a start-up request: "request startup", "start up", "reque
 - **No call:** if you don't call within 30 s of leaving the runway, Tower reminds you once: "contact Kutaisi Ground."
 - **Parking spot:** you get your own spot if it is free, otherwise the nearest free one. Spots already assigned to other players are skipped. Ground gives the direction once, and again only if you drift away (or each time the distance halves with "progressive").
 - **On your spot:** "you are on your parking position, shut down at your discretion."
-- **When you count as parked:** after 30 s stopped on the apron, or when you shut down your engines at a spot. This ends the flight and writes the debriefing.
+- **When you count as parked:** after 30 s stopped on the apron, or when you shut down your engines at a spot. This ends the flight and writes the debriefing. If Ground gave you a parking spot, stopping counts only within 100 m of that spot.
 
 ### Tower: departure
 
@@ -2926,6 +2928,7 @@ Open `http://localhost:18600/` in a browser on the PC running DCS-ATC, for examp
 - **Tablet or another PC:** set `"MapLan": true` and restart DCS-ATC. Windows asks once whether to allow the network access. Then open `http://<name or IP of the PC>:18600/`.
 - **Other port or off:** `"MapPort"` in `config.jsonc` (0 = off). If the port is in use, the DCS-ATC window says so and there is no map.
 - The page only reads. Nothing on it can change anything in DCS-ATC or the mission. In VR, use the kneeboard pages.
+- **Radio wheel:** `http://localhost:18600/wheel` shows the open radio wheel as a picture, for an OpenKneeboard tab in VR or a tablet (see [Radio wheel as text in the game (VR)](#radio-wheel-as-text-in-the-game-vr)).
 
 ### Log files
 
