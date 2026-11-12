@@ -398,8 +398,8 @@ static class Settings
                         cfg.MicName == "" ? 0 : Array.FindIndex(mics, m => m.Contains(cfg.MicName, StringComparison.OrdinalIgnoreCase)) + 1);
         Row(L("Mikrofon (nur ohne SRS) *", "Microphone (only without SRS) *"), mic);
         Group(L("Funkrad", "Radio wheel"));
-        string[] ingames = { "auto", "on", "off" };
-        var ingame = Combo(new[] { L("automatisch (wenn DCS im VR-Modus)", "automatic (when DCS is in VR mode)"), L("immer", "always"), L("aus", "off") }, Array.IndexOf(ingames, cfg.WheelInGame));
+        string[] ingames = { "auto", "on", "off", "window" };
+        var ingame = Combo(new[] { L("Text, automatisch (wenn DCS im VR-Modus)", "text, automatic (when DCS is in VR mode)"), L("Text, immer", "text, always"), L("aus", "off"), L("Rad als Bild (Test)", "wheel as a picture (test)") }, Array.IndexOf(ingames, cfg.WheelInGame));
         Row(L("Funkrad im Spiel (VR)", "Radio wheel in game (VR)"), ingame);
         var wsize = new Slider(25, 95, 5, Math.Round(cfg.WheelSize * 100), "0' %'");
         Row(L("Größe (Anteil der Fensterhöhe, im Rad mit + / -) *", "Size (share of the window height, + / - in the wheel) *"), wsize);

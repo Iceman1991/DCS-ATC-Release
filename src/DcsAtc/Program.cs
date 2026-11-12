@@ -62,7 +62,7 @@ public class Config
     public int WheelKey { get; set; } = 0xDE;          // selection wheel: key (0xDE = Ä), 0 = off
     public int WheelJoystick { get; set; } = -1;       // selection wheel on the HOTAS: button opens, coolie hat selects
     public int WheelButton { get; set; } = 1;
-    public string WheelInGame { get; set; } = "auto";   // radio wheel additionally as in-game text: auto (when DCS is in VR mode), on, off
+    public string WheelInGame { get; set; } = "auto";   // radio wheel additionally as in-game text: auto (when DCS is in VR mode), on, off; window = as a picture in a DCS window (#30, also in the headset)
     public double WheelSize { get; set; } = 0.45;       // radio wheel: fraction of the DCS window height, adjustable in the wheel with + / -
     public int CommsKey { get; set; } = 0x2B;          // DCS radio menu key as scancode (0x2B = backslash US, # DE). With it the app presses the tanker menu (basket/boom) and, for lighting at dusk/night/poor visibility, "Inbound" or on the ground "Request startup", 0 = off
     public bool SrsListen { get; set; } = true;        // listen to all players' radio calls via SRS (instead of own PTT key)
@@ -279,7 +279,7 @@ static partial class Program
         Wheel.Log = Log;   // screenshot (press with wheel open) into atc-log
         Wheel.InGame = text =>   // VR: headset shows only DCS, wheel additionally as in-game text (mission reads .cmd every 0.25 s)
         {
-            if (Cfg.WheelInGame == "off" || Cfg.WheelInGame != "on" && !VrOn()) return;
+            if (Cfg.WheelInGame is "off" or "window" || Cfg.WheelInGame != "on" && !VrOn()) return;   // "window": the picture in the game instead of the text (Wheel.ToGame)
             string? u;
             lock (TowerLock) u = Host()?.Unit;
             if (!string.IsNullOrEmpty(u)) AiCmd($"WHEEL;{u};{text}", false);

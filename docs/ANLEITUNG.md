@@ -598,9 +598,11 @@ DCS-ATC – Tower
 
 | Einstellung | Standard | Werte |
 |---|---|---|
-| `"WheelInGame"` | `"auto"` | `"auto"` = wenn DCS im VR-Modus läuft (VR in den DCS-Optionen oder Startparameter `--force_enable_VR`), `"on"` = immer, `"off"` |
+| `"WheelInGame"` | `"auto"` | `"auto"` = wenn DCS im VR-Modus läuft (VR in den DCS-Optionen oder Startparameter `--force_enable_VR`), `"on"` = immer, `"off"`, `"window"` = das Rad als Bild im Spiel statt des Texts (Test, siehe unten) |
 
-Dieselbe Wahl im Einstellungsfenster → *Funkrad im Spiel (VR)*: automatisch / immer / aus.
+Dieselbe Wahl im Einstellungsfenster → *Funkrad im Spiel (VR)*: Text automatisch / Text immer / aus / Rad als Bild (Test).
+
+**Das grafische Rad im Spiel (Test).** Mit `"WheelInGame": "window"` zeigt DCS selbst das Rad als Bild in der Bildschirmmitte, dasselbe Rad wie das Desktop-Overlay, anstelle des Texts. Es ist ein Fenster der DCS-Oberfläche, sollte also auch im Headset erscheinen, ohne ein weiteres Programm. Es zeigt das Rad nur an; bedient wird es mit denselben Tasten bzw. HOTAS wie bisher. DCS muss nach der Installation dieser Version gestartet worden sein. Das ist eine erste Fassung, in DCS und in VR noch nicht getestet: Erscheint nichts, steht in `dcs.log` eine Zeile, die mit `DcsAtcHook: Rad-Fenster` beginnt.
 
 **Das grafische Rad in VR (OpenKneeboard).** Die Seite `http://localhost:18600/wheel` zeigt dasselbe Rad wie das Desktop-Overlay, solange es offen ist, auf durchsichtigem Hintergrund, und nichts, solange es zu ist. In OpenKneeboard einen Tab vom Typ „Web Dashboard“ mit dieser Adresse anlegen. Bedient wird das Rad mit denselben Tasten bzw. HOTAS wie bisher. Wer es nutzt, kann *Funkrad im Spiel (VR)* auf aus stellen. Die Seite kommt vom Server des [Lagebilds](#lagebild-im-browser), `MapPort` darf also nicht 0 sein. Mit OpenKneeboard noch nicht getestet, Rückmeldungen sind willkommen.
 
@@ -2793,7 +2795,7 @@ Links wählst du die Seite: Allgemein, Stimmen, Funk & Verkehr, AWACS, Frequenze
 | **Debug-Log für Fehlerberichte (atc-debug.txt)** | an/aus | `DebugLog` |
 | **Bahnbefeuerung (nachts)** | stumm / mit DCS-Lotse (hörbar) / aus. Gilt ab dem nächsten Start. | `RunwayLights` |
 | **Höhenmesser-Einstellung** | automatisch (nach Flugzeugtyp) / hPa (QNH) / inHg (altimeter) | `AltimeterUnit` |
-| **Funkrad im Spiel (VR)** | automatisch (wenn DCS im VR-Modus) / immer / aus | `WheelInGame` |
+| **Funkrad im Spiel (VR)** | Text automatisch (wenn DCS im VR-Modus) / Text immer / aus / Rad als Bild (Test) | `WheelInGame` |
 | **Mikrofon (nur ohne SRS)** `*` | Windows-Standard oder ein bestimmtes Gerät | `MicName` |
 | **SRS-Ordner** `*` | Der Pfad, mit „…“ zum Durchsuchen. Geprüft wird auf `ExternalAudio\DCS-SR-ExternalAudio.exe`. | `SrsPath` |
 | **Tasten festlegen …** | Öffnet die Tastenabfrage (Funkrad, HOTAS, Sprechtaste). | `WheelKey`, `PttKey`, … |
@@ -2838,7 +2840,7 @@ Die Datei liegt im Installationsordner: `%LOCALAPPDATA%\Programs\DCS-ATC\config.
 | `WheelJoystick` | `-1` (aus) | Joystick-ID für den Rad-Knopf. Ist sie gesetzt, bedient der Hat das Rad. |
 | `WheelButton` | `1` | Knopfnummer, die das Rad öffnet. |
 | `WheelSize` | `0.45` | Radgröße als Anteil der DCS-Fensterhöhe (0,25–0,95). `+`/`-` im offenen Rad ändern und speichern sie. |
-| `WheelInGame` | `"auto"` | Rad zusätzlich als Text im Spiel: `"auto"`, wenn DCS in VR läuft (VR-Option oder `--force_enable_VR`), `"on"`, `"off"`. |
+| `WheelInGame` | `"auto"` | Rad zusätzlich als Text im Spiel: `"auto"`, wenn DCS in VR läuft (VR-Option oder `--force_enable_VR`), `"on"`, `"off"`. `"window"` = stattdessen das Rad als Bild in einem DCS-Fenster (Test). |
 | `CommsKey` | `43` (`\` US / `#` deutsch) | Deine DCS-Taste für das **Kommunikationsmenü** als Scancode. DCS-ATC drückt sie, um das DCS-Tankermenü (Korb/Boom) zu öffnen und in Dämmerung, Nacht oder schlechter Sicht die Bahnbefeuerung anzufordern. `0` = aus. |
 | `MicName` | `""` | Teil des Mikrofonnamens, etwa `"FDUCE"`. Leer = Windows-Standard. Nur ohne SRS. |
 

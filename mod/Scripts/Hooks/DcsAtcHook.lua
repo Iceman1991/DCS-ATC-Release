@@ -64,8 +64,56 @@ function cb.onPlayerTrySendChat(id, msg, all)
   return ''   -- do not show in chat
 end
 
+-- Radio wheel as a picture in the game (#30, setting WheelInGame "window"): DcsAtc.exe draws the open wheel into %TMP%\DcsAtc-Wheel\<hash>.png and names
+-- the file and its size in show.txt ("file|fraction of the screen height"); no show.txt = wheel closed. The window is DCS's own GUI (dxgui),
+-- so DCS draws it in the headset too. Display only: no cursor, the wheel is operated with its keys / HOTAS as before.
+local wheelDir = tmp .. '\\DcsAtc-Wheel'
+local wheel = { next = 0 }
+local WHEEL_DLG = [[dialog = {
+  ["type"] = "Window",
+  ["params"] = { ["bounds"] = { [1] = { ["x"] = 0, ["y"] = 0, ["w"] = 600, ["h"] = 600 } }, ["draggable"] = false, ["enabled"] = true, ["hasCursor"] = false,
+                 ["lockFlow"] = false, ["modal"] = false, ["offscreen"] = false, ["resizable"] = false, ["zOrder"] = 111, ["text"] = "" },
+  ["skin"] = { ["params"] = { ["headerHeight"] = 0, ["name"] = "windowSkin" }, ["states"] = { ["released"] = { [1] = { ["bkg"] = { ["center_center"] = "0x00000000" } } } } },
+  ["children"] = {
+    ["pic"] = { ["type"] = "Static", ["params"] = { ["bounds"] = { ["x"] = 0, ["y"] = 0, ["w"] = 600, ["h"] = 600 }, ["text"] = "" },
+                ["skin"] = { ["params"] = { ["name"] = "staticSkin" } } },
+  },
+}]]
+local function wheelShow(line)
+  if not line then if wheel.win then wheel.win:setVisible(false) end return end
+  local file, frac = line:match('^([%w]+%.png)|([%d.]+)$')
+  if not file then return end
+  if not wheel.win then
+    local dlg = wheelDir .. '\\wheel.dlg'
+    local d = assert(io.open(dlg, 'w'))
+    d:write(WHEEL_DLG) d:close()
+    wheel.win = require('DialogLoader').spawnDialogFromFile(dlg)
+    wheel.win:setHasCursor(false)
+    net.log('DcsAtcHook: Rad-Fenster angelegt')
+  end
+  local sw, sh = require('dxgui').GetScreenSize()
+  local s = math.floor(sh * tonumber(frac))
+  local skin = require('SkinUtils').setStaticPicture(wheelDir .. '\\' .. file, wheel.win.pic:getSkin())
+  skin.skinData.states.released[1].picture.size = { horz = s, vert = s }   -- the PNG is 840 px, DCS scales it
+  wheel.win.pic:setSkin(skin)
+  wheel.win:setBounds(math.floor((sw - s) / 2), math.floor((sh - s) / 2), s, s)
+  wheel.win.pic:setBounds(0, 0, s, s)
+  wheel.win:setVisible(true)
+end
+local function wheelPoll()
+  if wheel.dead then return end
+  local h = io.open(wheelDir .. '\\show.txt', 'r')
+  local line = h and h:read('*l') or nil
+  if h then h:close() end
+  if line == wheel.line then return end
+  wheel.line = line
+  local ok, err = pcall(wheelShow, line)
+  if not ok then wheel.dead = true net.log('DcsAtcHook: Rad-Fenster abgeschaltet: ' .. tostring(err)) end   -- no GUI (dedicated server) or another dxgui: once, not every frame
+end
+
 function cb.onSimulationFrame()
   local now = os.clock()
+  if now >= wheel.next then wheel.next = now + 0.05; wheelPoll() end
   if now < nextPoll then return end
   nextPoll = now + 0.3
   if Sim.isServer() or not lfs.attributes(outDir) then return end

@@ -596,9 +596,11 @@ DCS-ATC – Tower
 
 | Setting | Default | Values |
 |---|---|---|
-| `"WheelInGame"` | `"auto"` | `"auto"` = when DCS runs in VR mode (VR enabled in the DCS options or the `--force_enable_VR` start parameter), `"on"` = always, `"off"` |
+| `"WheelInGame"` | `"auto"` | `"auto"` = when DCS runs in VR mode (VR enabled in the DCS options or the `--force_enable_VR` start parameter), `"on"` = always, `"off"`, `"window"` = the wheel as a picture in the game instead of the text (test, see below) |
 
-The same choice is in the settings window → *Radio wheel in game (VR)*: automatic / always / off.
+The same choice is in the settings window → *Radio wheel in game (VR)*: text automatic / text always / off / wheel as a picture (test).
+
+**The graphical wheel in the game (test).** With `"WheelInGame": "window"` DCS itself shows the wheel as a picture in the middle of the screen, the same wheel as the desktop overlay, in place of the text. It is a window of the DCS interface, so it should also show in the headset, without any other program. It only shows the wheel; you operate it with the same keys or HOTAS controls as before. DCS must have been started after installing this version. This is a first version that is not tested in DCS or in VR yet: if nothing shows, `dcs.log` has a line starting with `DcsAtcHook: Rad-Fenster`.
 
 **The graphical wheel in VR (OpenKneeboard).** The page `http://localhost:18600/wheel` shows the same wheel as the desktop overlay while it is open, on a transparent background, and nothing while it is closed. In OpenKneeboard, add a tab of the type "Web Dashboard" with this address. You operate the wheel with the same keys or HOTAS controls as before. If you use it, you can set *Radio wheel in game (VR)* to off. The page comes from the [situation map](#situation-map-in-the-browser) server, so `MapPort` must not be 0. Not tested with OpenKneeboard yet, reports are welcome.
 
@@ -2791,7 +2793,7 @@ Pick the page on the left: General, Voices, Radio & traffic, AWACS, Frequencies,
 | **Debug log for bug reports (atc-debug.txt)** | on/off | `DebugLog` |
 | **Runway lights (at night)** | silent / with DCS controller (audible) / off. Takes effect the next time DCS-ATC starts. | `RunwayLights` |
 | **Altimeter setting** | automatic (by aircraft type) / hPa (QNH) / inHg (altimeter) | `AltimeterUnit` |
-| **Radio wheel in game (VR)** | automatic (when DCS is in VR mode) / always / off | `WheelInGame` |
+| **Radio wheel in game (VR)** | text automatic (when DCS is in VR mode) / text always / off / wheel as a picture (test) | `WheelInGame` |
 | **Microphone (only without SRS)** `*` | Windows default or a specific device | `MicName` |
 | **SRS folder** `*` | The path, with "…" to browse. It is checked for `ExternalAudio\DCS-SR-ExternalAudio.exe`. | `SrsPath` |
 | **Set keys …** | Opens the key prompt (radio wheel, HOTAS, push-to-talk). | `WheelKey`, `PttKey`, … |
@@ -2836,7 +2838,7 @@ The file is in the installation folder: `%LOCALAPPDATA%\Programs\DCS-ATC\config.
 | `WheelJoystick` | `-1` (off) | Joystick ID for the wheel button. When it is set, the hat navigates the wheel. |
 | `WheelButton` | `1` | Button number that opens the wheel. |
 | `WheelSize` | `0.45` | Wheel size as a fraction of the DCS window height (0.25–0.95). `+`/`-` in the open wheel change it and save it. |
-| `WheelInGame` | `"auto"` | Also show the wheel as text in the game: `"auto"` when DCS runs in VR (VR option or `--force_enable_VR`), `"on"`, `"off"`. |
+| `WheelInGame` | `"auto"` | Also show the wheel as text in the game: `"auto"` when DCS runs in VR (VR option or `--force_enable_VR`), `"on"`, `"off"`. `"window"` = the wheel as a picture in a DCS window instead (test). |
 | `CommsKey` | `43` (`\` US / `#` German) | Your DCS **communication menu** key as a keyboard scancode. DCS-ATC presses it to open DCS's own tanker menu (basket/boom) and, at dusk, at night or in poor visibility, to request runway lighting. `0` = off. |
 | `MicName` | `""` | Part of the microphone name, e.g. `"FDUCE"`. Empty = Windows default. Used only without SRS. |
 

@@ -232,6 +232,12 @@ sealed class Wheel : Form
         w.Close2();
         InGame = ig;
         check(png.Length > 5000 && png.AsSpan(0, 4).SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47 }) && Web == null, $"#30 Funkrad als PNG für /wheel ({png.Length} Bytes), Schließen leert es");
+        ToGame(png, 0.55); ToGame(png, 0.55);
+        var show = File.ReadAllText(Path.Combine(GameDir, "show.txt"));
+        bool same = w.Png().AsSpan().SequenceEqual(w.Png()), file = Directory.GetFiles(GameDir, "*.png") is [var pf] && show == Path.GetFileName(pf) + "|0.55" && new FileInfo(pf).Length == png.Length;
+        ToGame(null, 0);
+        check(file && same && !File.Exists(Path.Combine(GameDir, "show.txt")), $"#30 Funkrad-Fenster im Spiel: eine PNG je Radbild, show.txt \"{show}\", gleiches Rad = gleiche Bytes {same}, Schließen löscht show.txt");
+        Directory.Delete(GameDir, true);
         check(vt.StartsWith("ENTER ▸ Tower: ready for departure\nDCS-ATC – Tower\n") && vt.Contains("\n> 2 Ready, closed pattern") && vt.Contains("\n   1 Ready for departure")
               && !vt.Contains("Suggested") && !vt.Contains("Vorschlag") && sent.SequenceEqual(new[] { "" }),
               "Funkrad VR-Text: " + vt.Replace("\n", " | ") + " / Schließen: " + string.Join(",", sent.Select(x => $"\"{x}\"")));
@@ -270,6 +276,7 @@ sealed class Wheel : Form
         {
             Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);   // DCS runs with 125 % scaling
             var w = new Wheel(cfg, send, suggest);
+            try { if (Directory.Exists(GameDir)) Directory.Delete(GameDir, true); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }   // no wheel left over from a crash, old pictures gone
             w.hookProc = w.Hook;
             w.hook = SetWindowsHookEx(13 /*WH_KEYBOARD_LL*/, w.hookProc, GetModuleHandle(null), 0);
             var timer = new System.Windows.Forms.Timer { Interval = 30 };
@@ -351,7 +358,26 @@ sealed class Wheel : Form
     }
     public static Action<double> SaveSize = _ => { };   // Program writes config.jsonc
 
-    void Close2() { Hide(); items = Top; InGame(""); Web = null; }
+    void Close2() { Hide(); items = Top; InGame(""); Web = null; ToGame(null, 0); }
+    /// #30: the wheel as a window in the game (WheelInGame "window"): DCS's own GUI from the hook (DcsAtcHook.lua), so the headset shows it too.
+    /// PNG named by its content in %TEMP%\DcsAtc-Wheel (same wheel = same file, DCS loads each picture once), show.txt names the file and
+    /// the size as a fraction of the screen height; no show.txt = closed.
+    internal static readonly string GameDir = Path.Combine(Path.GetTempPath(), "DcsAtc-Wheel");
+    internal static void ToGame(byte[]? png, double size)
+    {
+        var show = Path.Combine(GameDir, "show.txt");
+        try
+        {
+            if (png == null) { if (File.Exists(show)) File.Delete(show); return; }
+            Directory.CreateDirectory(GameDir);
+            var name = Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(png))[..16] + ".png";
+            var file = Path.Combine(GameDir, name);
+            if (!File.Exists(file)) { File.WriteAllBytes(file + ".tmp", png); File.Move(file + ".tmp", file, true); }
+            File.WriteAllText(show + ".tmp", FormattableString.Invariant($"{name}|{size:0.00}"));
+            File.Move(show + ".tmp", show, true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Log($"[ATC] Funkrad-Fenster im Spiel: {e.Message}"); }   // hook reads show.txt right now: the next change writes it again
+    }
     /// #30: the open wheel as PNG for the page /wheel of the map server (OpenKneeboard web dashboard tab in VR, tablet); null = closed
     public static volatile byte[]? Web;
     Bitmap Paint(int s)
@@ -445,7 +471,9 @@ sealed class Wheel : Form
     {
         if (!Visible) return;
         InGame(VrText());
-        if (cfg.MapPort > 0) Web = Png();
+        bool game = cfg.WheelInGame == "window";
+        if (cfg.MapPort > 0 || game) Web = Png();
+        if (game) ToGame(Web, Math.Clamp(cfg.WheelSize, 0.25, 0.95));
         int s = Width;
         using var bmp = Paint(s);
         IntPtr screen = GetDC(IntPtr.Zero), mem = CreateCompatibleDC(screen), hb = bmp.GetHbitmap(Color.FromArgb(0)), old = SelectObject(mem, hb);

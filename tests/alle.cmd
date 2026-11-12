@@ -13,6 +13,7 @@ if not exist "%LUAE%" (echo luae.exe fehlt, Lua-Tests uebersprungen & goto ok)
 call :run missiontest "%LUAE%" tests\missiontest.lua mod\Scripts\DcsAtc\DcsAtcMission.lua || exit /b 1
 call :run crewtest "%LUAE%" tests\crewtest.lua mission\KutaisiTraffic.lua || exit /b 1
 call :run wingtest "%LUAE%" tests\wingtest.lua mod\Scripts\DcsAtc\DcsAtcWing.lua "%ProgramFiles%\Eagle Dynamics\DCS World" || exit /b 1
+call :run hooktest "%LUAE%" tests\hooktest.lua mod\Scripts\Hooks\DcsAtcHook.lua || exit /b 1
 :ok
 echo Alle Testsuiten OK
 exit /b 0
