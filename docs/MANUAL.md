@@ -310,7 +310,7 @@ You only hear (and see) what you are tuned to. Controller calls appear as text o
 - **Where it comes from:** DCS-ATC takes your callsign from your **DCS slot**, so "Enfield11" becomes **Enfield 1-1**. Controllers say it as "Enfield one one". In a flight they say "Enfield one one flight".
 - **Slots without a western callsign:** the first such player gets `"Callsign"` from config.jsonc (default `"Enfield 1-1"`). Other players are addressed by their player name.
 - **Your own callsign:** set `"MyCallsign"` (default `""` = take it from DCS), or use the settings window → *Your callsign*. The format is a name and two digits, for example `Viper 1-1`. It replaces the slot callsign of the player at this PC (the host); other players keep theirs.
-- **Callsign from the unit name:** set `"CallsignFromUnit": true` or use the settings window → *Callsign from the mission unit name*. If the unit in the mission is named like a callsign (`VICTORY 9-1`, `WOLF-2-1`), you are called that ("Victory 9-1") instead of the DCS callsign (for example Pontiac). Other unit names (`Aerial-1-1`, `F-4E ADVERSARIES NELLIS 1-1`) keep the DCS callsign. It applies to all players; "MyCallsign" takes precedence for the host.
+- **Callsign from the unit name:** set `"CallsignFromUnit": true` or use the settings window → *Callsign from the mission unit name*. If the unit in the mission is named like a callsign (`VICTORY 9-1`, `WOLF-2-1`), you are called that ("Victory 9-1") instead of the DCS callsign (for example Pontiac). Other unit names (`Aerial-1-1`, `F-4E ADVERSARIES NELLIS 1-1`) keep the DCS callsign. It applies to all players; "MyCallsign" takes precedence for the host. It applies to AI aircraft too: an AI flight, AWACS or tanker whose unit is named `SENTRY 1-1` is called Sentry, and you can call it by that name ("Sentry, Enfield 1-1, picture").
 - **Mishearings are tolerated.** Your callsign is still recognised when the digits match and the word is only slightly off ("Enfeld 1-1" counts as "Enfield 1-1").
 - **What you say doesn't change your callsign.** When the mission provides your callsign (or you set one), a different callsign in your speech doesn't rename you. A call that starts with another callsign or a wingman number and doesn't contain yours ("Enfield 1-2, check fuel", "Two, go trail") counts as flight chatter, and the controller ignores it. An order like "Two, go trail" goes to your AI wingmen (see [Commanding your AI wingmen](#commanding-your-ai-wingmen)).
 - **Who sent a call:** your call is matched to you by your SRS/DCS unit. If that fails, DCS-ATC matches the callsign you speak.
@@ -2654,7 +2654,7 @@ Without a `ground` section the airfield has no taxiway names and holding points 
 
 #### Arrival routes (recoveries)
 
-A route is a chain of named fixes that ends at a reporting point, like the MINTT recovery to Nellis runway 03 (MINTT, GASS PEAK, SIMNS, then report CRAIG to the tower). You ask for it by name: "Nellis Approach, Enfield 1-1, inbound via MINTT" or "request MINTT recovery". You can add a runway ("inbound runway 03R via MINTT").
+A route is a chain of named fixes that ends at a reporting point, like the MINTT recovery to Nellis runway 03 (MINTT, GASS PEAK, SIMNS, then report CRAIG to the tower). You ask for it by name: "Nellis Approach, Enfield 1-1, inbound via MINTT" or "request MINTT recovery". You can add a runway ("inbound runway 03R via MINTT"). If you ask for a name that is not among the airfield's routes and departures, the controller says so: "Unable Dream departure, not on file."
 
 - Approach answers "cleared Mintt recovery runway zero three right, proceed direct Mintt, cross Mintt at or above 15000 feet, Gass Peak at or above 9000 feet, Simns at 5500 feet, report Craig." You fly the route as on the chart.
 - You may report the fixes ("Gass Peak"); Approach answers "roger, report Craig". If you don't, Approach follows you from fix to fix by itself.
@@ -2942,7 +2942,7 @@ All logs are in `%LOCALAPPDATA%\Programs\DCS-ATC`:
 | `atc-debug.txt` | Detailed log for bug reports: speech recognition, airfield choice, flight phases, aircraft data every 10 s. Written only when `DebugLog` is on. At 20 MB it is moved to `atc-debug.old.txt`, so it uses at most 2 × 20 MB. |
 | `crash-log.txt` | Error details if DCS-ATC crashes. DCS-ATC then restarts itself, unless it crashed within its first minute. |
 
-When you report a bug, include the time, the airfield, a short description, `atc-log.txt` and `atc-debug.txt`.
+When you report a bug, include the time, the airfield, a short description, `atc-log.txt` and `atc-debug.txt`. For a problem with vectors or the way to the runway also add `airfields.txt` from the DCS-ATC folder, the files `DcsAtc-Terrain-*.txt` from `%TEMP%` and your `charts.jsonc`: with them the flight from your log can be played again through the current version (`DcsAtc.exe --replay atc-debug.txt`, the files next to the log; it lists the controller calls of the log next to the ones the current version makes).
 
 ### Troubleshooting
 
@@ -2997,5 +2997,6 @@ When you report a bug, include the time, the airfield, a short description, `atc
 
 **Answers are slow**
 - Speech recognition runs on the CPU and needs a few seconds per call. The radio wheel is instant.
+- The speech model is loaded when DCS-ATC starts, not on your first call.
 - Several calls at once are recognised one after the other, not all together. `atc-debug.txt` shows the waiting time per call (`WHISPER … ms (davon … ms gewartet)`).
 - On a server without a graphics card, `AsrApiUrl` sends the recognition to a service or to a whisper server on another PC (see the settings table).

@@ -69,6 +69,20 @@ static partial class Program
         return (Tower.FixNames(output.Trim(), names), conf);
     }
 
+    /// #28 (the first radio call of the day made DCS stutter in the air): the first whisper run reads the model from disk, builds the Vulkan pipelines
+    /// and picks the device. One run on a second of silence at the start does that on the ground, before the first radio call.
+    static void AsrWarm()
+    {
+        if (Cfg.AsrApiUrl != "" || Fields.Count == 0) return;   // endpoint: local whisper is only the fallback
+        try
+        {
+            var wav = Path.Combine(Root, "tmp", "warm.wav");
+            using (var w = new WaveFileWriter(wav, new WaveFormat(16000, 16, 1))) w.WriteSamples(new short[16000], 0, 16000);
+            Transcribe(wav, keep: false);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception) { Trace("FEHLER", $"Whisper vorab: {e.GetType().Name}: {e.Message}"); }
+    }
+
     /// GPU1: whisper device: -2 = not yet known (the first call lists the devices), -1 = CPU, otherwise Vulkan device of the dedicated GPU.
     static volatile int asrDev = -2;
     static readonly SemaphoreSlim AsrGate = new(1);   // #11: whisper processes one after the other

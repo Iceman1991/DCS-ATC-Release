@@ -20,6 +20,7 @@ static partial class Program
     /// running mission (Persian Gulf instead of Caucasus, different results depending on the last mission) and thereby overwrote the checked-in airfields.txt.
     internal static bool TestRun;
     static bool MissionFields => !TestRun && File.Exists(AirfieldFile);
+    static string? FieldsFile;   // --replay: airfields.txt of the reporter's map next to his log
 
     /// #28: charts.jsonc name -> DCS airfield of this map: same name (case, spaces, hyphens irrelevant), else the only airfield whose name contains it or is contained in it
     /// ("Nellis AFB" = "Nellis"). Result DCS name -> charts.jsonc name; notes: renamed, ambiguous, not on this map (for the log).
@@ -96,7 +97,7 @@ static partial class Program
             try { File.Copy(AirfieldFile, copy, true); } catch (IOException) { }
         }
         Tower.Freqs = Cfg.Frequencies;
-        var file = MissionFields ? AirfieldFile : copy;
+        var file = FieldsFile ?? (MissionFields ? AirfieldFile : copy);
         if (File.Exists(file) && File.ReadLines(file).FirstOrDefault() is { } m && m.StartsWith("M;")) Airfield.Theatre = m[2..];   // charts.jsonc check with the projection of this map
         if (!TestRun) Airfield.OwnChart = OwnChart(Path.Combine(Root, "charts.jsonc"));
         if (Airfield.OwnChart is { } oc && File.Exists(file))   // #28: charts.jsonc names like "Nellis AFB" for the DCS airfield "Nellis"

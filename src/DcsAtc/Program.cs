@@ -152,10 +152,10 @@ static partial class Program
         Ui.En = File.Exists(lang) && File.ReadAllText(lang).Trim() == "en";
         Tower.FreeLevel = FreeLevel;
         Ops.Callsigns = AiCallsign;
-        TestRun = args.Any(a => a is "--selftest" or "--anflugtest" or "--mptest" or "--asr-test" or "--srs-test" or "--platztest");
+        TestRun = args.Any(a => a is "--selftest" or "--anflugtest" or "--mptest" or "--asr-test" or "--srs-test" or "--platztest" or "--replay");
         if (args.Length >= 1 && args[0] == "--charttest") { if (args.Length > 1) Airfield.ChartFile = args[1]; ChartTest(); return 0; }   // chart data check, optionally a file instead of the embedded one
         if (args.Contains("--platztest")) { Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); return 0; }
-        if (args.Contains("--selftest")) { RadioTest(); ChartTest(); Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); Update.Test(); AtisTest(); CrewTest(); ExpectTest(); PromptTest(); GpuTest(); return Tower.SelfTest(); }
+        if (args.Contains("--selftest")) { RadioTest(); ChartTest(); Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); Update.Test(); AtisTest(); CrewTest(); ExpectTest(); PromptTest(); GpuTest(); int rc = Tower.SelfTest(); ReplayTest(); return rc; }   // ReplayTest last: it runs the app loop (TickAll) and leaves static state behind
         LoadConfig();
         if (args.Length == 2 && args[0] == "--preview") { Preview(args[1]); return 0; }   // Test: DcsAtc --preview random (PC speakers, as the play button in the settings)
         if (args.Contains("--settings")) { Dedicated = DedicatedNow(); Settings.Show(Cfg); return 0; }   // language then also in the server's Saved Games
@@ -174,6 +174,7 @@ static partial class Program
             return 0;
         }
         if (args.Length >= 1 && args[0] == "--anflugtest") { LoadFields(); LoadTerrain(); return Tower.AnflugTest(Fields, args[1..]); }   // airfields from the repo airfields.txt, terrain of the last mission (%TEMP%)
+        if (args.Length == 2 && args[0] == "--replay") return ReplayCli(args[1]);   // a reporter's atc-debug.txt through this build
         if (args.Length >= 1 && args[0] == "--mptest") { LoadFields(); LoadTerrain(); return MpTest(args[1..]); }   // multiple players + AI via the app logic
 
         TraceOn = Cfg.DebugLog;   // live from here: debug log (tests above without file)
@@ -236,6 +237,7 @@ static partial class Program
         {
             Srs = new SrsListener(SrsPort, Cfg.Frequencies.Where(f => f.Key != "ATIS").Select(f => f.Value), IsOwnStation, OnSrs);
             Srs.Start();
+            new Thread(AsrWarm) { IsBackground = true }.Start();
         }
         if (!Dedicated) Wheel.Start(Cfg, text => { lock (TowerLock) Request(Host(), text, "RAD", true); }, () =>   // dedicated server: no radio wheel, no key hook
         {
@@ -849,6 +851,9 @@ static partial class Program
     /// Forum 0.13: mission unit name as call sign, "VICTORY 9-1", "WOLF-2-1" -> "Victory 9-1", "Wolf 2-1"; ME default (Aerial-1-1, Rotary-1-1) and other names -> null
     internal static string? UnitCallsign(string unit) => Regex.Match(unit.Trim(), @"^(?!(?i:aerial|rotary)\b)([A-Za-z]+)[\s-]*(\d)\s*-\s*(\d)$") is { Success: true } m
         ? $"{char.ToUpperInvariant(m.Groups[1].Value[0])}{m.Groups[1].Value[1..].ToLowerInvariant()} {m.Groups[2].Value}-{m.Groups[3].Value}" : null;
+
+    /// Forum (Abr): CallsignFromUnit for AI too: a flight, AWACS or tanker whose mission unit is named like a call sign ("SENTRY 1-1") is called that, otherwise the DCS call sign
+    internal static string AiCs(string unit, string dcs) => Cfg.CallsignFromUnit && UnitCallsign(unit) is { } uc ? uc : dcs;
 
     static void Rename(Pilot p, string cs)
     {

@@ -312,7 +312,7 @@ Du hörst (und siehst) nur, worauf du gerastet bist. Lotsensprüche erscheinen a
 - **Herkunft:** DCS-ATC nimmt dein Rufzeichen aus deinem **DCS-Slot**, aus „Enfield11“ wird **Enfield 1-1**. Lotsen sprechen es „Enfield one one“, in einer Rotte „Enfield one one flight“.
 - **Slots ohne westliches Rufzeichen:** der erste solche Spieler bekommt `"Callsign"` aus config.jsonc (Standard `"Enfield 1-1"`). Weitere werden mit ihrem Spielernamen angesprochen.
 - **Eigenes Rufzeichen:** `"MyCallsign"` setzen (Standard `""` = aus DCS) oder Einstellungsfenster → *Eigenes Rufzeichen*. Format: Name und zwei Ziffern, etwa `Viper 1-1`. Es ersetzt das Slot-Rufzeichen des Spielers an diesem PC (Host); andere Spieler behalten ihres.
-- **Rufzeichen aus dem Unitnamen:** `"CallsignFromUnit": true` oder Einstellungsfenster → *Rufzeichen aus dem Unitnamen der Mission*. Heißt die Unit in der Mission wie ein Rufzeichen (`VICTORY 9-1`, `WOLF-2-1`), wirst du so gerufen („Victory 9-1“) statt mit dem DCS-Rufzeichen (etwa Pontiac). Andere Unitnamen (`Aerial-1-1`, `F-4E ADVERSARIES NELLIS 1-1`) behalten das DCS-Rufzeichen. Gilt für alle Spieler, „MyCallsign“ geht für den Host vor.
+- **Rufzeichen aus dem Unitnamen:** `"CallsignFromUnit": true` oder Einstellungsfenster → *Rufzeichen aus dem Unitnamen der Mission*. Heißt die Unit in der Mission wie ein Rufzeichen (`VICTORY 9-1`, `WOLF-2-1`), wirst du so gerufen („Victory 9-1“) statt mit dem DCS-Rufzeichen (etwa Pontiac). Andere Unitnamen (`Aerial-1-1`, `F-4E ADVERSARIES NELLIS 1-1`) behalten das DCS-Rufzeichen. Gilt für alle Spieler, „MyCallsign“ geht für den Host vor. Gilt auch für KI-Flugzeuge: Ein KI-Flug, AWACS oder Tanker, dessen Unit `SENTRY 1-1` heißt, wird Sentry gerufen, und du kannst ihn so anrufen („Sentry, Enfield 1-1, picture“).
 - **Verhörer werden toleriert.** Dein Rufzeichen wird erkannt, wenn die Ziffern stimmen und das Wort nur leicht abweicht („Enfeld 1-1“ zählt als „Enfield 1-1“).
 - **Was du sagst, ändert dein Rufzeichen nicht.** Liefert die Mission dein Rufzeichen (oder hast du eins gesetzt), benennt dich ein anderes Rufzeichen im Gesprochenen nicht um. Ein Spruch, der mit einem anderen Rufzeichen oder einer Rottennummer beginnt und deins nicht enthält („Enfield 1-2, check fuel“, „Two, go trail“), gilt als Rottenfunk, der Lotse ignoriert ihn. Ein Befehl wie „Two, go trail“ geht an deine KI-Rottenflieger (siehe [Deine KI-Rottenflieger befehlen](#deine-ki-rottenflieger-befehlen)).
 - **Wer gesendet hat:** dein Spruch wird dir über deine SRS-/DCS-Einheit zugeordnet. Klappt das nicht, über das gesprochene Rufzeichen.
@@ -2656,7 +2656,7 @@ Ohne Abschnitt `ground` gibt es für den Platz keine Rollwegnamen und Warteplät
 
 #### Anflugrouten (Recoveries)
 
-Eine Route ist eine Kette benannter Fixes, die an einem Meldepunkt endet, etwa die MINTT-Recovery auf Nellis Bahn 03 (MINTT, GASS PEAK, SIMNS, dann CRAIG an den Tower melden). Du forderst sie mit Namen an: „Nellis Approach, Enfield 1-1, inbound via MINTT“ oder „request MINTT recovery“. Eine Bahn kannst du dazusagen („inbound runway 03R via MINTT“).
+Eine Route ist eine Kette benannter Fixes, die an einem Meldepunkt endet, etwa die MINTT-Recovery auf Nellis Bahn 03 (MINTT, GASS PEAK, SIMNS, dann CRAIG an den Tower melden). Du forderst sie mit Namen an: „Nellis Approach, Enfield 1-1, inbound via MINTT“ oder „request MINTT recovery“. Eine Bahn kannst du dazusagen („inbound runway 03R via MINTT“). Fragst du nach einem Namen, der nicht unter den Routen und Departures des Platzes ist, sagt der Lotse das: „Unable Dream departure, not on file.“
 
 - Approach antwortet „cleared Mintt recovery runway zero three right, proceed direct Mintt, cross Mintt at or above 15000 feet, Gass Peak at or above 9000 feet, Simns at 5500 feet, report Craig.“ Du fliegst die Route wie auf der Karte.
 - Die Fixes darfst du melden („Gass Peak“), Approach antwortet „roger, report Craig“. Meldest du nicht, verfolgt Approach dich trotzdem von Fix zu Fix.
@@ -2944,7 +2944,7 @@ Alle Logs liegen in `%LOCALAPPDATA%\Programs\DCS-ATC`:
 | `atc-debug.txt` | Ausführliches Log für Fehlerberichte: Spracherkennung, Platzwahl, Flugphasen, Flugzeugdaten alle 10 s. Nur mit `DebugLog`. Bei 20 MB wird sie zu `atc-debug.old.txt`, belegt also höchstens 2 × 20 MB. |
 | `crash-log.txt` | Fehlerdetails bei einem Absturz von DCS-ATC. DCS-ATC startet sich dann neu, außer es ist in seiner ersten Minute abgestürzt. |
 
-Für einen Fehlerbericht: Uhrzeit, Platz, kurze Beschreibung, `atc-log.txt` und `atc-debug.txt`.
+Für einen Fehlerbericht: Uhrzeit, Platz, kurze Beschreibung, `atc-log.txt` und `atc-debug.txt`. Bei einem Problem mit Vektoren oder dem Weg zur Bahn dazu `airfields.txt` aus dem DCS-ATC-Ordner, die Dateien `DcsAtc-Terrain-*.txt` aus `%TEMP%` und deine `charts.jsonc`: damit lässt sich der Flug aus deinem Log durch die aktuelle Version noch einmal abspielen (`DcsAtc.exe --replay atc-debug.txt`, die Dateien neben dem Log; listet die Lotsensprüche des Logs neben denen der aktuellen Version).
 
 ### Fehlersuche
 
@@ -2999,5 +2999,6 @@ Für einen Fehlerbericht: Uhrzeit, Platz, kurze Beschreibung, `atc-log.txt` und 
 
 **Antworten kommen langsam**
 - Die Spracherkennung läuft auf der CPU und braucht ein paar Sekunden pro Spruch. Das Funkrad ist sofort da.
+- Das Sprachmodell wird beim Start von DCS-ATC geladen, nicht erst bei deinem ersten Funkspruch.
 - Mehrere Sprüche gleichzeitig werden nacheinander erkannt, nicht alle auf einmal. `atc-debug.txt` zeigt die Wartezeit je Spruch (`WHISPER … ms (davon … ms gewartet)`).
 - Auf einem Server ohne Grafikkarte schickt `AsrApiUrl` die Erkennung an einen Dienst oder an einen Whisper-Server auf einem anderen PC (siehe Einstellungstabelle).

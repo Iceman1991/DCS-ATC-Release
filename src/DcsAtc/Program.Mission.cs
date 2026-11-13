@@ -95,8 +95,8 @@ static partial class Program
                         break;
                     case "T" when p.Length >= 11:   // T;unit;group;type;x;z;alt;hdg;speed;inAir;flag;coalition;callsign;fuel;gid;freq;ammo;kind;fuelkg;task[;m]
                         ai.Add(new Traffic(p[1].GetHashCode(), p[3], D(4), D(5), D(6), D(7), D(8), p[2], p[10], p[9] == "1", p.Length > 11 ? int.Parse(p[11]) : 0,
-                            Cs: p.Length > 12 ? p[12] : "", Fuel: p.Length > 13 ? D(13) : 1, Heli: p.Length > 17 && p[17] == "h", Mission: p.Length > 20 && p[20] == "m"));   // Callsign and fuel per unit (ball call), AiCallsign/AiFuel per group only
-                        if (p.Length > 12) AiCallsign[p[2]] = p[12];
+                            Cs: p.Length > 12 ? AiCs(p[1], p[12]) : "", Fuel: p.Length > 13 ? D(13) : 1, Heli: p.Length > 17 && p[17] == "h", Mission: p.Length > 20 && p[20] == "m"));   // Callsign and fuel per unit (ball call), AiCallsign/AiFuel per group only
+                        if (p.Length > 12) AiCallsign[p[2]] = AiCs(p[1], p[12]);
                         if (p.Length > 13) AiFuel[p[2]] = D(13);
                         if (p.Length > 14) AiGid[p[2]] = (int)D(14);
                         if (p.Length > 16)   // AI radio: flight frequency, ammunition fox3/fox1/fox2/gun/air-to-ground

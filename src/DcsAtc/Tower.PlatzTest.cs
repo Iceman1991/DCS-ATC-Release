@@ -233,7 +233,16 @@ public partial class Tower
             Chk(rz.Count == 1 && rz[0].Text.Contains("negative, Zulu departure is for runway zero seven") && clr && ci.Any(m => m.Text.Contains("Continue Tiki departure")) &&
                 string.Join(",", seen) == "Alpha,Bravo" && w.nav == null && w.depRoute == null,
                 $"Abflug TIKI ({string.Join(",", seen)}, {w.Phase}, nav {w.nav != null}, dep {w.depRoute != null}, at {w.depAt}): " + J(rz) + " / " + J(r1) + " / " + J(ci) + " // " + J(msgs));
-            n += 4;
+            // #23 (log 12.11.): a departure asked for by name that the chart does not have is said so; known names, CRPs and ordinary wordings are not
+            var ru = Hold().OnTranscript("Kutaisi Tower, Enfield 11, ready for departure, departure via Dream", G0(), none, 10);
+            var hu = Hold();
+            Chk(ru.Count == 1 && ru[0].Text.Contains("cleared for takeoff") && ru[0].Text.EndsWith(" Unable Dream departure, not on file.")
+                && hu.UnknownProc("request dream recovery") == "Dream recovery" && hu.UnknownProc("request taxi and departure via dream") == "Dream departure"
+                && new[] { "ready for departure tiki departure", "request tiki departure", "request taxi for departure", "request immediate departure", "ready for departure",
+                           "departure via " + k.Exit["25"][0].ToLowerInvariant(), "request ifr departure", "inbound via the initial" }.All(x => hu.UnknownProc(x) == null)
+                && new Tower("Enfield 1-1").UnknownProc("departure via dream") == null,
+                "#23 unbekannte Departure angesagt: " + J(ru));
+            n += 5;
         }
 
         // Etappe 4 (K29/K33/K34/K36): taxi, holding point, vacate and return route from the data, every apron x every runway of all airfields (and via radio from the apron)

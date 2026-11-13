@@ -21,6 +21,20 @@ static partial class Program
             WithConfigValue("{\n}", "RunwayLights", "\"dcs\"", "Fehlt") != "{\n  \"RunwayLights\": \"dcs\",\n}" || JsonSerializer.Deserialize<Config>("{ \"WheelStyle\": \"hud\" }") == null || NormCallsign("viper11") != "Viper 1-1" || NormCallsign("Viper") != null ||
             UnitCallsign("VICTORY 9-1") != "Victory 9-1" || UnitCallsign("WOLF-2-1") != "Wolf 2-1" || UnitCallsign("Aerial-1-1") != null || UnitCallsign("F-4E ADVERSARIES NELLIS 1-1") != null)
             throw new Exception("Einstellungen: " + c);
+        {   // forum (Abr): CallsignFromUnit for AI flights, AWACS and tanker too; the own name of a mission AWACS/tanker is a station
+            var (cu, kc, ka, kt) = (Cfg.CallsignFromUnit, Ops.Callsigns, Ops.AwacsFreq, Ops.TankerFreq);
+            Cfg.CallsignFromUnit = true;
+            var on = (AiCs("SENTRY 1-1", "Overlord11"), AiCs("AWACS Blue", "Overlord11"));
+            Cfg.CallsignFromUnit = false;
+            var off = AiCs("SENTRY 1-1", "Overlord11");
+            var before = Ops.RoleOf("sentry enfield 1 1 radio check");
+            Ops.Callsigns = new Dictionary<string, string> { ["A"] = "Sentry 1-1", ["T"] = "Petrol 2-1" };
+            (Ops.AwacsFreq, Ops.TankerFreq) = (new() { ["A"] = 251 }, new() { ["T"] = 252 });
+            var roles = new[] { Ops.RoleOf("sentry enfield 1 1 radio check"), Ops.RoleOf("petrol enfield 1 1 radio check"), Ops.RoleOf("kutaisi tower enfield 1 1 radio check") };
+            (Cfg.CallsignFromUnit, Ops.Callsigns, Ops.AwacsFreq, Ops.TankerFreq) = (cu, kc, ka, kt);
+            if (on != ("Sentry 1-1", "Overlord11") || off != "Overlord11" || before != null || !roles.SequenceEqual(new[] { "AWACS", "Tanker", null }))
+                throw new Exception($"KI-Rufzeichen aus dem Unitnamen: {on}, aus {off}, vorher {before}, Stationen {string.Join(",", roles.Select(r => r ?? "-"))}");
+        }
         var nest = "{\n  \"Frequencies\": { \"Tower\": 265.0, \"ATIS\": 263.5 },\n  \"Voices\": {\n    \"Tower\": \"ryan\",   // fest\n    \"ATIS\": \"amy\"\n  }\n}";   // Tower in both blocks: only the named one changes
         var nested = Settings.WithNested(Settings.WithNested(nest, "Voices", new[] { ("Tower", "\"alan|joe\"") }, ""), "Frequencies", new[] { ("Tower", "251.5"), ("Range", "267.5") }, "");
         if (!nested.Contains("\"Range\": 267.5, \"Tower\": 251.5, \"ATIS\": 263.5 }") || !nested.Contains("\"Tower\": \"alan|joe\",   // fest") || Settings.WithNested(nest, "Voices", Array.Empty<(string, string)>(), "") != nest ||
@@ -763,8 +777,10 @@ static partial class Program
                 throw new Exception($"Geteilte Frequenz: {s1} '{ask}' {s2} {s3} {s4} {s5} {s6}");
             // #23: Platz auf seiner Frequenz beim Namen gerufen -> Platz, auch mit Tankernamen im Spruch (ARCOE-Recovery); ohne Platznamen oder ohne Platzfrequenz wie bisher nach Inhalt
             var o23 = new[] { OpsByContent(ps, "Senaki Approach, Enfield 3-1 inbound. Full landing. Request Arco.", sen), OpsByContent(ps, "Senaki Approach, Enfield 3-1 inbound. Full landing. Request Arco.", null),
-                              OpsByContent(ps, "Arco, Enfield 3-1, request rejoin", sen), OpsByContent(ps, "Enfield 3-1, request picture", sen) };
-            if (!o23.SequenceEqual(new[] { null, "Tanker", "Tanker", "AWACS" })) throw new Exception("#23 Station nach Inhalt auf Platzfrequenz: " + string.Join(",", o23.Select(x => x ?? "Platz")));
+                              OpsByContent(ps, "Arco, Enfield 3-1, request rejoin", sen), OpsByContent(ps, "Enfield 3-1, request picture", sen),
+                              OpsByContent(ps, "324 decimal 4, Darkstar for Enfield 3-1. Have a good one. Good day.", sen), OpsByContent(ps, "324 decimal 4, Darkstar for Enfield 3-1. Have a good one. Good day.", null),
+                              OpsByContent(ps, "Darkstar, Enfield 3-1, checking in on 324 decimal 4", sen) };
+            if (!o23.SequenceEqual(new[] { null, "Tanker", "Tanker", "AWACS", null, "AWACS", "AWACS" })) throw new Exception("#23 Station nach Inhalt auf Platzfrequenz: " + string.Join(",", o23.Select(x => x ?? "Platz")));
             Console.WriteLine("OK   Geteilte Frequenz (Platz = AWACS): Rückfrage ohne Stationsnamen, Name entscheidet und bleibt");
             var boats13 = Carrier.Boats;   // #13: carrier frequency = airfield frequency (Nevatim 225.0): "Marshal" names the carrier
             Carrier.Boats = new() { new Carrier.Boat("CVN-73", "CVN", "CVN_73", 0, 0, 0, 10, 2, 225, "73X", "11", Wx: 10) };

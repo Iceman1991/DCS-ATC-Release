@@ -95,13 +95,16 @@ partial class Ops
     static string Blank(string n, string? own) => own == null ? n : Regex.Replace(n, $@"\b{Regex.Replace(Normalize(own), @"(?<=\d) (?=\d)", " ?")}\b", " ");
     /// R393: "say again" without a station (own call sign blanked): repeats the last call of the controller that spoke last (Program.Request)
     public static bool BareSayAgain(string n, string? own = null) => Regex.IsMatch(Blank(n, own).Trim(), @"^(?:say again|say again please)$");
+    /// Forum (Abr): the name of a mission AWACS/tanker is a station too, also an own one from the unit name ("Sentry 1-1", CallsignFromUnit)
+    static bool Named(Dictionary<string, double> groups, string n) =>
+        groups.Keys.Any(g => Callsigns.TryGetValue(g, out var cs) && Regex.Match(cs, "^[A-Za-z]{3,}").Value is { Length: > 0 } w && Has(n, w.ToLowerInvariant() + @"\b"));
     public static string? RoleOf(string n, string? own = null)
     {
         n = Blank(n, own);
         return Range != null && (Regex.IsMatch(n, @"^range\b") || Has(n, "range control", "range alpha", "range ")) ? "Range"   // A17: without a range zone in the mission no range controller
-          : Has(n, "overlord", "awacs", "magic", "moscow", "darkstar", "wizard", "focus", "spike", "request sort", "picture", "bogey dope")
+          : Has(n, "overlord", "awacs", "magic", "moscow", "darkstar", "wizard", "focus", "spike", "request sort", "picture", "bogey dope") || Named(AwacsFreq, n)
             || Has(n, "declare") && !Has(n, "tower", "ground", "approach", "departure", "mayday", "pan pan", "emergency") && Regex.IsMatch(n, @"\bdeclare\b(?: [a-z]+){0,3}? \d") ? "AWACS"
-          : Has(n, "tanker", "shell", "texaco", "arco", "refuel") ? "Tanker"
+          : Has(n, "tanker", "shell", "texaco", "arco", "refuel") || Named(TankerFreq, n) ? "Tanker"
           : Regex.IsMatch(n, @"\b(?:jtac|fac a|faca|forward air controller)\b") || Leaders.Any(l => CsKey(l) is { Length: > 2 } k && Has(n, k)) ? "JTAC"   // J5
           : null;
     }

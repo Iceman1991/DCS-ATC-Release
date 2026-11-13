@@ -63,8 +63,11 @@ static partial class Program
 
     /// Station by a name or keyword in a call without prefix. #23 (log 12.11.: "Nellis Approach, … inbound. Request Arco." on the Approach frequency was answered by
     /// the tanker Arco, ARCOE is a recovery there): a call on an airfield's own frequency that names this airfield goes to the airfield, whatever word follows.
+    /// Same log: the readback of the handover ("324 decimal 4, Darkstar for Victory 9-1. Good day.") on the Departure frequency checked the pilot in with the AWACS:
+    /// a farewell with a frequency on an airfield frequency is the readback to that airfield (Tower.SignedOff stays silent).
     internal static string? OpsByContent(Pilot p, string text, Airfield? via) =>
-        via != null && Called(text, p.Tel, via) == via ? null : Ops.RoleOf(Tower.Normalize(text), p.Callsign);
+        via != null && (Called(text, p.Tel, via) == via || Tower.Normalize(text) is var n && Regex.IsMatch(n, @"\b\d+ (?:decimal|point) \d") && Tower.Farewell(n)) ? null
+        : Ops.RoleOf(Tower.Normalize(text), p.Callsign);
 
     /// Issue #3: AWACS and tanker on one frequency (Instant Action, mission or config): the station name in the call decides and is remembered for unnamed calls; never named -> role of the frequency.
     internal static string OpsPick(Pilot p, double mhz, string text, string role)

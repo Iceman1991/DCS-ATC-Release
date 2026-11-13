@@ -49,6 +49,27 @@ public partial class Tower
 
     public List<Msg> OnTranscript(string text, Telemetry? t, IReadOnlyList<Traffic> traffic, double now, bool fromMenu = false)
     {
+        var r = Heard(text, t, traffic, now, fromMenu);
+        // #23 (log 12.11.: "request taxi and departure via Dream" was cleared "exit via Flex" without a word): a procedure asked for by name that this airfield does not have is said so
+        if (!fromMenu && r.Count > 0 && !r[0].Text.EndsWith("say again.") && UnknownProc(Normalize(text)) is { } up) r[0] = r[0] with { Text = $"{r[0].Text} Unable {up}, not on file." };
+        return r;
+    }
+    /// Procedure asked for by name ("departure via Dream", "request Dream departure", "request Mintt recovery") that the charts.jsonc of this airfield does not have,
+    /// as spoken ("Dream departure"); null = none asked, known (route, departure, CRP, compass point) or no own procedures here.
+    /// ponytail: only these two phrasings and a stop list of ordinary words before "departure"; widen when logs show other wordings.
+    internal string? UnknownProc(string n)
+    {
+        if (F.Routes.Count + F.Departures.Count == 0) return null;
+        var m = Regex.Match(n, @"\b(?<k>departure|recovery|arrival|inbound) via (?:the )?(?<n>[a-z]{3,})\b");
+        if (!m.Success) m = Regex.Match(n, @"\brequest(?:ing)? (?:the )?(?<n>[a-z]{3,}) (?<k>departure|recovery|arrival)\b");
+        var name = m.Groups["n"].Value;
+        if (!m.Success || Named(F.Routes, name) != null || Named(F.Departures, name) != null || Direction(name) != null
+            || name is "ifr" or "vfr" or "immediate" or "tactical" or "combat" or "unrestricted" or "visual" or "straight" or "closed" or "standard" or "early" or "normal" or "formation"
+                    or "rolling" or "intersection" or "practice" or "radar" or "vectors" or "runway" or "pattern" or "overhead" or "initial" or "taxi" or "and" or "for" or "our" or "any") return null;
+        return $"{Cap(name)} {(m.Groups["k"].Value == "departure" ? "departure" : "recovery")}";
+    }
+    List<Msg> Heard(string text, Telemetry? t, IReadOnlyList<Traffic> traffic, double now, bool fromMenu)
+    {
         callAt = heardAt = now;   // LA19: pilot transmission
         if (t != null) Seen(t, now);
         var n = Normalize(text);
