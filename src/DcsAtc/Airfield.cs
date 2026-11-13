@@ -58,6 +58,7 @@ public class Airfield
     public List<RwyEnd> Ends = new();
     public Dictionary<string, (double X, double Z)> Crp = new();   // Compulsory reporting points (map only)
     public Ramp[] Ramps = Array.Empty<Ramp>();
+    public bool RampOnly;   // forum (Lt_Jaeger): chart "ground": { "ramp_only": true }: after landing Ground names only the ramp here, no stand (all airfields: config AssignParkingSpot false)
     public Rollnetz? Net;                     // DCS taxi network (Rollnetz.LoadAll, from the user's DCS installation), null = none
     public Dictionary<string, (double X, double Z, string[] Rwy)> Holds = new();   // Named holding points (map)
     public Dictionary<string, string> HandOf = new();                          // Runway -> "right hand"/"left hand" (map)
@@ -352,6 +353,7 @@ public class Airfield
                 var (note, inNote) = (Strs(r.Value, "note"), Strs(r.Value, "in_note"));
                 return r.Value.GetProperty("pts").EnumerateArray().Select(q => { var (x, z) = Pos(q); return new Ramp(r.Name, x, z, to, hold, vac, inb, note, inNote); });
             }).ToArray();
+        if (a.TryGetProperty("ground", out g) && g.TryGetProperty("ramp_only", out var ro)) RampOnly = ro.GetBoolean();
         // K32: chart stand name only for a single DCS stand (a range "23-43" = "1-21" does not give the order)
         if (a.TryGetProperty("ground", out g) && g.TryGetProperty("stands", out var stands))
             foreach (var s in stands.EnumerateArray())

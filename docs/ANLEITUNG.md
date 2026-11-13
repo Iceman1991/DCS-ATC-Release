@@ -926,7 +926,7 @@ Als Anlassanfrage zählen: „request startup“, „start up“, „request eng
 - **Zu früh gefragt:** fragst du noch auf der Bahn nach Rollen, kommt „report runway vacated.“
 - **Kein Anruf:** rufst du 30 s nach dem Abrollen nicht, erinnert Tower einmal: „contact Kutaisi Ground.“
 - **Parkplatz:** dein eigener, wenn frei, sonst der nächste freie. Plätze anderer Spieler werden übersprungen. Ground gibt die Richtung einmal und erneut nur, wenn du abdriftest (oder mit „progressive“ bei jeder Halbierung der Entfernung).
-- **Nur Rampe:** Mit `"AssignParkingSpot": false` in der `config.jsonc` nennt Ground nur die Rampe aus der `charts.jsonc` („taxi to Ramp West via Alpha“), und du parkst darauf, wo du willst. Plätze ohne benannte Rampe bekommen weiter einen Parkplatz.
+- **Nur Rampe:** Mit `"AssignParkingSpot": false` in der `config.jsonc` nennt Ground nur die Rampe aus der `charts.jsonc` („taxi to Ramp West via Alpha“), und du parkst darauf, wo du willst. Plätze ohne benannte Rampe bekommen weiter einen Parkplatz. Nur für einen einzelnen Platz: `"ramp_only": true` in seinem `ground`-Abschnitt der `charts.jsonc`.
 - **Auf deinem Platz:** „you are on your parking position, shut down at your discretion.“
 - **Wann du als geparkt giltst:** nach 30 s Stillstand auf dem Vorfeld oder wenn du auf einem Parkplatz die Triebwerke abstellst. Das beendet den Flug und schreibt das Debriefing. Hat Ground dir einen Parkplatz genannt, zählt der Stillstand nur im Umkreis von 100 m um diesen Platz.
 
@@ -2667,6 +2667,43 @@ Beispiel: Kutaisi mit Platzrunde 1500 ft und nur zwei CRPs.
 ```
 
 Ohne Abschnitt `ground` gibt es für den Platz keine Rollwegnamen und Warteplätze aus der Karte. Willst du sie behalten, kopiere `ground` aus der Vorlage mit.
+
+#### Mehrere Dateien, eine je Karte
+
+Neben `charts.jsonc` liest DCS-ATC jede Datei im selben Ordner, deren Name mit `charts` beginnt und auf `.jsonc` endet, zum Beispiel `charts-nevada.jsonc` oder `charts-syria.jsonc`. Jede Datei ist aufgebaut wie `charts.jsonc`.
+
+- Eine Datei je Karte oder je Autor geht, und du kannst eine Datei weitergeben, ohne sie mit einer anderen zusammenzuführen.
+- Steht derselbe Platz in zwei Dateien, gilt `charts.jsonc`, danach die übrigen Dateien in alphabetischer Reihenfolge.
+- Eine fehlerhafte Datei wird übersprungen und im DCS-ATC-Fenster genannt. Die anderen Dateien gelten trotzdem.
+- Plätze einer anderen Karte in einer Datei schaden nicht; das Fenster nennt sie als nicht auf dieser Karte.
+
+#### Schritt für Schritt: Verfahren für einen neuen Platz
+
+1. Flieg einmal irgendeine Mission auf der Karte. Danach kennt DCS-ATC ihre Plätze, Bahnen und Parkplätze, auch ohne laufende Mission.
+2. Öffne den [Verfahrens-Editor](#verfahrens-editor) und wähle den Platz. Er zeigt die Bahnen mit ihren DCS-Namen. Klick die Meldepunkte und, wenn du willst, die Routen an.
+3. Kopiere das Ergebnis in `charts.jsonc` oder in eine eigene Datei wie `charts-nevada.jsonc`. Das ist schon ein vollständiger Eintrag.
+4. Ergänze von Hand, was der Editor nicht kennt. Die Tabelle zeigt, was jeder Schlüssel bedeutet und woher der Wert kommt.
+5. Starte eine Mission. Das DCS-ATC-Fenster nennt die Plätze, die es aus jeder Datei übernommen hat, oder die Stelle eines Fehlers.
+
+| Schlüssel | Bedeutung | Woher |
+|---|---|---|
+| Platzname | Wie in DCS; ein eindeutiger Teil genügt (`Nellis AFB`) | Verfahrens-Editor, F10-Karte |
+| `pattern_ft` | Platzrundenhöhe, Fuß über Meer | Platzkarte; sonst Platzhöhe plus 1000 bis 1500 ft |
+| `arrdep_max_ft` | Größte Höhe für An- und Abflug nach Sicht in der Zone („not above“) | Platzkarte |
+| `ctr_top_ft` | Obergrenze der Kontrollzone, Fuß über Meer | Platzkarte |
+| `crp` | Meldepunkte: Name und Position | Verfahrens-Editor; gedruckte Koordinaten einer Karte; die F10-Karte zeigt die Position unter dem Mauszeiger (LAlt+Y wechselt das Format) |
+| `rwy` → `"03L"` | Ein Block je Bahnrichtung, benannt wie in DCS | Verfahrens-Editor |
+| `hand` | Richtung der Platzrunde: `"left"` oder `"right"` | Platzkarte |
+| `side` | Seite der Bahn, auf der die Platzrunde liegt, so wie der Lotse sie sagt (`"south"`) | Platzkarte |
+| `initial_nm` | Abstand des Initial von der Schwelle in NM | Platzkarte; üblich sind 2 bis 3 NM |
+| `entry` | Meldepunkte für den Einflug, jeder mit `"via": "overhead"` oder `"initial"`. Der letzte ist der Standard, wenn deine Position nicht entscheidet | Platzkarte |
+| `exit` | Meldepunkte für den Ausflug. Der erste ist der Standard | Platzkarte |
+| `ground` → `ramps` | Benannte Vorfelder. `pts`: ein oder mehrere Punkte auf dem Vorfeld; ein Parkplatz gehört zum Vorfeld mit dem nächsten Punkt. `to`: Rollwege zur Bahn, je Bahn. `in`: Rollwege nach der Landung, je Bahn (`"*"` = jede Bahn). `vacate`: wie du die Bahn verlässt | Platzkarte; Positionen von der F10-Karte |
+| `ground` → `holds` | Benannte Warteplätze: `pos` und die Bahnen `rwy`. Ein Vorfeld verweist darauf mit `"hold": { "03L": "Alpha" }` | Platzkarte; Position von der F10-Karte |
+| `ground` → `ramp_only` | `true` = nach der Landung nennt Ground an diesem Platz nur das Vorfeld, keinen Parkplatz | Deine Entscheidung |
+| `ground` → `stands` | Parkplatznummer in DCS und ihr Name auf der Karte. Brauchst du nicht: DCS-ATC sagt die Parkplatznamen, die DCS selbst zeigt | – |
+
+`"crs"` in der Vorlage ist nur eine Notiz des gedruckten Kurses, DCS-ATC liest es nicht. Schlüssel, die du weglässt, behalten ihren allgemeinen Wert. Ein Platz mit Meldepunkten braucht je Bahn mindestens einen `entry` und einen `exit`.
 
 #### Anflugrouten (Recoveries)
 

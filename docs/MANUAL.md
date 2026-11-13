@@ -924,7 +924,7 @@ These phrases count as a start-up request: "request startup", "start up", "reque
 - **Asking too early:** asking for taxi while still on the runway gets "report runway vacated."
 - **No call:** if you don't call within 30 s of leaving the runway, Tower reminds you once: "contact Kutaisi Ground."
 - **Parking spot:** you get your own spot if it is free, otherwise the nearest free one. Spots already assigned to other players are skipped. Ground gives the direction once, and again only if you drift away (or each time the distance halves with "progressive").
-- **Ramp only:** with `"AssignParkingSpot": false` in `config.jsonc` Ground names just the ramp from `charts.jsonc` ("taxi to Ramp West via Alpha") and you park where you like on it. Airfields without a named ramp still get a parking spot.
+- **Ramp only:** with `"AssignParkingSpot": false` in `config.jsonc` Ground names just the ramp from `charts.jsonc` ("taxi to Ramp West via Alpha") and you park where you like on it. Airfields without a named ramp still get a parking spot. For a single airfield only: `"ramp_only": true` in its `ground` section in `charts.jsonc`.
 - **On your spot:** "you are on your parking position, shut down at your discretion."
 - **When you count as parked:** after 30 s stopped on the apron, or when you shut down your engines at a spot. This ends the flight and writes the debriefing. If Ground gave you a parking spot, stopping counts only within 100 m of that spot.
 
@@ -2665,6 +2665,43 @@ Example: Kutaisi with a 1500 ft pattern and only two CRPs.
 ```
 
 Without a `ground` section the airfield has no taxiway names and holding points from the chart. To keep them, copy `ground` from the template as well.
+
+#### Several files, one per map
+
+Besides `charts.jsonc` DCS-ATC reads every file in the same folder whose name starts with `charts` and ends with `.jsonc`, for example `charts-nevada.jsonc` or `charts-syria.jsonc`. Each file is built like `charts.jsonc`.
+
+- One file per map or per author works, and you can pass a file on without merging it into someone else's.
+- If two files have the same airfield, `charts.jsonc` wins, then the other files in alphabetical order.
+- A faulty file is skipped and named in the DCS-ATC window. The other files still apply.
+- Airfields of another map in a file do no harm; the window lists them as not on this map.
+
+#### Step by step: procedures for a new airfield
+
+1. Fly any mission on the map once. After that DCS-ATC knows its airfields, runways and parking spots, also without a running mission.
+2. Open the [chart editor](#chart-editor) and pick the airfield. It shows the runways under their DCS names. Click the reporting points and, if you want, the routes.
+3. Copy the result into `charts.jsonc` or into a file of its own such as `charts-nevada.jsonc`. This is already a complete entry.
+4. Add by hand what the editor does not know. The table shows what each key means and where the value comes from.
+5. Start a mission. The DCS-ATC window lists the airfields it took from each file, or names the place of an error.
+
+| Key | Meaning | Where to find it |
+|---|---|---|
+| Airfield name | As in DCS; a clear part of it is enough (`Nellis AFB`) | Chart editor, F10 map |
+| `pattern_ft` | Pattern altitude, feet MSL | Airfield chart; otherwise field elevation plus 1000 to 1500 ft |
+| `arrdep_max_ft` | Highest altitude for visual arrivals and departures in the zone ("not above") | Airfield chart |
+| `ctr_top_ft` | Top of the control zone, feet MSL | Airfield chart |
+| `crp` | Reporting points: name and position | Chart editor; printed coordinates from a chart; the F10 map shows the position under the cursor (LAlt+Y changes the format) |
+| `rwy` → `"03L"` | One block per runway end, named as in DCS | Chart editor |
+| `hand` | Pattern direction: `"left"` or `"right"` | Airfield chart |
+| `side` | Side of the runway the pattern is on, as the controller says it (`"south"`) | Airfield chart |
+| `initial_nm` | Distance from the initial point to the threshold, NM | Airfield chart; 2 to 3 NM is usual |
+| `entry` | Reporting points you may enter by, each with `"via": "overhead"` or `"initial"`. The last one is the default when your position does not decide | Airfield chart |
+| `exit` | Reporting points you may leave by. The first one is the default | Airfield chart |
+| `ground` → `ramps` | Named ramps. `pts`: one or more points on the ramp; a parking spot belongs to the ramp with the nearest point. `to`: taxiways to the runway, per runway. `in`: taxiways after landing, per runway (`"*"` = every runway). `vacate`: how to leave the runway | Airfield chart; positions from the F10 map |
+| `ground` → `holds` | Named holding points: `pos` and the runways `rwy`. A ramp refers to one with `"hold": { "03L": "Alpha" }` | Airfield chart; position from the F10 map |
+| `ground` → `ramp_only` | `true` = after landing Ground names only the ramp at this airfield, no parking spot | Your choice |
+| `ground` → `stands` | Parking spot number in DCS and its name on the chart. You don't need it: DCS-ATC says the parking spot names DCS itself shows | – |
+
+`"crs"` in the template is only a note of the printed course; DCS-ATC does not read it. Keys you leave out keep their generic value. An airfield with reporting points needs at least one `entry` and one `exit` per runway.
 
 #### Arrival routes (recoveries)
 

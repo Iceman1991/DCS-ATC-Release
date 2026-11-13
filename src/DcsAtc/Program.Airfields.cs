@@ -44,23 +44,30 @@ static partial class Program
 
     /// Forum 0.15: own procedures in charts.jsonc (DCS-ATC folder), format like the built-in charts/caucasus.jsonc; an airfield in there replaces the built-in entry.
     /// Faulty file: message, the built-in data stay.
+    /// Forum (Lt_Jaeger): besides charts.jsonc every charts*.jsonc next to it ("charts-nevada.jsonc", one file per map or author). An airfield counts from the
+    /// first file that has it, charts.jsonc first, then by name; a faulty file is skipped as a whole, the others stay.
     internal static JsonElement? OwnChart(string path)
     {
-        if (!File.Exists(path)) return null;
-        try
+        var all = new System.Text.Json.Nodes.JsonObject();
+        var more = Directory.Exists(Path.GetDirectoryName(path)) ? Directory.GetFiles(Path.GetDirectoryName(path)!, "charts*.jsonc") : Array.Empty<string>();
+        foreach (var f in new[] { path }.Concat(more.Where(f => !f.Equals(path, StringComparison.OrdinalIgnoreCase)).OrderBy(f => f, StringComparer.OrdinalIgnoreCase)).Where(File.Exists))
         {
-            var own = JsonDocument.Parse(File.ReadAllText(path), Airfield.ChartOpts).RootElement;
-            Airfield.OwnChart = own;
-            foreach (var a in own.EnumerateObject()) new Airfield { Name = a.Name }.ApplyChart();   // checks every entry once
-            Log(L($"[Karten] eigene Verfahren aus charts.jsonc: {string.Join(", ", own.EnumerateObject().Select(a => a.Name))}", $"[Charts] own procedures from charts.jsonc: {string.Join(", ", own.EnumerateObject().Select(a => a.Name))}"));
-            return own;
+            var name = Path.GetFileName(f);
+            try
+            {
+                var own = JsonDocument.Parse(File.ReadAllText(f), Airfield.ChartOpts).RootElement;
+                Airfield.OwnChart = own;
+                foreach (var a in own.EnumerateObject()) new Airfield { Name = a.Name }.ApplyChart();   // checks every entry once
+                foreach (var a in own.EnumerateObject()) if (!all.ContainsKey(a.Name)) all[a.Name] = System.Text.Json.Nodes.JsonNode.Parse(a.Value.GetRawText(), null, Airfield.ChartOpts);
+                Log(L($"[Karten] eigene Verfahren aus {name}: {string.Join(", ", own.EnumerateObject().Select(a => a.Name))}", $"[Charts] own procedures from {name}: {string.Join(", ", own.EnumerateObject().Select(a => a.Name))}"));
+            }
+            catch (Exception e)
+            {
+                Log(L($"[Karten] {name} fehlerhaft, die Datei wird nicht benutzt: {e.Message}", $"[Charts] {name} is faulty, the file is not used: {e.Message}"));
+            }
+            finally { Airfield.OwnChart = null; }
         }
-        catch (Exception e)
-        {
-            Log(L($"[Karten] charts.jsonc fehlerhaft, es gelten die eingebauten Verfahren: {e.Message}", $"[Charts] charts.jsonc is faulty, the built-in procedures apply: {e.Message}"));
-            return null;
-        }
-        finally { Airfield.OwnChart = null; }
+        return all.Count == 0 ? null : JsonDocument.Parse(all.ToJsonString()).RootElement;
     }
 
     /// Forum 0.15: kneeboard pages into Saved Games\DCS\Kneeboard (shown in every aircraft) on a new mission, with its frequencies, for every map and in

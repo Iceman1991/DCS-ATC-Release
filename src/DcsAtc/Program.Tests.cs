@@ -364,6 +364,18 @@ static partial class Program
         var ownBad = OwnChart(ownF);
         Airfield.OwnChart = null;
         File.Delete(ownF);
+        {   // forum (Lt_Jaeger): several files (charts.jsonc first, then charts*.jsonc by name), first entry of an airfield wins, a faulty file is skipped; ramp_only per airfield
+            var dir = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "dcsatc-charts-dir")).FullName;
+            File.WriteAllText(Path.Combine(dir, "charts.jsonc"), "{ \"Kutaisi\": { \"pattern_ft\": 1111 } }");
+            File.WriteAllText(Path.Combine(dir, "charts-a.jsonc"), "{ \"Kutaisi\": { \"pattern_ft\": 2222 }, \"Senaki-Kolkhi\": { \"pattern_ft\": 3333, \"ground\": { \"ramp_only\": true } } }");
+            File.WriteAllText(Path.Combine(dir, "charts-b.jsonc"), "{ \"Batumi\": { \"crp\": { \"x\": \"kaputt\" } } }");
+            Airfield.OwnChart = OwnChart(Path.Combine(dir, "charts.jsonc"));
+            var (mk, ms, mb) = (Airfield.Kutaisi(), new Airfield { Name = "Senaki-Kolkhi" }.ApplyChart(), Airfield.OwnChart?.TryGetProperty("Batumi", out _));
+            Airfield.OwnChart = null;
+            Directory.Delete(dir, true);
+            if (mk.PatternFt != 1111 || ms.PatternFt != 3333 || !ms.RampOnly || mk.RampOnly || mb != false) throw new Exception($"Mehrere Karten-Dateien: {mk.PatternFt} {ms.PatternFt} {ms.RampOnly} {mb}");
+            Console.WriteLine("OK   Mehrere Karten-Dateien (charts*.jsonc), ramp_only je Platz");
+        }
         if (ownOk == null || ownK.PatternFt != 1234 || !ownK.Crp.ContainsKey("x") || ownK.Crp.ContainsKey("north") || ownBad != null || Airfield.Kutaisi().PatternFt == 1234)
             throw new Exception($"Eigene charts.jsonc: {ownOk != null} {ownK.PatternFt} {string.Join(",", ownK.Crp.Keys)} {ownBad != null}");
         Console.WriteLine("OK   Eigene charts.jsonc ersetzt den Platz, fehlerhafte wird ignoriert");

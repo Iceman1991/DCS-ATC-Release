@@ -1524,6 +1524,10 @@ public partial class Tower
         r = twS.OnTranscript("Kutaisi Ground, Enfield 11, runway vacated, request taxi to parking", At(CX - 400 * Uz, CZ + 400 * Ux, 0, 254, 5), busy, 27);
         ParkSpot = true;
         Check(r[0].Contains("taxi to Ramp ") && !r[0].Contains("parking") && !r[0].Contains("o'clock") && twS.spot == null, "Nur Rampe statt Stellplatz: " + r[0]);
+        twS.F.RampOnly = true;   // the same for this airfield only: chart "ground": { "ramp_only": true }
+        r = twS.OnTranscript("Kutaisi Ground, Enfield 11, runway vacated, request taxi to parking", At(CX - 400 * Uz, CZ + 400 * Ux, 0, 254, 5), busy, 28);
+        twS.F.RampOnly = false;
+        Check(r[0].Contains("taxi to Ramp ") && !r[0].Contains("parking"), "Nur Rampe je Platz (ramp_only): " + r[0]);
         // PARK-P1: back at the departure airfield (gap in the air -> reset) own spot; occupied -> next free, ramp that of the spot
         // (before, spot forgotten and ramp from departure: "taxi to Ramp West via November, parking spot three eight")
         string Back(Traffic[] tr)
