@@ -1519,7 +1519,7 @@ local function start()
     if not grp or not Group.getByName(grp) then return end
     if f[1] == "LASE" then spotOn(L, grp, false, tonumber(f[4]) or tonumber(L.code) or 1688) return end
     if f[1] ~= "MARK" then return end
-    local kind, delay = f[4] or "", tonumber(f[5]) or 0
+    local kind, delay, ox, oz = f[4] or "", tonumber(f[5]) or 0, tonumber(f[6]) or 0, tonumber(f[7]) or 0   -- ox/oz: smoke beside the target, metres north/east
     local sm, SM = trigger.smokeColor or {}, { smoke_green = "Green", smoke_red = "Red", smoke_white = "White", smoke_orange = "Orange", smoke_blue = "Blue", wp = "White" }
     local col = SM[kind] and (sm[SM[kind]] or ({ Green = 0, Red = 1, White = 2, Orange = 3, Blue = 4 })[SM[kind]])
     if not col and kind ~= "ir" and kind ~= "illum" then return end
@@ -1528,7 +1528,7 @@ local function start()
       pcall(function()
         local p = jTarget(grp) or p0   -- target may have moved or died during the delay
         if not p then return end
-        local gp = { x = p.x, y = land.getHeight({ x = p.x, y = p.z }), z = p.z }
+        local gp = { x = p.x + ox, y = land.getHeight({ x = p.x + ox, y = p.z + oz }), z = p.z + oz }
         if col then trigger.action.smoke(gp, col)
         elseif kind == "illum" then trigger.action.illuminationBomb({ x = gp.x, y = gp.y + 500, z = gp.z }, 1000000)
         else spotOn(L, grp, true) end

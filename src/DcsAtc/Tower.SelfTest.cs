@@ -4466,6 +4466,10 @@ public partial class Tower
         Check(dr == "Enfield one-one, wind two-four-zero at eight, splash one, two-five-one decimal zero", "Piper: Ziffern gebunden: " + dr);
         var d9 = Program.ForPiper("Line 6, north four two degrees two one decimal five seven minutes", true);
         Check(d9 == "Line 6, north four two degrees two one decimal five seven minutes", "Piper: 9-Liner Ziffern einzeln: " + d9);
+        Program.Cfg.Pronunciation["Ramstein"] = "Rahm-shtine";   // forum (Abr, Lt_Jaeger): SAM as a word, SA-2 spelled, own respellings from the config
+        var ps = Program.ForPiper("Viper one two, SAM west. Mud spike, SA-2, east. Ramstein Tower, Ramsteiner");
+        Program.Cfg.Pronunciation.Remove("Ramstein");
+        Check(ps == "Viper one-two, sam west. Mud spike, S-A-2, east. Rahm-shtine Tower, Ramsteiner", "Piper: Aussprache SAM, SA-2, Pronunciation: " + ps);
 
         // --- RW1 (A8-A12): runway occupied, takeoff clearances, go-around
         {

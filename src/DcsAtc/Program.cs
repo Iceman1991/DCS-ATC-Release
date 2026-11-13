@@ -21,6 +21,7 @@ public class Config
     public string MyCallsign { get; set; } = "";       // own call sign instead of the one from the DCS slot, "" = from DCS (Settings window)
     public bool CallsignFromUnit { get; set; }         // forum 0.13: call sign from the mission unit name ("VICTORY 9-1", "WOLF-2-1") instead of the DCS slot (Pontiac); other names stay DCS
     public Dictionary<string, double> Frequencies { get; set; } = new(Tower.Freqs) { ["Range"] = 267.5, ["AWACS"] = 251.5, ["Tanker"] = 255.5, ["Carrier"] = 127.5, ["RedCrown"] = Carrier.RedCrownDefault, ["JTAC"] = 133.5 };   // AWACS/tanker on .5: not on an airfield frequency (Radio.lua whole MHz, K3)
+    public Dictionary<string, string> Pronunciation { get; set; } = new();   // word -> respelling for the voice only ("Ramstein": "Rahm-shtine"), Program.ForPiper; radio text stays as written
     public Dictionary<string, string> CenterNames { get; set; } = new();   // Center name per map ("Caucasus": "Tbilisi Control", "Caucasus:red": red side), without entry the table in Tower.CenterName
     public List<CenterSector> CenterSectors { get; set; } = new();   // several Center sectors per map (nearest center point inside RadiusNm): Name, Freq, Lat/Lon (Caucasus only) or X/Z, RadiusNm, Side blue/red
     public bool AwacsBullseye { get; set; } = true;    // LK4: picture and situation updates to all as bullseye; false = everything BRAA from the player (fallback)
@@ -72,6 +73,8 @@ public class Config
     public bool AiChatter { get; set; } = true;        // AI flights also transmit audibly (request, reply, readback)
     public string AiFlightComms { get; set; } = "voll"; // AI flights in combat: full (Fox, Splash, Tally …), tactical (only Fox/Splash/Bingo/Defending/Guard), off
     public double AiFlightRadiusNm { get; set; } = 60; // AI radio only from flights this close to a player of the same side
+    public bool JtacKeypad { get; set; }       // forum (buur): 9-line line 6 as 1 km grid square and keypad ("grid 37 T, G H, 26, 21, keypad 7") for every aircraft
+    public int JtacMarkOffsetM { get; set; } = 100;   // forum (buur): smoke / WP mark lands this far beside the target, the JTAC gives direction and distance from the smoke; 0 = on the target
     public bool TankerVectors { get; set; }    // tanker itself guides the receiver with join vectors until "visual" (N38); off: AWACS vectors or "request vector" only
     public bool AiOwnWingmen { get; set; } = false;    // players' AI wingmen also transmit (DCS already speaks for them)
     public bool AiFollowAwacs { get; set; } = true;    // LD1: AI fighters fly the AWACS assignment (AttackGroup in the mission script), off = radio only
@@ -1019,6 +1022,7 @@ static partial class Program
         Carrier.OnSpeedAoa = new(Carrier.OnSpeedDefault);
         foreach (var kv in Cfg.OnSpeedAoa) Carrier.OnSpeedAoa[kv.Key] = kv.Value;
         Ops.Vectors = Cfg.TankerVectors;
+        (Ops.Keypad, Ops.MarkOffsetM) = (Cfg.JtacKeypad, Math.Clamp(Cfg.JtacMarkOffsetM, 0, 500));
         Tower.Watch = Cfg.AirspaceWatch && On("atc");
         Tower.IffCheck = Cfg.IffCheck;
         (Flights.Mode, Flights.RadiusNm, Flights.OwnWingmen) = (Cfg.AiFlightComms, Cfg.AiFlightRadiusNm, Cfg.AiOwnWingmen);

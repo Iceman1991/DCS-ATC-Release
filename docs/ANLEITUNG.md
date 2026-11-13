@@ -2246,7 +2246,7 @@ Nenne das Rufzeichen des Lotsen (*Axeman one one*) oder *JTAC* / *FAC A* im Spru
 | **ready to copy** (*go ahead*, *ready for 9 line*, *ready for tasking*, *ready for next*, *next target*, *send it*, *ready for re-attack*) | Der 9-Liner (unten). *request re-attack* auf dasselbe Ziel nach dem BDA: *„re-attack approved, same 9-line, final attack heading …, advise IN“*, ohne neuen 9-Liner. Solange du in der Warteschleife bist: *„stand by, hold as directed.“* |
 | **readback** (Zeilen 4 und 6 und die Einschränkungen) | *„readback correct, push when ready, advise IN.“* Bei *danger close* nennen die Bemerkungen das Kürzel des Bodenkommandeurs (*„danger close, ground commander's initials whiskey golf“*); es muss im Readback zurückkommen (das Funkrad ergänzt es), sonst *„negative initials, ...“*. Eine falsche Zeile wird einzeln berichtigt: *„negative line 4, line 4 elevation six six zero feet. Say again your readback.“* |
 | **say again 9-line** (*repeat the 9-line*, *say again all*) | Der ganze 9-Liner noch einmal, beim Readback mit der Readback-Aufforderung. |
-| **say again line 6** (jede Zeile 1 bis 9) | Die Zeile noch einmal; *„say again remarks“* gibt die Remarks. *„say again in MGRS“* oder *„in lat long“* gibt Zeile 6 in diesem Format. |
+| **say again line 6** (jede Zeile 1 bis 9) | Die Zeile noch einmal; *„say again remarks“* gibt die Remarks. *„say again in MGRS“*, *„in lat long“* oder *„in keypad“* gibt Zeile 6 in diesem Format. |
 | **laser code** | *„laser code one six eight eight.“* |
 | **threats** (*air defense*) | Die bekannte Luftabwehr oder *„no threats observed.“* |
 | **request mark** (*mark the target*, *smoke*, *request smoke*, *request WP*) | JTAC: *„mark on the way, three zero seconds.“*, danach *„mark is red smoke, advise contact.“* FAC(A): bei laserfähigem Flugzeug (Hornet, F-16, A-10, Harrier, Apache …) oder lasergelenkten Bomben *„laser mark, code one six eight eight, advise spot.“* (auch Zeile 7 ist dann der Laser), sonst oder auf *request smoke* *„rocket away, mark is white phosphorus.“* Wunsch: *request green smoke* (red, green, white, orange, blue; nur JTAC), *request illum* (Leuchtgranate, JTAC), *request sparkle* oder *IR pointer* (sofort: *„sparkle, advise contact sparkle“*). *„contact smoke“* / *„contact sparkle“* ist das Tally. Vor dem Readback: *„negative, readback first.“* |
@@ -2279,7 +2279,9 @@ Nach *ready to copy* kommt *„standby for 9-line“*, die Zeilen 1 bis 9 und di
 | 9 | Egress-Richtung, weg von den eigenen Truppen |
 | Remarks | *final attack heading*, *danger close* (eigene Truppen unter 1000 m), *laser to target line* (nur JTAC), *threats* |
 
-Zeile 6 hängt vom Flugzeug ab. A-10, AH-64 und Ka-50 bekommen MGRS (*„MGRS three seven tango, golf golf, one two three four five, six seven eight nine zero“*), alle anderen Breite und Länge in Grad und Dezimalminuten.
+Zeile 6 hängt vom Flugzeug ab. A-10, AH-64 und Ka-50 bekommen MGRS (*„MGRS three seven tango, golf golf, one two three four five, six seven eight nine zero“*), alle anderen Breite und Länge in Grad und Dezimalminuten. Kürzer: mit `"JtacKeypad": true` in der `config.jsonc` oder auf *„say again in keypad“* ist Zeile 6 das 1-km-Gitterquadrat und eine Keypad-Zahl (*„grid three seven tango, golf hotel, two six, two one, keypad seven“*; 7 8 9 sind das nördliche Drittel des Quadrats, 1 2 3 das südliche).
+
+Rauch und WP landen nicht auf dem Ziel, sondern 100 m daneben, und der JTAC sagt, wo das Ziel vom Rauch aus liegt: *„mark is red smoke, target from the smoke west one zero zero meters“*. Entfernung: `JtacMarkOffsetM` in der `config.jsonc`, mit `0` liegt der Rauch auf dem Ziel.
 
 #### Kontrollart
 
@@ -2326,7 +2328,7 @@ Du:     Axeman one one, Enfield 1-1, readback, line 4 six six zero, line 6 north
 JTAC:   Enfield one one, Axeman one one, readback correct, advise when ready for mark or IN.
 Du:     Axeman one one, Enfield 1-1, request mark.
 JTAC:   Enfield one one, Axeman one one, mark on the way, three zero seconds.
-JTAC:   Enfield one one, Axeman one one, mark is red smoke, advise contact.
+JTAC:   Enfield one one, Axeman one one, mark is red smoke, target from the smoke west one zero zero meters, advise contact.
 Du:     Axeman one one, Enfield 1-1, tally target.
 JTAC:   Enfield one one, Axeman one one, roger, advise IN.
 Du:     Axeman one one, Enfield 1-1, in from the west.
@@ -2902,6 +2904,7 @@ Die Datei liegt im Installationsordner: `%LOCALAPPDATA%\Programs\DCS-ATC\config.
 |---|---|---|
 | `Frequencies` | `{ "ATIS": 263.5, "Ground": 264.5, "Tower": 265.0, "Approach": 266.5, "Range": 267.5, "Center": 268.5, "RedCrown": 252.5, "AWACS": 251.5, "Tanker": 255.5, "Carrier": 127.5, "JTAC": 133.5 }` | Stationsfrequenzen in MHz. **ATIS** ist die gemeinsame ATIS-Frequenz. **Range** ist der Range-Lotse. **JTAC** ist die Frequenz eines JTAC oder FAC(A), der in der Mission keine eigene hat. **Tanker** ist der Tankerfunk von DCS-ATC. **AWACS**, **Carrier** und **RedCrown** gelten nur, wenn die Missionseinheit keine eigene Frequenz hat. **Ground / Tower / Approach** sind Ersatz für Plätze ohne DCS-Frequenzdaten; normalerweise nutzt jeder Platz seine Kartenfrequenz. DCS-ATC warnt im Fenster, wenn eine Stationsfrequenz gleich einer Platzfrequenz ist. |
 | `AtisFreqs` | `{}` | Eigene ATIS-Frequenz je Platz, etwa `{ "Kutaisi": 262.0 }`. Nicht genannte Plätze nutzen `Frequencies.ATIS`. Gilt nach Neustart. |
+| `Pronunciation` | `{}` | Aussprache einzelner Wörter durch die Stimme, z. B. `{ "Ramstein": "Rahm-shtine" }`. Die Stimmen sind englisch, ein deutscher Name wird also so geschrieben, wie ihn ein Englischsprecher lesen würde. Nur ganze Wörter, Groß- und Kleinschreibung egal; der Funktext bleibt wie geschrieben. |
 | `CenterNames` | `{}` | Center-Name je Karte, z. B. `{ "Nevada": "Seattle Center", "Caucasus:red": "Rostov Control" }`. Leer = eingebaute Namen (siehe [Center](#center)). |
 | `CenterSectors` | `[]` | Mehrere Center-Sektoren je Karte, z. B. `[{ "Name": "Rostov Control", "Freq": 269.0, "Lat": 47.2, "Lon": 39.7, "RadiusNm": 120, "Side": "red" }]`. `Lat`/`Lon` auf jeder Karte, oder `X`/`Z` in Metern. `"Gci": true` macht den Eintrag zum GCI/CRC (Radarlotse wie das AWACS) statt zum Center. Der nächste Mittelpunkt, in dessen Radius du liegst, gilt. |
 | `Modulation` | `"AM"` | Modulation aller DCS-ATC-Sendungen. |
@@ -2937,6 +2940,8 @@ Eigene Frequenzen je Platz und Lotse stehen nicht in `config.jsonc`, sondern in 
 | `AiFollowAwacs` | `true` | Eigene KI-Jäger fliegen die Gruppe an, auf die das AWACS sie ansetzt. Das AWACS weicht Bedrohungen aus. `false`: die KI fliegt ihre Mission, der Funk folgt ihr. |
 | `AwacsBullseye` | `true` | Picture und Updates an alle im Bullseye-Format; `false` = alles BRAA von dir. |
 | `AwacsNewGroupNm` | `200` | AWACS meldet neue Gruppen (und „picture clean“) bis zu dieser Entfernung, 40–200 NM. |
+| `JtacKeypad` | `false` | `true` = der JTAC gibt Zeile 6 für jedes Flugzeug als 1-km-Gitterquadrat mit Keypad (*„grid three seven tango, golf hotel, two six, two one, keypad seven“*). Das Keypad teilt das Quadrat in neun Felder wie ein Ziffernblock: 7 8 9 im Norden, 1 2 3 im Süden. |
+| `JtacMarkOffsetM` | `100` | Rauch- und WP-Markierungen landen so viele Meter neben dem Ziel, der JTAC nennt Richtung und Entfernung vom Rauch zum Ziel. `0` = Rauch direkt auf dem Ziel. |
 | `TankerVectors` | `false` | `true` = der Tanker führt dich selbst zum Join (Kurs, Entfernung, Höhe), bis du „visual“ meldest. `false` = nur die erste Peilung, Vektoren vom AWACS oder auf „request vector“. |
 | `OnSpeedAoa` | `{ }` | LSO: On-Speed-Anstellwinkel in Grad je Typ-Präfix für „you're fast/slow“. Ergänzt die eingebauten Werte (FA-18 8.1, F-14 10.4, T-45 8.5, A-4E 8.75, AV8B 10.0) oder ersetzt einen. Andere Typen bekommen keine Fahrt-Rufe. Werte aus der Logzeile `[LSO] AoA im Mittel` ableiten. |
 

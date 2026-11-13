@@ -100,7 +100,7 @@ static partial class Program
                         if (p.Length > 13) AiFuel[p[2]] = D(13);
                         if (p.Length > 14) AiGid[p[2]] = (int)D(14);
                         if (p.Length > 16)   // AI radio: flight frequency, ammunition fox3/fox1/fox2/gun/air-to-ground
-                            fu[p[1]] = new Flights.Unit(p[1], p[2], p[3], p[12], int.Parse(p[11]), D(4), D(5), D(6), p[9] == "1", D(13), D(15),
+                            fu[p[1]] = new Flights.Unit(p[1], p[2], p[3], AiCs(p[1], p[12]), int.Parse(p[11]), D(4), D(5), D(6), p[9] == "1", D(13), D(15),
                                 p[16].Split('/', StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).ToArray(), p[10], (int)D(14), D(7), p.Length > 18 ? D(18) : 0,
                                 p.Length > 19 ? p[19] : "", p.Length > 17 && p[17] == "h");   // D(7): heading (rad) for commit/RTB; D(18): internal tank kg (LK15 ops check); p[19]: editor task (R376)
                         break;

@@ -426,7 +426,14 @@ static partial class Program
     static readonly Dictionary<string, (string Mp3, double Sec)> SynthCache = new();   // Text|voice -> finished mp3
     /// "two four zero" -> "two-four-zero": Piper otherwise stresses each digit individually and speaks numbers slowly
     static readonly Regex DigitRun = new($@"\b(?:{string.Join("|", Tower.DigitWords)})(?: (?:{string.Join("|", Tower.DigitWords)})\b)+");
-    internal static string ForPiper(string text, bool slow = false) => DigitRun.Replace(text.Replace("Kutaisi", "Koo-tie-see"), slow ? m => m.Value : m => m.Value.Replace(" ", "-"));   // Pronunciation; slow (9-line): digits as single words for writing down, otherwise bound (brisk as on the radio)
+    /// Pronunciation; slow (9-line): digits as single words for writing down, otherwise bound (brisk as on the radio).
+    /// Forum (Abr): Piper spells "SAM" and says "sah two" for "SA-2". Forum (Lt_Jaeger): own respellings per word, config "Pronunciation" (German names on the English voice).
+    internal static string ForPiper(string text, bool slow = false)
+    {
+        text = Regex.Replace(Regex.Replace(text.Replace("Kutaisi", "Koo-tie-see"), @"\bSAM\b", "sam"), @"\bSA-(\d+)\b", "S-A-$1");
+        foreach (var (k, v) in Cfg.Pronunciation) if (k != "") text = Regex.Replace(text, $@"(?<!\w){Regex.Escape(k)}(?!\w)", v.Replace("$", "$$"), RegexOptions.IgnoreCase);
+        return DigitRun.Replace(text, slow ? m => m.Value : m => m.Value.Replace(" ", "-"));
+    }
 
     /// Equalize the natural pace per Piper voice: the same radio call takes 10.0 s (ryan) to 14.1 s (bryce) at length_scale 1.
     /// Factor = 11.5 s / measured duration, so that SpeechRate sounds equally fast for every voice (0.85 -> about 9.8 s); unknown voice 1.

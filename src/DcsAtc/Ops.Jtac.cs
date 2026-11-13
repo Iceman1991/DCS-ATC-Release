@@ -29,6 +29,8 @@ partial class Ops
 
     static string CsKey(Leader l) => Normalize(l.Cs).Split(' ')[0];
     static bool Laser(string type) => Regex.IsMatch(type, @"^(?:A-10|FA-18|F/A-18|F-16|AV8B|AH-64|F-15E|F-14|Ka-50)");
+    public static bool Keypad;        // config JtacKeypad: line 6 as 1 km grid square and keypad for every aircraft
+    public static int MarkOffsetM;    // config JtacMarkOffsetM: smoke / WP this far beside the target, 0 = on the target
     static bool MgrsType(string type) => Regex.IsMatch(type, @"^(?:A-10|AH-64|Ka-50)");   // E3: format as the avionics takes it
     static readonly string[] Nato = { "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet", "kilo", "lima", "mike", "november", "oscar", "papa", "quebec", "romeo", "sierra", "tango", "uniform", "victor", "whiskey", "xray", "yankee", "zulu" };
     static readonly string[] Num = { "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten" };
@@ -106,9 +108,9 @@ partial class Ops
             CasEnd();
             return Say(OneOf("copy checking out", "roger checking out") + (tot > 0 ? $", {tot} destroyed in total" : "") + OneOf(". Good work", ". Thanks for the support"));
         }
-        if (cas >= 2 && cur != null && !Has(n, "readback", "read back") && Regex.IsMatch(n, @"\b(?:mgrs|lat long|latitude|lat lon)\b"))   // E3: "say again in MGRS / lat long"
+        if (cas >= 2 && cur != null && !Has(n, "readback", "read back") && Regex.IsMatch(n, @"\b(?:mgrs|lat long|latitude|lat lon|key ?pad|num ?pad|short grid)\b"))   // E3: "say again in MGRS / lat long / keypad"
         {
-            casFmt = Has(n, "mgrs") ? 1 : 2;
+            casFmt = Has(n, "mgrs") ? 1 : Has(n, "lat long", "latitude", "lat lon") ? 2 : 3;
             (casLines[6], casLoc6) = Loc(me, cur);
             return Say($"line 6, {casLines[6]}");
         }
@@ -168,8 +170,15 @@ partial class Ops
             if (Has(n, "ir pointer", "ir mark", "infrared", "sparkle")) (kind, delay) = ("ir", 0);
             else if (l.Kind == "jtac" && Has(n, "illum")) kind = "illum";
             else if (l.Kind == "jtac" && Regex.Match(n, @"\b(green|red|white|orange|blue) smoke\b") is { Success: true } sc) kind = "smoke_" + sc.Groups[1].Value;
-            Cmds.Add($"MARK;{casL};{casG};{kind};{delay}");
-            (casMarkAt, casMarkTxt) = (delay > 0 ? now + delay : 0, kind switch { "wp" => "white phosphorus", "ir" => "sparkle", "illum" => "illumination", _ => kind.Replace("smoke_", "") + " smoke" });
+            var (off, offTxt) = ("", "");
+            if (MarkOffsetM > 0 && kind is not ("ir" or "illum"))   // forum (buur): smoke lands beside the target (direction fixed per target group), the JTAC corrects from the smoke
+            {
+                double d = casG.Sum(c => c) % 8 * 45, r = d * Math.PI / 180;
+                off = FormattableString.Invariant($";{(int)Math.Round(MarkOffsetM * Math.Cos(r))};{(int)Math.Round(MarkOffsetM * Math.Sin(r))}");   // metres north;east of the target
+                offTxt = $", target from the smoke {Dir8((d + 180) % 360)} {Meters(MarkOffsetM)}";
+            }
+            Cmds.Add($"MARK;{casL};{casG};{kind};{delay}{off}");
+            (casMarkAt, casMarkTxt) = (delay > 0 ? now + delay : 0, kind switch { "wp" => "white phosphorus", "ir" => "sparkle", "illum" => "illumination", _ => kind.Replace("smoke_", "") + " smoke" } + offTxt);
             return Say(kind == "ir" ? "sparkle, advise contact sparkle" : delay > 0 ? $"mark on the way, {Digits(delay.ToString())} seconds" : $"rocket away, mark is {casMarkTxt}, advise contact");
         }
         bool noTally = Regex.IsMatch(n, @"\b(?:negative|no|not|unable)\b.*\b(?:tally|visual|contact|target|mark)\b|\b(?:no joy|not in sight|blind|talk on|describe the target|target description)\b");   // R419: "negative contact", "no tally", "no joy"; talk-on on request
@@ -253,10 +262,18 @@ partial class Ops
     /// Line 6 spoken and the digits the readback must contain. E3: MGRS for A-10C / AH-64 / Ka-50, otherwise lat/long degrees and decimal minutes.
     (string Say, string Key) Loc(Me me, Trg t)
     {
-        if ((casFmt == 1 || casFmt == 0 && MgrsType(me.Type)) && Regex.Match(t.Mgrs.Replace(" ", ""), @"^(\d{1,2})([A-Z])([A-Z]{2})(\d+)$") is { Success: true } m && m.Groups[4].Value.Length % 2 == 0)
+        bool pad = casFmt == 3 || casFmt == 0 && Keypad;
+        if ((pad || casFmt == 1 || casFmt == 0 && MgrsType(me.Type)) && Regex.Match(t.Mgrs.Replace(" ", ""), @"^(\d{1,2})([A-Z])([A-Z]{2})(\d+)$") is { Success: true } m && m.Groups[4].Value.Length % 2 == 0)
         {
             var h = m.Groups[4].Value.Length / 2;
             string N(char ch) => Nato[ch - 'A'];
+            if (pad && h >= 3)   // forum (buur): 1 km square and keypad (7 8 9 north, 1 2 3 south) instead of ten digits
+            {
+                string e = m.Groups[4].Value[..h], no = m.Groups[4].Value[h..];
+                int Third(string s) => int.Parse(s[2..]) * 3 / (int)Math.Pow(10, s.Length - 2);
+                var k = (Third(no) * 3 + Third(e) + 1).ToString();
+                return ($"grid {Digits(m.Groups[1].Value)} {N(m.Groups[2].Value[0])}, {N(m.Groups[3].Value[0])} {N(m.Groups[3].Value[1])}, {Digits(e[..2])}, {Digits(no[..2])}, keypad {Digits(k)}", m.Groups[1].Value + e[..2] + no[..2] + k);
+            }
             return ($"MGRS {Digits(m.Groups[1].Value)} {N(m.Groups[2].Value[0])}, {N(m.Groups[3].Value[0])} {N(m.Groups[3].Value[1])}, {Digits(m.Groups[4].Value[..h])}, {Digits(m.Groups[4].Value[h..])}", m.Groups[1].Value + m.Groups[4].Value);
         }
         string lk = "";
@@ -420,7 +437,8 @@ partial class Ops
     /// Self-test J6-J12: check-in, 9-line, readback, IN, BDA, check fire, hold, Type 1, handover, ground types.
     internal static void JtacTest(Action<bool, string> check)
     {
-        var (ol, ot, on) = (Leaders, Targets, NavPts);
+        var (ol, ot, on, okp, omo) = (Leaders, Targets, NavPts, Keypad, MarkOffsetM);
+        (Keypad, MarkOffsetM) = (false, 0);
         casAll.Clear();
         var none = Array.Empty<Traffic>();
         var fl = new List<Airfield>();
@@ -464,6 +482,14 @@ partial class Ops
         check(tk.Contains("copy no joy. Target is four tanks"), "Talk-on auf Wunsch -> " + tk);
         var (ns, es, sm) = (Say(o, m1, "JTAC: target not in sight", 5.92), Say(o, m1, "JTAC: eyes on the target", 5.94), Say(o, m1, "JTAC: smoke in sight", 5.96));
         check(ns.Contains("no joy") && es.Contains("advise IN") && sm.Contains("advise IN"), "JTAC Tally-Varianten: not in sight / eyes on / smoke in sight -> " + ns + " / " + es + " / " + sm);
+        {   // forum (buur): line 6 as grid square and keypad, smoke beside the target with the correction from the smoke
+            var kp = Say(o, m1, "JTAC: say again in keypad", 5.97); var kk = o.casLoc6; Say(o, m1, "JTAC: say again in lat long", 5.98);
+            MarkOffsetM = 100;
+            Say(o, m1, "JTAC: request red smoke", 5.99);
+            MarkOffsetM = 0;
+            check(kp.EndsWith("line 6, grid three seven tango, golf golf, one two, six seven, keypad eight") && kk == "3712678" && o.Cmds[^1] == "MARK;JTAC-1;T-1;smoke_red;30;0;100"
+                  && o.casMarkTxt == "red smoke, target from the smoke west one zero zero meters", "JTAC Kurzposition mit Keypad, Rauch versetzt -> " + kp + " / " + kk + " / " + o.Cmds[^1] + " / " + o.casMarkTxt);
+        }
         var ty = Say(o, m1, "JTAC: tally target", 6);
         var hot = Say(o, m1, "JTAC: in from the south", 7);
         check(ty.Contains("advise IN") && hot.EndsWith("cleared hot") && o.Cas == 5, "J6: Tally, IN -> cleared hot -> " + ty + " / " + hot);
@@ -558,7 +584,7 @@ partial class Ops
         check(dd.Count == 1 && dd[0].Role == "Info" && o6.Cas == 0 && !casAll.Contains(o6), "J10: Leiter tot, keiner mehr -> Funk endet -> " + dd.Count + " " + string.Join(" | ", dd.Select(c => c.Role + ":" + c.Text)) + " cas=" + o6.Cas);
         check(TypeSay("T-72B") == "tanks" && TypeSay("BTR-80") == "APCs" && TypeSay("ZSU-23-4 Shilka") == "Shilka" && TypeSay("Ural-375") == "trucks" && TypeSay("FA-18C_hornet") == "Hornet"
               && Desc(t4 with { Type = "BTR-80", Count = 1 }) == "one APC" && Desc(t4) == "four tanks", "J12: Bodentypen sprechbar (Mehrzahl/Einzahl)");
-        (Leaders, Targets, NavPts) = (ol, ot, on);
+        (Leaders, Targets, NavPts, Keypad, MarkOffsetM) = (ol, ot, on, okp, omo);
         casAll.Clear();
     }
 }
