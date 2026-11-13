@@ -198,7 +198,8 @@ static class Settings
         string[] units = { "auto", "hpa", "inhg" };
         var unit = Combo(new[] { L("automatisch (nach Flugzeugtyp)", "automatic (by aircraft type)"), "hPa (QNH)", "inHg (altimeter)" }, Math.Max(0, Array.IndexOf(units, cfg.AltimeterUnit.ToLowerInvariant())));
         Row(L("Höhenmesser-Einstellung", "Altimeter setting"), unit);
-        var knee = Check(L("Kneeboard-Seiten bei Missionsstart schreiben (nur Kaukasus, deutsch) *", "Write kneeboard pages at mission start (Caucasus only, German) *"), cfg.KneeboardPages);
+        var knee = Check(L("Kneeboard-Seiten bei Missionsstart schreiben *", "Write kneeboard pages at mission start *"), cfg.KneeboardPages);
+        var f10 = Check(L("Kontrollzonen, Meldepunkte und Routen auf die F10-Karte zeichnen *", "Draw control zones, reporting points and routes on the F10 map *"), cfg.F10Drawings);
         // Update from the GitHub releases: look when the window opens (Config.UpdateCheck) or on the button; download and setup only on the button
         Group("Update");
         var updState = new Label { Text = L($"Installiert: {Update.Own}", $"Installed: {Update.Own}"), AutoSize = true, MaximumSize = new Size(285, 0), UseMnemonic = false };
@@ -517,7 +518,7 @@ static class Settings
                 ("PilotVoice", J(pv.SelectedIndex == 0 ? "" : known[pv.SelectedIndex - 1] == pilot ? cfg.PilotVoice : known[pv.SelectedIndex - 1]), "Voices"),   // same model: its "@pitch" stays
                 ("AiChatter", J(chat.Checked), "ReplyPause"), ("AwacsBullseye", J(bull.Checked), "Coalition"), ("AwacsNewGroupNm", D(awNm.Value), "AwacsBullseye"), ("Atis", J(atis.Checked), "AiChatter"), ("RunwayLights", J(lights[light.SelectedIndex]), "Atis"), ("AltimeterUnit", J(units[unit.SelectedIndex]), "RunwayLights"), ("AiFlightComms", J(modes[combat.SelectedIndex]), "Volume"), ("IffCheck", J(iffc.Checked), "AirspaceWatch"), ("StationPositions", J(spos.Checked), "IffCheck"), ("RandomNotams", J(notam.Checked), "StationPositions"),("AirspaceWatch", J(watch.Checked), "RunwayLights"), ("DebugLog", J(dbg.Checked), "AirspaceWatch"),
                 ("WheelInGame", J(ingames[ingame.SelectedIndex]), "WheelSize"), ("MicName", J(mic.SelectedIndex == 0 ? "" : mics[mic.SelectedIndex - 1]), "WheelSize"), ("SrsPath", J(srs.Text.Trim()), "DebugLog"),
-                ("KneeboardPages", J(knee.Checked), "DebugLog"), ("AiFlightRadiusNm", D(aiNm.Value), "AiFlightComms"), ("AiOwnWingmen", J(wingmen.Checked), "AiFlightRadiusNm"), ("TankerVectors", J(tvec.Checked), "AiOwnWingmen"),
+                ("KneeboardPages", J(knee.Checked), "DebugLog"), ("F10Drawings", J(f10.Checked), "KneeboardPages"),("AiFlightRadiusNm", D(aiNm.Value), "AiFlightComms"), ("AiOwnWingmen", J(wingmen.Checked), "AiFlightRadiusNm"), ("TankerVectors", J(tvec.Checked), "AiOwnWingmen"),
                 ("AiFollowAwacs", J(follow.Checked), "AiFlightComms"), ("Modulation", J(modu.Text), "AwacsNewGroupNm"), ("Coalition", side.SelectedIndex == 1 ? "1" : "2", "Modulation"),
                 ("WheelSize", D(wsize.Value / 100), "WheelButton"), ("SrsListen", J(listen.Checked), "AiChatter"), ("SrsAutoConnect", J(auto.Checked), "SrsListen"),
                 ("AsrGpu", J(gpu.Checked), "DebugLog"), ("AsrApiUrl", J(apiUrl.Text.Trim()), "AsrGpu"), ("AsrApiKey", J(apiKey.Text.Trim()), "AsrApiUrl"), ("AsrApiModel", J(apiModel.Text.Trim()), "AsrApiKey"),

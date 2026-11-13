@@ -18,7 +18,7 @@ DCS-ATC never spawns aircraft. It only provides the radio for units that are alr
 5. [AWACS, tankers and ranges](#awacs-tankers-and-ranges)
    - [AWACS](#awacs) · [Tankers](#tankers) · [Range](#range) · [JTAC and FAC(A)](#jtac-and-faca) · [AI flights on the radio](#ai-flights-on-the-radio) · [Commanding your AI wingmen](#commanding-your-ai-wingmen) · [CSAR (helicopters)](#csar-helicopters) · [Ground crew and crew chief](#ground-crew-and-crew-chief)
 6. [Multiplayer, dedicated server, custom frequencies and other maps](#multiplayer-dedicated-server-custom-frequencies-and-other-maps)
-   - [How multiplayer works](#how-multiplayer-works) · [Dedicated server, step by step](#dedicated-server-step-by-step) · [Custom frequencies per airfield](#custom-frequencies-per-airfield) · [Own airfield procedures](#own-airfield-procedures-chartsjsonc) · [Kneeboard pages](#kneeboard-pages) · [Other maps than Caucasus](#other-maps-than-caucasus)
+   - [How multiplayer works](#how-multiplayer-works) · [Dedicated server, step by step](#dedicated-server-step-by-step) · [Custom frequencies per airfield](#custom-frequencies-per-airfield) · [Own airfield procedures](#own-airfield-procedures-chartsjsonc) · [Kneeboard pages](#kneeboard-pages) · [Drawings on the F10 map](#drawings-on-the-f10-map) · [Other maps than Caucasus](#other-maps-than-caucasus)
 7. [Appendix: settings, logs and troubleshooting](#appendix-settings-logs-and-troubleshooting)
    - [The settings window](#the-settings-window) · [config.jsonc reference](#configjsonc-reference) · [Situation map in the browser](#situation-map-in-the-browser) · [Log files](#log-files) · [Troubleshooting](#troubleshooting)
 
@@ -1184,6 +1184,17 @@ Approach puts you in a hold if any of these apply:
 - **Expected approach time:** given once as the minute of the mission clock ("expected approach time three five"). It is repeated only if it changes by 5 min or more ("revised expected approach time …"). Without a mission clock: "expect approach in 6 minutes".
 - **Checks in the hold:** if you drift off, or are more than 30 kt off speed, you get a heading or speed reminder. More than 500 ft off altitude gets "check altitude, maintain 5000 feet."
 - **Leaving the hold:** when it's your turn, you are released with a heading that points roughly toward the approach, within 2 min.
+
+#### Separation
+
+Approach and Departure keep you apart from other traffic, players and AI alike. The pieces in one place:
+
+- **Altitudes:** you only get an altitude that is free: no traffic within 3 NM and 1000 ft on the way there, and no conflict in the next 60 s. Otherwise you stay where you are until the traffic has passed. Under vectors the next descent step comes later; on a request you hear "unable higher, traffic, maintain 5000 feet."
+- **Holding:** the stack is separated by 1000 ft per aircraft. You get the next lower level when the aircraft ahead has left it.
+- **Final:** 3 NM behind the aircraft ahead, 5 NM behind a heavy. If you get too close: "reduce speed to 170 knots for spacing." In the pattern: "extend downwind, number two", and "go around" if the runway is not free in time.
+- **Sequence:** from two aircraft in the pattern on, arrivals wait in the hold with an expected approach time.
+- **Last resort:** a traffic alert with an avoidance heading and altitude, see below.
+- AI aircraft fly as DCS flies them; DCS-ATC does not steer them in flight. You are separated around them.
 
 #### Traffic information and traffic alerts
 
@@ -2717,13 +2728,42 @@ A departure route is a chain of fixes you fly after takeoff, then own navigation
 
 `"departures"` sits next to `"routes"` in the airfield's entry. `"rwy"` and `"pts"` work as for arrival routes, and so does a list of variants under one name; there is no `"to"`.
 
+#### Chart editor
+
+The chart editor is a page in the browser that writes reporting points and routes for `charts.jsonc`, so you don't have to measure coordinates by hand.
+
+- **Open it:** Start menu → DCS-ATC → *Chart editor*, or `http://localhost:18600/chart` while DCS-ATC is running (the situation map has a link). Without a running mission it shows the airfields of the last mission.
+- **Pick the airfield** at the top right. The map shows its runways, the reporting points and routes it already has (blue, green, orange) and the neighbouring airfields. Drag moves the map, the mouse wheel zooms. At the bottom left you see the magnetic bearing and distance of the mouse pointer from the airfield, to place a point from a real chart.
+- **Reporting point:** click on the map and type the name. In the list, choose whether it is an entry (via initial or via overhead) and an exit. This applies to all runways of the airfield.
+- **Arrival route:** type the route's name, click the fixes in order, then click the reporting point where the route ends. Set the altitude of each fix in the list (at or above, at, at or below; empty = none). The route serves every runway that has the end point as an entry.
+- **Departure route:** type the name, click the fixes in order, then *Finish route*.
+- A click on a point that already exists uses that point, with its name and position.
+- **Result:** the text box holds the airfield's complete entry: what it had so far (also the built-in Caucasus data with its taxiways) plus your additions. *Copy* it and paste it inside the outer `{ }` of `charts.jsonc`, in place of the airfield's entry if the file already has one. It applies from the next mission start. Positions are written as DCS coordinates `[x, z]`.
+- A red line above the text names what is still missing, for example a runway without an entry or exit point. Every runway of an airfield with reporting points needs at least one of each.
+- The page only reads; it does not change `charts.jsonc`. Your additions stay in the browser until you remove them (×).
+- Finer differences (a point as entry for one runway only, the pattern side, taxiways) are edited in the text as described above.
+
 ### Kneeboard pages
 
-At every mission start DCS-ATC puts its kneeboard pages into `Saved Games\DCS\Kneeboard`. DCS shows them in the kneeboard of every aircraft. The pages: radio, Kutaisi, airfields with frequencies, patterns and CRPs, navaids, AWACS and tankers, notes on the map. The frequencies are those of the running mission.
+At every mission start DCS-ATC puts its kneeboard pages into `Saved Games\DCS\Kneeboard`. DCS shows them in the kneeboard of every aircraft. The pages: radio, airfields with frequencies, patterns and CRPs, arrival and departure routes, navaids, AWACS and tankers. The frequencies are those of the running mission.
 
-- Caucasus map only, and only in German. On other maps and with English as language DCS-ATC removes its pages again.
+- On every map, in the language of the interface (German or English). On maps with many airfields the tables run over several pages.
+- Patterns, CRPs and routes are listed for the airfields with procedures: built in for the Caucasus, otherwise from your `charts.jsonc` (see [Own airfield procedures](#own-airfield-procedures-chartsjsonc)). The routes page gives the runways of each route, its fixes in order and their altitudes ("9000+" = at or above, "5000-" = at or below).
+- Caucasus only: the Kutaisi page and the notes on the map.
+- DCS reads the page list when the mission loads. A page that did not exist before (another map, more table pages) therefore shows from the next mission on. A page this mission does not need shows a note and is gone from the next mission on.
 - Switch off: `"KneeboardPages": false` in `config.jsonc`.
 - The files are named `ATC-*.png`. Uninstalling deletes them.
+
+### Drawings on the F10 map
+
+At every mission start DCS-ATC draws the airspace of the airfields on the F10 map. Every player sees them, with or without their own DCS-ATC.
+
+- **Control zone:** a blue circle around every airfield with its name and top ("Kutaisi CTR 2700 ft"). This is the airspace Tower watches (see [Airspace](#airspace)).
+- **Reporting points:** a small blue circle with the name ("CRP north", "CRAIG"), at airfields with procedures (built in for the Caucasus, otherwise from `charts.jsonc`).
+- **Arrival routes** (`"routes"`): a green line from fix to fix, ending at the route's reporting point.
+- **Departure routes** (`"departures"`): an orange dashed line from fix to fix.
+- The drawings can't be moved or deleted on the map. After a change to `charts.jsonc` they apply from the next mission start.
+- Switch off: `"F10Drawings": false` in `config.jsonc`, or in the settings window.
 
 ### Other maps than Caucasus
 
@@ -2801,6 +2841,7 @@ Pick the page on the left: General, Voices, Radio & traffic, AWACS, Frequencies,
 | **DCS-ATC active** | on/off. Off: DCS-ATC no longer starts from the next mission, without uninstalling. No radio wheel, no F10 menu, the DCS AI radio works as without DCS-ATC. Back on: tick the box. | (`DcsAtcOff.txt`) |
 
 | **Write kneeboard pages at mission start** `*` | on/off | `KneeboardPages` |
+| **Draw control zones, reporting points and routes on the F10 map** `*` | on/off | `F10Drawings` |
 | **Update** | Shows the installed version. *Check for updates* asks GitHub for the latest release. If there is a newer one the button becomes *Update now*: it downloads the update, checks size and checksum, runs the setup and opens this window again. The download is only the app (about 75 MB) when the speech model, voices and tools on your PC are the ones of the new release, otherwise the full release (about 850 MB); the window shows the size. Not while DCS is running. Your `config.jsonc` and keys stay. | |
 | **Look for a new version at start** | on/off. On: one request to GitHub when DCS-ATC starts and when this window opens. A newer version is only announced (log line, this window), nothing is downloaded without the button. | `UpdateCheck` |
 | **Voice per station** `*` | Per station: *Random* (one of the installed voices at each start, not the pilot voice) or a fixed voice from the `models` folder with its pitch (1.00 = unchanged, lower = deeper). With a second voice the airfields alternate. The button on the right plays a sample on the PC speakers. *All random* and *Defaults* set every row. Three or more voices from the file stay a text field. | `Voices` |
@@ -2915,7 +2956,8 @@ Own frequencies per airfield and controller are not in `config.jsonc` but in the
 | `AsrApiKey` | `""` | Key for `AsrApiUrl` (sent as `Bearer`). Empty for a server without a key. |
 | `AsrApiModel` | `"whisper-1"` | Model name at `AsrApiUrl`, e.g. `"whisper-1"` or `"gpt-4o-mini-transcribe"`. |
 | `UpdateCheck` | `true` | Ask GitHub once at start for a newer release (notice only, the download starts from the settings window). `false` for a dedicated server or a PC without internet. |
-| `KneeboardPages` | `true` | Kneeboard pages into `Saved Games\DCS\Kneeboard` at mission start (Caucasus only, German), see [Kneeboard pages](#kneeboard-pages). |
+| `KneeboardPages` | `true` | Kneeboard pages into `Saved Games\DCS\Kneeboard` at mission start (every map, interface language), see [Kneeboard pages](#kneeboard-pages). |
+| `F10Drawings` | `true` | Draw control zones, reporting points and named routes on the F10 map at mission start, see [Drawings on the F10 map](#drawings-on-the-f10-map). |
 
 **Per-mission options.** Ground crew (fuel/ammo trucks, fire service) is a mission option, not part of `config.jsonc`:
 
@@ -2930,6 +2972,7 @@ Open `http://localhost:18600/` in a browser on the PC running DCS-ATC, for examp
 - **Tablet or another PC:** set `"MapLan": true` and restart DCS-ATC. Windows asks once whether to allow the network access. Then open `http://<name or IP of the PC>:18600/`.
 - **Other port or off:** `"MapPort"` in `config.jsonc` (0 = off). If the port is in use, the DCS-ATC window says so and there is no map.
 - The page only reads. Nothing on it can change anything in DCS-ATC or the mission. In VR, use the kneeboard pages.
+- **Chart editor:** `http://localhost:18600/chart` writes reporting points and routes for `charts.jsonc`, see [Chart editor](#chart-editor).
 - **Radio wheel:** `http://localhost:18600/wheel` shows the open radio wheel as a picture, for an OpenKneeboard tab in VR or a tablet (see [Radio wheel as text in the game (VR)](#radio-wheel-as-text-in-the-game-vr)).
 
 ### Log files

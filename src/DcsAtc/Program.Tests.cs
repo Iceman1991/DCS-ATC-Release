@@ -400,6 +400,26 @@ static partial class Program
             var st = bn.Routes.Values.Where(r => r.Name == "STRYK").ToList();
             if (st.Count != 2 || st[0].Rwy[0] != "09" || st[0].To != "north" || st[1].Rwy[0] != "27" || st[1].To != "APEX" || st[1].Pts.Length != 2 || bn.LandRwy != "27" || bn.DepRwy != "09")
                 throw new Exception($"charts.jsonc Routenvarianten: {string.Join(" | ", st.Select(r => $"{r.Name} {string.Join(",", r.Rwy)} {r.To} {r.Pts.Length}"))} land {bn.LandRwy} dep {bn.DepRwy}");
+            // F10 map: zone circle with label, CRPs, route fixes and legs once each (STRYK is in both variants), arrival ends at its CRP; Kutaisi placeholder on another map not drawn
+            var dl = DrawLine(new[] { Airfield.Kutaisi(), bn }).Split('|');
+            string[] want = { "T;1;1;2;CRP north", "T;1;3;4;APEX", "T;2;5;6;STRYK", "T;2;7;8;GASS PEAK", "L;2;5;6;1;2", "L;2;5;6;7;8", "L;2;7;8;3;4" };
+            if (!dl[0].StartsWith("DRAW;C;1;22736;5935;") || !dl[1].EndsWith($";Banias CTR {bn.CtrTopFt:0} ft") || want.Any(w => dl.Count(p => p == w) != 1) || dl.Length != 2 + 4 * 2 + 3)
+                throw new Exception($"F10-Zeichnung: {string.Join(" | ", dl)}");
+            Console.WriteLine($"OK   F10-Karte: Kontrollzone, CRPs, Route STRYK mit beiden Varianten ohne doppelte Punkte ({dl.Length} Zeichnungen)");
+            // Chart editor: its data (airfield as loaded plus the entry as written, no Kutaisi placeholder), and an entry as the page writes it is read
+            var cs = JsonSerializer.Serialize(ChartState(new[] { Airfield.Kutaisi(), bn }));
+            if (!cs.StartsWith("{\"theatre\":\"Syria\",\"fields\":[{\"name\":\"Banias\",\"key\":\"Banias\",") || !cs.Contains("\"crp\":{\"north\":[1,2],\"APEX\":[3,4]}") || !cs.Contains("\"raw\":{\"land_rwy\":\"27\"") || cs.Contains("Kutaisi"))
+                throw new Exception($"Verfahrens-Editor: {cs}");
+            File.WriteAllText(ownF, """
+                { "Banias": { "crp": { "TEST": [1, 2] }, "rwy": { "09": { "entry": { "TEST": { "via": "initial" } }, "exit": { "TEST": {} } } },
+                  "routes": { "MINTT": { "rwy": ["09"], "to": "TEST", "pts": [ { "fix": "ALPHA", "pos": [5, 6], "above": 15000 }, { "fix": "BRAVO", "pos": [7, 8] } ] } },
+                  "departures": { "FLEX": { "rwy": ["09"], "pts": [ { "fix": "DELTA", "pos": [9, 10], "below": 5000 } ] } } } }
+                """);
+            Airfield.OwnChart = OwnChart(ownF);
+            var ed = Airfield.FromDcs("Banias", 22735.7, 5935.4, 8, rw).ApplyChart();
+            if (Airfield.OwnChart == null || ed.Entry["09"][0] != ("TEST", "initial", null) || ed.Exit["09"][0] != "TEST" || ed.Routes["MINTT"].Pts.Length != 2 || ed.Routes["MINTT"].Pts[0].Cross != "at or above" || ed.Departures["FLEX"].Pts[0].Ft != 5000)
+                throw new Exception("Verfahrens-Editor: Eintrag der Seite wird nicht gelesen");
+            Console.WriteLine("OK   Verfahrens-Editor: Platzdaten als JSON mit dem Eintrag wie geschrieben, Eintrag der Seite (Punkt, An- und Abflugroute) wird gelesen");
             File.WriteAllText(ownF, """{ "Banias": { "land_rwy": "28" } }""");
             Airfield.OwnChart = OwnChart(ownF);
             try { Airfield.FromDcs("Banias", 22735.7, 5935.4, 8, rw).ApplyChart(); throw new Exception("charts.jsonc: land_rwy 28 auf Banias nicht erkannt"); }

@@ -72,7 +72,8 @@
   "AltimeterUnit": "auto",   // Höhenmesser-Einstellung im Funk: "auto" (nach eigenem Flugzeugtyp: westliche Typen "altimeter two niner niner two" in inHg, sonst "QNH one zero one three" in hPa; ATIS nennt beides), "hpa", "inhg"
   "DebugLog": true,   // ausführliches Protokoll atc-debug.txt für Fehlerberichte (Spracherkennung, Platzwahl, Phasen, Telemetrie alle 10 s), höchstens 2 × 20 MB; false = aus
   "UpdateCheck": true,   // beim Start einmal bei GitHub nach einer neueren Version fragen (nur Hinweis im Log und im Einstellungsfenster, geladen wird erst auf Knopfdruck); false = keine Anfrage (Dedicated Server, PC ohne Internet)
-  "KneeboardPages": true,   // Kneeboard-Seiten (Funk, Plätze, Platzrunden, Navigation, AWACS) bei Missionsstart nach Saved Games\DCS\Kneeboard, in jedem Flugzeug sichtbar (nur Kaukasus, deutsch); false = keine
+  "KneeboardPages": true,   // Kneeboard-Seiten (Funk, Plätze, Platzrunden, Routen, Navigation, AWACS) bei Missionsstart nach Saved Games\DCS\Kneeboard, in jedem Flugzeug sichtbar (jede Karte, Sprache der Oberfläche); false = keine
+  "F10Drawings": true,   // Kontrollzonen, Meldepunkte (CRPs) und benannte Routen (charts.jsonc) bei Missionsstart auf die F10-Karte zeichnen, für alle Spieler sichtbar; false = keine
   "AtisFreqs": {},   // eigene ATIS-Frequenz je Platz, z. B. { "Kutaisi": 262.0 } (nicht auf Platz-/Funktionsfrequenzen); leer/fehlend = Frequencies.ATIS, erst nach Neustart
 
   "SrsPath": "C:\\Program Files\\DCS-SimpleRadio-Standalone"   // SRS-Ordner (mit ExternalAudio); stimmt er nicht, nimmt DCS-ATC die SRS-Installation aus der Registry bzw. das laufende SRS. Auch im Einstellungsfenster wählbar

@@ -831,6 +831,12 @@ static partial class Program
             }
             else noSrsClientAt = null;
             if (MissionFields && File.GetLastWriteTime(AirfieldFile) != airfieldStamp) LoadFields();
+            if (Cfg.F10Drawings && MissionFields && MissionData && drawnStamp != airfieldStamp)   // mission is running (fresh state): a command written earlier would wait for the next mission, maybe on another map
+            {
+                drawnStamp = airfieldStamp;
+                AiCmd(DrawLine(Fields), false);
+                Log(L("[F10] Kontrollzonen, Meldepunkte und Routen auf der F10-Karte gezeichnet", "[F10] control zones, reporting points and routes drawn on the F10 map"));
+            }
             if (MissionFields && File.GetLastWriteTime(StandFile) is var ss && ss != standStamp)
                 try { Airfield.LoadStands(Fields, StandFile); standStamp = ss; Trace("PLATZ", $"DCS-Standnamen: {Fields.Sum(f => f.Stands.Count)}"); }
                 catch (IOException) { }   // hook is still writing: next second

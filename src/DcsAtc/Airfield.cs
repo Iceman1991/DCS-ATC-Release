@@ -76,6 +76,8 @@ public class Airfield
     /// Chart point written in capitals ("CRAIG", "GASS_PEAK") = named fix, said by its name ("Gass Peak"); otherwise "C R P north".
     public static string Say(string k) => k.Any(char.IsLower) || !k.Any(char.IsLetter) ? "C R P " + k.Replace('_', ' ')
         : string.Join(' ', k.Replace('_', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w => w[0] + w[1..].ToLowerInvariant()));
+    /// The same point as written on the F10 map and the kneeboard: "CRP north", "GASS PEAK".
+    public static string Label(string k) => (k.Any(char.IsLower) || !k.Any(char.IsLetter) ? "CRP " : "") + k.Replace('_', ' ');
     double? ctrTopFt;
     public List<(double X, double Z, int Num, int Type)> Spots = new();   // Parking positions from DCS (Airbase:getParking): Term_Index, Term_Type (16 runway, 40 helicopter)
     public bool Charted => Crp.Count > 0;     // procedures per DCS kneeboard chart (charts/caucasus.jsonc)
@@ -281,10 +283,18 @@ public class Airfield
         ChartOpts)).RootElement;
 
     /// Procedures from the chart data if the airfield is in there; without entry everything stays as before (E5). Built-in data Caucasus only, charts.jsonc on every map (forum 0.20).
-    public Airfield ApplyChart()
+    /// The airfield's chart entry as written: charts.jsonc, otherwise built in (Caucasus); null = none.
+    public JsonElement? ChartEntry()
     {
         JsonElement a = default;
-        if (OwnChart?.TryGetProperty(OwnAlias.GetValueOrDefault(Name, Name), out a) != true && (Theatre != "Caucasus" || !Chart.TryGetProperty(Name, out a))) return this;
+        return OwnChart?.TryGetProperty(OwnAlias.GetValueOrDefault(Name, Name), out a) == true || Theatre == "Caucasus" && Chart.TryGetProperty(Name, out a) ? a : null;
+    }
+    /// False for the Kutaisi that Load puts first on every map (placeholder outside the Caucasus).
+    public bool OnMap => Name != "Kutaisi" || Theatre == "Caucasus";
+
+    public Airfield ApplyChart()
+    {
+        if (ChartEntry() is not { } a) return this;
         static Dictionary<string, string> Strs(JsonElement e, string key) =>
             e.TryGetProperty(key, out var v) ? v.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString()!) : new();
         if (a.TryGetProperty("pattern_ft", out var p)) PatternFt = p.GetDouble();

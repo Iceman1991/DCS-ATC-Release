@@ -57,7 +57,8 @@ public class Config
     public string AsrApiKey { get; set; } = "";        // #11: Bearer key for AsrApiUrl ("" = none, e.g. own server)
     public string AsrApiModel { get; set; } = "whisper-1";   // #11: model name at AsrApiUrl
     public bool UpdateCheck { get; set; } = true;      // ask GitHub at start whether a newer release exists (log line, button in the settings window); nothing is downloaded without the button
-    public bool KneeboardPages { get; set; } = true;   // kneeboard pages into Saved Games\DCS\Kneeboard on mission start (Caucasus, German)
+    public bool KneeboardPages { get; set; } = true;   // kneeboard pages into Saved Games\DCS\Kneeboard on mission start (every map, interface language)
+    public bool F10Drawings { get; set; } = true;      // control zones, reporting points and named routes drawn on the F10 map on mission start (Program.DrawLine)
     public Dictionary<string, double> AtisFreqs { get; set; } = new();   // A35: own ATIS frequency per airfield (airfield name -> MHz), if the airfield is missing: Frequencies["ATIS"]; only after restart
     public int WheelKey { get; set; } = 0xDE;          // selection wheel: key (0xDE = Ä), 0 = off
     public int WheelJoystick { get; set; } = -1;       // selection wheel on the HOTAS: button opens, coolie hat selects
@@ -173,6 +174,17 @@ static partial class Program
             Kneeboard.Write(args.Length > 1 ? args[1] : Path.Combine(Root, "kneeboard"), Fields, Cfg);
             return 0;
         }
+        if (args.Contains("--charts"))   // chart editor without DCS: airfields of the last mission at http://localhost:MapPort/chart; DCS-ATC already running = its page
+        {
+            int port = Cfg.MapPort > 0 ? Cfg.MapPort : 18600;
+            bool own = true;
+            try { Lagebild.Start(port, false); } catch (SocketException) { own = false; }
+            if (own) { LoadFields(); Lagebild.Charts = () => ChartState(Fields); }
+            Process.Start(new ProcessStartInfo($"http://localhost:{port}/chart") { UseShellExecute = true });
+            if (!own) return 0;
+            Console.WriteLine(L($"Verfahrens-Editor im Browser: http://localhost:{port}/chart – dieses Fenster schließen beendet ihn.", $"Chart editor in the browser: http://localhost:{port}/chart – closing this window ends it."));
+            Thread.Sleep(Timeout.Infinite);
+        }
         if (args.Length >= 1 && args[0] == "--anflugtest") { LoadFields(); LoadTerrain(); return Tower.AnflugTest(Fields, args[1..]); }   // airfields from the repo airfields.txt, terrain of the last mission (%TEMP%)
         if (args.Length == 2 && args[0] == "--replay") return ReplayCli(args[1]);   // a reporter's atc-debug.txt through this build
         if (args.Length >= 1 && args[0] == "--mptest") { LoadFields(); LoadTerrain(); return MpTest(args[1..]); }   // multiple players + AI via the app logic
@@ -205,7 +217,7 @@ static partial class Program
             {
                 SetThreadExecutionState(0x80000000 | 0x1 | 0x2);   // ES_CONTINUOUS | SYSTEM | DISPLAY: no standby while DCS runs (HOTAS input does not count as activity for Windows); ends with the thread
                 while (Session()[0] != "stop" && RunningDcs().Length > 0) Thread.Sleep(2000);
-                if (dropBoard) DeleteBoardPages();   // English or pages off: gone from the next mission on (not earlier, DCS already listed them)
+                DeleteBoardPages();   // pages of another map or switched off: gone from the next mission on (not earlier, DCS already listed them)
                 Environment.Exit(0);
             }) { IsBackground = true }.Start();
         }
@@ -230,7 +242,7 @@ static partial class Program
         new Thread(TelemetryLoop) { IsBackground = true }.Start();
         new Thread(SpeakLoop) { IsBackground = true }.Start();
         if (Cfg.MapPort > 0)   // FI7
-            try { Lagebild.State = MapState; Lagebild.Start(Cfg.MapPort, Cfg.MapLan); Log(L($"[Lagebild] im Browser: http://localhost:{Cfg.MapPort}/", $"[Map] in the browser: http://localhost:{Cfg.MapPort}/")); }
+            try { Lagebild.State = MapState; Lagebild.Charts = () => ChartState(Fields); Lagebild.Start(Cfg.MapPort, Cfg.MapLan); Log(L($"[Lagebild] im Browser: http://localhost:{Cfg.MapPort}/", $"[Map] in the browser: http://localhost:{Cfg.MapPort}/")); }
             catch (SocketException e) { Log(L($"[Lagebild] Port {Cfg.MapPort} belegt, kein Lagebild: {e.Message}", $"[Map] port {Cfg.MapPort} in use, no map: {e.Message}")); }
         StartAtis();
         if (Cfg.SrsListen)

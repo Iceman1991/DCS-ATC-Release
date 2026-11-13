@@ -20,7 +20,7 @@ Funk ist Englisch: Alle Funksprüche, die du sagst oder hörst, stehen in diesem
 5. [AWACS, Tanker und Range](#awacs-tanker-und-range)
    - [AWACS](#awacs) · [Tanker](#tanker) · [Range](#range) · [JTAC und FAC(A)](#jtac-und-faca) · [KI-Flüge im Funk](#ki-flüge-im-funk) · [Deine KI-Rottenflieger befehlen](#deine-ki-rottenflieger-befehlen) · [CSAR (Hubschrauber)](#csar-hubschrauber) · [Bodenpersonal und Crew Chief](#bodenpersonal-und-crew-chief)
 6. [Multiplayer, Dedicated Server, eigene Frequenzen und andere Karten](#multiplayer-dedicated-server-eigene-frequenzen-und-andere-karten)
-   - [So funktioniert Multiplayer](#so-funktioniert-multiplayer) · [Dedicated Server einrichten](#dedicated-server-einrichten) · [Eigene Frequenzen je Platz](#eigene-frequenzen-je-platz) · [Eigene Platzverfahren](#eigene-platzverfahren-chartsjsonc) · [Kneeboard-Seiten](#kneeboard-seiten) · [Andere Karten als Kaukasus](#andere-karten-als-kaukasus)
+   - [So funktioniert Multiplayer](#so-funktioniert-multiplayer) · [Dedicated Server einrichten](#dedicated-server-einrichten) · [Eigene Frequenzen je Platz](#eigene-frequenzen-je-platz) · [Eigene Platzverfahren](#eigene-platzverfahren-chartsjsonc) · [Kneeboard-Seiten](#kneeboard-seiten) · [Zeichnungen auf der F10-Karte](#zeichnungen-auf-der-f10-karte) · [Andere Karten als Kaukasus](#andere-karten-als-kaukasus)
 7. [Anhang: Einstellungen, Logs und Fehlersuche](#anhang-einstellungen-logs-und-fehlersuche)
    - [Das Einstellungsfenster](#das-einstellungsfenster) · [config.jsonc-Referenz](#configjsonc-referenz) · [Lagebild im Browser](#lagebild-im-browser) · [Logdateien](#logdateien) · [Fehlersuche](#fehlersuche)
 
@@ -1186,6 +1186,17 @@ Approach schickt dich ins Holding, wenn eines davon zutrifft:
 - **Erwartete Anflugzeit:** einmal als Minute der Missionsuhr („expected approach time three five“). Erneut nur bei einer Änderung um 5 min oder mehr („revised expected approach time …“). Ohne Missionsuhr: „expect approach in 6 minutes“.
 - **Prüfungen im Holding:** driftest du ab oder bist mehr als 30 kt neben der Fahrt, kommt eine Kurs- bzw. Fahrterinnerung. Mehr als 500 ft neben der Höhe: „check altitude, maintain 5000 feet.“
 - **Holding verlassen:** bist du dran, wirst du innerhalb 2 min mit einem Kurs grob Richtung Anflug entlassen.
+
+#### Staffelung
+
+Approach und Departure halten dich von anderem Verkehr fern, Spieler wie KI. Die Teile an einer Stelle:
+
+- **Höhen:** Du bekommst nur eine Höhe, die frei ist: auf dem Weg dorthin kein Verkehr innerhalb 3 NM und 1000 ft und kein Konflikt in den nächsten 60 s. Sonst bleibst du, wo du bist, bis der Verkehr durch ist. Unter Radarführung kommt der nächste Sinkschritt später; auf eine Anfrage hörst du „unable higher, traffic, maintain 5000 feet.“
+- **Warteschleife:** Der Stapel ist mit 1000 ft je Flugzeug gestaffelt. Die nächsttiefere Höhe bekommst du, wenn der Vordermann sie verlassen hat.
+- **Endanflug:** 3 NM hinter dem Vordermann, 5 NM hinter einem Heavy. Kommst du zu nah: „reduce speed to 170 knots for spacing.“ In der Platzrunde: „extend downwind, number two“, und „go around“, wenn die Bahn nicht rechtzeitig frei ist.
+- **Reihenfolge:** Ab zwei Flugzeugen in der Platzrunde warten Anflüge in der Warteschleife mit erwarteter Anflugzeit.
+- **Letztes Mittel:** die Verkehrswarnung mit Ausweichkurs und Ausweichhöhe, siehe unten.
+- KI-Flugzeuge fliegen, wie DCS sie fliegt; DCS-ATC steuert sie im Flug nicht. Du wirst um sie herum gestaffelt.
 
 #### Verkehrsinformationen und Verkehrswarnungen
 
@@ -2719,13 +2730,43 @@ Eine Abflugroute ist eine Kette von Fixes, die du nach dem Start abfliegst, dana
 
 `"departures"` steht im Eintrag des Platzes neben `"routes"`. `"rwy"` und `"pts"` funktionieren wie bei Anflugrouten, ebenso eine Liste von Varianten unter einem Namen; ein `"to"` gibt es nicht.
 
+#### Verfahrens-Editor
+
+Der Verfahrens-Editor ist eine Seite im Browser, die Meldepunkte und Routen für `charts.jsonc` schreibt. Koordinaten musst du damit nicht mehr von Hand messen.
+
+- **Öffnen:** Startmenü → DCS-ATC → *Verfahrens-Editor*, oder `http://localhost:18600/chart`, während DCS-ATC läuft (das Lagebild hat einen Link). Ohne laufende Mission zeigt er die Plätze der letzten Mission.
+- **Platz wählen** oben rechts. Die Karte zeigt seine Bahnen, die Meldepunkte und Routen, die er schon hat (blau, grün, orange), und die Nachbarplätze. Ziehen verschiebt die Karte, das Mausrad zoomt. Unten links stehen missweisende Peilung und Entfernung des Mauszeigers vom Platz, um einen Punkt von einer echten Karte zu setzen.
+- **Meldepunkt:** auf die Karte klicken und den Namen eintippen. In der Liste wählst du, ob er Einflug (über Initial oder Overhead) und Ausflug ist. Das gilt für alle Bahnen des Platzes.
+- **Anflugroute:** Namen der Route eintippen, die Fixes der Reihe nach anklicken, dann den Meldepunkt anklicken, an dem die Route endet. Die Höhe je Fix stellst du in der Liste ein (oder höher, genau, oder tiefer; leer = keine). Die Route gilt für jede Bahn, die den Endpunkt als Einflug hat.
+- **Abflugroute:** Namen eintippen, die Fixes der Reihe nach anklicken, dann *Finish route*.
+- Ein Klick auf einen Punkt, den es schon gibt, nimmt diesen Punkt mit Namen und Position.
+- **Ergebnis:** Im Textfeld steht der vollständige Eintrag des Platzes: was er bisher hatte (auch die eingebauten Kaukasus-Daten mit den Rollwegen) plus deine Ergänzungen. Mit *Copy* kopieren und in `charts.jsonc` innerhalb der äußeren `{ }` einfügen, anstelle des Eintrags des Platzes, falls die Datei schon einen hat. Gilt ab dem nächsten Missionsstart. Positionen stehen als DCS-Koordinaten `[x, z]` drin.
+- Eine rote Zeile über dem Text nennt, was noch fehlt, zum Beispiel eine Bahn ohne Einflug- oder Ausflugpunkt. Jede Bahn eines Platzes mit Meldepunkten braucht mindestens einen von jedem.
+- Die Seite liest nur, sie ändert `charts.jsonc` nicht. Deine Ergänzungen bleiben im Browser, bis du sie entfernst (×).
+- Feinheiten (ein Punkt als Einflug nur für eine Bahn, Seite der Platzrunde, Rollwege) änderst du im Text wie oben beschrieben.
+- Die Seite ist auf Englisch.
+
 ### Kneeboard-Seiten
 
-Bei jedem Missionsstart legt DCS-ATC seine Kneeboard-Seiten in `Saved Games\DCS\Kneeboard` ab. DCS zeigt sie im Kneeboard jedes Flugzeugs. Die Seiten: Funk, Kutaisi, Plätze mit Frequenzen, Platzrunden und CRPs, Navigationsanlagen, AWACS und Tanker, Hinweise zur Karte. Die Frequenzen sind die der laufenden Mission.
+Bei jedem Missionsstart legt DCS-ATC seine Kneeboard-Seiten in `Saved Games\DCS\Kneeboard` ab. DCS zeigt sie im Kneeboard jedes Flugzeugs. Die Seiten: Funk, Plätze mit Frequenzen, Platzrunden und CRPs, An- und Abflugrouten, Navigationsanlagen, AWACS und Tanker. Die Frequenzen sind die der laufenden Mission.
 
-- Nur Karte Kaukasus und nur auf Deutsch. Auf anderen Karten und bei englischer Sprache entfernt DCS-ATC seine Seiten wieder.
+- Auf jeder Karte, in der Sprache der Oberfläche (Deutsch oder Englisch). Auf Karten mit vielen Plätzen laufen die Tabellen über mehrere Seiten.
+- Platzrunden, CRPs und Routen stehen für die Plätze mit Verfahren drin: Kaukasus eingebaut, sonst aus deiner `charts.jsonc` (siehe [Eigene Platzverfahren](#eigene-platzverfahren-chartsjsonc)). Die Routen-Seite nennt je Route die Bahnen, die Fixes in Reihenfolge und ihre Höhen („9000+“ = oder höher, „5000-“ = oder tiefer).
+- Nur im Kaukasus: die Seite Kutaisi und die Hinweise zur Karte.
+- DCS liest die Seitenliste beim Laden der Mission. Eine Seite, die es bisher nicht gab (andere Karte, mehr Tabellenseiten), erscheint deshalb erst ab der nächsten Mission. Eine Seite, die diese Mission nicht braucht, zeigt einen Hinweis und ist ab der nächsten Mission weg.
 - Ausschalten: `"KneeboardPages": false` in `config.jsonc`.
 - Die Dateien heißen `ATC-*.png`. Beim Deinstallieren werden sie gelöscht.
+
+### Zeichnungen auf der F10-Karte
+
+Bei jedem Missionsstart zeichnet DCS-ATC die Lufträume der Plätze auf die F10-Karte. Alle Spieler sehen sie, auch ohne eigenes DCS-ATC.
+
+- **Kontrollzone:** blauer Kreis um jeden Platz mit Namen und Obergrenze („Kutaisi CTR 2700 ft“). Das ist der Luftraum, den der Tower überwacht (siehe [Luftraum](#luftraum)).
+- **Meldepunkte:** kleiner blauer Kreis mit Namen („CRP north“, „CRAIG“), bei Plätzen mit Verfahren (Kaukasus eingebaut, sonst aus `charts.jsonc`).
+- **Anflugrouten** (`"routes"`): grüne Linie von Fix zu Fix bis zum Meldepunkt am Ende.
+- **Abflugrouten** (`"departures"`): orange gestrichelte Linie von Fix zu Fix.
+- Die Zeichnungen lassen sich in der Karte nicht verschieben oder löschen. Nach einer Änderung an `charts.jsonc` gelten sie ab dem nächsten Missionsstart.
+- Ausschalten: `"F10Drawings": false` in `config.jsonc` oder im Einstellungsfenster.
 
 ### Andere Karten als Kaukasus
 
@@ -2803,6 +2844,7 @@ Links wählst du die Seite: Allgemein, Stimmen, Funk & Verkehr, AWACS, Frequenze
 | **DCS-ATC aktiv** | an/aus. Aus: DCS-ATC startet ab der nächsten Mission nicht mehr, ohne Deinstallieren. Kein Funkrad, kein F10-Menü, der KI-Funk von DCS läuft wie ohne DCS-ATC. Wieder an: Haken setzen. | (`DcsAtcOff.txt`) |
 
 | **Kneeboard-Seiten bei Missionsstart schreiben** `*` | an/aus | `KneeboardPages` |
+| **Kontrollzonen, Meldepunkte und Routen auf die F10-Karte zeichnen** `*` | an/aus | `F10Drawings` |
 | **Update** | Zeigt die installierte Version. *Nach Updates suchen* fragt GitHub nach dem neuesten Release. Gibt es ein neueres, wird der Knopf zu *Jetzt aktualisieren*: lädt das Update, prüft Größe und Prüfsumme, führt das Setup aus und öffnet dieses Fenster wieder. Geladen wird nur das Programm (rund 75 MB), wenn Sprachmodell, Stimmen und Werkzeuge auf deinem PC die des neuen Release sind, sonst das volle Release (rund 850 MB); das Fenster zeigt die Größe. Nicht, solange DCS läuft. `config.jsonc` und Tasten bleiben erhalten. | |
 | **Beim Start nach einer neuen Version suchen** | an/aus. An: eine Anfrage an GitHub beim Start von DCS-ATC und beim Öffnen dieses Fensters. Eine neuere Version wird nur gemeldet (Zeile im Log, dieses Fenster), geladen wird nichts ohne den Knopf. | `UpdateCheck` |
 | **Stimme je Station** `*` | Je Station: *Zufällig* (bei jedem Start eine der installierten Stimmen, ohne die Pilotenstimme) oder eine feste Stimme aus dem Ordner `models` mit Tonhöhe (1.00 = unverändert, kleiner = tiefer). Mit einer zweiten Stimme wechseln sich die Plätze ab. Der Knopf rechts spricht eine Probe über die PC-Lautsprecher. *Alle zufällig* und *Standard* setzen alle Zeilen. Drei und mehr Stimmen aus der Datei bleiben ein Textfeld. | `Voices` |
@@ -2917,7 +2959,8 @@ Eigene Frequenzen je Platz und Lotse stehen nicht in `config.jsonc`, sondern in 
 | `AsrApiKey` | `""` | Schlüssel für `AsrApiUrl` (als `Bearer`). Leer für einen Server ohne Schlüssel. |
 | `AsrApiModel` | `"whisper-1"` | Modellname bei `AsrApiUrl`, z. B. `"whisper-1"` oder `"gpt-4o-mini-transcribe"`. |
 | `UpdateCheck` | `true` | Beim Start einmal bei GitHub nach einem neueren Release fragen (nur Hinweis, geladen wird aus dem Einstellungsfenster). `false` für Dedicated Server oder PC ohne Internet. |
-| `KneeboardPages` | `true` | Kneeboard-Seiten bei Missionsstart nach `Saved Games\DCS\Kneeboard` (nur Kaukasus, deutsch), siehe [Kneeboard-Seiten](#kneeboard-seiten). |
+| `KneeboardPages` | `true` | Kneeboard-Seiten bei Missionsstart nach `Saved Games\DCS\Kneeboard` (jede Karte, Sprache der Oberfläche), siehe [Kneeboard-Seiten](#kneeboard-seiten). |
+| `F10Drawings` | `true` | Kontrollzonen, Meldepunkte und benannte Routen bei Missionsstart auf die F10-Karte zeichnen, siehe [Zeichnungen auf der F10-Karte](#zeichnungen-auf-der-f10-karte). |
 
 **Optionen je Mission.** Bodenpersonal (Tank-/Munitionswagen, Feuerwehr) ist eine Missionsoption, nicht Teil von `config.jsonc`:
 
@@ -2932,6 +2975,7 @@ Eigene Frequenzen je Platz und Lotse stehen nicht in `config.jsonc`, sondern in 
 - **Tablet oder anderer PC:** `"MapLan": true` setzen und DCS-ATC neu starten. Windows fragt einmal, ob der Netzzugriff erlaubt ist. Dann `http://<Name oder IP des PCs>:18600/` öffnen.
 - **Anderer Port oder aus:** `"MapPort"` in der `config.jsonc` (0 = aus). Ist der Port belegt, sagt das DCS-ATC-Fenster das, und es gibt kein Lagebild.
 - Die Seite liest nur. Über sie lässt sich in DCS-ATC und in der Mission nichts ändern. In VR gibt es dafür die Kneeboard-Seiten.
+- **Verfahrens-Editor:** `http://localhost:18600/chart` schreibt Meldepunkte und Routen für `charts.jsonc`, siehe [Verfahrens-Editor](#verfahrens-editor).
 - **Funkrad:** `http://localhost:18600/wheel` zeigt das offene Funkrad als Bild, für einen OpenKneeboard-Tab in VR oder ein Tablet (siehe [Funkrad als Text im Spiel (VR)](#funkrad-als-text-im-spiel-vr)).
 
 ### Logdateien

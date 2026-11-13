@@ -10,7 +10,7 @@
     DcsAtc-Menu\*.txt      F10 requests "unit|text"                 -> App
     DcsAtc-Menu\*.evt      events (C;unit;crew|back|fuel|stopped, X;shot|guns|hit|kill|eject|pitbull|maddog|trashed;… AI radio, R/H/K range)  -> app
     DcsAtc-Menu\*.out      Controller texts "gid|sec|text" (0 = all)   <- App (old: "gid|text")
-    DcsAtc-Menu\*.cmd      Commands START/WAIT/RESUME, WHEEL;unit;text (VR radio wheel)   <- App
+    DcsAtc-Menu\*.cmd      Commands START/WAIT/RESUME, WHEEL;unit;text (VR radio wheel), DRAW;… (F10 map)   <- App
 
   Plus: AI traffic at the airfields near the players, ground crew with fuel/ammo trucks and fire brigade,
   tanker and AWACS (if the mission has none), cleanup of wrecks.
@@ -1678,8 +1678,29 @@ local function start()
     no((f and "Platz " or "Tanker ") .. target .. " nicht in der DCS-Liste (Koalition)")
   end
 
+  -- F10 map: control zones, reporting points and named routes of the airfields. App: "DRAW;C;style;x;z;r|T;style;x;z;text|L;style;x1;z1;x2;z2|…",
+  -- style 1 zone/reporting point (blue), 2 arrival route (green), 3 departure route (orange, dashed). Every DRAW replaces the previous drawing (app restart).
+  local drawIds, DRAW0 = {}, 7730000   -- mark ids share one number range with the players' own marks and other scripts
+  local STYLE = { { 0.2, 0.5, 1, 0.9 }, { 0.1, 0.7, 0.2, 0.9 }, { 0.95, 0.5, 0.1, 0.9 } }
+  local function draw(line)
+    for _, id in ipairs(drawIds) do trigger.action.removeMark(id) end
+    drawIds = {}
+    for part in line:sub(6):gmatch("[^|]+") do
+      local f = {}
+      for v in part:gmatch("[^;]+") do f[#f + 1] = v end
+      local s, p, id = tonumber(f[2]), { x = tonumber(f[3]), y = 0, z = tonumber(f[4]) }, DRAW0 + #drawIds + 1
+      local c = STYLE[s] or STYLE[1]
+      if f[1] == "C" then trigger.action.circleToAll(-1, id, p, tonumber(f[5]), c, { 0, 0, 0, 0 }, 1, true)
+      elseif f[1] == "L" then trigger.action.lineToAll(-1, id, p, { x = tonumber(f[5]), y = 0, z = tonumber(f[6]) }, c, s == 3 and 2 or 1, true)
+      elseif f[1] == "T" then trigger.action.textToAll(-1, id, p, c, { 0, 0, 0, 0 }, 11, true, f[5]) end
+      drawIds[#drawIds + 1] = id
+    end
+    log("F10-Karte: " .. #drawIds .. " Zeichnungen")
+  end
+
   local function command(line)
     if line:match("^MENU;") then pcall(menuIndex, line) return end
+    if line:match("^DRAW;") then draw(line) return end
     local wu, wt = line:match("^WHEEL;([^;]+);(.*)$")   -- VR: radio wheel as text to the player, empty = wheel closed
     if wu then
       local u = Unit.getByName(wu)

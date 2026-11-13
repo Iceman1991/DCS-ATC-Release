@@ -439,6 +439,16 @@ trigger.action.signalFlare = function(p, c) SIG[#SIG + 1] = string.format("flare
 files["9-90.cmd"] = "SIGNAL;61200;450;smoke"; run(T + 1)
 files["9-91.cmd"] = "SIGNAL;-300;-20;flare"; run(T + 1)
 assert(table.concat(SIG, ",") == "smoke 61200 450 3,flare -300 -20 1", "SIGNAL Rauch/Leuchtkugel: " .. table.concat(SIG, ","))
+-- F10 map: DRAW from the app -> circle, text and line marks (departure leg dashed); the next DRAW removes the previous drawing
+local MARKS, GONE = {}, {}
+trigger.action.circleToAll = function(_, id, p, r, _, _, lt) MARKS[#MARKS + 1] = string.format("C%d %.0f %.0f %.0f %d", id, p.x, p.z, r, lt) end
+trigger.action.textToAll = function(_, id, p, _, _, _, _, text) MARKS[#MARKS + 1] = string.format("T%d %.0f %.0f %s", id, p.x, p.z, text) end
+trigger.action.lineToAll = function(_, id, a, b, _, lt) MARKS[#MARKS + 1] = string.format("L%d %.0f %.0f %.0f %.0f %d", id, a.x, a.z, b.x, b.z, lt) end
+trigger.action.removeMark = function(id) GONE[#GONE + 1] = id end
+files["9-92.cmd"] = "DRAW;C;1;-284000;683000;9260|T;1;-274740;683000;Kutaisi CTR 2700 ft|L;3;100;200;300;400"; run(T + 1)
+assert(table.concat(MARKS, ",") == "C7730001 -284000 683000 9260 1,T7730002 -274740 683000 Kutaisi CTR 2700 ft,L7730003 100 200 300 400 2", "DRAW: " .. table.concat(MARKS, ","))
+files["9-93.cmd"] = "DRAW;C;1;0;0;300"; run(T + 1)
+assert(table.concat(GONE, ",") == "7730001,7730002,7730003" and #MARKS == 4, "DRAW ersetzt die alte Zeichnung nicht: " .. table.concat(GONE, ","))
 landX = nil
 -- KF6/LK14: red SAM radar tracks the AI Viper -> X;spike (once, with type and location), ends -> X;naked; radar on the player -> nothing
 local sr = unit("SR1", 70000, 1000, nil, 1)

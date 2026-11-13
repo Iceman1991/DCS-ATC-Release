@@ -1,7 +1,7 @@
 ﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe und (ISCC /DSmall) dist\DCS-ATC-Update-Setup.exe
 ; Small: update setup without the big files (models, tools) for the update from the app; only over an existing installation.
 ; installer\manifest.ps1 reads the big files from the block "#ifndef Small" in [Files].
-#define AppVer "0.22.6-alpha"
+#define AppVer "0.23.0-alpha"
 #define Src ".."
 
 [Setup]
@@ -40,6 +40,8 @@ de.IconKeys=Tasten festlegen (Funkrad, Push-to-Talk)
 en.IconKeys=Set keys (radio wheel, push-to-talk)
 de.IconConfig=Einstellungen (Rufzeichen, Lautstärke, Funk)
 en.IconConfig=Settings (callsign, volume, radio)
+de.IconCharts=Verfahrens-Editor (Meldepunkte, Routen)
+en.IconCharts=Chart editor (reporting points, routes)
 de.IconOptions=Bodenpersonal (Standard)
 en.IconOptions=Ground crew (default)
 de.IconRepair=Nach DCS-Update reparieren
@@ -155,6 +157,7 @@ Root: HKCU; Subkey: "Software\DCS-ATC"; ValueType: string; ValueName: "ServerDcs
 Name: "{group}\{cm:IconStart}"; Filename: "{app}\DcsAtc.exe"; WorkingDir: "{app}"
 Name: "{group}\{cm:IconKeys}"; Filename: "{app}\DcsAtc.exe"; Parameters: "--keys"; WorkingDir: "{app}"
 Name: "{group}\{cm:IconConfig}"; Filename: "{app}\DcsAtc.exe"; Parameters: "--settings"; WorkingDir: "{app}"
+Name: "{group}\{cm:IconCharts}"; Filename: "{app}\DcsAtc.exe"; Parameters: "--charts"; WorkingDir: "{app}"
 Name: "{group}\{cm:IconOptions}"; Filename: "notepad.exe"; Parameters: """{code:SavedGames}\Scripts\DcsAtc\DcsAtcOptions.lua"""
 Name: "{group}\{cm:IconRepair}"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\DcsAtc-Patch.ps1"" -Pause"
 Name: "{group}\{cm:IconReadme}"; Filename: "{app}\LIESMICH.txt"; Languages: de

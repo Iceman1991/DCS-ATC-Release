@@ -63,28 +63,26 @@ static partial class Program
         finally { Airfield.OwnChart = null; }
     }
 
-    static readonly string[] BoardPages = { "ATC-1-Funk", "ATC-2-Kutaisi", "ATC-3-Plaetze", "ATC-3b-Platzrunden", "ATC-4-Navigation", "ATC-5-AWACS", "ATC-6-Hinweise" };
-
-    /// Forum 0.15: kneeboard pages into Saved Games\DCS\Kneeboard (shown in every aircraft) on a new mission, with its frequencies. The pages exist only
-    /// for Caucasus and in German. DCS reads the page list when the mission loads, before the mission data reach us: pages deleted now show
-    /// MISSINGTEXTURE, pages written now only appear from the next mission. So the files stay; another map gets a note in them (the next Caucasus
-    /// mission lists them again). English or KneeboardPages off: note now, deleted when the mission ends (app exit).
+    /// Forum 0.15: kneeboard pages into Saved Games\DCS\Kneeboard (shown in every aircraft) on a new mission, with its frequencies, for every map and in
+    /// the language of the interface. DCS reads the page list when the mission loads, before the mission data reach us: pages deleted now show
+    /// MISSINGTEXTURE, pages written now only appear from the next mission. So a page this mission does not use (another map: Kutaisi, more table
+    /// pages; KneeboardPages off) gets a note now and is deleted when the mission ends (app exit).
     static void WriteKneeboard()
     {
         var dir = Path.Combine(SavedGamesDcs(), "Kneeboard");
         try
         {
-            dropBoard = !Cfg.KneeboardPages || En;
-            if (!dropBoard && Airfield.Theatre == "Caucasus" && Fields.Any(f => f.Name == "Kutaisi")) Kneeboard.Write(dir, Fields, Cfg);
-            else Kneeboard.Note(BoardPages.Select(p => Path.Combine(dir, p + ".png")).Where(File.Exists));
+            var done = Cfg.KneeboardPages ? Kneeboard.Write(dir, Fields, Cfg) : new();
+            boardDrop = Kneeboard.Names.Select(p => Path.Combine(dir, p + ".png")).Except(done).Where(File.Exists).ToList();
+            Kneeboard.Note(boardDrop);
         }
         catch (Exception e) { Log(L($"[Kneeboard] Seiten nicht geschrieben: {e.Message}", $"[Kneeboard] pages not written: {e.Message}")); }
     }
-    static bool dropBoard;
+    static List<string> boardDrop = new();
 
     static void DeleteBoardPages()
     {
-        try { foreach (var p in BoardPages) File.Delete(Path.Combine(SavedGamesDcs(), "Kneeboard", p + ".png")); }
+        try { foreach (var p in boardDrop) File.Delete(p); }
         catch (Exception) { }
     }
 
@@ -125,6 +123,61 @@ static partial class Program
             Console.WriteLine(L($"⚠ config.jsonc: {c} – Anrufe an den Platz gehen dorthin, Frequenz ändern", $"⚠ config.jsonc: {c} – calls to the airfield go there, change the frequency"));
         foreach (var c in AtisClashes(Fields, Cfg.AtisFreqs, Cfg.Frequencies))   // A35
             Console.WriteLine(L($"⚠ config.jsonc: {c} – Frequenz ändern", $"⚠ config.jsonc: {c} – change the frequency"));
+    }
+
+    static DateTime drawnStamp;   // airfield file whose drawing went to the mission (TickAll): once per mission start, again after an app restart
+    /// F10 map (Config.F10Drawings): control zone, reporting points and named routes of every airfield as one command for DcsAtcMission.lua (draw):
+    /// parts "C;style;x;z;r", "T;style;x;z;text", "L;style;x1;z1;x2;z2"; style 1 zone/reporting point, 2 arrival route (ends at its CRP), 3 departure route.
+    /// A point or leg shared by several routes is drawn once. Kutaisi on another map is only the placeholder of Airfield.Load.
+    internal static string DrawLine(IEnumerable<Airfield> fields)
+    {
+        var parts = new List<string>();
+        var seen = new HashSet<string>();
+        static string N(double v) => v.ToString("0", CultureInfo.InvariantCulture);
+        void Point(int style, string k, double x, double z)
+        {
+            string name = Airfield.Label(k).Replace(';', ' ').Replace('|', ' ');
+            if (!seen.Add($"{name};{N(x)};{N(z)}")) return;
+            parts.Add($"C;{style};{N(x)};{N(z)};300");
+            parts.Add($"T;{style};{N(x)};{N(z)};{name}");
+        }
+        foreach (var f in fields.Where(f => f.Ends.Count > 0 && f.OnMap))
+        {
+            double r = f.CtrNm * 1852;
+            parts.Add($"C;1;{N(f.X)};{N(f.Z)};{N(r)}");
+            parts.Add($"T;1;{N(f.X + r)};{N(f.Z)};{f.Name.Replace('|', ' ')} CTR {N(f.CtrTopFt)} ft");   // x = north: label on top of the circle
+            foreach (var (k, p) in f.Crp) Point(1, k, p.X, p.Z);
+            foreach (var (style, routes) in new[] { (2, f.Routes), (3, f.Departures) })
+                foreach (var rt in routes.Values)
+                {
+                    var pts = rt.Pts.Select(p => (p.X, p.Z)).ToList();
+                    foreach (var p in rt.Pts) Point(style, p.Fix, p.X, p.Z);
+                    if (rt.To != "" && f.Crp.TryGetValue(rt.To, out var to)) pts.Add(to);
+                    for (int i = 1; i < pts.Count; i++)
+                        if (seen.Add($"L;{N(pts[i - 1].X)};{N(pts[i - 1].Z)};{N(pts[i].X)};{N(pts[i].Z)}"))
+                            parts.Add($"L;{style};{N(pts[i - 1].X)};{N(pts[i - 1].Z)};{N(pts[i].X)};{N(pts[i].Z)}");
+                }
+        }
+        return "DRAW;" + string.Join('|', parts);
+    }
+
+    /// Chart editor (Lagebild "/chart"): every airfield of the map with its runways and its procedures as loaded, plus its chart entry as written
+    /// (charts.jsonc or built in; key = its name there), which the page extends with new points and routes.
+    internal static object ChartState(IEnumerable<Airfield> fields)
+    {
+        static object Rt(Airfield.Route r) => new { name = r.Name, to = r.To, pts = r.Pts.Select(p => new { fix = p.Fix, x = p.X, z = p.Z }) };
+        return new
+        {
+            theatre = Airfield.Theatre,
+            fields = fields.Where(f => f.Ends.Count > 0 && f.OnMap).OrderBy(f => f.Name).Select(f => new
+            {
+                name = f.Name, key = Airfield.OwnAlias.GetValueOrDefault(f.Name, f.Name), x = f.X, z = f.Z, mv = f.MagVar,
+                ends = f.Ends.Select(e => new { n = e.Name, x = e.ThrX, z = e.ThrZ, x2 = e.ThrX + e.Len * e.Dx, z2 = e.ThrZ + e.Len * e.Dz }),
+                crp = f.Crp.ToDictionary(c => c.Key, c => new[] { c.Value.X, c.Value.Z }),
+                routes = f.Routes.Values.Select(Rt), deps = f.Departures.Values.Select(Rt),
+                raw = f.ChartEntry(),
+            }),
+        };
     }
 
     /// R15: magnetic variation of the map for Ops (bearings mag): mean of the airfields (Kutaisi appears on other maps only as a placeholder), Caucasus fixed 6 (FromDcs).
