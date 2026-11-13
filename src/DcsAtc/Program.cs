@@ -50,7 +50,8 @@ public class Config
     public bool StationPositions { get; set; } = true;   // FI2: controllers transmit with their position (SRS range and line of sight, if the server has them on)
     public bool RandomNotams { get; set; } = false;   // FI5: at most one NOTAM per airfield and day (ILS out, closed parallel runway, bird activity); ATIS reads it, runway choice and approach follow it
     public Dictionary<string, List<string>> Notams { get; set; } = new();   // FI5: own NOTAMs per airfield ("Kutaisi": ["ILS 25 unserviceable", "runway 07 closed", free text read as written])
-    public bool IffCheck { get; set; } = false;       // FI1 (issue #2): controllers check the transponder from SRS (code, ident, 7600, AWACS "parrot sour"); 7700 is always noticed
+    public bool AssignParkingSpot { get; set; } = true;   // forum (Lt_Jaeger): false = after landing Ground names only the ramp from charts.jsonc ("taxi to Ramp West via …"), no stand
+    public bool IffCheck { get; set; } = false;      // FI1 (issue #2): controllers check the transponder from SRS (code, ident, 7600, AWACS "parrot sour"); 7700 is always noticed
     public bool AirspaceWatch { get; set; } = true;    // monitor control zones (N2) and announce violations ("possible pilot deviation") and into the debrief (N4); off: safety warnings only
     public bool DebugLog { get; set; } = true;         // atc-debug.txt for bug reports (speech recognition, airfield selection, phases, telemetry every 10 s), at most 2 × 20 MB
     public bool AsrGpu { get; set; } = true;           // GPU1: speech recognition on a dedicated graphics card (Vulkan), CPU without one or if it fails; false = always CPU
@@ -1025,6 +1026,7 @@ static partial class Program
         (Ops.Keypad, Ops.MarkOffsetM) = (Cfg.JtacKeypad, Math.Clamp(Cfg.JtacMarkOffsetM, 0, 500));
         Tower.Watch = Cfg.AirspaceWatch && On("atc");
         Tower.IffCheck = Cfg.IffCheck;
+        Tower.ParkSpot = Cfg.AssignParkingSpot;
         (Flights.Mode, Flights.RadiusNm, Flights.OwnWingmen) = (Cfg.AiFlightComms, Cfg.AiFlightRadiusNm, Cfg.AiOwnWingmen);
         if (!TestRun) Flights.Cmd = l => AiCmd(l);   // was only set by ReloadLive: without a config change the AI never got ENGAGE/RTB
         Flights.Follow = Cfg.AiFollowAwacs && On("awacs");   // LD1 ENGAGE only with AiFollowAwacs, LD7 RTB always

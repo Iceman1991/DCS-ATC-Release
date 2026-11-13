@@ -81,6 +81,7 @@
   "StationPositions": true,   // Lotsen senden mit Standort (Platz, AWACS, Tanker, JTAC): hat der SRS-Server Sichtlinie/Reichweite an, hört man sie hinter Bergen oder zu weit weg nicht
   "RandomNotams": false,   // zufällige NOTAMs, je Platz und Tag höchstens eins: ILS außer Betrieb (Approach führt dann PAR oder Sichtanflug), Parallelbahn gesperrt, Vogelschlaggefahr; die ATIS liest sie vor
   "Notams": {},   // eigene NOTAMs je Platz, z. B. { "Kutaisi": ["ILS 25 unserviceable", "taxiway B closed"] }: "runway 07 closed" sperrt die Bahn (beide Richtungen, die DCS-KI landet trotzdem), "ILS 25 u/s" schaltet das ILS ab, anderer Text wird so vorgelesen
+  "AssignParkingSpot": true,   // false = Ground nennt nach der Landung nur die Rampe aus charts.jsonc ("taxi to Ramp West via ..."), keinen Stellplatz; du parkst, wo du willst. Plätze ohne benannte Rampe bekommen weiter einen Stellplatz
   "IffCheck": false,   // Transponder prüfen (über SRS): Code beim Radarkontakt, "squawk ident", 7600, AWACS "parrot sour" ohne Mode 4; 7700 wird immer bemerkt
   "AirspaceWatch": true,   // Kontrollzonen überwachen (Einflug ohne Kontakt wird angerufen) und Verstöße ansagen ("possible pilot deviation", z. B. Start ohne Freigabe) und ins Debriefing; false = nur Sicherheitswarnungen
   "AltimeterUnit": "auto",   // Höhenmesser-Einstellung im Funk: "auto" (nach eigenem Flugzeugtyp: westliche Typen "altimeter two niner niner two" in inHg, sonst "QNH one zero one three" in hPa; ATIS nennt beides), "hpa", "inhg"

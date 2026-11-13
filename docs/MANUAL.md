@@ -924,6 +924,7 @@ These phrases count as a start-up request: "request startup", "start up", "reque
 - **Asking too early:** asking for taxi while still on the runway gets "report runway vacated."
 - **No call:** if you don't call within 30 s of leaving the runway, Tower reminds you once: "contact Kutaisi Ground."
 - **Parking spot:** you get your own spot if it is free, otherwise the nearest free one. Spots already assigned to other players are skipped. Ground gives the direction once, and again only if you drift away (or each time the distance halves with "progressive").
+- **Ramp only:** with `"AssignParkingSpot": false` in `config.jsonc` Ground names just the ramp from `charts.jsonc` ("taxi to Ramp West via Alpha") and you park where you like on it. Airfields without a named ramp still get a parking spot.
 - **On your spot:** "you are on your parking position, shut down at your discretion."
 - **When you count as parked:** after 30 s stopped on the apron, or when you shut down your engines at a spot. This ends the flight and writes the debriefing. If Ground gave you a parking spot, stopping counts only within 100 m of that spot.
 
@@ -1447,7 +1448,7 @@ An instructor rides along on the intercom and checks three patterns, an approach
 |---|---|---|
 | **Initial:** "Kutaisi Tower, Enfield 1-1, initial runway 25" | At the initial point: "report initial" | 1 NM past initial: "no break clearance, continue straight through, re-enter initial runway two five, report initial." |
 | **Overhead:** "…, overhead" | Over the field (0.7 NM): "report overhead" | 1.5 NM later: "no clearance to join, remain outside the pattern, say intentions." |
-| **CRP** (Kutaisi): "…, C R P north" | Within 1 NM of the CRP, Approach: "report C R P north" | 2 NM past it: "say position, remain outside the control zone" (no handoff) |
+| **CRP** (Kutaisi): "…, C R P north" | Only once the CRP lies behind you (you flew over it without a call), Approach: "report C R P north". You can report from 2.5 NM before the point and right over it. | 2 NM past it: "say position, remain outside the control zone" (no handoff) |
 | **Landing call:** pattern "base, gear down (full stop)"; straight-in or ILS "four mile final, gear down" | At about 2.5 NM on final, or on base: "report final" | Inside 0.8 NM or below 300 ft: "go around, no landing clearance, …, report base" (IFR or straight-in: missed approach), plus a deviation |
 | **First call before entering the zone** (Approach or Tower) | Zone guard: "…, say intentions" | Inside 1 NM on final: "go around, you are not cleared to land", plus a deviation |
 | **Tower check-in after "contact Tower"** ("…Tower, Enfield 1-1, initial / overhead / four mile final") | Only if Tower has its own frequency: after 60 s, or within 5 NM of the field, Approach says "contact Kutaisi Tower now, <freq>" (on a shared frequency the prompts above apply) | No landing clearance; the landing-call rule above applies |
@@ -2950,6 +2951,7 @@ Own frequencies per airfield and controller are not in `config.jsonc` but in the
 | `MapPort` | `18600` | Port of the [situation map in the browser](#situation-map-in-the-browser), 0 = off. Applies after a restart. |
 | `MapLan` | `false` | `true` = the map can also be opened from other devices in the network (tablet). Applies after a restart. |
 | `StationPositions` | `true` | Controllers transmit with their position (airfield, AWACS, tanker, JTAC, AI flights). If the SRS server has line of sight or distance limit on, they can't be heard behind terrain or too far away. See [Setting up SRS](#setting-up-srs). |
+| `AssignParkingSpot` | `true` | `false` = after landing Ground names only the ramp from `charts.jsonc` (*"taxi to Ramp West via …"*) and no parking spot; park where you like on it. Airfields without a named ramp still get a parking spot. |
 | `IffCheck` | `false` | Controllers check your transponder from SRS: code and *"squawk … and ident"* at radar contact, *"reset transponder"*, squawk 7600, AWACS *"parrot sour"* without Mode 4. See [Transponder (IFF)](#transponder-iff). Squawk 7700 is noticed even when it's off. |
 | `RandomNotams` | `false` | At most one random NOTAM per airfield and day: ILS out of service, parallel runway closed, bird activity. See [NOTAMs](#notams). |
 | `Notams` | `{}` | Your own NOTAMs per airfield, for example `{ "Kutaisi": ["ILS 25 unserviceable", "runway 07 closed"] }`. See [NOTAMs](#notams). |

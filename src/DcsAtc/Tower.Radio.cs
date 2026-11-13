@@ -356,6 +356,7 @@ public partial class Tower
                 ProgStart(Has(n, "progressive"), now);
                 if (special is { } sp) { special = null; lastParkCall = -1; return Say($"{c}, taxi to the {sp}."); }   // R251: once de-arm area instead of parking position (afterwards "request taxi to parking" normal), no taxi guidance to the old parking spot
                 if (!again && t != null && FreeSpot(t, traffic) is { } fs) { spot = (fs.X, fs.Z); parkNum = fs.Num; home = NearestRamp(t with { X = fs.X, Z = fs.Z }); }   // named ramp = that of the parking spot
+                if (!ParkSpot && home != null) (spot, parkNum) = (null, 0);   // forum (Lt_Jaeger): only the ramp of that spot ("taxi to Ramp West via …"), he parks where he likes
                 var park = parkNum > 0 ? $"parking spot {StandName(parkNum)}" : "parking";
                 var route = (IsHeli ? "air " : "") + (home != null ? $"taxi to {home.Name}{ParkRoute()}{(parkNum > 0 ? ", " + park : "")}" : $"taxi to {park}");   // R347: helicopter air taxi
                 var where = F.Net == null && t != null && ParkDir(t) is { } pd ? (parkNum > 0 ? $", {pd}" : $", your parking position {pd}") : "";   // DCS network: no clock direction (wrong way only)
@@ -1253,7 +1254,7 @@ public partial class Tower
 
     /// LA06: taxi in: runway between the aircraft and its parking position (nearest first, not the landing runway), name in the direction of the active runway. Without taxiways:
     /// only if the straight line to the parking position crosses the centerline within the runway (otherwise it goes around its end).
-    string? CrossIn(Telemetry t) => spot is not { } sp ? null : F.Ends.Where(o => HdgDiff(o.Hdg, F.End(Runway).Hdg) < 90 && !Landed(o.Name)).Select(o =>
+    string? CrossIn(Telemetry t) => (spot ?? (!ParkSpot && Phase == Phase.TaxiIn && home != null ? (home.X, home.Z) : null)) is not { } sp ? null : F.Ends.Where(o => HdgDiff(o.Hdg, F.End(Runway).Hdg) < 90 && !Landed(o.Name)).Select(o =>
     {
         double la = (t.X - o.CX) * o.Dz - (t.Z - o.CZ) * o.Dx, lb = (sp.X - o.CX) * o.Dz - (sp.Z - o.CZ) * o.Dx;   // lateral: aircraft, parking position
         double aa = (t.X - o.CX) * o.Dx + (t.Z - o.CZ) * o.Dz, ab = (sp.X - o.CX) * o.Dx + (sp.Z - o.CZ) * o.Dz;   // along

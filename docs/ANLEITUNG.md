@@ -926,6 +926,7 @@ Als Anlassanfrage zählen: „request startup“, „start up“, „request eng
 - **Zu früh gefragt:** fragst du noch auf der Bahn nach Rollen, kommt „report runway vacated.“
 - **Kein Anruf:** rufst du 30 s nach dem Abrollen nicht, erinnert Tower einmal: „contact Kutaisi Ground.“
 - **Parkplatz:** dein eigener, wenn frei, sonst der nächste freie. Plätze anderer Spieler werden übersprungen. Ground gibt die Richtung einmal und erneut nur, wenn du abdriftest (oder mit „progressive“ bei jeder Halbierung der Entfernung).
+- **Nur Rampe:** Mit `"AssignParkingSpot": false` in der `config.jsonc` nennt Ground nur die Rampe aus der `charts.jsonc` („taxi to Ramp West via Alpha“), und du parkst darauf, wo du willst. Plätze ohne benannte Rampe bekommen weiter einen Parkplatz.
 - **Auf deinem Platz:** „you are on your parking position, shut down at your discretion.“
 - **Wann du als geparkt giltst:** nach 30 s Stillstand auf dem Vorfeld oder wenn du auf einem Parkplatz die Triebwerke abstellst. Das beendet den Flug und schreibt das Debriefing. Hat Ground dir einen Parkplatz genannt, zählt der Stillstand nur im Umkreis von 100 m um diesen Platz.
 
@@ -1449,7 +1450,7 @@ Ein Fluglehrer fliegt auf dem Bordfunk mit und prüft drei Platzrunden, einen An
 |---|---|---|
 | **Initial:** „Kutaisi Tower, Enfield 1-1, initial runway 25“ | Am Initial: „report initial“ | 1 NM hinter dem Initial: „no break clearance, continue straight through, re-enter initial runway two five, report initial.“ |
 | **Overhead:** „…, overhead“ | Über dem Platz (0,7 NM): „report overhead“ | 1,5 NM später: „no clearance to join, remain outside the pattern, say intentions.“ |
-| **CRP** (Kutaisi): „…, C R P north“ | Innerhalb 1 NM vom CRP, Approach: „report C R P north“ | 2 NM danach: „say position, remain outside the control zone“ (keine Übergabe) |
+| **CRP** (Kutaisi): „…, C R P north“ | Erst wenn der CRP hinter dir liegt (du also ohne Meldung darüber weg bist), Approach: „report C R P north“. Melden kannst du ab 2,5 NM vor dem Punkt und auch genau darüber. | 2 NM danach: „say position, remain outside the control zone“ (keine Übergabe) |
 | **Landemeldung:** Platzrunde „base, gear down (full stop)“; geradeaus oder ILS „four mile final, gear down“ | Bei etwa 2,5 NM im Endanflug oder im Queranflug: „report final“ | Innerhalb 0,8 NM bzw. unter 300 ft: „go around, no landing clearance, …, report base“ (IFR oder geradeaus: Fehlanflug), dazu ein Verstoß |
 | **Erstanruf vor dem Einflug in die Zone** (Approach oder Tower) | Zonenwache: „…, say intentions“ | Innerhalb 1 NM im Endanflug: „go around, you are not cleared to land“, dazu ein Verstoß |
 | **Tower-Check-in nach „contact Tower“** („…Tower, Enfield 1-1, initial / overhead / four mile final“) | Nur wenn Tower eine eigene Frequenz hat: nach 60 s oder innerhalb 5 NM vom Platz sagt Approach „contact Kutaisi Tower now, <Frequenz>“ (auf gemeinsamer Frequenz gelten die Aufforderungen oben) | Keine Landefreigabe; es gilt die Regel zur Landemeldung oben |
@@ -2953,6 +2954,7 @@ Eigene Frequenzen je Platz und Lotse stehen nicht in `config.jsonc`, sondern in 
 | `MapPort` | `18600` | Port des [Lagebilds im Browser](#lagebild-im-browser), 0 = aus. Gilt nach einem Neustart. |
 | `MapLan` | `false` | `true` = das Lagebild lässt sich auch von anderen Geräten im Netz öffnen (Tablet). Gilt nach einem Neustart. |
 | `StationPositions` | `true` | Lotsen senden mit Standort (Platz, AWACS, Tanker, JTAC, KI-Flüge). Hat der SRS-Server Sichtlinie oder Reichweite an, hört man sie hinter Gelände oder zu weit weg nicht. Siehe [SRS einrichten](#srs-einrichten). |
+| `AssignParkingSpot` | `true` | `false` = Ground nennt nach der Landung nur die Rampe aus der `charts.jsonc` (*„taxi to Ramp West via …“*) und keinen Stellplatz; du parkst darauf, wo du willst. Plätze ohne benannte Rampe bekommen weiter einen Stellplatz. |
 | `IffCheck` | `false` | Lotsen prüfen deinen Transponder aus SRS: Code und *„squawk … and ident“* beim Radarkontakt, *„reset transponder“*, Squawk 7600, AWACS *„parrot sour“* ohne Mode 4. Siehe [Transponder (IFF)](#transponder-iff). Squawk 7700 wird auch ohne die Einstellung bemerkt. |
 | `RandomNotams` | `false` | Höchstens ein zufälliges NOTAM pro Platz und Tag: ILS außer Betrieb, Parallelbahn gesperrt, Vogelschlaggefahr. Siehe [NOTAMs](#notams). |
 | `Notams` | `{}` | Eigene NOTAMs je Platz, zum Beispiel `{ "Kutaisi": ["ILS 25 unserviceable", "runway 07 closed"] }`. Siehe [NOTAMs](#notams). |

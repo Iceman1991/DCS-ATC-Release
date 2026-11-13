@@ -466,7 +466,8 @@ public partial class Tower
                 return Say($"{c}, contact {Contact("Tower")}, report {CrpSay(entry!)}.", "Approach");
             }
             // Reporting obligation C R P: handoff only on the call "C R P north" (case crp); at the point without call once "report C R P", 2 NM later once "say position", no handoff
-            if (crpLeg && d < NM && !crpAsked) { crpAsked = true; return Say(Phase == Phase.Entering ? $"{c}, {F.StationOf("Tower")}, report {CrpSay(entry!)}." : $"{c}, report {CrpSay(entry!)}.", Owner()); }
+            // Forum (Lt_Jaeger): not before the point (he reports right over it), only once it lies behind him (inside the 2.5 NM in which the report counts)
+            if (crpLeg && d > 0.3 * NM && d < 2.5 * NM && !crpAsked && HdgDiff(t.Hdg * 180 / Math.PI, Bearing(t.X, t.Z, goal.X, goal.Z)) > 90) { crpAsked = true; return Say(Phase == Phase.Entering ? $"{c}, {F.StationOf("Tower")}, report {CrpSay(entry!)}." : $"{c}, report {CrpSay(entry!)}.", Owner()); }
             if (crpLeg && crpAsked && !crpWaved && d > 2 * NM)
             {
                 crpWaved = true; nav = null; (keepAt, keepRef, keepTold) = (now, Dist(goal.X, goal.Z, CX, CZ), false);
@@ -905,7 +906,8 @@ public partial class Tower
         var cl = ceil >= 1000 ? "" : $"{(vis == "" ? " Ceiling" : ", ceiling")} {Alt(Math.Max(0, Math.Round(ceil / 100) * 100))}";
         return $"{vis}{cl}.{(visM < 550 || ceil < 200 ? " Say intentions." : "")}";
     }
-    void Park() { wxTold = false; special = null; Phase = Phase.Parked; exitDir = null; entry = null; Separate = false; depClr = false; dest = null; Following = false; cenName = null; cenTo = null; lowTold = lowAck = false; Squawk = null; cruiseFt = 0; climbOut = null; iffTold = emSq = 0; depRoute = null; }
+    void Park() { if (lastTel is { } pk) spot ??= (pk.X, pk.Z);   // ramp only (ParkSpot off): where he stopped is his stand from now on
+        wxTold = false; special = null; Phase = Phase.Parked; exitDir = null; entry = null; Separate = false; depClr = false; dest = null; Following = false; cenName = null; cenTo = null; lowTold = lowAck = false; Squawk = null; cruiseFt = 0; climbOut = null; iffTold = emSq = 0; depRoute = null; }
 
     /// R128: identification by code (FAA JO 7110.65 5-3-3): "radar contact" only once the code is observed; idAt = time, idFf = flight following instead of departure report.
     double idAt = -1; bool idFf;

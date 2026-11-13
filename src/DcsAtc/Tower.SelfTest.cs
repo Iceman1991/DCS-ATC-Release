@@ -1520,6 +1520,10 @@ public partial class Tower
         twS.F.Spots.RemoveRange(twS.F.Spots.Count - 3, 3);
         twS.F.Stands.Clear();
         Check(r[0].Contains("parking spot Foxtrot one two five"), "Parkposition DCS-Standname: " + r[0]);
+        ParkSpot = false;   // forum (Lt_Jaeger): config AssignParkingSpot false -> only the ramp, no stand, no direction to a stand
+        r = twS.OnTranscript("Kutaisi Ground, Enfield 11, runway vacated, request taxi to parking", At(CX - 400 * Uz, CZ + 400 * Ux, 0, 254, 5), busy, 27);
+        ParkSpot = true;
+        Check(r[0].Contains("taxi to Ramp ") && !r[0].Contains("parking") && !r[0].Contains("o'clock") && twS.spot == null, "Nur Rampe statt Stellplatz: " + r[0]);
         // PARK-P1: back at the departure airfield (gap in the air -> reset) own spot; occupied -> next free, ramp that of the spot
         // (before, spot forgotten and ramp from departure: "taxi to Ramp West via November, parking spot three eight")
         string Back(Traffic[] tr)
@@ -4633,15 +4637,16 @@ public partial class Tower
             var atC = At(cn.X, cn.Z, PatternFt * Ft - FieldElev, 180, 150 * Kt);
             wc.Tick(atC, none, 0);
             (wc.Phase, wc.entry, wc.nav, wc.navName) = (Phase.Inbound, "north", cn, "C R P north");
-            var c1 = wc.Tick(atC, none, 1);
-            var c2 = wc.Tick(atC with { X = cn.X + 1.2 * NM }, none, 10).Concat(wc.Tick(atC with { X = cn.X + 2.2 * NM }, none, 20)).ToList();
+            var c0 = wc.Tick(atC with { X = cn.X + 0.5 * NM }, none, 0.5).Concat(wc.Tick(atC, none, 0.8)).ToList();   // forum (Lt_Jaeger): before and over the point no reminder yet
+            var c1 = wc.Tick(atC with { X = cn.X - 0.5 * NM }, none, 1);   // the point lies behind him
+            var c2 =wc.Tick(atC with { X = cn.X + 1.2 * NM }, none, 10).Concat(wc.Tick(atC with { X = cn.X + 2.2 * NM }, none, 20)).ToList();
             var c3 = wc.OnTranscript("Kutaisi Approach, Enfield 11, C R P north", atC, none, 25);
             var ovh = wc.Ovh;
             var c4 = FlyP(wc, cn, ovh, 30, 30 + Dist(cn.X, cn.Z, ovh.X, ovh.Z) / (150 * Kt));
             var c6 = FlyP(wc, ovh, (ovh.X + 1.6 * NM, ovh.Z), 400, 440);
             var c7 = wc.OnTranscript("Kutaisi Tower, Enfield 11, overhead", At(ovh.X + 1.6 * NM, ovh.Z, PatternFt * Ft - FieldElev, 90, 150 * Kt), none, 441);
             int nagI = c4.FindIndex(m => m.Role == "Approach" && m.Text.StartsWith("Enfield one one, contact Kutaisi Tower now, ")), rep = c4.FindIndex(m => m.Text == "Enfield one one, Kutaisi Tower, report overhead.");
-            Check(T(c1) == "Enfield one one, report C R P north." && c1[0].Role == "Approach" && T(c2) == "Enfield one one, say position, remain outside the control zone." &&
+            Check(c0.Count == 0 && T(c1) == "Enfield one one, report C R P north." && c1[0].Role == "Approach" && T(c2) == "Enfield one one, say position, remain outside the control zone." &&
                   c3[0].Contains("contact Kutaisi Tower") && nagI >= 0 && rep > nagI && c4.Count(m => m.Text.Contains("now,")) == 1 && c4.Count(m => m.Text.Contains("report overhead")) == 1 &&
                   T(c6) == "Enfield one one, no clearance to join, remain outside the pattern, say intentions." && c7[0].Contains("join"),
                   "Meldepflicht C R P / contact Tower now / overhead: " + string.Join(" / ", new[] { c1, c2, c3, c4, c6, c7 }.Select(T)));
@@ -4676,8 +4681,8 @@ public partial class Tower
             var kzw = new Tower("Enfield 1-1");
             kzw.Tick(atC, none, 0);
             (kzw.Phase, kzw.entry, kzw.nav, kzw.navName) = (Phase.Inbound, "north", cn, "C R P north");
-            kzw.Tick(atC, none, 1);
-            var kz2 = kzw.Tick(atC with { X = cn.X + 1.2 * NM }, none, 10).Concat(kzw.Tick(atC with { X = cn.X + 2.2 * NM }, none, 20)).ToList();
+            kzw.Tick(atC with { X = cn.X - 0.5 * NM }, none, 1);   // past the point: "report C R P"
+            var kz2 =kzw.Tick(atC with { X = cn.X + 1.2 * NM }, none, 10).Concat(kzw.Tick(atC with { X = cn.X + 2.2 * NM }, none, 20)).ToList();
             var kz3 = FlyP(kzw, (cn.X + 2.2 * NM, cn.Z), ovh, 25, 160);   // flies to the airfield anyway
             Check(ko1.Concat(ko2).Count(m => m.Text.Contains("no clearance to join")) == 1 && ko2.Count(m => m.Text == "Enfield one one, you are not cleared to join, leave the pattern immediately, say intentions.") == 1 &&
                   ko2.Any(m => m.Role == "Info" && m.Text.StartsWith(L("Verstoß: Platzrunde ohne Freigabe Kutaisi", "Deviation: pattern entry without clearance Kutaisi"))) &&

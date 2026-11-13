@@ -81,6 +81,7 @@ public partial class Tower
     public static IReadOnlyList<Airfield> All = new List<Airfield>();   // all airfields (Program): destination of the en-route clearance
     Airfield? dest; bool depClr; double depFt;   // V14: route clearance (Clearance Delivery) -> departure vector
     string? climbOut; double climbFt;   // requested departure: "free" (unrestricted climb) / "tactical" (spiral climb overhead), climbFt = requested altitude, 0 = none
+    public static bool ParkSpot = true;   // config AssignParkingSpot: Ground names a stand after landing; false = only the ramp where the chart names one
     public static bool IffCheck;   // FI1: config IffCheck (code check, ident, 7600, AWACS parrot); 7700 always
     public Iff? Iff;               // FI1: this pilot's transponder (SRS, Program.Prep), null = unknown or not fitted
     public string? Squawk;   // A90: transponder code, assigned once per flight (en-route clearance, VFR taxi clearance, flight following), moves along on airfield change (Program)

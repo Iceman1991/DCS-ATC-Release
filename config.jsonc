@@ -71,6 +71,7 @@
   "SrsAutoConnect": true,   // SRS-Client nach dem Start automatisch mit dem lokalen SRS-Server verbinden (127.0.0.1, Port aus der server.cfg), nur wenn er noch nicht verbunden ist; false = selbst verbinden
   "Atis": true,      // ATIS-Dauersendung für Plätze mit Spielern im Umkreis von 40 NM
   "RunwayLights": "silent",   // Bahnbefeuerung nachts über das DCS-ATC-Menü: "silent" (Platz bleibt stumm), "dcs" (DCS-Lotse antwortet 15 s hörbar), "off"
+  "AssignParkingSpot": true,   // false = Ground nennt nach der Landung nur die Rampe aus charts.jsonc ("taxi to Ramp West via ..."), keinen Stellplatz; du parkst, wo du willst. Plätze ohne benannte Rampe bekommen weiter einen Stellplatz
   "AirspaceWatch": true,   // Kontrollzonen überwachen (Einflug ohne Kontakt wird angerufen) und Verstöße ansagen ("possible pilot deviation", z. B. Start ohne Freigabe) und ins Debriefing; false = nur Sicherheitswarnungen
   "AltimeterUnit": "auto",   // Höhenmesser-Einstellung im Funk: "auto" (nach eigenem Flugzeugtyp: westliche Typen "altimeter two niner niner two" in inHg, sonst "QNH one zero one three" in hPa; ATIS nennt beides), "hpa", "inhg"
   "DebugLog": true,   // ausführliches Protokoll atc-debug.txt für Fehlerberichte (Spracherkennung, Platzwahl, Phasen, Telemetrie alle 10 s), höchstens 2 × 20 MB; false = aus
