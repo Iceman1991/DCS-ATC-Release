@@ -1788,6 +1788,18 @@ public partial class Tower
         rb = Rb(twRa, west, 2, "Left heading 045, maintain 2000, Enfield 1-1", "Squawk 7171, Enfield 1-1", "QNH one zero one niner, Enfield 1-1",
                 "Cleared ILS approach runway 25, Enfield 1-1", "Proceed overhead, 2000, contact Tower, report overhead, Enfield 1-1");
         Check(rb == "" && twRa.Phase == vecPh && twRa.vec != null && twRa.Rejected == 0, "Rücklesungen in der Luft -> still " + rb);
+        {   // forum (Heling): "Descend to 2000 ft, Hawk 1-1" got "say again": short altitude readbacks as spoken and as Whisper writes them
+            var hs = new[] { "Descend to 2000 ft, Enfield 1-1", "Descend to 2000 feet, Enfield 1-1", "Descend to 2,000 feet, Enfield 1-1", "Descend to 2000ft, Enfield 1-1", "Descending 2000, Enfield 1-1",
+                             "Down to 2000, Enfield 1-1", "Descend two thousand, Enfield 1-1", "Descend and maintain two thousand feet, Enfield one one", "2000 feet, Enfield 1-1", "Descending to 2,000, Enfield 1-1",
+                             "Descend 2000 feet. Enfield 1-1.", "Enfield 1-1, descend to 2000 ft" };
+            var hr = hs.Select(s => (s, r: Rb(twRa, west, 2.5, s))).Where(x => x.r != "").Select(x => $"{x.s} -> {x.r}").ToList();
+            Check(hr.Count == 0 && twRa.Rejected == 0, "Höhe zurückgelesen -> still: " + string.Join(" || ", hr));
+            var keepL = twRa.last;   // another transmission in between: the assigned altitude still counts, another altitude does not
+            (twRa.last, twRa.lastAltFt) = (new Msg("Approach", "Enfield one one, traffic 2 o'clock, 5 miles, eastbound, 1000 feet above, Viper."), 2000);
+            var (lateOk, lateBad) = (Rb(twRa, west, 2.6, "Descend to 2000 ft, Enfield 1-1"), Rb(twRa, west, 2.7, "Descend to 6500 ft, Enfield 1-1"));
+            twRa.last = keepL;
+            Check(lateOk == "" && lateBad != "", "Höhe nach einem Zwischenspruch zurückgelesen -> still, falsche Höhe nicht: " + lateOk + " / " + lateBad);
+        }
         Check(Rb(twRa, west, 3, "Enfield 1-1, QNH").Contains("QNH") && Rb(twRa, west, 4, "Enfield 1-1, initial runway 25") != "", "Frage/Meldung mit Wert -> Antwort");
         twRa.last = new Msg("Approach", "Enfield one one, radar service terminated, squawk VFR, frequency change approved.");
         Check(Rb(twRa, west, 5, "Radar service terminated, squawk VFR, frequency change approved, Enfield 1-1") == "" && !twRa.Following, "Abmeldung zurückgelesen -> still");

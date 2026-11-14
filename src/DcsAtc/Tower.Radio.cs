@@ -963,6 +963,8 @@ public partial class Tower
         return new[] { Phase is Phase.TaxiOut or Phase.TaxiIn ? "hold short" : "hold(?:ing)? short", "hold(?:ing)? position", "giv(?:e|ing) way", "line up", "contact", "vacate", "when vacated", "when ready", "expect", "squawk(?:ing)?", "qnh", "altimeter", "until established", "frequency change", "own navigation", "maintain vfr" }   // TaxiOut: "holding short runway 25" reports at the holding point, Ground's "Hold short, contact Tower" is read back only as "hold short" (R111); LA06: likewise taxiing in
                    .Any(p => After(n, p) is { } v && (v == After(l, p) || p is "qnh" or "altimeter" && v == After(l, p == "qnh" ? "altimeter" : "qnh")))   // "altimeter 1013" reads back "QNH 1013"
             || HdgSlot(n) is { } h && h == HdgSlot(l)   // the pilot states a heading only when reading back ("request heading" is a request)
+            // Forum (Heling: "Descend to 2000 ft, Hawk 1-1" -> "say again"): the altitude he was given counts too when another transmission (traffic, heading) came in between
+            || intent == "unknown" && AltSlot(n) is { } ga && (vec != null && (ga == vecFt || ga == lastAltFt) || holding && ga == holdFt)
             || intent == "unknown" && (AltSlot(n) is { } a && a == AltSlot(l) || RwySlot(n) is { } rn && rn == RwySlot(l)
                                        || Regex.Replace(NoCs(n), @"\D", "") is { Length: >= 3 } d && Regex.Replace(l, @"\D", "").Contains(d));   // values only: "4321, 1013, Enfield 1-1", "Tower 134.0, Enfield 1-1"
     }
