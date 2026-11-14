@@ -1,7 +1,7 @@
 ﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe und (ISCC /DSmall) dist\DCS-ATC-Update-Setup.exe
 ; Small: update setup without the big files (models, tools) for the update from the app; only over an existing installation.
 ; installer\manifest.ps1 reads the big files from the block "#ifndef Small" in [Files].
-#define AppVer "0.23.3-alpha"
+#define AppVer "0.23.4-alpha"
 #define Src ".."
 
 [Setup]

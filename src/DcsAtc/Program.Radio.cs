@@ -35,6 +35,7 @@ static partial class Program
         {
             // A26: sender unknown -> match the spoken call sign to a player (otherwise Request(null): "say again your callsign")
             p ??= ByCallsign(text);
+            if (WingChatter(tx.FreqMHz, p, text)) { Trace("SRS", $"{tx.FreqMHz:0.000} MHz unit {tx.UnitId} '{tx.Name}': Flight-Frequenz, kein Wingman-Befehl: {text}"); return; }
             if (p != null) p.CalledOn = tx.FreqMHz;   // K2: reply names this frequency
             if (p != null && role is "AWACS" or "Tanker" or "Carrier") role = OpsPick(p, tx.FreqMHz, text, role);   // #3, #17: shared AWACS/tanker/carrier frequency
             if (p != null && shared.Via is { } sv)
@@ -747,7 +748,17 @@ static partial class Program
         return c.Msg == null ? null : (m.Groups[1].Value == "flight" ? 5 : m.Groups[1].Value[0] - '1', "wMsgLeader" + c.Msg);
     }
 
-    static readonly string WingFile = Path.Combine(Path.GetTempPath(), "DcsAtc-Wing.txt");   // DcsAtcHook.lua performs the radio menu item, reply as event "WING;result;par;msg"
+    /// Forum (jojojung, "no log entries at all"): orders to the AI wingmen are spoken on the flight's own frequency (the group's frequency in the mission editor, where DCS
+    /// voices the wingmen), which no controller has, so nobody listened there. Monitored now, for wingman orders only; a controller frequency stays what it is (other).
+    /// ponytail: AM only like every monitored frequency (Srs.cs); an FM flight frequency needs the modulation from the mission.
+    static double[] WingFq = Array.Empty<double>();
+    internal static double[] WingFreqs(Pilot? host, IReadOnlyCollection<double> other) => host is not { Gid: > 0 } h ? Array.Empty<double>()
+        : Flights.Units.Values.Where(u => u.Gid == h.Gid && u.Freq > 0).Select(u => u.Freq).Distinct().Where(f => !other.Any(o => Math.Abs(o - f) < 0.005)).ToArray();
+    /// A call on the flight frequency that is no wingman order of the host: flight chatter, no controller answers.
+    internal static bool WingChatter(double mhz, Pilot? p, string text) =>
+        WingFq.Any(f => Math.Abs(f - mhz) < 0.005) && (p == null || p != Host() || WingCmd(Tower.Normalize(text), p.Callsign) == null);
+
+    static readonly string WingFile =Path.Combine(Path.GetTempPath(), "DcsAtc-Wing.txt");   // DcsAtcHook.lua performs the radio menu item, reply as event "WING;result;par;msg"
 
     /// K2/K4: airfield frequency on which p hears the controller: tuned (SRS, most recently called first), otherwise the called (SRS state may be older than the call), otherwise VHF (= map), otherwise UHF. 0 = without Radio.lua.
     /// any: any controller frequency of the airfield (Tower.HeardOn, own per controller from AirfieldFrequencies), otherwise that of the tower.
@@ -848,7 +859,9 @@ static partial class Program
                 if (Carrier.Deck(p.Tel, p.Coalition) != null) (p.Active, p.Pinned) = (null, null);   // R24: no land tower on the deck (no Ground suggestion, no airfield ATIS)
                 else if (Pick(p, null) is { } pt) Switch(p, pt);   // no own/neutral airfield: stays (N1)
             SaveSession();
-            Srs?.SetFreqs(ListenFreqs(pilots));
+            var lf = ListenFreqs(pilots).ToList();
+            WingFq = WingFreqs(Host(), lf);
+            Srs?.SetFreqs(WingFq.Concat(lf));
             foreach (var f in pilots.Where(p => p.Active != null).Select(p => p.Active!.F).Distinct())
                 if (MissionData && UpdateAtis(f)) outq.AddRange(AtisCall(f, pilots));   // new identifier: announcement to all at the airfield; R120: only with fresh mission data
             LoadTerrain();

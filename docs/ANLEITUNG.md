@@ -2379,6 +2379,8 @@ Damit die Frequenz brauchbar bleibt, gehen je Frequenz höchstens 10 niedrig pri
 
 Deine KI-Rottenflieger nehmen Befehle per Sprache an, wie im DCS-Funkmenü (Wingman / Flight). Fang mit der Nummer des Rottenfliegers oder „Flight“ an, wahlweise mit dem Rufzeichen deines Flugs davor: *„Two, go trail.“* · *„Enfield one three, rejoin.“* · *„Flight, engage bandits.“* DCS-ATC wählt dann genau diesen Punkt im DCS-Funkmenü für dich. Es drückt keine Tasten, deshalb geht das auch mit Easy Communication aus, in jedem Flugzeug und in jeder DCS-Sprache. Den Befehl und die Antwort des Rottenfliegers spricht DCS selbst, wie beim Menü.
 
+**Welche Frequenz:** Sag den Befehl auf der eigenen Frequenz deines Flights (die Frequenz deiner Gruppe im Missionseditor, auf der du deine Rottenflieger hörst) oder auf irgendeiner Frequenz, auf der ein DCS-ATC-Lotse sitzt. Auf der Flight-Frequenz reagiert DCS-ATC nur auf Wingman-Befehle; alles andere dort ist Rottenfunk, kein Lotse antwortet. Die Flight-Frequenz muss AM sein.
+
 **Voraussetzung: eine Zeile in `autoexec.lua`.** Das Funkmenü liegt in der Skriptumgebung der Simulation, nicht in der des DCS-ATC-Hooks. Setup fügt deshalb bei der Admin-Abfrage auch eine Zeile ans Ende von `<DCS-Ordner>\Scripts\autoexec.lua` an, die nur `Scripts\DcsAtc\DcsAtcWing.lua` aus Saved Games lädt. DCS liest diese Datei nur beim Start: nach der Installation DCS einmal neu starten. Kommt der Befehl nicht an, sagt DCS-ATC *„Wingman: Befehl nicht angekommen …“*; dann **Startmenü → DCS-ATC → Nach DCS-Update reparieren** und DCS neu starten. Deinstallieren entfernt die Zeile wieder.
 
 | Sag | Befehl im DCS-Menü |

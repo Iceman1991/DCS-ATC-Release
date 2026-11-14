@@ -142,6 +142,16 @@ static partial class Program
             "Texaco 1-2, Enfield 1-1, request rejoin", "Two, unable", "flight level 240", "Kutaisi Tower, Enfield 1-1, ready for departure", "Two, echelon left", "Three, radar off" }.Select(Wc));
         if (wcs != "1:GoTrail,2:JoinUp,5:EngageBandits,3:FulfilTheTaskAndReturnToBase,5:FlightCheckIn,1:EngageMyTarget,-,-,-,-,1:EchelonLeft,2:RadarOff") throw new Exception("Wingman-Befehle: " + wcs);
         Console.WriteLine("OK   Wingman-Befehle: Two/Enfield 1-3/Flight + Befehl -> Empfaenger wie im DCS-Menue, fremdes Rufzeichen und Rottenfunk ohne Befehl nicht");
+        {   // forum (jojojung): the flight frequency of the own AI wingmen is monitored (it was not: orders spoken there never arrived), a controller frequency is not taken twice
+            var ku = Flights.Units;
+            Flights.Units = new() { ["w2"] = new Flights.Unit("w2", "Enfield", "FA-18C_hornet", "Enfield12", 2, 0, 0, 6000, true, 0.8, 124, new[] { 0, 0, 0, 0, 0 }, Gid: 7),
+                                    ["x1"] = new Flights.Unit("x1", "Uzi", "FA-18C_hornet", "Uzi11", 2, 0, 0, 6000, true, 0.8, 130, new[] { 0, 0, 0, 0, 0 }, Gid: 8) };
+            var wh = new Pilot { Unit = "WF1", Gid = 7, Id = 3 };
+            var wf = $"{string.Join(",", WingFreqs(wh, new[] { 251.0 }))}/{WingFreqs(wh, new[] { 124.0 }).Length}/{WingFreqs(null, new[] { 251.0 }).Length}/{WingChatter(124, wh, "Two, go trail")}";
+            Flights.Units = ku;
+            if (wf != "124/0/0/False") throw new Exception("Wingman-Frequenz: " + wf);
+            Console.WriteLine("OK   Wingman-Frequenz: Flight-Frequenz der eigenen KI-Wingmen wird abgehoert, Lotsenfrequenz nicht doppelt");
+        }
         // Debug log: format "HH:mm:ss.fff [KAT] Text", via TraceMax to .old.txt, off/tests (SimLog) without a line
         var (tp, tm, to, sl0) = (TracePath, TraceMax, TraceOn, SimLog);
         var dir = Directory.CreateTempSubdirectory("dcsatc-trace").FullName;

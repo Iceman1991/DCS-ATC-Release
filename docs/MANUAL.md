@@ -2377,6 +2377,8 @@ To keep the frequency usable, at most 10 low-priority and 16 normal calls are se
 
 You can give your AI wingmen orders by voice, like the DCS radio menu (Wingman / Flight). Start with the wingman number or "Flight", optionally with your flight's callsign in front: *"Two, go trail."* · *"Enfield one three, rejoin."* · *"Flight, engage bandits."* DCS-ATC then selects that item of the DCS radio menu for you. No keys are pressed, so it works with Easy Communication off, in every aircraft and in every DCS language. DCS voices the order and the wingman's reply itself, the same as with the menu.
 
+**Which frequency:** say the order on your flight's own frequency (the frequency of your group in the mission editor, where you hear your wingmen), or on any frequency a DCS-ATC controller is on. On the flight frequency DCS-ATC acts on wingman orders only; anything else you say there is flight chatter and no controller answers. The flight frequency has to be AM.
+
 **Needs one line in `autoexec.lua`.** The radio menu lives in the script environment of the simulation, not in that of the DCS-ATC hook. So at the admin prompt setup also adds a line at the end of `<DCS folder>\Scripts\autoexec.lua`, which loads only `Scripts\DcsAtc\DcsAtcWing.lua` from Saved Games. DCS reads that file only when it starts: restart DCS once after installing. If an order does not arrive, DCS-ATC says *"Wingman: command not received ..."*; then run **Start menu → DCS-ATC → Repair after DCS update** and restart DCS. Uninstalling removes the line again.
 
 | Say | Order in the DCS menu |
