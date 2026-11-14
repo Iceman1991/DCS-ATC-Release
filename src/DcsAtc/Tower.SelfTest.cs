@@ -341,6 +341,15 @@ public partial class Tower
         Check(r[0].Role == "Ground" && r[0].Contains("cleared to Batumi airport via radar vectors") && r[0].Contains("squawk") && r[0].Contains("departure Kutaisi Approach"), r[0]);   // without own Departure frequency as before
         r = new Tower("Enfield 1-1").OnTranscript("Kutaisi Ground, Enfield 11, request IFR clearance to Krasnodar Pashkovsky", parked, none, 1);
         Check(r[0].Contains("cleared to Krasnodar Pashkovsky airport via"), "A3 Ziel nach Namenswörtern: " + r[0]);
+        {   // #32 (OwlRetnek): destination by ICAO code, in the alphabet, spelled or as one word
+            All[2].Icao = "UGSB";
+            var ic = new[] { "request IFR clearance to ICAO Uniform Golf Sierra Bravo", "request IFR clearance to U G S B", "request IFR clearance to UGSB", "request IFR clearance to uniform golf sierra bravo airport" }
+                .Select(s => new Tower("Enfield 1-1").OnTranscript($"Kutaisi Ground, Enfield 11, {s}", parked, none, 1)[0].Text).ToList();
+            All[2].Icao = "";
+            var rx = IcaoRx("UGSB")!;   // another code or a word that only starts like it is no match; digits as Normalize writes them
+            bool no = !Regex.IsMatch("to uniform golf sierra charlie", rx) && !Regex.IsMatch("to ugsbx", rx) && Regex.IsMatch("to uniform golf 5 x-ray", IcaoRx("UG5X")!);
+            Check(ic.All(t => t.Contains("cleared to Batumi airport via")) && no, "#32 Ziel per ICAO-Code: " + string.Join(" | ", ic) + $" / {no}");
+        }
         // R113: pop-up IFR in the air = route clearance to the destination (squawk, heading, altitude), no landing here
         var twPop = new Tower("Enfield 1-1");
         var w30 = At(CX - 30 * NM, CZ, 3000, 90, 150);
@@ -1494,6 +1503,17 @@ public partial class Tower
         tw265d.OnTranscript("Kutaisi Ground, Enfield 1-1, request taxi to parking", offRwy with { Ias = 0 }, none, 20);
         Check(sg265 == " / (Ground, request taxi to parking)" && ph265 == Phase.Parked && r.Count == 1 && r[0].Text.Contains("start up approved") &&
               tw265d.Suggest(offRwy with { Ias = 0 })?.Text == "request taxi to parking", $"R265 Sonderbereich: {sg265}, {ph265}, {r.FirstOrDefault()?.Text}, {tw265d.Suggest(offRwy with { Ias = 0 })}");
+        {   // #28 (log Nellis): "at parking, shutting down" ends the flight wherever he parked; standing before the taxi clearance does not count as parked
+            var tsd = Landed();
+            Enumerable.Range(10, 25).ToList().ForEach(s => tsd.Tick(offRwy with { Ias = 0 }, none, s));   // stands 25 s before calling
+            tsd.OnTranscript("Kutaisi Ground, Enfield 1-1, runway vacated, request taxi to parking", offRwy with { Ias = 0 }, none, 35);
+            Enumerable.Range(36, 15).ToList().ForEach(s => tsd.Tick(offRwy with { Ias = 0 }, none, s));   // reads back, 15 s more
+            var ph1 = tsd.Phase;
+            var sd = tsd.OnTranscript("Kutaisi Ground, Enfield 1-1, at parking, shutting down", offRwy with { Ias = 0 }, none, 60);
+            var sd2 = tsd.OnTranscript("Enfield 1-1, shutting down", offRwy with { Ias = 0 }, none, 75);
+            Check(ph1 == Phase.TaxiIn && sd.Count == 1 && sd[0].Text == "Enfield one one, roger." && tsd.Phase == Phase.Parked && sd2.All(m => !m.Text.Contains("say again")),
+                  $"#28 shutting down -> geparkt, Stehen vor der Rollfreigabe zählt nicht: {ph1} / {string.Join(" | ", sd.Select(m => m.Text))} / {tsd.Phase} / {string.Join(" | ", sd2.Select(m => m.Text))}");
+        }
         // #13: standing off the runway with headwind (export IAS shows the wind) is not taxiing
         var tw13w = new Tower("Enfield 1-1");
         tw13w.Tick(At(CX, CZ, 300, 254, 80), none, 0); tw13w.Tick(At(CX, CZ, 0, 254, 20), none, 5); tw13w.Tick(At(CX, CZ, 0, 254, 5), none, 8);

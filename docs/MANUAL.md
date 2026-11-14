@@ -885,6 +885,7 @@ These phrases count as a start-up request: "request startup", "start up", "reque
 
 - **Clearance limit:** without a destination, the clearance limit is the nearest friendly airfield in the departure direction. The F10 menu **Ground → IFR clearance** lists airfields by distance.
 - **Cruise level** follows the semicircular rule: FL150 eastbound, 14,000 ft westbound. A destination closer than 40 NM gets a low level. The level is never less than terrain plus 2,000 ft.
+- **Destination by ICAO code:** "request IFR clearance to Uniform Golf Sierra Bravo" (or "UGSB") works like the name, for names the speech recognition gets wrong. The Caucasus airfields have their codes built in; on other maps add `"icao": "ETMN"` to the airfield's entry in a chart file (see [Own airfield procedures](#own-airfield-procedures-chartsjsonc)).
 - **Enemy destination:** "unable clearance to …, say alternate destination."
 - **Readback check:** only the squawk code in your readback is checked ("squawk 4216").
 - **Own Departure frequency:** if the airfield has one in `frequencies.jsonc`, the clearance says "departure frequency two seven three decimal five five" instead of "departure Kutaisi Approach".
@@ -926,7 +927,7 @@ These phrases count as a start-up request: "request startup", "start up", "reque
 - **Parking spot:** you get your own spot if it is free, otherwise the nearest free one. Spots already assigned to other players are skipped. Ground gives the direction once, and again only if you drift away (or each time the distance halves with "progressive").
 - **Ramp only:** with `"AssignParkingSpot": false` in `config.jsonc` Ground names just the ramp from `charts.jsonc` ("taxi to Ramp West via Alpha") and you park where you like on it. Airfields without a named ramp still get a parking spot. For a single airfield only: `"ramp_only": true` in its `ground` section in `charts.jsonc`.
 - **On your spot:** "you are on your parking position, shut down at your discretion."
-- **When you count as parked:** after 30 s stopped on the apron, or when you shut down your engines at a spot. This ends the flight and writes the debriefing. If Ground gave you a parking spot, stopping counts only within 100 m of that spot.
+- **When you count as parked:** after 30 s stopped on the apron, or when you shut down your engines at a spot. This ends the flight and writes the debriefing. If Ground gave you a parking spot, stopping counts only within 100 m of that spot, and only after the taxi clearance. Parked somewhere else, for example on your squadron's ramp: report "Nellis Ground, Enfield 1-1, at parking, shutting down", Ground answers "roger" and the flight ends there.
 
 ### Tower: departure
 
@@ -2688,6 +2689,7 @@ Besides `charts.jsonc` DCS-ATC reads every file in the same folder whose name st
 | Key | Meaning | Where to find it |
 |---|---|---|
 | Airfield name | As in DCS; a clear part of it is enough (`Nellis AFB`) | Chart editor, F10 map |
+| `icao` | ICAO code, for "request IFR clearance to Echo Tango Mike November" | Airfield chart |
 | `pattern_ft` | Pattern altitude, feet MSL | Airfield chart; otherwise field elevation plus 1000 to 1500 ft |
 | `arrdep_max_ft` | Highest altitude for visual arrivals and departures in the zone ("not above") | Airfield chart |
 | `ctr_top_ft` | Top of the control zone, feet MSL | Airfield chart |
@@ -2735,6 +2737,7 @@ A route is a chain of named fixes that ends at a reporting point, like the MINTT
 - `"rwy"`: the runways the route serves. Asked for with another runway in use, Approach says which runways it is for.
 - `"to"`: the reporting point at the end. It has to be an `entry` of each of these runways.
 - `"pts"`: the fixes in order. `"above"` = at or above, `"at"` = at that altitude, `"below"` = at or below, in feet. All can be left out.
+- `"say"`: other names you can ask for the route with, for a name the speech recognition does not get: `"say": ["ECHO"]` lets "request Echo recovery" pick ARCOE. Optional, also for departure routes.
 
 One name for several runways: write a list of variants instead of a single route. You ask for "STRYK" as usual, and DCS-ATC takes the variant for the runway in use.
 
@@ -2777,7 +2780,7 @@ The chart editor is a page in the browser that writes reporting points and route
 - **Open it:** Start menu → DCS-ATC → *Chart editor*, or `http://localhost:18600/chart` while DCS-ATC is running (the situation map has a link). Without a running mission it shows the airfields of the last mission.
 - **Pick the airfield** at the top right. The map shows its runways, the reporting points and routes it already has (blue, green, orange) and the neighbouring airfields. Drag moves the map, the mouse wheel zooms. At the bottom left you see the magnetic bearing and distance of the mouse pointer from the airfield, to place a point from a real chart.
 - **Reporting point:** click on the map and type the name. In the list, choose whether it is an entry (via initial or via overhead) and an exit. This applies to all runways of the airfield.
-- **Arrival route:** type the route's name, click the fixes in order, then click the reporting point where the route ends. Set the altitude of each fix in the list (at or above, at, at or below; empty = none). The route serves every runway that has the end point as an entry.
+- **Arrival route:** type the route's name, click the fixes in order, then click the reporting point where the route ends, then *Finish route*. If you click on after a reporting point, the route goes past it and that point becomes one of its fixes. Set the altitude of each fix in the list (at or above, at, at or below; empty = none). The route serves every runway that has the end point as an entry.
 - **Departure route:** type the name, click the fixes in order, then *Finish route*.
 - A click on a point that already exists uses that point, with its name and position.
 - **Result:** the text box holds the airfield's complete entry: what it had so far (also the built-in Caucasus data with its taxiways) plus your additions. *Copy* it and paste it inside the outer `{ }` of `charts.jsonc`, in place of the airfield's entry if the file already has one. It applies from the next mission start. Positions are written as DCS coordinates `[x, z]`.

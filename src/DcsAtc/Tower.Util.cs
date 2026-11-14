@@ -323,7 +323,7 @@ public partial class Tower
     Airfield.Route? RouteOf(string n) => Named(F.Routes, n);
     /// Route named in the transmission; several variants under one name (charts.jsonc array): the one for the runway in use first.
     Airfield.Route? Named(Dictionary<string, Airfield.Route> d, string n) =>
-        d.Values.Where(r => Regex.IsMatch(Sq(n), $@"\b{Sq(Rx(r.Name))}\b")).OrderByDescending(r => r.Rwy.Contains(Runway)).FirstOrDefault();
+        d.Values.Where(r => (r.Say ?? Array.Empty<string>()).Prepend(r.Name).Any(k => Regex.IsMatch(Sq(n), $@"\b{Sq(Rx(k))}\b"))).OrderByDescending(r => r.Rwy.Contains(Runway)).FirstOrDefault();
     /// Index of the fix of the route being flown that the pilot reports, -1 = none.
     int RouteFix(string n) => Rt is { } r ? Array.FindIndex(r.Pts, p => Regex.IsMatch(Sq(n), $@"\b{Sq(Rx(p.Fix))}\b")) : -1;
     /// Departure of the chart (charts.jsonc "departures") named in the transmission ("FLEX departure").

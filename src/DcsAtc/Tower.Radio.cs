@@ -352,6 +352,7 @@ public partial class Tower
                 bool again = Phase == Phase.TaxiIn && taxiInTold && spot != null;   // "say again parking": same parking spot
                 Phase = Phase.TaxiIn;
                 taxiInTold = true;
+                stoppedSince = -1;   // #28 (log Nellis): standing still before the clearance does not count, the stand Ground gives can be right beside him
                 specArea = special != null;
                 ProgStart(Has(n, "progressive"), now);
                 if (special is { } sp) { special = null; lastParkCall = -1; return Say($"{c}, taxi to the {sp}."); }   // R251: once de-arm area instead of parking position (afterwards "request taxi to parking" normal), no taxi guidance to the old parking spot
@@ -941,6 +942,9 @@ public partial class Tower
                 return Say($"{c}, {OneOf("good day", "good bye")}.");
             case "ground_say":
                 return Say($"{c}, you are on the ground. Say request.");
+            case "shutdown":   // #28: parked where he says (his squadron's ramp, no DCS stand there), the flight ends
+                if (Phase == Phase.TaxiIn && t != null && !OnRunwayPos(t.X, t.Z)) Park();
+                return Say($"{c}, roger.", "Ground");
             default:   // not understood: ask back, keep the last transmission ("say again" then repeats it), the repeat does not count as a readback
                 lastIntent = "";
                 if (addressed == null && Chatter(n)) return new();   // A140: flight radio does not go to the station
@@ -999,6 +1003,8 @@ public partial class Tower
             if (Has(n, "clearance", "ifr to") && !Has(n, "takeoff", "take off", "landing")) return "clearance";
             if (Has(n, "progressive") && (Phase == Phase.TaxiOut || Phase == Phase.TaxiIn && taxiInTold)) return "progressive";   // N26: otherwise part of the taxi request (taxi/taxiin)
             if (Phase == Phase.TaxiIn && taxiInTold && lastTel is { } it && CrossIn(it) is { } ix && NearRwy(it, ix) && Has(n, "cross", "holding short")) return "cross";   // LA06: holding short of a runway on the way to parking
+            // #28 (log Nellis): "at parking, shutting down" after landing is the report that he is parked (also off a DCS stand), not a taxi request
+            if (Phase is Phase.TaxiIn or Phase.Parked && taxiInTold && Has(n, "shutting down", "shut ?down", "engines? (?:off|shut)", "parked", "in (?:the )?(?:chocks|blocks)") && !Has(n, "request")) return "shutdown";
             // A7: parking spot/apron before departure only as destination ("taxi to parking"), "parking spot 12, information Charlie, request taxi" states the location
             if (Has(n, "vacated", "clear of") && !Has(n, "holding point", "departure", "take off", "takeoff") || Regex.IsMatch(n, (Phase is Phase.ClearedLand or Phase.TaxiIn ? @"\b" : @"\bto (?:the )?") + "(?:parking|ramp|apron)") ||   // R267: "runway vacated, request taxi to holding point" (after aborted takeoff) = back to the start
                 (Has(n, "taxi") && !Has(n, "departure", "runway", "holding", "take off", "takeoff") &&
@@ -1156,7 +1162,12 @@ public partial class Tower
     bool SameFreq(string r) => (F.HasFreq || F.Own.Count > 0) && Math.Abs(FreqOf(F, Dep(r)) - FreqOf(F, Dep(role))) < 0.005;
 
     /// Other airfield named in the transmission (most name words), null = none.
-    Airfield? Named(string n) => ByName(All.Where(f => f.Name != F.Name), w => Regex.IsMatch(n, $@"\b{w}\b"));
+    Airfield? Named(string n) => ByName(All.Where(f => f.Name != F.Name), w => Regex.IsMatch(n, $@"\b{w}\b")) ?? All.FirstOrDefault(f => f.Name != F.Name && IcaoRx(f.Icao) is { } rx && Regex.IsMatch(n, rx));
+    /// #32: ICAO code spoken in the alphabet ("echo tango mike november"), spelled ("e t m n") or as one word ("etmn"); null = airfield without code.
+    static string? IcaoRx(string icao) => icao.Length != 4 || !icao.All(c => char.IsAsciiLetterUpper(c) || char.IsAsciiDigit(c)) ? null   // "UG5X": digits as Normalize writes them
+        : @"\b" + string.Join(@"[ .-]*", icao.Select(ch => char.IsAsciiDigit(ch) ? ch.ToString() : $"(?:{Spell[ch - 'A']}|{char.ToLowerInvariant(ch)})")) + @"\b";
+    static readonly string[] Spell = { "alpha|alfa", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliett?", "kilo", "lima", "mike", "november", "oscar",
+                                       "papa", "quebec", "romeo", "sierra", "tango", "uniform", "victor", "whiske?y", "x[ -]?ray", "yankee", "zulu" };
     /// N1: airfield of the opposing side (neutral and without player's side: never).
     bool Hostile(Airfield? f) => f is { Side: > 0 } && Side > 0 && f.Side != Side;
     /// Threat for a tactical departure: enemy aircraft airborne or an enemy airfield within 60 NM

@@ -110,7 +110,7 @@ static partial class Program
         if (PromptPhrases.TryGetValue(role ?? "", out var ph)) return $"{ph} {string.Join(", ", names.Append(cs).Distinct())}.";
         string Fn(Airfield x) => x.Name.Replace('-', ' ') + (x.Name.Contains(x.Callsign) ? "" : $" ({x.Callsign})");   // "Mineralnye Vody (Minvody)"
         var crps = f.Charted ? string.Join(", ", f.Crp.Keys.Select(k => Airfield.Say(k).Replace("C R P", "CRP"))   // chart CRP names ("black sea", "river west"), named fixes ("Craig")
-            .Concat(f.Routes.Values.SelectMany(r => r.Pts.Select(p => Airfield.Say(p.Fix)).Prepend(Airfield.Say(r.Name) + " recovery")))
+            .Concat(f.Routes.Values.SelectMany(r => r.Pts.Select(p => Airfield.Say(p.Fix)).Prepend(Airfield.Say(r.Name) + " recovery").Concat((r.Say ?? Array.Empty<string>()).Select(Airfield.Say))))
             .Concat(f.Departures.Values.Select(r => Airfield.Say(r.Name) + " departure")).Distinct()) : "CRP South";
         return $"Request startup. Request taxi. Ready for departure runway 25. Airborne, switching to departure. Inbound, {crps}. " +
                "Initial 07, overhead, break, downwind. Final, touch and go. Request ILS approach. Runway vacated. Wilco. " +

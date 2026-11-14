@@ -887,6 +887,7 @@ Als Anlassanfrage zählen: „request startup“, „start up“, „request eng
 
 - **Freigabegrenze:** ohne Ziel der nächste eigene Platz in Abflugrichtung. Das F10-Menü **Ground → IFR clearance** listet Plätze nach Entfernung.
 - **Reiseflughöhe** nach Halbkreisregel: FL150 ostwärts, 14.000 ft westwärts. Ein Ziel näher als 40 NM bekommt eine niedrige Höhe. Nie unter Gelände plus 2000 ft.
+- **Ziel per ICAO-Code:** „request IFR clearance to Uniform Golf Sierra Bravo“ (oder „UGSB“) geht wie der Name, für Namen, die die Spracherkennung falsch versteht. Die Kaukasus-Plätze haben ihren Code eingebaut; auf anderen Karten trägst du `"icao": "ETMN"` in den Eintrag des Platzes in einer Kartendatei ein (siehe [Eigene Platzverfahren](#eigene-platzverfahren-chartsjsonc)).
 - **Feindliches Ziel:** „unable clearance to …, say alternate destination.“
 - **Readback-Prüfung:** geprüft wird nur der Squawk im Readback („squawk 4216“).
 - **Eigene Departure-Frequenz:** hat der Platz eine in `frequencies.jsonc`, sagt die Freigabe „departure frequency two seven three decimal five five“ statt „departure Kutaisi Approach“.
@@ -928,7 +929,7 @@ Als Anlassanfrage zählen: „request startup“, „start up“, „request eng
 - **Parkplatz:** dein eigener, wenn frei, sonst der nächste freie. Plätze anderer Spieler werden übersprungen. Ground gibt die Richtung einmal und erneut nur, wenn du abdriftest (oder mit „progressive“ bei jeder Halbierung der Entfernung).
 - **Nur Rampe:** Mit `"AssignParkingSpot": false` in der `config.jsonc` nennt Ground nur die Rampe aus der `charts.jsonc` („taxi to Ramp West via Alpha“), und du parkst darauf, wo du willst. Plätze ohne benannte Rampe bekommen weiter einen Parkplatz. Nur für einen einzelnen Platz: `"ramp_only": true` in seinem `ground`-Abschnitt der `charts.jsonc`.
 - **Auf deinem Platz:** „you are on your parking position, shut down at your discretion.“
-- **Wann du als geparkt giltst:** nach 30 s Stillstand auf dem Vorfeld oder wenn du auf einem Parkplatz die Triebwerke abstellst. Das beendet den Flug und schreibt das Debriefing. Hat Ground dir einen Parkplatz genannt, zählt der Stillstand nur im Umkreis von 100 m um diesen Platz.
+- **Wann du als geparkt giltst:** nach 30 s Stillstand auf dem Vorfeld oder wenn du auf einem Parkplatz die Triebwerke abstellst. Das beendet den Flug und schreibt das Debriefing. Hat Ground dir einen Parkplatz genannt, zählt der Stillstand nur im Umkreis von 100 m um diesen Platz und erst nach der Rollfreigabe. Woanders geparkt, zum Beispiel auf dem Vorfeld deiner Staffel: melde „Nellis Ground, Enfield 1-1, at parking, shutting down“, Ground antwortet „roger“, und der Flug endet dort.
 
 ### Tower: Abflug
 
@@ -2690,6 +2691,7 @@ Neben `charts.jsonc` liest DCS-ATC jede Datei im selben Ordner, deren Name mit `
 | Schlüssel | Bedeutung | Woher |
 |---|---|---|
 | Platzname | Wie in DCS; ein eindeutiger Teil genügt (`Nellis AFB`) | Verfahrens-Editor, F10-Karte |
+| `icao` | ICAO-Code, für „request IFR clearance to Echo Tango Mike November“ | Platzkarte |
 | `pattern_ft` | Platzrundenhöhe, Fuß über Meer | Platzkarte; sonst Platzhöhe plus 1000 bis 1500 ft |
 | `arrdep_max_ft` | Größte Höhe für An- und Abflug nach Sicht in der Zone („not above“) | Platzkarte |
 | `ctr_top_ft` | Obergrenze der Kontrollzone, Fuß über Meer | Platzkarte |
@@ -2737,6 +2739,7 @@ Eine Route ist eine Kette benannter Fixes, die an einem Meldepunkt endet, etwa d
 - `"rwy"`: die Bahnen, für die die Route gilt. Fragst du sie an, während eine andere Bahn in Betrieb ist, nennt Approach die passenden Bahnen.
 - `"to"`: der Meldepunkt am Ende. Er muss für jede dieser Bahnen ein `entry` sein.
 - `"pts"`: die Fixes der Reihe nach. `"above"` = in oder über, `"at"` = in dieser Höhe, `"below"` = in oder unter, jeweils in Fuß. Alles darf fehlen.
+- `"say"`: weitere Namen, mit denen du die Route anfordern kannst, für einen Namen, den die Spracherkennung nicht versteht: `"say": ["ECHO"]` lässt „request Echo recovery“ ARCOE wählen. Optional, auch für Abflugrouten.
 
 Ein Name für mehrere Bahnen: statt einer Route eine Liste von Varianten. Du fragst wie gewohnt nach „STRYK“, DCS-ATC nimmt die Variante für die Bahn in Betrieb.
 
@@ -2779,7 +2782,7 @@ Der Verfahrens-Editor ist eine Seite im Browser, die Meldepunkte und Routen für
 - **Öffnen:** Startmenü → DCS-ATC → *Verfahrens-Editor*, oder `http://localhost:18600/chart`, während DCS-ATC läuft (das Lagebild hat einen Link). Ohne laufende Mission zeigt er die Plätze der letzten Mission.
 - **Platz wählen** oben rechts. Die Karte zeigt seine Bahnen, die Meldepunkte und Routen, die er schon hat (blau, grün, orange), und die Nachbarplätze. Ziehen verschiebt die Karte, das Mausrad zoomt. Unten links stehen missweisende Peilung und Entfernung des Mauszeigers vom Platz, um einen Punkt von einer echten Karte zu setzen.
 - **Meldepunkt:** auf die Karte klicken und den Namen eintippen. In der Liste wählst du, ob er Einflug (über Initial oder Overhead) und Ausflug ist. Das gilt für alle Bahnen des Platzes.
-- **Anflugroute:** Namen der Route eintippen, die Fixes der Reihe nach anklicken, dann den Meldepunkt anklicken, an dem die Route endet. Die Höhe je Fix stellst du in der Liste ein (oder höher, genau, oder tiefer; leer = keine). Die Route gilt für jede Bahn, die den Endpunkt als Einflug hat.
+- **Anflugroute:** Namen der Route eintippen, die Fixes der Reihe nach anklicken, dann den Meldepunkt anklicken, an dem die Route endet, dann *Finish route*. Klickst du nach einem Meldepunkt weiter, geht die Route über ihn hinaus, und der Punkt wird einer ihrer Fixes. Die Höhe je Fix stellst du in der Liste ein (oder höher, genau, oder tiefer; leer = keine). Die Route gilt für jede Bahn, die den Endpunkt als Einflug hat.
 - **Abflugroute:** Namen eintippen, die Fixes der Reihe nach anklicken, dann *Finish route*.
 - Ein Klick auf einen Punkt, den es schon gibt, nimmt diesen Punkt mit Namen und Position.
 - **Ergebnis:** Im Textfeld steht der vollständige Eintrag des Platzes: was er bisher hatte (auch die eingebauten Kaukasus-Daten mit den Rollwegen) plus deine Ergänzungen. Mit *Copy* kopieren und in `charts.jsonc` innerhalb der äußeren `{ }` einfügen, anstelle des Eintrags des Platzes, falls die Datei schon einen hat. Gilt ab dem nächsten Missionsstart. Positionen stehen als DCS-Koordinaten `[x, z]` drin.

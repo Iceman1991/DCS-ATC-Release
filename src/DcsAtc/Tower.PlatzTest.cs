@@ -195,6 +195,13 @@ public partial class Tower
             bool Snd(string said, string name) => System.Text.RegularExpressions.Regex.IsMatch(Sq(said), $@"\b{Sq(Rx(name))}\b");
             Chk(Snd("inbound request arco", "ARCOE") && Snd("request strike recovery", "STRYK") &&Snd("request stryk 21 recovery", "STRYK") && Snd("inbound via mint", "MINTT") && Snd("gass peak", "GASS_PEAK") && Snd("sin city", "SIN_CITY")
                 && !Snd("request striker recovery", "STRYK") && !Snd("request straight in", "STRYK") && !Snd("request minute", "MINTT"), "Route nach Klang: strike = STRYK");
+            {   // #23 (LtJaeger): "say": other spoken names of a route ("ECHO" for ARCOE)
+                var ka = w.F.Routes.Values.First();
+                w.F.Routes["ARCOE"] = ka with { Name = "ARCOE", Say = new[] { "ECHO" } };
+                var (ae, an, unk) = (w.RouteOf("request echo recovery")?.Name, w.RouteOf("request arcoe recovery")?.Name, w.UnknownProc("request echo recovery"));
+                w.F.Routes.Remove("ARCOE");
+                Chk(ae == "ARCOE" && an == "ARCOE" && unk == null, $"Route-Zweitname (say): {ae} / {an} / {unk}");
+            }
             n++;
             n += 4;
         }

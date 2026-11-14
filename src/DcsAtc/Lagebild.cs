@@ -157,7 +157,7 @@ const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).
 const label = n => (/[a-z]/.test(n) || !/[A-Za-z]/.test(n) ? "CRP " : "") + n.replace(/_/g, " ");
 const HINT = {
   crp: "Click where the point is. A lower-case name (north) is called \"CRP north\", a name in CAPITALS (CRAIG) is called by its name.",
-  arr: "Click the fixes in order, then the reporting point where the route ends. A click on an existing point uses that point.",
+  arr: "Click the fixes in order, then the reporting point where the route ends, then \"Finish route\". Clicking on after a reporting point goes past it. A click on an existing point uses that point.",
   dep: "Click the fixes in order, then \"Finish route\". A click on an existing point uses that point." };
 const cv = $("c"), cx = cv.getContext("2d");
 let data = { fields: [] }, F = null, adds = {}, mode = "crp", range = 15, vx = 0, vz = 0, view = null, drag = null;
@@ -202,7 +202,8 @@ function render() {
   for (const [key, word] of [["routes", "recovery"], ["deps", "departure"]])
     a[key].forEach((r, i) => {
       h += `<div class="row"><span class="name">${esc(r.name)} ${word}</span>
-        ${key == "routes" ? (r.to ? "to " + esc(label(r.to)) : '<span class="bad">click the reporting point where it ends</span>') : r.open ? `<button onclick="A().deps[${i}].open=false;changed()">Finish route</button>` : ""}
+        ${key == "routes" ? (r.to ? "to " + esc(label(r.to)) : '<span class="bad">click the reporting point where it ends</span>') : ""}
+        ${r.open ? `<button onclick="A().${key}[${i}].open=false;changed()">Finish route</button>` : ""}
         <button onclick="A().${key}.splice(${i},1);changed()">&times;</button></div>` +
         r.pts.map((p, j) => `<div class="row">&nbsp; ${esc(label(p.fix))}
           ${sel(p.cross, [["above", "at or above"], ["at", "at"], ["below", "at or below"]], `A().${key}[${i}].pts[${j}].cross=this.value;changed()`)}
@@ -263,13 +264,15 @@ function click(e) {
     a.crp.push({ name, x, z, via: "initial", exit: true });
   } else {
     const list = mode == "arr" ? a.routes : a.deps;
-    let cur = list.find(r => mode == "arr" ? !r.to : r.open);
+    let cur = list.find(r => r.open);
     if (!cur) {
       const name = ask("Name of the " + (mode == "arr" ? "arrival" : "departure") + " route (MINTT)", true);
       if (!name) return;
       list.push(cur = { name, to: "", open: true, pts: [] });
     }
-    if (mode == "arr" && hit && hit.crp && cur.pts.length) { cur.to = hit.n; cur.open = false; }
+    // #33: a reporting point ends the route only for now; a further click goes past it (it becomes a fix), "Finish route" closes it
+    if (mode == "arr" && cur.to) { const t = known().find(p => p.crp && p.n == cur.to); if (t) cur.pts.push({ fix: t.n, x: t.x, z: t.z, alt: "", cross: "above" }); cur.to = ""; }
+    if (mode == "arr" && hit && hit.crp && cur.pts.length) cur.to = hit.n;
     else {
       const fix = hit ? hit.n : ask("Name of the fix (GASS_PEAK)", true);
       if (fix) cur.pts.push({ fix, x: hit ? hit.x : x, z: hit ? hit.z : z, alt: "", cross: "above" });

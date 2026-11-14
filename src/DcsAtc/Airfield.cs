@@ -58,6 +58,7 @@ public class Airfield
     public List<RwyEnd> Ends = new();
     public Dictionary<string, (double X, double Z)> Crp = new();   // Compulsory reporting points (map only)
     public Ramp[] Ramps = Array.Empty<Ramp>();
+    public string Icao = "";   // #32: chart "icao" (built in for the Caucasus), destination by ICAO code ("request IFR clearance to Echo Tango Mike November")
     public bool RampOnly;   // forum (Lt_Jaeger): chart "ground": { "ramp_only": true }: after landing Ground names only the ramp here, no stand (all airfields: config AssignParkingSpot false)
     public Rollnetz? Net;                     // DCS taxi network (Rollnetz.LoadAll, from the user's DCS installation), null = none
     public Dictionary<string, (double X, double Z, string[] Rwy)> Holds = new();   // Named holding points (map)
@@ -71,7 +72,7 @@ public class Airfield
     public HashSet<string> Backtrack = new();                                  // Runways whose holding point leads only to the middle: backtrack on the runway
     public List<string> Notes = new();                                         // Airfield notes (English) from the chart
     public Dictionary<string, string> StandChart = new();                      // DCS stand (Term_Index) -> stand name on the chart, only where unambiguous
-    public record Route(string Name, string[] Rwy, string To, (string Fix, double X, double Z, double Ft, string Cross)[] Pts);   // Cross: "at or above", "at", "at or below" (Ft 0 = none)
+    public record Route(string Name, string[] Rwy, string To, (string Fix, double X, double Z, double Ft, string Cross)[] Pts, string[]? Say = null);   // Say: other spoken names (#23: "ECHO" for ARCOE, which the speech recognition does not get)   // Cross: "at or above", "at", "at or below" (Ft 0 = none)
     public Dictionary<string, Route> Routes = new();                           // Forum (Lt_Jaeger): named arrival chains (charts.jsonc "routes"), after the last point the CRP "to" = handover to Tower
     public Dictionary<string, Route> Departures = new();                       // Forum: named departure chains (charts.jsonc "departures"), after the last fix own navigation (To unused)
     /// Chart point written in capitals ("CRAIG", "GASS_PEAK") = named fix, said by its name ("Gass Peak"); otherwise "C R P north".
@@ -298,6 +299,7 @@ public class Airfield
         if (ChartEntry() is not { } a) return this;
         static Dictionary<string, string> Strs(JsonElement e, string key) =>
             e.TryGetProperty(key, out var v) ? v.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString()!) : new();
+        if (a.TryGetProperty("icao", out var ic)) Icao = ic.GetString()!.Trim().ToUpperInvariant();
         if (a.TryGetProperty("pattern_ft", out var p)) PatternFt = p.GetDouble();
         if (a.TryGetProperty("arrdep_max_ft", out var m)) MaxFt = m.GetDouble();
         if (a.TryGetProperty("ctr_top_ft", out var ct)) ctrTopFt = ct.GetDouble();
@@ -342,7 +344,8 @@ public class Airfield
                     if (pts.Length == 0) throw new FormatException($"{Name} {key} {r.Name}: \"pts\" is empty");
                     if (!dep && rws.FirstOrDefault(rw => !(Entry.TryGetValue(rw, out var en) && en.Any(e => e.Crp == to))) is { } bad)
                         throw new FormatException($"{Name} route {r.Name}: \"to\": \"{to}\" is no entry of runway {bad}");
-                    (dep ? Departures : Routes)[vi == 0 ? r.Name : $"{r.Name}#{vi}"] = new(r.Name, rws, to, pts);
+                    var say = rv.TryGetProperty("say", out var sy) ? (sy.ValueKind == JsonValueKind.Array ? sy.EnumerateArray().Select(v => v.GetString()!).ToArray() : new[] { sy.GetString()! }) : null;
+                    (dep ? Departures : Routes)[vi == 0 ? r.Name : $"{r.Name}#{vi}"] = new(r.Name, rws, to, pts, say);
                 }
         if (a.TryGetProperty("ground", out var g) && g.TryGetProperty("holds", out var holds))
             foreach (var h in holds.EnumerateObject()) { var (x, z) = Pos(h.Value.GetProperty("pos")); Holds[h.Name] = (x, z, h.Value.GetProperty("rwy").EnumerateArray().Select(v => v.GetString()!).ToArray()); }
