@@ -80,6 +80,12 @@ Update: settings window, page General, group "Update": "Check for updates", then
 
 Open an [issue](../../issues) with time, airfield, a short description and `atc-log.txt` plus `atc-debug.txt` from `%LOCALAPPDATA%\Programs\DCS-ATC`. A short video with SRS audio helps a lot.
 
+## Community files
+
+Chart files made by other users (`charts-*.jsonc`, one per map or airfield) are in [Discussions](../../discussions/categories/community-files). Download a file, put it into `%LOCALAPPDATA%\Programs\DCS-ATC\charts` and restart DCS-ATC. The file name has to start with `charts`.
+
+If a file works for you, upvote its thread. If something is wrong, write it there. To share your own file, open a new thread and attach it. Files that hold up go into the installer, with credit in the changelog.
+
 ## Technology
 
 Two models are used while running, both locally on your PC:
