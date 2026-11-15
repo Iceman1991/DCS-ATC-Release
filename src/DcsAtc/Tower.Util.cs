@@ -319,7 +319,7 @@ public partial class Tower
 
     /// Route of the chart (charts.jsonc "routes") named in the transmission, compared by sound: doubled letters count once (Whisper hears "Mint" for MINTT),
     /// y = i and an e at the end of a word is dropped (#28 log: "request strike recovery" for the route STRYK; #23 log: "request Arco" for ARCOE).
-    static string Sq(string s) => Regex.Replace(Regex.Replace(s.Replace('y', 'i'), @"([a-z])\1+", "$1"), @"(?<=[a-z])e(?![a-z])", "");
+    static string Sq(string s) => Regex.Replace(Regex.Replace(s.Replace('y', 'i'), @"([a-z])\1+", "$1"), @"(?<=[a-z])e(?=r?(?![a-z]))", "");   // #40: "fitter" for FYTTR (-er at the end of a word = -r)
     Airfield.Route? RouteOf(string n) => Named(F.Routes, n);
     /// Route named in the transmission; several variants under one name (charts.jsonc array): the one for the runway in use first.
     Airfield.Route? Named(Dictionary<string, Airfield.Route> d, string n) =>

@@ -888,6 +888,7 @@ Als Anlassanfrage zählen: „request startup“, „start up“, „request eng
 - **Freigabegrenze:** ohne Ziel der nächste eigene Platz in Abflugrichtung. Das F10-Menü **Ground → IFR clearance** listet Plätze nach Entfernung.
 - **Reiseflughöhe** nach Halbkreisregel: FL150 ostwärts, 14.000 ft westwärts. Ein Ziel näher als 40 NM bekommt eine niedrige Höhe. Nie unter Gelände plus 2000 ft.
 - **Ziel per ICAO-Code:** „request IFR clearance to Uniform Golf Sierra Bravo“ (oder „UGSB“) geht wie der Name, für Namen, die die Spracherkennung falsch versteht. Die Kaukasus-Plätze haben ihren Code eingebaut; auf anderen Karten trägst du `"icao": "ETMN"` in den Eintrag des Platzes in einer Kartendatei ein (siehe [Eigene Platzverfahren](#eigene-platzverfahren-chartsjsonc)).
+- **Abflug aus der Kartendatei:** „request IFR clearance, Dream departure“ nimmt den Abflug in die Freigabe auf („after departure fly the Dream departure …“) und merkt ihn für die Startfreigabe, wie bei „request taxi, Dream departure“.
 - **Feindliches Ziel:** „unable clearance to …, say alternate destination.“
 - **Readback-Prüfung:** geprüft wird nur der Squawk im Readback („squawk 4216“).
 - **Eigene Departure-Frequenz:** hat der Platz eine in `frequencies.jsonc`, sagt die Freigabe „departure frequency two seven three decimal five five“ statt „departure Kutaisi Approach“.
@@ -2641,6 +2642,7 @@ Die Platzverfahren im Kaukasus (CRPs, Ein- und Ausflug je Bahn, Platzrundenhöhe
 - Meldepunkte in Kleinbuchstaben heißen CRP („report CRP north“). Schreibst du einen Punkt in Großbuchstaben (`CRAIG`, `GASS_PEAK`), sagt der Lotse stattdessen seinen Namen („report Craig“, „Gass Peak“). Der Unterstrich steht für ein Leerzeichen.
 - `"via"` ist `"overhead"` oder `"initial"`, `"hand"` ist `"left"` oder `"right"`. Alles andere, oder ein Ein- oder Ausflugpunkt, der in `"crp"` fehlt, macht die Datei fehlerhaft, und das DCS-ATC-Fenster nennt die Stelle.
 - Koordinaten wie auf der Karte gedruckt (`"42°15.924'N 042°30.086'E"`) oder als DCS-Koordinaten `[x, z]`. Kurse in Grad missweisend.
+- Weitere Dateien `charts-*.jsonc` (eine je Karte oder Autor, etwa `charts-NTTR.jsonc`) liegen im DCS-ATC-Ordner oder im Unterordner `charts`. Steht ein Platz in mehreren Dateien, gilt `charts.jsonc`, dann die übrigen im DCS-ATC-Ordner nach Namen, zuletzt die im Unterordner `charts`.
 - Gelesen wird die Datei bei jedem Missionsstart. Ist sie fehlerhaft, meldet das DCS-ATC-Fenster den Fehler, und es gelten die eingebauten Verfahren.
 - Gilt auf jeder Karte. Eingebaute Verfahren hat nur der Kaukasus, auf anderen Karten hat ein Platz nur welche, wenn er in `charts.jsonc` steht. Breite/Länge braucht dort die installierte Karte, weil DCS-ATC die Kartenprojektion aus ihren Funkfeuerdaten nimmt. DCS-Koordinaten `[x, z]` gehen immer.
 - Die Kontrollzone reicht 0,5 NM über den entferntesten CRP hinaus und bis `ctr_top_ft` (ohne CRPs: 5 NM um den Platz, bis 3000 ft darüber). Diesen Luftraum überwacht DCS-ATC auf Verstöße.
@@ -2708,6 +2710,32 @@ Neben `charts.jsonc` liest DCS-ATC jede Datei im selben Ordner, deren Name mit `
 | `ground` → `stands` | Parkplatznummer in DCS und ihr Name auf der Karte. Brauchst du nicht: DCS-ATC sagt die Parkplatznamen, die DCS selbst zeigt | – |
 
 `"crs"` in der Vorlage ist nur eine Notiz des gedruckten Kurses, DCS-ATC liest es nicht. Schlüssel, die du weglässt, behalten ihren allgemeinen Wert. Ein Platz mit Meldepunkten braucht je Bahn mindestens einen `entry` und einen `exit`.
+
+#### Rollwege hin und zurück (Vorfelder)
+
+Ground nennt nur Rollwege, die du im `ramps`-Eintrag des Platzes festlegst. DCS-ATC kennt die Namen der Rollwege in DCS nicht. Derselbe Eintrag gilt für beide Richtungen:
+
+- `to` gilt für die Rollfreigabe zur Bahn: „taxi to holding point runway zero three right via Foxtrot, Alpha“. Schreibe **jede Bahn, die du benutzt,** als eigenen Schlüssel, so benannt wie in DCS (`"03L"`, `"03R"`, `"21L"`, `"21R"`). `to` kennt kein `"*"`: eine Bahn ohne Schlüssel bekommt „taxi to holding point runway two one left“ ohne Route.
+- `in` gilt nach der Landung: „taxi to Ramp West via Alpha, Foxtrot“. `"*"` heißt jede Bahn.
+- `pts` braucht mindestens einen Punkt. Ein Vorfeld mit `"pts": []` wird ignoriert, Ground nennt dafür gar keine Rollwege.
+- Das Vorfeld wird nach Position gewählt: das mit dem Punkt am nächsten an deinem Flugzeug (Rollen zur Bahn) oder an deinem Parkplatz (Rollen zum Vorfeld).
+
+```jsonc
+"ground": {
+  "holds": {
+    "Alpha": { "pos": "36°13.892'N 115°02.410'W", "rwy": ["03L", "21R"] }
+  },
+  "ramps": {
+    "Ramp West": {
+      "pts": [[228, 524], [198, 508], [163, 574], [193, 590]],
+      "to": { "03L": "Foxtrot, Alpha", "03R": "Foxtrot, Alpha", "21L": "Foxtrot, Echo", "21R": "Foxtrot, Echo" },
+      "in": { "*": "Alpha, Foxtrot" }
+    }
+  }
+}
+```
+
+Mit benanntem Warteplatz (`"hold": { "21R": "Echo" }`) lautet die Freigabe „taxi to holding point Echo, runway two one right, via Foxtrot, Echo“.
 
 #### Anflugrouten (Recoveries)
 

@@ -896,13 +896,21 @@ static partial class Program
         Log("[ATC] Einstellungen übernommen");
     }
 
+    /// #37: buttons that went from released to pressed since the last good reading; no earlier reading (device silent at the start) = baseline only, so a latched switch never counts
+    internal static int NewPress(int? last, int now) => last is { } l ? now & ~l : 0;
+
     static string Bind(string cfg, string what, string name)
     {
         static string Set(string c, string key, int v) => Regex.Replace(c, $@"(""{key}""\s*:\s*)-?\d+",m => m.Groups[1].Value + v);
         static bool Down(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
         Console.Write(what + ": ");
         while (Enumerable.Range(8, 247).Any(Down)) Thread.Sleep(20);   // release the previous key first
-        var prev = Enumerable.Range(0, 16).Select(id => Joy(id).Buttons).ToArray();
+        var prev = new int?[16];
+        for (int i = 0; i < 15; i++)   // 300 ms settle: a device may report stale 0 buttons on its first polls; whatever is seen pressed meanwhile counts as already on
+        {
+            for (int id = 0; id < 16; id++) if (JoyState(id) is var (sb, _)) prev[id] = (prev[id] ?? 0) | sb;
+            Thread.Sleep(20);
+        }
         while (true)
         {
             foreach (var vk in Enumerable.Range(8, 247).Where(vk => vk is not (0x10 or 0x11 or 0x12) && Down(vk)))   // Shift/Ctrl/Alt left/right only
@@ -913,7 +921,8 @@ static partial class Program
             }
             for (int id = 0; id < 16; id++)
             {
-                int b = Joy(id).Buttons, now = b & ~prev[id];
+                if (JoyState(id) is not var (b, _)) continue;   // silent device: keep the last good reading
+                int now = NewPress(prev[id], b);
                 prev[id] = b;
                 if (now == 0) continue;
                 int k = System.Numerics.BitOperations.TrailingZeroCount(now) + 1;

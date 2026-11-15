@@ -158,6 +158,7 @@ sealed class Wheel : Form
             check(n <= 9 || name is "Approach" or "Carrier" or "Top", $"Funkrad {name}: {n} Einträge (max. 9)");   // R307: Approach has 12, visible at most 9 (Vis); Top 10 with JTAC (only shown with a leader)
         int b32 = 1 << 31;
         check(!Pressed(null, b32, b32) && !Pressed(b32, b32, b32) && Pressed(0, b32, b32) && !Pressed(b32, 0, b32), "#25 Funkrad: Joystick-Taste beim Start schon gedrückt öffnet nicht, erst ein neuer Druck");
+        check(Program.NewPress(null, b32) == 0 && Program.NewPress(b32, b32) == 0 && Program.NewPress(0, b32) == b32 && Program.NewPress(b32, 0) == 0 && Program.NewPress(0 | b32, b32) == 0, "#37 Tasten festlegen: beim Start schon gedrückter Joystick-Knopf (auch erst im Einschwingfenster gesehen) wird nicht übernommen, erst ein neuer Druck");
         int? lb = null;   // switch on, device silent at first, a dropout in between: no press; released and pressed again: one press
         var ed = new int?[] { null, b32, null, b32, 0, b32, b32 }.Select(r => Edge(ref lb, r, b32)).ToArray();
         check(ed.SequenceEqual(new[] { false, false, false, false, false, true, false }), "#25 Funkrad: ausgefallene Joystick-Abfrage zählt nicht als losgelassen: " + string.Join(",", ed));

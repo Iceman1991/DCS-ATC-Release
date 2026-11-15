@@ -886,6 +886,7 @@ These phrases count as a start-up request: "request startup", "start up", "reque
 - **Clearance limit:** without a destination, the clearance limit is the nearest friendly airfield in the departure direction. The F10 menu **Ground → IFR clearance** lists airfields by distance.
 - **Cruise level** follows the semicircular rule: FL150 eastbound, 14,000 ft westbound. A destination closer than 40 NM gets a low level. The level is never less than terrain plus 2,000 ft.
 - **Destination by ICAO code:** "request IFR clearance to Uniform Golf Sierra Bravo" (or "UGSB") works like the name, for names the speech recognition gets wrong. The Caucasus airfields have their codes built in; on other maps add `"icao": "ETMN"` to the airfield's entry in a chart file (see [Own airfield procedures](#own-airfield-procedures-chartsjsonc)).
+- **Departure from the chart file:** "request IFR clearance, Dream departure" puts the departure into the clearance ("after departure fly the Dream departure ...") and keeps it for the takeoff clearance, as with "request taxi, Dream departure".
 - **Enemy destination:** "unable clearance to …, say alternate destination."
 - **Readback check:** only the squawk code in your readback is checked ("squawk 4216").
 - **Own Departure frequency:** if the airfield has one in `frequencies.jsonc`, the clearance says "departure frequency two seven three decimal five five" instead of "departure Kutaisi Approach".
@@ -2639,6 +2640,7 @@ The Caucasus airfield procedures (CRPs, entry and exit per runway, pattern altit
 - Reporting points in lower case are called CRPs ("report CRP north"). Write a point in capitals (`CRAIG`, `GASS_PEAK`) and the controller says its name instead ("report Craig", "Gass Peak"). The underscore stands for a space.
 - `"via"` is `"overhead"` or `"initial"`, `"hand"` is `"left"` or `"right"`. Anything else, or an entry or exit point missing from `"crp"`, makes the file faulty, and the DCS-ATC window names the place.
 - Coordinates as printed on the chart (`"42°15.924'N 042°30.086'E"`) or as DCS coordinates `[x, z]`. Courses in degrees magnetic.
+- Further files `charts-*.jsonc` (one per map or author, e.g. `charts-NTTR.jsonc`) go in the DCS-ATC folder or its `charts` subfolder. If an airfield is in several files, `charts.jsonc` wins, then the others in the DCS-ATC folder by name, last those in the `charts` subfolder.
 - The file is read at every mission start. If it is faulty, the DCS-ATC window shows the error and the built-in procedures apply.
 - Works on every map. Only the Caucasus has procedures built in; on other maps an airfield has them only if it is in `charts.jsonc`. Latitude/longitude there needs the map installed, because DCS-ATC takes the map projection from its beacon data. DCS coordinates `[x, z]` always work.
 - The control zone reaches 0.5 NM beyond the farthest CRP and up to `ctr_top_ft` (without CRPs: 5 NM around the airfield, 3000 ft above it). This is the airspace DCS-ATC watches for deviations.
@@ -2706,6 +2708,32 @@ Besides `charts.jsonc` DCS-ATC reads every file in the same folder whose name st
 | `ground` → `stands` | Parking spot number in DCS and its name on the chart. You don't need it: DCS-ATC says the parking spot names DCS itself shows | – |
 
 `"crs"` in the template is only a note of the printed course; DCS-ATC does not read it. Keys you leave out keep their generic value. An airfield with reporting points needs at least one `entry` and one `exit` per runway.
+
+#### Taxiways on the way out and back (ramps)
+
+Ground only says taxiways that you write into the `ramps` entry of the airfield. DCS-ATC does not know the names of the taxiways in DCS. The same entry serves both directions:
+
+- `to` is used for the taxi clearance to the runway: "taxi to holding point runway zero three right via Foxtrot, Alpha". Write **every runway you use** as its own key, named as DCS names it (`"03L"`, `"03R"`, `"21L"`, `"21R"`). `to` has no `"*"`: a runway without a key gets "taxi to holding point runway two one left" with no route.
+- `in` is used after landing: "taxi to Ramp West via Alpha, Foxtrot". `"*"` means every runway.
+- `pts` needs at least one point. A ramp with `"pts": []` is ignored, and Ground says no taxiways for it at all.
+- A ramp is picked by position: the ramp with the point nearest to your aircraft (taxi out) or to your parking spot (taxi in).
+
+```jsonc
+"ground": {
+  "holds": {
+    "Alpha": { "pos": "36°13.892'N 115°02.410'W", "rwy": ["03L", "21R"] }
+  },
+  "ramps": {
+    "Ramp West": {
+      "pts": [[228, 524], [198, 508], [163, 574], [193, 590]],
+      "to": { "03L": "Foxtrot, Alpha", "03R": "Foxtrot, Alpha", "21L": "Foxtrot, Echo", "21R": "Foxtrot, Echo" },
+      "in": { "*": "Alpha, Foxtrot" }
+    }
+  }
+}
+```
+
+With a named holding point (`"hold": { "21R": "Echo" }`) the clearance reads "taxi to holding point Echo, runway two one right, via Foxtrot, Echo".
 
 #### Arrival routes (recoveries)
 

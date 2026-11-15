@@ -191,6 +191,15 @@ public partial class Tower
                 r2.Count == 1 && r2[0].Role == "Tower" && r2[0].Text.StartsWith("Enfield one one, proceed overhead") &&
                 r3.Count == 1 && r3[0].Text == "Enfield one one, roger, report Craig." && wf.navName == "Craig" && Airfield.Say("north") == "C R P north",
                 $"Route MINTT ({string.Join(",", seen)}, {w.Phase}): " + J(r1) + " / " + ho?.Text + " / " + J(r2) + " / " + J(r3) + $" ({wf.navName})");
+            {   // #36: next fix with a 90 degree turn at 450 kt: the heading to it is spoken before the current fix, not miles behind it
+                k.Routes["MINTT"] = new("MINTT", new[] { "25" }, "CRAIG", new[] { ("MINTT", P(25).X, P(25).Z, 15000.0, "at or above"), ("GASS_PEAK", P(10).X, c.Z + 15 * NM, 9000.0, "at or above") });   // 45 degree turn at MINTT
+                var wt = Fly(c.X + 40 * NM);
+                wt.OnTranscript("Kutaisi Approach, Enfield 11, inbound via mint", At(c.X + 40 * NM), none, 2);
+                double tx = c.X + 40 * NM, ts = 2, said = double.NaN;
+                for (; tx > c.X + 20 * NM && double.IsNaN(said); tx -= 450 * Kt * 5)
+                    if (wt.Tick(new(k.Elev + 1000, 1000, 450 * Kt, Math.PI, tx, c.Z, 0, 0, 760), none, ts += 5).Any(m => m.Text.Contains("Gass Peak"))) said = tx - P(25).X;
+                Chk(said > 0, $"Route #36: Kurs zum naechsten Fix vor dem Fix bei 450 kt ({said / NM:0.0} NM davor)");
+            }
             // #28 (log): Whisper writes "strike" for the route STRYK; "striker" and other words stay different
             bool Snd(string said, string name) => System.Text.RegularExpressions.Regex.IsMatch(Sq(said), $@"\b{Sq(Rx(name))}\b");
             Chk(Snd("inbound request arco", "ARCOE") && Snd("request strike recovery", "STRYK") &&Snd("request stryk 21 recovery", "STRYK") && Snd("inbound via mint", "MINTT") && Snd("gass peak", "GASS_PEAK") && Snd("sin city", "SIN_CITY")
@@ -203,7 +212,7 @@ public partial class Tower
                 Chk(ae == "ARCOE" && an == "ARCOE" && unk == null, $"Route-Zweitname (say): {ae} / {an} / {unk}");
             }
             n++;
-            n += 4;
+            n += 5;
         }
 
         // Forum: charts.jsonc departure on request ("ready for departure, Tiki departure"): takeoff clearance with the fixes and altitudes, silently from fix to fix,
@@ -249,7 +258,14 @@ public partial class Tower
                            "departure via " + k.Exit["25"][0].ToLowerInvariant(), "request ifr departure", "inbound via the initial" }.All(x => hu.UnknownProc(x) == null)
                 && new Tower("Enfield 1-1").UnknownProc("departure via dream") == null,
                 "#23 unbekannte Departure angesagt: " + J(ru));
-            n += 5;
+            // #40 (log Nellis 14:40/14:43: "request clearance, dream" / "request clearance to fitter" got the plain runway-heading clearance): the departure named in the clearance request is cleared and kept for takeoff
+            k.Departures["FYTTR"] = new("FYTTR", new[] { "25" }, "", new[] { ("ALPHA", pa.X, pa.Z, 0.0, "") });
+            var (wc, wf) = (Hold(), Hold());
+            var (rc, rf) = (wc.OnTranscript("Kutaisi Ground, Enfield 11, request clearance, tiki departure", G0(), none, 10), wf.OnTranscript("Kutaisi Ground, Enfield 11 with kilo, request clearance to fitter.", G0(), none, 10));
+            Chk(rc.Any(m => m.Text.Contains("after departure fly the Tiki departure")) && wc.depRoute?.Name == "TIKI" && rf.Any(m => m.Text.Contains("after departure fly the Fyttr departure")) && wf.depRoute?.Name == "FYTTR"
+                && Hold().OnTranscript("Kutaisi Ground, Enfield 11, request clearance, zulu departure", G0(), none, 10).Any(m => m.Text.Contains("Zulu departure is for runway zero seven")),
+                "#40 Clearance mit Departure: " + J(rc) + " / " + J(rf));
+            n += 6;
         }
 
         // Etappe 4 (K29/K33/K34/K36): taxi, holding point, vacate and return route from the data, every apron x every runway of all airfields (and via radio from the apron)

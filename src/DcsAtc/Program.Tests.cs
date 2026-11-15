@@ -379,10 +379,15 @@ static partial class Program
             File.WriteAllText(Path.Combine(dir, "charts.jsonc"), "{ \"Kutaisi\": { \"pattern_ft\": 1111 } }");
             File.WriteAllText(Path.Combine(dir, "charts-a.jsonc"), "{ \"Kutaisi\": { \"pattern_ft\": 2222 }, \"Senaki-Kolkhi\": { \"pattern_ft\": 3333, \"ground\": { \"ramp_only\": true } } }");
             File.WriteAllText(Path.Combine(dir, "charts-b.jsonc"), "{ \"Batumi\": { \"crp\": { \"x\": \"kaputt\" } } }");
+            var sub = Directory.CreateDirectory(Path.Combine(dir, "charts")).FullName;   // #41: charts\ folder: user files by the same pattern after the root ones, the shipped caucasus.jsonc is not one
+            File.WriteAllText(Path.Combine(sub, "caucasus.jsonc"), "{ \"Gudauta\": { \"pattern_ft\": 7777 } }");
+            File.WriteAllText(Path.Combine(sub, "charts-c.jsonc"), "{ \"Kutaisi\": { \"pattern_ft\": 5555 }, \"Gudauta\": { \"pattern_ft\": 4444 } }");
             Airfield.OwnChart = OwnChart(Path.Combine(dir, "charts.jsonc"));
             var (mk, ms, mb) = (Airfield.Kutaisi(), new Airfield { Name = "Senaki-Kolkhi" }.ApplyChart(), Airfield.OwnChart?.TryGetProperty("Batumi", out _));
+            var gp = Airfield.OwnChart?.TryGetProperty("Gudauta", out var gu) == true && gu.TryGetProperty("pattern_ft", out var gf) ? gf.GetInt32() : 0;
             Airfield.OwnChart = null;
             Directory.Delete(dir, true);
+            if (gp != 4444) throw new Exception($"Karten-Dateien im Ordner charts: Gudauta {gp}");
             if (mk.PatternFt != 1111 || ms.PatternFt != 3333 || !ms.RampOnly || mk.RampOnly || mb != false) throw new Exception($"Mehrere Karten-Dateien: {mk.PatternFt} {ms.PatternFt} {ms.RampOnly} {mb}");
             Console.WriteLine("OK   Mehrere Karten-Dateien (charts*.jsonc), ramp_only je Platz");
         }

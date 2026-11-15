@@ -442,9 +442,10 @@ public partial class Tower
             if (Rt is { } rt && routeAt < rt.Pts.Length && navName == CrpSay(rt.Pts[routeAt].Fix))
             {
                 var nx = routeAt + 1 < rt.Pts.Length ? (rt.Pts[routeAt + 1].X, rt.Pts[routeAt + 1].Z) : Crp[rt.To];
-                if (d < 1.5 * NM || Dist(t.X, t.Z, nx.Item1, nx.Item2) < Dist(goal.X, goal.Z, nx.Item1, nx.Item2))
+                const double FixLeadSec = 20;   // #36: reply pause + speaking the sentence + turn anticipation; lead = ground speed * this, 1.5..4 NM (250 kt 1.5, 350 kt 1.9, 450 kt 2.5 NM)
+                if (d < Math.Clamp(Gs(t) * FixLeadSec, 1.5 * NM, 4 * NM) || Dist(t.X, t.Z, nx.Item1, nx.Item2) < Dist(goal.X, goal.Z, nx.Item1, nx.Item2))
                 {
-                    (nav, navName, lastVector) = (nx, ++routeAt < rt.Pts.Length ? CrpSay(rt.Pts[routeAt].Fix) : CrpSay(rt.To), now);
+                    (nav, navName, lastVector) = (nx, ++routeAt < rt.Pts.Length ? CrpSay(rt.Pts[routeAt].Fix) : CrpSay(rt.To), now - 46);   // 46: the heading check below (45 s) fires on the next tick if the course changes by more than 30 degrees
                     if (routeAt >= rt.Pts.Length) arrRoute = null;
                     return new();
                 }

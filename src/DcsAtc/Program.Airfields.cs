@@ -46,11 +46,13 @@ static partial class Program
     /// Faulty file: message, the built-in data stay.
     /// Forum (Lt_Jaeger): besides charts.jsonc every charts*.jsonc next to it ("charts-nevada.jsonc", one file per map or author). An airfield counts from the
     /// first file that has it, charts.jsonc first, then by name; a faulty file is skipped as a whole, the others stay.
+    /// #41: the same charts*.jsonc pattern in the charts subfolder, after the ones next to charts.jsonc (the shipped caucasus.jsonc there does not match).
     internal static JsonElement? OwnChart(string path)
     {
         var all = new System.Text.Json.Nodes.JsonObject();
-        var more = Directory.Exists(Path.GetDirectoryName(path)) ? Directory.GetFiles(Path.GetDirectoryName(path)!, "charts*.jsonc") : Array.Empty<string>();
-        foreach (var f in new[] { path }.Concat(more.Where(f => !f.Equals(path, StringComparison.OrdinalIgnoreCase)).OrderBy(f => f, StringComparer.OrdinalIgnoreCase)).Where(File.Exists))
+        string[] Find(string d) => Directory.Exists(d) ? Directory.GetFiles(d, "charts*.jsonc").Where(f => !f.Equals(path, StringComparison.OrdinalIgnoreCase)).OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToArray() : Array.Empty<string>();
+        var dir = Path.GetDirectoryName(path)!;
+        foreach (var f in new[] { path }.Concat(Find(dir)).Concat(Find(Path.Combine(dir, "charts"))).Where(File.Exists))
         {
             var name = Path.GetFileName(f);
             try

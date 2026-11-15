@@ -384,8 +384,12 @@ public partial class Tower
                     if (!known && fresh) { idFf = false; popDf = df; return Say($"{hdr}, {SqId(now)}.", "Approach"); }   // R219/R128: first the code, "radar contact" and clearance after observing (tick)
                     return Say($"{hdr}, {(fresh ? $"squawk {Digits(TakeSquawk())}, " : "")}" + (known ? PopClr(t, df) : $"radar contact, {Where(t)}. {Cap(PopClr(t, df))}"), "Approach");
                 }
+                var dpq = DepOf(n);   // #40 (log Nellis: "request clearance, Dream"): charts.jsonc departure named in the clearance request is kept for the takeoff clearance
+                if (dpq != null && !dpq.Rwy.Contains(rw))
+                    return Neg($"{c}, negative, {CrpSay(dpq.Name)} departure is for runway {string.Join(" and ", dpq.Rwy.Select(RwSay))}, runway {RwSay(rw)} in use. Say request.");
+                depRoute = dpq ?? depRoute;
                 return Say($"{hdr}, {rwAck}cleared {(dest != null ? $"to {dest.Name.Replace('-', ' ')} airport" : "out of the control zone")} via radar vectors, " +
-                           $"after departure fly runway heading, climb and maintain {Alt(depFt)}, expect {Alt(cruiseFt)} ten minutes after departure, " +
+                           $"after departure {(dpq != null ? $"fly the {CrpSay(dpq.Name)} departure" : "fly runway heading")}, climb and maintain {Alt(depFt)}, expect {Alt(cruiseFt)} ten minutes after departure, " +
                            $"{(F.Own.ContainsKey("Departure") ? $"departure frequency {FreqSay(FreqOf(F, "Departure"))}" : $"departure {Contact("Approach")}")}, squawk {Digits(TakeSquawk())}.");   // own departure frequency (AirfieldFrequencies): the one in the clearance
             }
 
@@ -967,6 +971,8 @@ public partial class Tower
         return new[] { Phase is Phase.TaxiOut or Phase.TaxiIn ? "hold short" : "hold(?:ing)? short", "hold(?:ing)? position", "giv(?:e|ing) way", "line up", "contact", "vacate", "when vacated", "when ready", "expect", "squawk(?:ing)?", "qnh", "altimeter", "until established", "frequency change", "own navigation", "maintain vfr" }   // TaxiOut: "holding short runway 25" reports at the holding point, Ground's "Hold short, contact Tower" is read back only as "hold short" (R111); LA06: likewise taxiing in
                    .Any(p => After(n, p) is { } v && (v == After(l, p) || p is "qnh" or "altimeter" && v == After(l, p == "qnh" ? "altimeter" : "qnh")))   // "altimeter 1013" reads back "QNH 1013"
             || HdgSlot(n) is { } h && h == HdgSlot(l)   // the pilot states a heading only when reading back ("request heading" is a request)
+            // #38 (log Nellis: "contact Showtime three two four decimal four" -> "324, 2004, Vapor 7-1." 0.59 -> "say again"): assigned frequency, Whisper drops "decimal" or turns it into extra digits
+            || Regex.Match(l, @"\b(\d) (\d) (\d) point (\d(?: \d)*)") is { Success: true } fm && Regex.IsMatch(Regex.Replace(NoCs(n), @"\D", ""), $@"^{fm.Groups[1]}{fm.Groups[2]}{fm.Groups[3]}\d{{0,4}}{fm.Groups[4].Value.Replace(" ", "")}$")
             // Forum (Heling: "Descend to 2000 ft, Hawk 1-1" -> "say again"): the altitude he was given counts too when another transmission (traffic, heading) came in between
             || intent == "unknown" && AltSlot(n) is { } ga && (vec != null && (ga == vecFt || ga == lastAltFt) || holding && ga == holdFt)
             || intent == "unknown" && (AltSlot(n) is { } a && a == AltSlot(l) || RwySlot(n) is { } rn && rn == RwySlot(l)

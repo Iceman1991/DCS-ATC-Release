@@ -1825,6 +1825,13 @@ public partial class Tower
         Check(Rb(twRa, west, 5, "Radar service terminated, squawk VFR, frequency change approved, Enfield 1-1") == "" && !twRa.Following, "Abmeldung zurückgelesen -> still");
         twRa.last = new Msg("Approach", "Enfield one one, radar service terminated, squawk 7000, frequency change approved.");
         Check(Rb(twRa, west, 6, "Radar service terminated, squawk 7000, frequency change approved, Enfield 1-1") == "", "FI1 I4: squawk 7000 zurückgelesen -> still");
+        {   // #38 (log Nellis: "contact Showtime three two four decimal four" -> "324, 2004, Vapor 7-1." 0.59 -> "say again"): assigned frequency as Whisper writes it, another one not; #40: "switching" after the handover
+            twRa.last = new Msg("Departure", "Enfield one one, radar service terminated, contact Showtime three two four decimal four.");
+            var fq = new[] { "324, 2004, Enfield 1-1.", "324.4, Enfield 1-1", "324, 4, Enfield 1-1", "Showtime, 324 decimal 4, Enfield 1-1", "Switching, Enfield 1-1", "Switching." };
+            var fr = fq.Select(s => (s, r: Rb(twRa, west, 7, s))).Where(x => x.r != "").Select(x => $"{x.s} -> {x.r}").ToList();
+            Check(fr.Count == 0 && twRa.ReadbackOnly("324, 2004, Enfield 1-1.", west) && !twRa.ReadbackOnly("325, 2004, Enfield 1-1.", west) && !twRa.ReadbackOnly("324, 5, Enfield 1-1.", west),
+                  "#38/#40 Frequenz-Rücklesung, \"switching\" -> still: " + string.Join(" || ", fr));
+        }
         var twRv = new Tower("Enfield 1-1");   // real vector transmission ("…, downwind"): readback with "downwind" is not a pattern report
         twRv.Tick(west, none, 0);
         var vRb = HdgSlot(Normalize(twRv.OnTranscript("Kutaisi Approach, Enfield 1-1, inbound for landing", west, none, 1)[0].Text));
