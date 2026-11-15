@@ -14,6 +14,35 @@ static class Settings
     /// Ko-fi supporters, named on the "Thanks" page (only with their OK, under the name they want)
     static readonly string[] Supporters = { "Heling", "buur", "Pascali Alessandro" };
 
+    /// Bug report zip: logs, config (API key blanked), frequencies, modules, own charts*.jsonc (also in charts\), info.txt. Missing files skipped, logs read while the app writes them, at most the last 20 MB each.
+    internal static void CollectDiagnostics(string dir, Stream output)
+    {
+        using var zip = new System.IO.Compression.ZipArchive(output, System.IO.Compression.ZipArchiveMode.Create, true);
+        void Add(string rel)
+        {
+            var path = Path.Combine(dir, rel);
+            if (!File.Exists(path)) return;
+            try
+            {
+                using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                if (fs.Length > 20_000_000) fs.Seek(-20_000_000, SeekOrigin.End);
+                var entry = zip.CreateEntry(rel.Replace('\\', '/'), System.IO.Compression.CompressionLevel.Optimal);
+                using var o = entry.Open();
+                var w = new StreamWriter(o);
+                w.Write(Program.MaskKey(new StreamReader(fs).ReadToEnd(), rel == "config.jsonc" ? "" : "***"));   // key also in old logs (START line)
+                w.Flush();
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        }
+        foreach (var f in new[] { "atc-log.txt", "atc-debug.txt", "config.jsonc", "frequencies.jsonc", "modules.txt" }) Add(f);
+        foreach (var d in new[] { dir, Path.Combine(dir, "charts") })
+            if (Directory.Exists(d))
+                foreach (var f in Directory.GetFiles(d, "charts*.jsonc")) Add(Path.GetRelativePath(dir, f));
+        var info = zip.CreateEntry("info.txt").Open();
+        using var iw = new StreamWriter(info);
+        iw.Write($"DCS-ATC {Update.Own}\r\n{RuntimeInformation.OSDescription}\r\n{DateTime.Now:yyyy-MM-dd HH:mm:ss zzz}\r\n");
+    }
+
     [DllImport("kernel32.dll")] static extern bool FreeConsole();
     [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
@@ -435,6 +464,18 @@ static class Settings
         Page(L("Erweitert", "Advanced"));
         Group(L("Diagnose", "Diagnostics"));
         var dbg = Check(L("Debug-Log für Fehlerberichte (atc-debug.txt)", "Debug log for bug reports (atc-debug.txt)"), cfg.DebugLog);
+        var diag = Btn(L("Diagnose-Zip erstellen …", "Create diagnostics zip …"), false);
+        diag.Click += (_, _) =>
+        {
+            try
+            {
+                var zipPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), $"DCS-ATC-diagnostics-{DateTime.Now:yyyyMMdd-HHmm}.zip");
+                using (var fs = File.Create(zipPath)) CollectDiagnostics(Program.Root, fs);
+                Process.Start("explorer.exe", $"/select,\"{zipPath}\"");
+            }
+            catch (Exception ex) { MessageBox.Show(ex.Message, "DCS-ATC"); }
+        };
+        Row(L("Logs, Einstellungen und Charts für Fehlerberichte (ohne API-Schlüssel)", "Logs, settings and charts for bug reports (without API key)"), diag);
         Group(L("Spracherkennung *", "Speech recognition *"));
         var gpu = Check(L("Auf der Grafikkarte rechnen (Vulkan), sonst CPU", "Run on the graphics card (Vulkan), otherwise CPU"), cfg.AsrGpu);
         var apiUrl = Field(cfg.AsrApiUrl, hint: "https://…/v1/audio/transcriptions");

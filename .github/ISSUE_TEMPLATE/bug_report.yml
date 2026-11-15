@@ -1,0 +1,76 @@
+name: Bug report
+description: Something in DCS-ATC does not work as it should
+body:
+  - type: input
+    id: version
+    attributes:
+      label: DCS-ATC version
+      description: Shown in the settings window title, or in the first line of atc-log.txt.
+      placeholder: e.g. 0.23.6-alpha
+    validations:
+      required: true
+
+  - type: input
+    id: map
+    attributes:
+      label: Map
+      description: The DCS map you were flying on.
+      placeholder: e.g. Caucasus, Nevada, Syria
+    validations:
+      required: true
+
+  - type: input
+    id: aircraft
+    attributes:
+      label: Aircraft
+      description: The module you were flying, if it matters.
+      placeholder: e.g. F-16C, A-10C II
+
+  - type: dropdown
+    id: how-you-fly
+    attributes:
+      label: How you fly
+      description: Your game mode.
+      options:
+        - Single player
+        - Multiplayer, I host
+        - Multiplayer, client
+        - Dedicated server
+
+  - type: dropdown
+    id: vr
+    attributes:
+      label: VR
+      description: Are you flying in VR?
+      options:
+        - "No"
+        - "Yes"
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, and what DCS-ATC did instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-expected
+    attributes:
+      label: What you expected
+      description: What should have happened.
+
+  - type: input
+    id: when
+    attributes:
+      label: When it happened
+      description: Mission time or clock time, so the spot can be found in the log.
+      placeholder: e.g. mission time 00:42:10, or 20:15 local time
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: 'Attach the zip from the settings window button "Create diagnostics zip ...", or drag atc-log.txt and atc-debug.txt from the DCS-ATC folder into this box. The atc-debug.txt file only exists when the debug log is switched on in the settings. If you use your own procedures, attach your charts*.jsonc too.'
+    validations:
+      required: true

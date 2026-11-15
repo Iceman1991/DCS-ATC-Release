@@ -60,6 +60,8 @@ Setup installs to `%LOCALAPPDATA%\Programs\DCS-ATC` and creates these Start-menu
 | Readme | Opens the short readme. |
 | Uninstall DCS-ATC | Removes DCS-ATC, including the lines it added to `MissionScripting.lua`, `autoexec.lua` and `Export.lua`. |
 
+Optional: on the additional-tasks page, the box "Desktop icon for the settings" puts a shortcut to the settings window on the desktop (unticked by default).
+
 #### Choosing modules
 
 Setup asks which parts of DCS-ATC you want. **Full** ticks everything. With **Custom** you untick what you don't need:
@@ -2082,6 +2084,7 @@ DCS still only operates the basket or boom through its own F-menu tanker dialog.
 - DCS-ATC's tanker listens and talks on the tanker's mission frequency (the AWACS and the radio wheel name it) as well as on the default 255.5. With Easy Communication, DCS tunes your radio to the mission frequency by itself. If the tanker shares it with an airfield (e.g. 261.0 = Senaki UHF), DCS-ATC doesn't switch you to that airfield.
 - This uses `"CommsKey"` (the DCS radio menu key as a scan code, default `43`, which is `\` on US and `#` on German keyboards). With `0`, DCS-ATC doesn't press the menu. Older `config.jsonc` files don't list it; the default applies. If your menu key is a different one, add the line, e.g. `"CommsKey": 43,`.
 - The DCS radio menu must be closed when DCS-ATC presses it. Don't put your SRS PTT on the same buttons as a DCS radio PTT that opens the menu (e.g. the Hornet's COMM 1 / COMM 2 with Easy Communication): DCS-ATC's press then lands in the open menu and closes it.
+- *Ready pre-contact* is pressed until your first contact. After that a further "pre-contact" call presses nothing: when you slip off the basket DCS keeps its clearance, and F1 in the DCS menu would then be *Abort refuel* or, once DCS has closed its tanker dialog, the *Flight* menu. Just plug in again. After a full tank a new "pre-contact" sends *Intent to refuel* again; call "pre-contact" once more for *Ready pre-contact*.
 - With Easy Communication off, DCS-ATC doesn't press the menu either: send *Intent to refuel* and *Ready pre-contact* yourself with your radio's own menu key (or VAICOM).
 - **Other players** in multiplayer operate the DCS tanker menu themselves.
 
@@ -2904,6 +2907,7 @@ Pick the page on the left: General, Voices, Radio & traffic, AWACS, Frequencies,
 | **Random NOTAMs (ILS out, runway closed, bird activity)** | on/off | `RandomNotams` |
 | **Watch airspace (control zones, deviations, debriefing)** | on/off | `AirspaceWatch` |
 | **Debug log for bug reports (atc-debug.txt)** | on/off | `DebugLog` |
+| **Create diagnostics zip …** | button | writes `DCS-ATC-diagnostics-<date>-<time>.zip` to the desktop (see bug reports below) |
 | **Runway lights (at night)** | silent / with DCS controller (audible) / off. Takes effect the next time DCS-ATC starts. | `RunwayLights` |
 | **Altimeter setting** | automatic (by aircraft type) / hPa (QNH) / inHg (altimeter) | `AltimeterUnit` |
 | **Radio wheel in game (VR)** | text automatic (when DCS is in VR mode) / text always / off / wheel as a picture (test) | `WheelInGame` |
@@ -3063,6 +3067,8 @@ All logs are in `%LOCALAPPDATA%\Programs\DCS-ATC`:
 | `crash-log.txt` | Error details if DCS-ATC crashes. DCS-ATC then restarts itself, unless it crashed within its first minute. |
 
 When you report a bug, include the time, the airfield, a short description, `atc-log.txt` and `atc-debug.txt`. For a problem with vectors or the way to the runway also add `airfields.txt` from the DCS-ATC folder, the files `DcsAtc-Terrain-*.txt` from `%TEMP%` and your `charts.jsonc`: with them the flight from your log can be played again through the current version (`DcsAtc.exe --replay atc-debug.txt`, the files next to the log; it lists the controller calls of the log next to the ones the current version makes).
+
+Easier: under Advanced, Diagnostics, **Create diagnostics zip …** puts everything into one zip file on the desktop and shows it in Explorer: `atc-log.txt`, `atc-debug.txt`, `config.jsonc`, `frequencies.jsonc`, `modules.txt`, every `charts*.jsonc` (also from `charts\`) and `info.txt` with the version, Windows and the time. The API key (`AsrApiKey`) is removed from the copy; the file on disk stays unchanged. The logs contain callsigns and what was said on the radio, so check the zip before you pass it on. If a log is larger than 20 MB, only its end is included. The debug log no longer contains the API key either; older logs are cleaned at the next start. If you posted an `atc-debug.txt` while a key was set, replace that key.
 
 ### Troubleshooting
 

@@ -1,7 +1,7 @@
 ﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe und (ISCC /DSmall) dist\DCS-ATC-Update-Setup.exe
 ; Small: update setup without the big files (models, tools) for the update from the app; only over an existing installation.
 ; installer\manifest.ps1 reads the big files from the block "#ifndef Small" in [Files].
-#define AppVer "0.23.7-alpha"
+#define AppVer "0.23.8-alpha"
 #define Src ".."
 
 [Setup]
@@ -40,6 +40,8 @@ de.IconKeys=Tasten festlegen (Funkrad, Push-to-Talk)
 en.IconKeys=Set keys (radio wheel, push-to-talk)
 de.IconConfig=Einstellungen (Rufzeichen, Lautstärke, Funk)
 en.IconConfig=Settings (callsign, volume, radio)
+de.IconDesktop=DCS-ATC Einstellungen
+en.IconDesktop=DCS-ATC Settings
 de.IconCharts=Verfahrens-Editor (Meldepunkte, Routen)
 en.IconCharts=Chart editor (reporting points, routes)
 de.IconOptions=Bodenpersonal (Standard)
@@ -62,6 +64,8 @@ de.NoBase=Dieses Update-Setup enthält keine Sprachmodelle und Stimmen und brauc
 en.NoBase=This update setup has no speech models and voices and needs an existing DCS-ATC installation. Please use DCS-ATC-Setup.exe from DCS-ATC.zip.
 de.NoDcs=Saved Games\DCS wurde nicht gefunden. Bitte deinen DCS-Ordner in Saved Games wählen (enthält Config und Scripts):
 en.NoDcs=Saved Games\DCS was not found. Please select your DCS folder in Saved Games (contains Config and Scripts):
+de.TaskDesktop=Desktop-Symbol für die Einstellungen
+en.TaskDesktop=Desktop icon for the settings
 de.TaskServer=Dedicated Server (DCS_server.exe auf diesem PC): Hook und Missionsskript auch in dessen Saved-Games-Ordner, MissionScripting.lua des Servers anpassen
 en.TaskServer=Dedicated server (DCS_server.exe on this PC): hook and mission script also into its Saved Games folder, patch the server's MissionScripting.lua
 de.ServerSaved=Saved-Games-Ordner des Dedicated Servers (z. B. DCS.server, DCS.dcs_serverrelease oder der Name nach -w):
@@ -145,6 +149,7 @@ Source: "{#Src}\mod\Scripts\DcsAtc\DcsAtcOptions.lua"; DestDir: "{code:ServerSav
 
 [Tasks]
 Name: "server"; Description: "{cm:TaskServer}"; Flags: unchecked
+Name: "desktopicon"; Description: "{cm:TaskDesktop}"; Flags: unchecked
 
 [Registry]
 ; Location of Saved Games\DCS for the app (language switch), reinstall and uninstall
@@ -158,6 +163,7 @@ Name: "{group}\{cm:IconStart}"; Filename: "{app}\DcsAtc.exe"; WorkingDir: "{app}
 Name: "{group}\{cm:IconKeys}"; Filename: "{app}\DcsAtc.exe"; Parameters: "--keys"; WorkingDir: "{app}"
 Name: "{group}\{cm:IconConfig}"; Filename: "{app}\DcsAtc.exe"; Parameters: "--settings"; WorkingDir: "{app}"
 Name: "{group}\{cm:IconCharts}"; Filename: "{app}\DcsAtc.exe"; Parameters: "--charts"; WorkingDir: "{app}"
+Name: "{autodesktop}\{cm:IconDesktop}"; Filename: "{app}\DcsAtc.exe"; Parameters: "--settings"; WorkingDir: "{app}"; Tasks: desktopicon
 Name: "{group}\{cm:IconOptions}"; Filename: "notepad.exe"; Parameters: """{code:SavedGames}\Scripts\DcsAtc\DcsAtcOptions.lua"""
 Name: "{group}\{cm:IconRepair}"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\DcsAtc-Patch.ps1"" -Pause"
 Name: "{group}\{cm:IconReadme}"; Filename: "{app}\LIESMICH.txt"; Languages: de

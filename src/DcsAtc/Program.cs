@@ -135,7 +135,7 @@ class AtisInfo { public char Letter = 'A'; public string Key = "", Text = "", Mp
 static partial class Program
 {
     const double NM = 1852;
-    static readonly string Root = FindRoot();
+    internal static readonly string Root = FindRoot();
     static readonly string Ffmpeg = File.Exists(Path.Combine(Root, "tools", "ffmpeg", "ffmpeg.exe")) ? Path.Combine(Root, "tools", "ffmpeg", "ffmpeg.exe") : "ffmpeg";   // bundled, otherwise PATH
     internal static Config Cfg = new();
     static List<Airfield> Fields = new();
@@ -193,9 +193,10 @@ static partial class Program
         if (args.Length == 2 && args[0] == "--replay") return ReplayCli(args[1]);   // a reporter's atc-debug.txt through this build
         if (args.Length >= 1 && args[0] == "--mptest") { LoadFields(); LoadTerrain(); return MpTest(args[1..]); }   // multiple players + AI via the app logic
 
+        ScrubKey(TracePath, Cfg.AsrApiKey); ScrubKey(Path.ChangeExtension(TracePath, ".old.txt"), Cfg.AsrApiKey);   // older logs: key from before it was masked
         TraceOn = Cfg.DebugLog;   // live from here: debug log (tests above without file)
         Dedicated = DedicatedNow();
-        Trace("START", $"{DateTime.Now:yyyy-MM-dd} DCS-ATC {System.Windows.Forms.Application.ProductVersion} {string.Join(" ", args)} | {JsonSerializer.Serialize(Cfg)}");
+        Trace("START", $"{DateTime.Now:yyyy-MM-dd} DCS-ATC {System.Windows.Forms.Application.ProductVersion} {string.Join(" ", args)} | {MaskKey(JsonSerializer.Serialize(Cfg), "***")}");
         bool auto = args.Contains("--auto");   // started by the DCS hook at mission start
         using var single = new Mutex(true, "DcsAtc", out bool first);
         if (!first && !args.Contains("--say") && !args.Contains("--srs-test"))
@@ -398,6 +399,15 @@ static partial class Program
                 File.AppendAllText(TracePath, $"{Clock:HH:mm:ss.fff} [{kat}] {text}\r\n");
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+    }
+    /// Non-empty "AsrApiKey" value in serialized config text -> to ("" in the zip's config.jsonc, "***" in logs); empty stays empty (shows whether a key is set)
+    internal static string MaskKey(string text, string to) => Regex.Replace(text, "(\"AsrApiKey\"\\s*:\\s*)\"(?:[^\"\\\\]|\\\\.)+\"", m => m.Groups[1].Value + "\"" + to + "\"");
+    /// Remove the key from a log file in place (only written if it occurs); never throws
+    internal static void ScrubKey(string file, string key)
+    {
+        if (key == "") return;
+        try { var t = File.ReadAllText(file); if (t.Contains(key)) File.WriteAllText(file, t.Replace(key, "***")); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
     }
     static string Fq(IEnumerable<double>? f) => f == null ? "?" : string.Join("/", f.Select(x => x.ToString("0.0##", CultureInfo.InvariantCulture)));
 

@@ -62,6 +62,8 @@ Setup installiert nach `%LOCALAPPDATA%\Programs\DCS-ATC` und legt diese Startmen
 | Liesmich | Öffnet die kurze Liesmich-Datei. |
 | DCS-ATC deinstallieren | Entfernt DCS-ATC, auch die Zeilen, die es in `MissionScripting.lua`, `autoexec.lua` und `Export.lua` eingefügt hat. |
 
+Optional: Auf der Seite mit den Zusatzaufgaben legt das Kästchen „Desktop-Symbol für die Einstellungen“ eine Verknüpfung zum Einstellungsfenster auf den Desktop (standardmäßig nicht angehakt).
+
 #### Module wählen
 
 Setup fragt, welche Teile von DCS-ATC du willst. **Vollständig** hakt alles an, bei **Benutzerdefiniert** nimmst du raus, was du nicht brauchst:
@@ -2084,6 +2086,7 @@ DCS bedient Korb bzw. Boom aber nur über seinen eigenen Tankerdialog im F-Menü
 - Der DCS-ATC-Tanker hört und spricht auf der Missionsfrequenz des Tankers (AWACS und Funkrad nennen sie) und auf dem Standard 255.5. Mit Easy Communication rastet DCS dein Funkgerät selbst auf die Missionsfrequenz. Teilt sie sich der Tanker mit einem Platz (etwa 261.0 = Senaki UHF), wechselt DCS-ATC deshalb nicht den Platz.
 - Das nutzt `"CommsKey"` (DCS-Funkmenü-Taste als Scancode, Standard `43`, also `\` auf US- und `#` auf deutschen Tastaturen). Mit `0` drückt DCS-ATC das Menü nicht. Ältere `config.jsonc` enthalten die Zeile nicht, dann gilt der Standard. Ist deine Menütaste eine andere, die Zeile ergänzen, z. B. `"CommsKey": 43,`.
 - Das DCS-Funkmenü muss zu sein, wenn DCS-ATC drückt. Leg die SRS-PTT nicht auf dieselben Knöpfe wie eine DCS-Funk-PTT, die das Menü öffnet (z. B. COMM 1 / COMM 2 der Hornet mit Easy Communication): Der Druck von DCS-ATC landet sonst im offenen Menü und schließt es.
+- *Ready pre-contact* wird bis zu deinem ersten Kontakt gedrückt. Danach drückt ein weiteres „pre-contact“ nichts mehr: Rutschst du vom Korb, behält DCS seine Freigabe, und F1 im DCS-Menü wäre dann *Abort refuel* oder, wenn DCS seinen Tankerdialog geschlossen hat, das *Flight*-Menü. Einfach wieder andocken. Nach vollem Tank sendet ein neues „pre-contact“ wieder *Intent to refuel*; für *Ready pre-contact* noch einmal „pre-contact“ melden.
 - Mit Easy Communication aus drückt DCS-ATC das Menü auch nicht: *Intent to refuel* und *Ready pre-contact* sendest du dann selbst mit der Menütaste deines Funkgeräts (oder VAICOM).
 - **Andere Spieler** im Multiplayer bedienen das DCS-Tankermenü selbst.
 
@@ -2907,6 +2910,7 @@ Links wählst du die Seite: Allgemein, Stimmen, Funk & Verkehr, AWACS, Frequenze
 | **Zufällige NOTAMs (ILS aus, Bahn gesperrt, Vogelschlag)** | an/aus | `RandomNotams` |
 | **Luftraum überwachen (Kontrollzonen, Verstöße, Debriefing)** | an/aus | `AirspaceWatch` |
 | **Debug-Log für Fehlerberichte (atc-debug.txt)** | an/aus | `DebugLog` |
+| **Diagnose-Zip erstellen …** | Knopf | legt `DCS-ATC-diagnostics-<Datum>-<Uhrzeit>.zip` auf den Desktop (siehe Fehlerbericht unten) |
 | **Bahnbefeuerung (nachts)** | stumm / mit DCS-Lotse (hörbar) / aus. Gilt ab dem nächsten Start. | `RunwayLights` |
 | **Höhenmesser-Einstellung** | automatisch (nach Flugzeugtyp) / hPa (QNH) / inHg (altimeter) | `AltimeterUnit` |
 | **Funkrad im Spiel (VR)** | Text automatisch (wenn DCS im VR-Modus) / Text immer / aus / Rad als Bild (Test) | `WheelInGame` |
@@ -3066,6 +3070,8 @@ Alle Logs liegen in `%LOCALAPPDATA%\Programs\DCS-ATC`:
 | `crash-log.txt` | Fehlerdetails bei einem Absturz von DCS-ATC. DCS-ATC startet sich dann neu, außer es ist in seiner ersten Minute abgestürzt. |
 
 Für einen Fehlerbericht: Uhrzeit, Platz, kurze Beschreibung, `atc-log.txt` und `atc-debug.txt`. Bei einem Problem mit Vektoren oder dem Weg zur Bahn dazu `airfields.txt` aus dem DCS-ATC-Ordner, die Dateien `DcsAtc-Terrain-*.txt` aus `%TEMP%` und deine `charts.jsonc`: damit lässt sich der Flug aus deinem Log durch die aktuelle Version noch einmal abspielen (`DcsAtc.exe --replay atc-debug.txt`, die Dateien neben dem Log; listet die Lotsensprüche des Logs neben denen der aktuellen Version).
+
+Einfacher: Unter Erweitert, Diagnose, packt **Diagnose-Zip erstellen …** alles in eine Zip-Datei auf dem Desktop und zeigt sie im Explorer: `atc-log.txt`, `atc-debug.txt`, `config.jsonc`, `frequencies.jsonc`, `modules.txt`, alle `charts*.jsonc` (auch aus `charts\`) und `info.txt` mit Version, Windows und Uhrzeit. Der API-Schlüssel (`AsrApiKey`) fehlt in der Kopie, die Datei auf der Platte bleibt unverändert. Die Logs enthalten Rufzeichen und das, was auf dem Funk gesagt wurde; prüfe die Zip, bevor du sie weitergibst. Ist ein Log größer als 20 MB, steht nur sein Ende darin. Auch das Debug-Log enthält den API-Schlüssel nicht mehr; ältere Logs werden beim nächsten Start bereinigt. Wer einen `atc-debug.txt` gepostet hat, während ein Schlüssel eingetragen war, sollte diesen Schlüssel ersetzen.
 
 ### Fehlersuche
 

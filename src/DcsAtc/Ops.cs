@@ -66,6 +66,10 @@ partial class Ops
     double contactAt, offload;                // offload: amount received until departure in lb ("total offload")
     public (string Step, string Group)? Menu;  // due DCS radio menu action: "intent" / "precontact"
     public bool DcsIntent;                    // Mission has pressed "Intent to refuel" (M reply); otherwise no direct F1 "Ready pre-contact" (would hit an open DCS-ATC dialog)
+    // Forum (jojojung, Hornet): a contact since "Intent to refuel" = DCS has cleared contact. F1 in its tanker dialog is then "Abort refuel", after the dialog's end
+    // F1 is the main menu's "Flight": a further "pre contact" call (after a slip off the basket) presses nothing. ponytail: after a slip DCS keeps the clearance
+    // ("return pre-contact"); if it ends the dialog there instead, the menu has to be redone by hand until the script asks DCS for the dialog state (DcsAtcWing.lua)
+    bool dcsCleared;
     public Airfield? Divert;                  // A15: MAYDAY/PAN at the AWACS -> Program selects this airfield and gives the call to its Approach
     // AWACS: memory per unit (Id), a group counts as reported if one of its units is reported (lead kill, regrouping)
     readonly Dictionary<int, double> mergeTold = new();
@@ -1184,6 +1188,7 @@ partial class Ops
             if (tp != null && Along(tp, tk.A) > 0.5 * NM)   // TP5 (ATP-56(C)): join only from astern
                 return T($"{c}, {tk.Name}, negative, rejoin from astern, {Clock(tp, tk)}, report visual.");
             Menu = ("intent", tk.A.Group);   // TP6: DCS "Intent to refuel" only now, not with the request
+            dcsCleared = false;
             if (!l.Contains(this)) l.Add(this);
             Arrive(l);
             tank = 2; disc = false;
@@ -1198,7 +1203,8 @@ partial class Ops
             if (!l.Contains(this)) l.Add(this);   // refuel without a new request: line up at the back
             Arrive(l);
             if (Pos(l) > 1) { tank = 2; return T($"{c}, {tk.Name}, negative, hold left observation, number {Pos(l)}."); }
-            Menu = (tank < 1 || !DcsIntent ? "intent" : "precontact", tk.A.Group);
+            if (tank < 1 || !DcsIntent) { Menu = ("intent", tk.A.Group); dcsCleared = false; }
+            else if (!dcsCleared) Menu = ("precontact", tk.A.Group);
             tank = 3; disc = false;
             return T($"{c}, cleared contact, {(Boom(tk.A) ? "boom" : "basket")} ready.");
         }
@@ -1452,6 +1458,7 @@ partial class Ops
         var name = tkr?.Name ?? "Tanker";
         if (start)
         {
+            dcsCleared = true;
             if (tank == 4) return new();
             if (tank != 3)   // #19 reporting duty: contact only after "pre-contact" -> "cleared contact" (ATP-56(C)); at most every 30 s (DCS reports every hookup)
             {
@@ -1483,6 +1490,7 @@ partial class Ops
             return new() { new("Tanker", name, $"{Cs(me)}, {name}, disconnect, return to pre-contact.") };
         }
         tank = 2; disc = true; broken = false;
+        DcsIntent = dcsCleared = false;   // full: DCS ends its dialog ("refueling complete"), more fuel needs "Intent to refuel" again
         OffLine();
         var next = line.GetValueOrDefault(tkr?.A.Group ?? "")?.FirstOrDefault(o => o.tank >= 2);
         var done = new Call("Tanker", name, $"{Cs(me)}, {name}, disconnect{(lb > 0 ? $", you received {lb / 1000:0.0}" : "")}, move to the right wing.{(next == null ? " Report complete, or pre-contact for more." : "")}");   // R288: "complete" first (Enter suggestion: first option), full is full
@@ -1949,6 +1957,18 @@ partial class Ops
         check(dj.Count == 1 && dj[0].Text.Contains("report visual") && dm == null && dv.Count == 1 && dv[0].Text.Contains("cleared to join") && dv2?.Step == "intent"
               && dq0.Count == 1 && dq0[0].Text.Contains("cleared contact") && dq?.Step == "intent" && dp.Count == 1 && od.Menu?.Step == "precontact" && dk.FirstOrDefault()?.Text == "Contact.",
               $"Tanker R304: Lotse spricht, Menü {dm} -> {dv2} -> {dq} -> {od.Menu} | {string.Join(" | ", dj.Concat(dv).Concat(dq0).Concat(dp).Concat(dk).Select(x => x.Text))}");
+        {   // forum (jojojung): after a slip off the basket "pre contact" presses nothing in DCS (F1 would be "Abort refuel" or "Flight"), after a full tank "Intent to refuel" again
+            od.Menu = null;
+            var slipDc = od.OnRefuel(me, false, 0.5, air, 10);
+            od.OnTranscript("Tanker", "Texaco, pre contact", meN, air, f, 12);
+            var afterSlip = od.Menu;
+            od.OnRefuel(me, true, 0.5, air, 20);
+            od.OnRefuel(me, false, 0.99, air, 60);
+            od.OnTranscript("Tanker", "Texaco, pre contact", meN, air, f, 62);
+            check(slipDc.FirstOrDefault()?.Text.Contains("return to pre-contact") == true && afterSlip == null && od.Menu?.Step == "intent" && !od.DcsIntent,
+                  $"Tanker DCS-Menü nach Kontakt: Abrutschen {slipDc.FirstOrDefault()?.Text} -> Menü {afterSlip}, voll -> Menü {od.Menu}, DcsIntent {od.DcsIntent}");
+            od.Menu = null;
+        }
         line.Clear();
         {   // TP1/TP2/TP5/TP3: queries without state change or menu, second request without restart, join only from astern, "judy" ends the vectors
             var oq = new Ops();
