@@ -321,7 +321,7 @@ static partial class Program
         if (e.Length < 2) return;
         if (e[0] == "WING")   // DcsAtcHook.lua: wingman command performed ("ok") or why not
         {
-            if (e.Length > 2 && e[2] == "MENU") { menuOpen = e[1] == "open" ? true : e[1] == "closed" ? false : null; menuReply.Set(); return; }   // answer to MenuOpen(), not a wingman result
+            if (e.Length > 2 && e[2] == "MENU") { menuState = ParseMenuState(e[1]); menuReply.Set(); return; }   // answer to MenuOpen(), not a wingman result
             if (e[1] == "ok") return;
             Log($"[DCS] Wingman-Befehl nicht gesendet: {e[1]} ({string.Join(";", e.Skip(2))})");
             lock (TowerLock) SayQueue.Add(new Tx(L($"Wingman: Befehl nicht gesendet ({e[1]}). Nimm das DCS-Funkmenü.", $"Wingman: command not sent ({e[1]}). Use the DCS radio menu."), "Info", "", Host()?.Gid ?? 0));
@@ -499,10 +499,7 @@ static partial class Program
             {
                 var calls = p.Ops.OnTranscript(opsRole, text, MeOf(p) with { Freq = src == "SRS" ? p.CalledOn : 0 }, TrafficFor(p), Fields, Now(), conf < MinConf, Cfg.Frequencies.GetValueOrDefault("AWACS", 251.5), FieldWxOf);
                 if (p.Ops.Menu is { } mn && Cfg.CommsKey != 0 && MissionData && p == Host())   // basket/boom only via the DCS menu: "Intent to refuel" (mission looks it up in the list) or "Ready pre-contact"
-                {
-                    if (mn.Step == "precontact") { Log("[DCS] Funkmenü tanker Ready pre-contact"); PressMenu((ushort)Cfg.CommsKey, 0x3B); p.TankMenuAt = Now(); }
-                    else AiCmd($"MENU;{p.Unit};tanker;{mn.Group};s");   // R304: s = DCS tanker stays mute, our controller speaks (without s: audible 15 s like the airfields); mission refuses without Easy Communication (issue #5)
-                }
+                    TankerMenu(p, mn.Step, mn.Group);
                 p.Ops.Menu = null;
                 foreach (var cm in p.Ops.Cmds.ToList()) AiCmd(cm);   // J4/J6: MARK / LASE / LASEOFF
                 p.Ops.Cmds.Clear();
@@ -768,20 +765,44 @@ static partial class Program
     static readonly string WingFile =Path.Combine(Path.GetTempPath(), "DcsAtc-Wing.txt");   // DcsAtcHook.lua performs the radio menu item, reply as event "WING;result;par;msg"
 
     static readonly ManualResetEventSlim menuReply = new(false);
-    static bool? menuOpen;   // written before menuReply.Set()
+    /// Open: radio menu shown; Dialog: DCS shows one of its own dialogs instead of the main menu; Stage: fsm state of its tanker dialog ("-" none). null = unknown (old script, no answer).
+    internal record MenuState(bool? Open, bool? Dialog, string? Stage);
+    static readonly MenuState MenuUnknown = new(null, null, null);
+    static MenuState menuState = MenuUnknown;   // written before menuReply.Set()
     static readonly object menuKeysLock = new();
 
-    /// Is the DCS radio menu shown? "MENU;state" to DcsAtcWing.lua (read only). null = no answer / no radio menu (script missing, older mod files, DCS busy).
-    /// Waits for the event file that PollMenu delivers: never call while holding TowerLock.
-    static bool? MenuOpen()
+    /// Reply of DcsAtcWing.lua: "open|closed [main|dialog stage]", the old script sends the first word only, "no radio menu" = unknown.
+    internal static MenuState ParseMenuState(string r)
     {
-        menuReply.Reset(); menuOpen = null;
-        try { File.WriteAllText(WingFile + ".tmp", "MENU;state"); File.Move(WingFile + ".tmp", WingFile, true); }
-        catch (IOException) { return null; }
-        return menuReply.Wait(1000) ? menuOpen : null;
+        var w = r.Split(' ', 3);
+        bool? open = w[0] == "open" ? true : w[0] == "closed" ? false : null;
+        return open == null ? MenuUnknown : w.Length < 3 ? new(open, null, null) : new(open, w[1] == "dialog" ? true : w[1] == "main" ? false : null, w[2]);
     }
 
-    /// DCS radio menu sequence (starts with CommsKey, a toggle): closes a menu left open first; if a key got lost and the menu stays open, closes it and tries once more.
+    /// What to press for a tanker step ("join", "intent", "precontact", "cleared") given the stage of the DCS tanker dialog: "intent" / "precontact" / "none".
+    /// Forum (jojojung): F1/F2 in the dialog's stages are Ready pre-contact / Abort refuel, so a wrong guess aborts the refueling. null = unknown: the app's own guess (Ops.Menu).
+    internal static string TankerAction(string step, string? stage) => stage switch
+    {
+        null => step is "precontact" ? "precontact" : step is "cleared" ? "none" : "intent",
+        "-" or "Closed" => "intent",
+        "Pre-contact" or "Trail" => step == "join" ? "none" : "precontact",
+        _ => "none",
+    };
+
+    /// State of the DCS radio menu: "MENU;state" to DcsAtcWing.lua (read only). Unknown without answer (script missing, older mod files, DCS busy).
+    /// Waits for the event file that PollMenu delivers: never call while holding TowerLock.
+    static MenuState MenuNow()
+    {
+        lock (menuKeysLock)   // one question at a time (PressMenu holds the lock, Monitor is reentrant)
+        {
+            menuReply.Reset(); menuState = MenuUnknown;
+            try { File.WriteAllText(WingFile + ".tmp", "MENU;state"); File.Move(WingFile + ".tmp", WingFile, true); }
+            catch (IOException) { return MenuUnknown; }
+            return menuReply.Wait(1000) ? menuState : MenuUnknown;
+        }
+    }
+
+    /// DCS radio menu sequence (starts with CommsKey, a toggle): closes a menu left open first; if a key got lost and the main menu stays open, closes it and tries once more.
     static void PressMenu(params ushort[] keys) => new Thread(() =>
     {
         lock (menuKeysLock)
@@ -789,15 +810,43 @@ static partial class Program
             var close = (ushort)Cfg.CommsKey;
             for (int round = 0; round < 2; round++)
             {
-                if (MenuOpen() == true) Wheel.PressDcsSync(close);
+                if (MenuNow().Open == true) Wheel.PressDcsSync(close);
                 Wheel.PressDcsSync(keys);
                 Thread.Sleep(700);
-                if (MenuOpen() != true) return;
+                var st = MenuNow();
+                if (st.Open != true) return;
+                if (st.Dialog != false) { Trace("DCS", $"Funkmenü offen, DCS zeigt einen eigenen Dialog oder Zustand unbekannt (Stufe {st.Stage ?? "?"}), Tasten nicht erneut"); return; }   // Forum (jojojung): pressing again there is Ready pre-contact / Abort refuel
                 Wheel.PressDcsSync(close);
                 if (round == 0) Log("[DCS] Funkmenü blieb offen, Tasten erneut");
             }
         }
     }) { IsBackground = true }.Start();
+
+    /// Tanker step of the radio call: asks DCS for the stage of its tanker dialog (waits, so on its own thread) and presses only what fits it.
+    static void TankerMenu(Pilot p, string step, string group)
+    {
+        var unit = p.Unit;
+        new Thread(() =>
+        {
+            void Ready() { Log("[DCS] Funkmenü tanker Ready pre-contact"); PressMenu((ushort)Cfg.CommsKey, 0x3B); lock (TowerLock) p.TankMenuAt = Now(); }
+            var stage = MenuNow().Stage;
+            var act = TankerAction(step, stage);
+            if (act == "precontact") Ready();
+            else if (act == "none") Trace("DCS", $"Funkmenü tanker nichts gedrückt (Schritt {step}), DCS-Stufe {stage ?? "?"}");
+            else
+            {
+                AiCmd($"MENU;{unit};tanker;{group};s");   // R304: s = DCS tanker stays mute, our controller speaks (without s: audible 15 s like the airfields); mission refuses without Easy Communication (issue #5)
+                if (step == "join") return;
+                for (int i = 0; i < 10; i++)   // our tanker has already cleared the contact: DCS still wants Ready pre-contact once its tanker has answered
+                {
+                    Thread.Sleep(1500);
+                    var s = MenuNow().Stage;
+                    if (s is "Pre-contact" or "Trail") { Ready(); return; }
+                    if (s is not ("-" or "Closed")) return;
+                }
+            }
+        }) { IsBackground = true }.Start();
+    }
 
     /// K2/K4: airfield frequency on which p hears the controller: tuned (SRS, most recently called first), otherwise the called (SRS state may be older than the call), otherwise VHF (= map), otherwise UHF. 0 = without Radio.lua.
     /// any: any controller frequency of the airfield (Tower.HeardOn, own per controller from AirfieldFrequencies), otherwise that of the tower.

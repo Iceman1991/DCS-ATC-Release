@@ -235,7 +235,7 @@ static partial class Program
     // ------------------------------------------------------------ Speech output (Piper -> ffmpeg -> SRS)
     /// One transmitter per frequency: different controllers speak simultaneously, on one frequency one after another –
     /// LK16: by rank (RankOf): emergency/defending before flights' combat brevity before AWACS threat before commit/answers before picture before AI chatter, within the same rank in order.
-    record Item(string Mp3, string Name, Action Show, DateTime At, double Freq2, int Prio, double Sec, double MaxAge, int Side = 0, int Rank = 3, Func<double>? Redo = null);   // Rank: order on the frequency (LK16, RankOf)
+    record Item(string Mp3, string Name, Action Show, DateTime At, double Freq2, int Prio, double Sec, double MaxAge, int Side = 0, int Rank = 3, Func<double>? Redo = null, string? Mod = null);   // Mod: modulation of the mission leader (JTAC on FM), null = Cfg.Modulation; Rank: order on the frequency (LK16, RankOf)
     sealed class Chan { public readonly List<Item> Q = new(); public DateTime FreeAt; }
     static bool Lso(Item it) => it.Prio == 0 && it.Name == "Paddles";   // LSO call to a player (A19), not AI radio
     /// LD3: after fox/defending (AI brevity rank 1 or player) 5 s urgent only (rank ≤ 2) – picture, answers and chatter wait. ponytail: global, not per frequency
@@ -244,7 +244,7 @@ static partial class Program
     static readonly ConcurrentDictionary<double, Chan> Channels = new();
 
     /// show: text in the game only when transmitting, so text and sound match. maxAge: after that text only (backlog).
-    static void Play(string mp3, double freq, string name, Action show, double freq2 = 0, int prio = 1, double sec = 0, double maxAge = 45, int side = 0, int rank = 3, Func<double>? redo = null)
+    static void Play(string mp3, double freq, string name, Action show, double freq2 = 0, int prio = 1, double sec = 0, double maxAge = 45, int side = 0, int rank = 3, Func<double>? redo = null, string? mod = null)
     {
         var ch = Channels.GetOrAdd(freq, f =>
         {
@@ -264,14 +264,14 @@ static partial class Program
                     bool fresh = (Clock - it.At).TotalSeconds <= it.MaxAge;
                     if (fresh || !Lso(it)) it.Show();   // A19: outdated LSO call not even as text
                     Trace("SENDEN", FormattableString.Invariant($"{Path.GetFileName(it.Mp3)} {it.Name} {f:0.0##} prio {it.Prio} nach {(Clock - it.At).TotalSeconds:0.0} s in der Warteschlange, {it.Sec:0.0} s") + (fresh ? "" : $" -> verworfen, älter als {it.MaxAge:0} s" + (Lso(it) ? "" : " (nur Text)")));
-                    if (fresh) { Transmit(it.Mp3, f, it.Name, it.Freq2, it.Side); lastEnd = Clock; if (it.Rank == 1) HotUntil = Clock.AddSeconds(5); }
+                    if (fresh) { Transmit(it.Mp3, f, it.Name, it.Freq2, it.Side, it.Mod); lastEnd = Clock; if (it.Rank == 1) HotUntil = Clock.AddSeconds(5); }
                     lock (c) c.FreeAt = Clock;
                     try { File.Delete(it.Mp3); } catch (IOException) { }
                 }
             }) { IsBackground = true }.Start();
             return c;
         });
-        lock (ch) { ch.Q.Add(new Item(mp3, name, show, Clock, freq2, prio, sec, maxAge, side, rank, redo)); Monitor.Pulse(ch); }
+        lock (ch) { ch.Q.Add(new Item(mp3, name, show, Clock, freq2, prio, sec, maxAge, side, rank, redo, mod)); Monitor.Pulse(ch); }
     }
 
     /// Seconds still to be transmitted on the frequency before a normal reply: waiting calls (prio ≤ 1) with pauses.
@@ -365,7 +365,9 @@ static partial class Program
             double freq = FreqOf(tx);
             var label = info ? "" : tx.Pilot || freq < 0 ? $"{tx.Station}: " : $"{tx.Station} ({freq:0.0}): ";
             if (!info && !tx.Pilot && tx.Gid > 0) label = ">>> " + label;   // to me (own group): DCS text knows no colors
-            if (!tx.Pilot) Log(info ? $"[INF] {tx.Text}" : $"[{tx.Role[..3].ToUpperInvariant()}] {tx.Station}: {tx.Text}");
+            var mod = tx.Role is "JTAC" or "FACA" && freq > 0 ? Ops.ModOn(freq) : null;   // JTAC on its own mission frequency: its modulation (FM) instead of Cfg.Modulation
+            var fm = mod != null && !mod.Equals(Cfg.Modulation, StringComparison.OrdinalIgnoreCase) ? " " + mod : "";
+            if (!tx.Pilot) Log(info ? $"[INF] {tx.Text}" : $"[{tx.Role[..3].ToUpperInvariant()}] {tx.Station}{(freq > 0 ? $" ({freq:0.0}{fm})" : "")}: {tx.Text}");
             double freq2 = tx.Freqs is { Length: > 1 } f2 ? f2[1] : 0;
             var text = tx.Text;   // LD4: may change until sending (live)
             void Show()   // Text for the mission (*.out in the game, to the player's group; Gid -1 = speech only)
@@ -392,9 +394,9 @@ static partial class Program
             var sw = Stopwatch.StartNew();
             sec = Synth(tx.Text, voice, mp3, tx.Pilot, tx.Stress, PaceOf(tx));
             Trace("TTS", FormattableString.Invariant($"{Path.GetFileName(mp3)} {tx.Role} {tx.Station} {freq:0.0##}{(freq2 > 0 ? $"/{freq2:0.0##}" : "")} gid {tx.Gid} prio {PrioOf(tx)} Seite {tx.Side} Stimme {voice} Tempo {(tx.Pilot ? 1.0 : Cfg.SpeechRate) * (tx.Stress ? 0.85 : 1) * PaceOf(tx):0.00} {sec:0.0} s, Synth {sw.ElapsedMilliseconds} ms, Rückstau {Backlog(freq):0} s: {tx.Text}"));
-            if (SayQueue.IsAddingCompleted) { Show(); Transmit(mp3, freq, tx.Station, freq2, tx.Side); }   // --say: wait until sent
+            if (SayQueue.IsAddingCompleted) { Show(); Transmit(mp3, freq, tx.Station, freq2, tx.Side, mod); }   // --say: wait until sent
             else Play(mp3, freq, tx.Station, Show, freq2, PrioOf(tx), sec, tx.MaxAge > 0 ? tx.MaxAge : tx.Prio == 2 || tx.Role == "AWACS" ? 20 : 45, tx.Side, RankOf(tx),   // AI radio, picture: becomes outdated quickly
-                      tx.Live == null ? null : () => tx.Live() is { } t2 && t2 != text ? Synth(text = t2, voice, mp3, tx.Pilot, tx.Stress, PaceOf(tx)) : -1);   // LD4: re-spoken if the BRAA has changed
+                      tx.Live == null ? null : () => tx.Live() is { } t2 && t2 != text ? Synth(text = t2, voice, mp3, tx.Pilot, tx.Stress, PaceOf(tx)) : -1, mod);   // LD4: re-spoken if the BRAA has changed
         }
     }
 
@@ -530,13 +532,14 @@ static partial class Program
         static void Stop(Process p) { try { p.Kill(); } catch (Exception) { } }
     }
 
-    static void Transmit(string mp3, double freq, string name, double freq2 = 0, int side = 0)   // side: SRS coalition (A133), 0 = Cfg.Coalition
+    static void Transmit(string mp3, double freq, string name, double freq2 = 0, int side = 0, string? mod = null)   // side: SRS coalition (A133), 0 = Cfg.Coalition; mod: null = Cfg.Modulation
     {
+        mod ??= Cfg.Modulation;
         lock (OwnStations) OwnStations.Add(name.Replace(" ", ""));
         bool ic = freq < 0;   // Intercom: SRS delivers it if the unitId is the aircraft's
         Run(SrsFile(Cfg.SrsPath, "ExternalAudio", "DCS-SR-ExternalAudio.exe") ?? Path.Combine(Cfg.SrsPath, "ExternalAudio", "DCS-SR-ExternalAudio.exe"), null, new[] {
             $"--file={mp3}", $"--freqs={(ic ? "100" : freq.ToString("0.000", CultureInfo.InvariantCulture) + (freq2 > 0 ? "," + freq2.ToString("0.000", CultureInfo.InvariantCulture) : ""))}",
-            $"--modulations={(ic ? "INTERCOM" : Cfg.Modulation + (freq2 > 0 ? "," + Cfg.Modulation : ""))}", $"--coalition={(side > 0 ? side : Cfg.Coalition)}", $"--port={SrsPort}", "--name=" + name.Replace(" ", ""),
+            $"--modulations={(ic ? "INTERCOM" : mod + (freq2 > 0 ? "," + mod : ""))}", $"--coalition={(side > 0 ? side : Cfg.Coalition)}", $"--port={SrsPort}", "--name=" + name.Replace(" ", ""),
             "--volume=" + Cfg.Volume.ToString(CultureInfo.InvariantCulture),
             $"--unitId={(ic ? -freq : 100000)}" }.Concat(PosArgs(name, freq)).ToArray());   // 100000: SrsListener does not overhear own controllers; FI2: position
     }

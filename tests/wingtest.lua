@@ -105,6 +105,24 @@ check(r == 'open' and s == '', 'MENU;state, Menue sichtbar -> ' .. tostring(r))
 vis = false
 r, s = wing('MENU;state')
 check(r == 'closed' and s == '', 'MENU;state, Menue zu -> ' .. tostring(r))
+-- DCS-internal dialog state: three words (menu, main/dialog, stage of the tanker dialog); without the internals the old one-word reply (checked above)
+local P, mainIt = package.loaded.RadioCommandDialogsPanel, {}
+local tk = { dialogFsmData = { transitions = { ['Cleared contact'] = {} } }, dialogFsm = { state = 'Pre-contact' } }
+local other = { dialogFsmData = { transitions = {} }, dialogFsm = { state = 'Closed' } }
+P.commonCommandMenuIt, P.curDialogIt, P.commandDialogIts = mainIt, mainIt, {}
+r = wing('MENU;state')
+check(r == 'closed main -', 'MENU;state, kein Tanker-Dialog -> ' .. tostring(r))
+P.commandDialogIts = { [7] = { Tanker = { element_ = tk }, ATC = { element_ = other } } }
+P.curDialogIt, vis = { element_ = tk }, true
+r = wing('MENU;state')
+check(r == 'open dialog Pre-contact', 'MENU;state, Tanker-Dialog aktuell, sichtbar -> ' .. tostring(r))
+tk.dialogFsm.state, P.curDialogIt = 'Cleared contact', mainIt
+r = wing('MENU;state')
+check(r == 'open main Cleared contact', 'MENU;state, Stufe mit Leerzeichen, Hauptmenue -> ' .. tostring(r))
+P.commandDialogIts = nil
+r = wing('MENU;state')
+check(r == 'open', 'MENU;state, Interna fehlen -> ' .. tostring(r))
+P.commonCommandMenuIt, P.curDialogIt = nil, nil
 
 tick = nil
 afterStart()

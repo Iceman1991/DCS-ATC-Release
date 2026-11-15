@@ -352,14 +352,14 @@ local function start()
     if (slots[gname] or 1) <= 1 then
       if not built[gid] then
         built[gid] = true
-        addMenu(gid, missionCommands.addSubMenuForGroup(gid, "ATC"), gname, nil, u)
+        addMenu(gid, missionCommands.addSubMenuForGroup(gid, "DCS-ATC"), gname, nil, u)
       end
       return
     end
     local key = u:getName()   -- several players in a group: one submenu per player
     if built[key] then return end
     built[key] = true
-    if not roots[gid] then roots[gid] = missionCommands.addSubMenuForGroup(gid, "ATC"); if on("crew") then optMenu(gid, roots[gid]) end end
+    if not roots[gid] then roots[gid] = missionCommands.addSubMenuForGroup(gid, "DCS-ATC"); if on("crew") then optMenu(gid, roots[gid]) end end
     local cs = (tostring(u:getCallsign() or key):gsub("^(%a+)(%d)(%d)$", "%1 %2-%3"))
     addMenu(gid, missionCommands.addSubMenuForGroup(gid, cs, roots[gid]), gname, key, u)
   end

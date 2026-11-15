@@ -268,6 +268,34 @@ public partial class Tower
             n += 6;
         }
 
+        // Forum (Heling): chart with entries but no exit (Andersen: no published VFR exits) - departure as without a chart, arrival still from the entries; runway end missing in the chart: as without a chart
+        {
+            var k = Airfield.Kutaisi();
+            k.Exit.Remove("25"); k.Entry.Remove("07"); k.Exit.Remove("07");
+            var e = k.End("25");
+            var hp = e.At(150, 100);
+            Telemetry G0() => new(k.Elev, 0, 0, e.Hdg * Math.PI / 180, hp.X, hp.Z, 0, 0, 760);
+            Tower Hold() { var w = new Tower(k, "Enfield 1-1") { FieldWind = (-e.Dx * 5, -e.Dz * 5) }; w.Tick(G0(), none, 0); (w.Phase, w.Runway, w.home) = (Phase.TaxiOut, "25", k.Ramps[0]); return w; }
+            var dn = Hold().OnTranscript("Kutaisi Tower, Enfield 11, ready for departure, departure north", G0(), none, 10);
+            var dp = Hold().OnTranscript("Kutaisi Tower, Enfield 11, ready for departure", G0(), none, 10);
+            var far = e.At(-20 * NM, 0);
+            Telemetry Fa(string rw) => new(k.Elev + 3000 * Ft, 3000 * Ft, 150 * Kt, 0, far.X, far.Z, 0, 0, 760);
+            var wi = new Tower(k, "Enfield 1-1") { FieldWind = (-e.Dx * 5, -e.Dz * 5) };
+            wi.Tick(Fa("25"), none, 0);
+            (wi.Phase, wi.Runway) = (Phase.Inbound, "25");
+            var cs = k.Crp["south"];
+            var ia = wi.OnTranscript("Kutaisi Approach, Enfield 11, C R P south", new(k.Elev + 3000 * Ft, 3000 * Ft, 150 * Kt, 0, cs.X, cs.Z, 0, 0, 760), none, 2);
+            var w7 = new Tower(k, "Enfield 1-1") { FieldWind = (-e.Dx * 5, -e.Dz * 5) };
+            w7.Tick(Fa("07"), none, 0);
+            w7.Runway = "07";
+            var i7 = w7.OnTranscript("Kutaisi Approach, Enfield 11, C R P north", Fa("07"), none, 2);
+            Chk(dn.Count == 1 && dn[0].Text.Contains("cleared for takeoff") && dn[0].Text.Contains("leave the control zone northbound") && !dn[0].Text.Contains("negative") && !dn[0].Text.Contains("C R P north") &&
+                dp.Count == 1 && dp[0].Text.Contains("cleared for takeoff") && dp[0].Text.Contains("own navigation") && !dp[0].Text.Contains("negative") &&
+                ia.Count == 1 && ia[0].Text.Contains("proceed to initial runway two five") && i7.Count == 1 && i7[0].Text.Contains("no reporting points"),
+                "Platz ohne exit: " + J(dn) + " / " + J(dp) + " / " + J(ia) + " / " + J(i7));
+            n++;
+        }
+
         // Etappe 4 (K29/K33/K34/K36): taxi, holding point, vacate and return route from the data, every apron x every runway of all airfields (and via radio from the apron)
         int nTaxi = 0;
         foreach (var f in all.Where(a => a.Ramps.Length > 0))

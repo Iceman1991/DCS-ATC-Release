@@ -88,12 +88,13 @@ public partial class Tower
             nav = null;
             return $"{c}, after departure fly runway heading, climb and maintain {Alt(depFt)}, {clr}";
         }
-        if (!F.Charted && exitDir != null)   // A92: without map departure direction instead of CRP
+        bool exitCh = F.Charted && ExitChart(Runway);
+        if (!exitCh && exitDir != null)   // A92: without map (or without exit in the chart) departure direction instead of CRP
         {
             nav = null;
             return $"{c}, after departure leave the control zone {exitDir}bound, not above {Alt(MaxFt)}, {clr}";
         }
-        if (!F.Charted || exitDir == null)
+        if (!exitCh || exitDir == null)
         {
             nav = null;
             return $"{c}, after departure own navigation, not above {Alt(MaxFt)} until leaving the control zone, {clr}";

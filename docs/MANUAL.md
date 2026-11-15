@@ -132,7 +132,7 @@ DCS-ATC can also run on a PC that hosts a DCS dedicated server (`DCS_server.exe`
 | HOTAS (if set) | The wheel button opens and closes the wheel. Hat up/down moves the highlight, right selects, left goes back. |
 | Push-to-talk, default right `Ctrl` | Used only when SRS is not connected. With SRS you talk with your normal SRS PTT. |
 
-All wheel entries are listed under [Radio wheel](#radio-wheel). The F10 radio menu **ATC** offers the same entries in the game. In VR you can't see the desktop wheel, so it is also shown as text in the game (see [Radio wheel as text in the game](#radio-wheel-as-text-in-the-game-vr)).
+All wheel entries are listed under [Radio wheel](#radio-wheel). The F10 radio menu **DCS-ATC** offers the same entries in the game. In VR you can't see the desktop wheel, so it is also shown as text in the game (see [Radio wheel as text in the game](#radio-wheel-as-text-in-the-game-vr)).
 
 ### Your first flight: ramp start at Kutaisi
 
@@ -264,7 +264,7 @@ You can talk to DCS-ATC in four ways, and you can mix them freely during a fligh
 |---|---|---|
 | **Voice over SRS** | Press your SRS push-to-talk on the controller's frequency and speak English | Everyone in the mission, including multiplayer clients |
 | **Radio wheel** | Press the wheel key and pick a call with the number keys or your HOTAS | Mission host and single player (clients get a reduced wheel, see below) |
-| **F10 menu** | DCS radio menu → **F10 Other → ATC** | Every player slot in the mission |
+| **F10 menu** | DCS radio menu → **F10 Other → DCS-ATC** | Every player slot in the mission |
 | **Chat text** | Type `ATC>` followed by the call in the multiplayer chat | Multiplayer only |
 
 Whichever way you use, the controllers answer the same way: by voice over SRS on their frequency, and as text in the game.
@@ -609,7 +609,7 @@ The same choice is in the settings window → *Radio wheel in game (VR)*: text a
 
 ### F10 menu
 
-In every mission with DCS-ATC, each player group gets **F10 Other → ATC**. If several players share a group, each of them gets their own submenu named after their callsign. The menu language follows your installer choice (German or English).
+In every mission with DCS-ATC, each player group gets **F10 Other → DCS-ATC**. If several players share a group, each of them gets their own submenu named after their callsign. The menu language follows your installer choice (German or English).
 
 | Submenu | Entries |
 |---|---|
@@ -1780,7 +1780,7 @@ Both are optional. You can still call "Marshal, checking in" directly and launch
 
 Red Crown only does check-in, identification and handoff, no air picture.
 
-Radio wheel: page **Carrier** (Strike check in / check out, Red Crown check in / check out), F10: `ATC → Carrier → Strike / Red Crown`. The entries show in the air until you have checked in with Marshal. The frequency is on the kneeboard. Strike and Red Crown belong to the "Carrier" module.
+Radio wheel: page **Carrier** (Strike check in / check out, Red Crown check in / check out), F10: `DCS-ATC → Carrier → Strike / Red Crown`. The entries show in the air until you have checked in with Marshal. The frequency is on the kneeboard. Strike and Red Crown belong to the "Carrier" module.
 
 ### Bingo and divert
 
@@ -1941,7 +1941,7 @@ You can call a station in three ways:
 
 - **SRS (voice):** tune the station's frequency and transmit. DCS-ATC routes each call by the frequency you are on.
 - **Station name in your call:** on an airfield frequency, or with push-to-talk without SRS, a call that names the station still reaches it: *Overlord / AWACS / Magic / Moscow / Darkstar / Wizard / Focus*, *Texaco / Shell / Arco / Tanker* (also *refuel*), *Range Alpha / Range control*, *JTAC / FAC A / forward air controller* or the callsign of the controller (*Axeman one one*). Some words also go straight to AWACS: *picture*, *bogey dope*, *declare*, *spike*, *request sort*.
-- **Radio wheel** or the F10 menu **ATC → AWACS / Tanker / Center**. If the pilot voice is on (`"PilotVoice"`), your request is read out first, in the form *"Overlord, Enfield 1-1, request picture."*
+- **Radio wheel** or the F10 menu **DCS-ATC → AWACS / Tanker / Center**. If the pilot voice is on (`"PilotVoice"`), your request is read out first, in the form *"Overlord, Enfield 1-1, request picture."*
 
 Radio wheel entries:
 
@@ -2085,8 +2085,8 @@ DCS still only operates the basket or boom through its own F-menu tanker dialog.
 - DCS-ATC's tanker listens and talks on the tanker's mission frequency (the AWACS and the radio wheel name it) as well as on the default 255.5. With Easy Communication, DCS tunes your radio to the mission frequency by itself. If the tanker shares it with an airfield (e.g. 261.0 = Senaki UHF), DCS-ATC doesn't switch you to that airfield.
 - This uses `"CommsKey"` (the DCS radio menu key as a scan code, default `43`, which is `\` on US and `#` on German keyboards). With `0`, DCS-ATC doesn't press the menu. Older `config.jsonc` files don't list it; the default applies. If your menu key is a different one, add the line, e.g. `"CommsKey": 43,`.
 - The DCS radio menu must be closed when DCS-ATC presses it. Don't put your SRS PTT on the same buttons as a DCS radio PTT that opens the menu (e.g. the Hornet's COMM 1 / COMM 2 with Easy Communication): DCS-ATC's press then lands in the open menu and closes it.
-- *Ready pre-contact* is pressed until your first contact. After that a further "pre-contact" call presses nothing: when you slip off the basket DCS keeps its clearance, and F1 in the DCS menu would then be *Abort refuel* or, once DCS has closed its tanker dialog, the *Flight* menu. Just plug in again. After a full tank a new "pre-contact" sends *Intent to refuel* again; call "pre-contact" once more for *Ready pre-contact*.
-- If the DCS radio menu is open when DCS-ATC wants to press it, or stays open afterwards because DCS missed a key, DCS-ATC closes it and presses the keys once more. This needs the AI wingmen part of the mod (`DcsAtcWing.lua`); without it the keys are pressed once as before.
+- DCS-ATC asks DCS which stage its tanker dialog is in and presses only what fits: *Intent to refuel* when there is no tanker dialog, *Ready pre-contact* when DCS waits for it and you have called "pre-contact", nothing from *cleared contact* on, because F1 would then be *Abort refuel*. So after you slipped off the basket a further "pre-contact" call presses nothing; just plug in again. After a full tank DCS ends its dialog and a new "pre-contact" sends *Intent to refuel* again. Without the AI wingmen part of the mod (`DcsAtcWing.lua`) DCS-ATC can't ask and guesses from what it pressed before.
+- If the DCS radio menu is open when DCS-ATC wants to press it, DCS-ATC closes it first. If the main menu stays open afterwards because DCS missed a key, it closes it and presses the keys once more. If DCS shows its own dialog instead (or `DcsAtcWing.lua` is missing), nothing is pressed again.
 - With Easy Communication off, DCS-ATC doesn't press the menu either: send *Intent to refuel* and *Ready pre-contact* yourself with your radio's own menu key (or VAICOM).
 - **Other players** in multiplayer operate the DCS tanker menu themselves.
 
@@ -2136,7 +2136,7 @@ DCS-ATC reacts to the real DCS refueling contact:
 
 **Contact and join only when cleared** (DCS-ATC tanker voice, see above):
 
-- **Contact without "cleared contact":** *"Enfield one one, Texaco, you are not cleared contact, disconnect, return to left observation."* and a deviation. If another receiver is already in contact on that tanker, you get *"breakaway, breakaway, breakaway."* instead.
+- **Contact without "cleared contact":** *"Enfield one one, Texaco, you are not cleared contact, disconnect, return to pre-contact."* (*"... return to left observation."* if you haven't joined yet or aren't first in line) and a deviation. If another receiver is already in contact on that tanker, you get *"breakaway, breakaway, breakaway."* instead.
 - **Too close before "cleared to join":** if you have asked for refueling but haven't been cleared to join yet, and you come within 1 NM and ±500 ft of the tanker: *"Enfield one one, Texaco, not cleared to join, remain 1000 feet below, report visual."* Still there 30 s later: deviation.
 
 #### Example (multiplayer client, DCS-ATC tanker voice)
@@ -2237,7 +2237,7 @@ Range:  Enfield one one, Range Alpha, check switches safe. 1 pass, best impact 4
 A JTAC is a controller on the ground, a FAC(A) one in the air. Both talk you onto a ground target: situation, 9-line, readback, mark, clearance and damage report. DCS-ATC only provides the voice. The mission has to contain the controller, and the enemy has to be in its sight.
 
 - **What counts as a controller:** a ground group with a FAC task or "JTAC" in its name is a JTAC. An aircraft or helicopter group with a FAC task, the task AFAC, or "JTAC" in its name is a FAC(A). "FACA" in the group name always makes it a FAC(A). A group that a player flies is never a controller.
-- **Callsign and frequency:** the callsign is the FAC callname from the Mission Editor (Axeman, Darknight, Warrior …). The frequency is the one set on the FAC task, otherwise `"JTAC": 133.5`. The laser code is the one on the task, otherwise 1688.
+- **Callsign and frequency:** the callsign is the FAC callname from the Mission Editor (Axeman, Darknight, Warrior …). The frequency is the one set on the FAC task, otherwise `"JTAC": 133.5`. On its own mission frequency the controller transmits in the modulation set in the mission (AM or FM; set your radio to match), on the config frequency in `Modulation`. The laser code is the one on the task, otherwise 1688.
 - **What it sees:** a JTAC sees enemy groups out to 8 km, a FAC(A) out to 15 km, and only with line of sight. It briefs one group at a time: air defence first, then moving groups, then the nearest.
 - **IP:** a mission navigation point of your side that is 3 to 60 km from the target is used as the IP in line 1.
 - **Without a controller** on your side nobody answers, and the **JTAC** entry stays hidden in the radio wheel. The module can also be switched off in setup.
@@ -2419,7 +2419,7 @@ If a pilot of your side ejects over land, a helicopter player can pick them up (
 
 ### Ground crew and crew chief
 
-The ground crew is **off by default**. Turn it on in the F10 menu **ATC → Settings → Ground crew on/off** (*Show* displays the current state). To make it the default for all missions, set `crew = true` in `Saved Games\DCS\Scripts\DcsAtc\DcsAtcOptions.lua`. A single mission can override this in a *Mission Start* trigger with the action *DO SCRIPT* and the code `DCSATC_OPTIONS = { crew = true }`. The ground crew consists only of soldiers and vehicles; DCS-ATC still spawns no aircraft.
+The ground crew is **off by default**. Turn it on in the F10 menu **DCS-ATC → Settings → Ground crew on/off** (*Show* displays the current state). To make it the default for all missions, set `crew = true` in `Saved Games\DCS\Scripts\DcsAtc\DcsAtcOptions.lua`. A single mission can override this in a *Mission Start* trigger with the action *DO SCRIPT* and the code `DCSATC_OPTIONS = { crew = true }`. The ground crew consists only of soldiers and vehicles; DCS-ATC still spawns no aircraft.
 
 What happens:
 
@@ -2507,7 +2507,7 @@ Players don't need to install DCS-ATC at all. If the host (or the dedicated serv
 
 - **Voice over SRS.** Connect to the host's SRS server, tune the controller frequency and talk, in English. Example:
   > "Kutaisi Ground, Enfield 1-2, request startup"
-- **F10 menu.** `F10 -> ATC` has the same requests as the radio wheel (Ground, Tower, Approach, AWACS / Tanker / Center, General, emergency…). Every player gets their own `ATC` menu. If several players share one group, the `ATC` menu has a submenu for each player, named by callsign.
+- **F10 menu.** `F10 -> DCS-ATC` has the same requests as the radio wheel (Ground, Tower, Approach, AWACS / Tanker / Center, General, emergency…). Every player gets their own `DCS-ATC` menu. If several players share one group, the `DCS-ATC` menu has a submenu for each player, named by callsign.
 - **Controller text** appears in the game for your group, and the voice comes over SRS.
 
 They don't get the radio wheel or the ENTER suggestion. Their F10 requests are still spoken by the pilot voice, like everyone else's.
@@ -2712,7 +2712,7 @@ Besides `charts.jsonc` DCS-ATC reads every file in the same folder whose name st
 | `ground` → `ramp_only` | `true` = after landing Ground names only the ramp at this airfield, no parking spot | Your choice |
 | `ground` → `stands` | Parking spot number in DCS and its name on the chart. You don't need it: DCS-ATC says the parking spot names DCS itself shows | – |
 
-`"crs"` in the template is only a note of the printed course; DCS-ATC does not read it. Keys you leave out keep their generic value. An airfield with reporting points needs at least one `entry` and one `exit` per runway.
+`"crs"` in the template is only a note of the printed course; DCS-ATC does not read it. Keys you leave out keep their generic value. An airfield with reporting points needs at least one `entry` per runway. Without an `exit` the departure is cleared as at an airfield without procedures; a runway without `entry` is handled as at an airfield without procedures (radar vectors to the initial).
 
 #### Taxiways on the way out and back (ramps)
 
@@ -2864,7 +2864,7 @@ The generated lines in `frequencies.jsonc` already contain the airfield names. T
   ```
 - **`airfields.txt`** in `%LOCALAPPDATA%\Programs\DCS-ATC` holds the airfields of the last map you flew. Each airfield is a line starting with `A;`, for example `A;Anapa-Vityazevo;…`. The second field is the exact name.
 - **The radio wheel:** General -> "Select airfield" lists the 8 nearest airfields.
-- **The F10 menu:** `ATC -> Ground -> IFR clearance` lists up to 8 airfields of your side by name.
+- **The F10 menu:** `DCS-ATC -> Ground -> IFR clearance` lists up to 8 airfields of your side by name.
 - **The F10 map** shows DCS's airfield names.
 - **atc-log.txt:** if a `frequencies.jsonc` name matches more than one airfield, the log line lists the airfields it matched.
 
@@ -3045,7 +3045,7 @@ Own frequencies per airfield and controller are not in `config.jsonc` but in the
 
 **Per-mission options.** Ground crew (fuel/ammo trucks, fire service) is a mission option, not part of `config.jsonc`:
 
-- **In the game:** F10 → ATC → Settings.
+- **In the game:** F10 → DCS-ATC → Settings.
 - **Default for all missions:** `Saved Games\DCS\Scripts\DcsAtc\DcsAtcOptions.lua` (`crew = false`).
 - **Different values for one mission:** in the Mission Editor, add a trigger "Mission Start" → DO SCRIPT: `DCSATC_OPTIONS = { crew = true }`.
 
@@ -3085,7 +3085,7 @@ Easier: under Advanced, Diagnostics, **Create diagnostics zip …** puts everyth
 - **Text in the game but no voice?** If the DCS-ATC window shows "(SRS server not reachable)", the SRS server isn't running locally or is on another port. Your SRS client must be connected to the SRS server on the PC running DCS-ATC (`127.0.0.1`), not to another server; otherwise no voice goes either way. Both cases also show once as text in the game.
 - **Antivirus or firewall:** these can block Piper and other parts of DCS-ATC, or SRS voice over UDP, while SRS still shows connected. If there is still no voice, add exceptions for the DCS-ATC folder and `C:\Program Files\DCS-SimpleRadio-Standalone`, in the firewall too.
 - **VoiceAttack, VAICOM, WhisperAttack:** DCS-ATC doesn't need them, only SRS and your SRS push-to-talk. If you can't transmit, turn them off and test with SRS alone.
-- **No F10 → ATC menu and the wrong callsign?** DCS-ATC has no mission data, which means `MissionScripting.lua` isn't patched. See "After a DCS update" below.
+- **No F10 → DCS-ATC menu and the wrong callsign?** DCS-ATC has no mission data, which means `MissionScripting.lua` isn't patched. See "After a DCS update" below.
 
 **Wrong frequency**
 - **Airfield request on a station frequency.** If you ask for taxi or landing on the AWACS, tanker, range or carrier frequency, you get a text hint instead of an answer. Example: "You are transmitting on AWACS 251.5. Kutaisi Ground: 263.0 / 134.0".

@@ -64,12 +64,12 @@ partial class Ops
     public string TankerGroup { get => tanker; internal set => tanker = value; }
     int tank;
     double contactAt, offload;                // offload: amount received until departure in lb ("total offload")
-    public (string Step, string Group)? Menu;  // due DCS radio menu action: "intent" / "precontact"
-    public bool DcsIntent;                    // Mission has pressed "Intent to refuel" (M reply); otherwise no direct F1 "Ready pre-contact" (would hit an open DCS-ATC dialog)
-    // Forum (jojojung, Hornet): a contact since "Intent to refuel" = DCS has cleared contact. F1 in its tanker dialog is then "Abort refuel", after the dialog's end
-    // F1 is the main menu's "Flight": a further "pre contact" call (after a slip off the basket) presses nothing. ponytail: after a slip DCS keeps the clearance
-    // ("return pre-contact"); if it ends the dialog there instead, the menu has to be redone by hand until the script asks DCS for the dialog state (DcsAtcWing.lua)
-    bool dcsCleared;
+    public (string Step, string Group)? Menu;  // due DCS radio menu action: "join" / "intent" / "precontact" / "cleared" (Program.TankerAction decides with the stage of the DCS tanker dialog)
+    // Forum (jojojung, Hornet): in DCS's tanker dialog F1 is "Ready pre-contact" or, from "cleared contact" on, "Abort refuel". Program asks DCS for the dialog stage
+    // (DcsAtcWing.lua) and decides with it; these two flags are only the guess for an unknown stage (old script, no answer).
+    public bool DcsIntent;                    // Mission has pressed "Intent to refuel" (M reply)
+    bool dcsCleared;                          // a contact since "Intent to refuel" = DCS has cleared contact; reset when full (the dialog ends)
+    bool afterFull;                           // Forum (jojojung): Full() called "disconnect, move to the right wing", nothing else changed tank since (external tanks may still be filling)
     public Airfield? Divert;                  // A15: MAYDAY/PAN at the AWACS -> Program selects this airfield and gives the call to its Approach
     // AWACS: memory per unit (Id), a group counts as reported if one of its units is reported (lead kill, regrouping)
     readonly Dictionary<int, double> mergeTold = new();
@@ -1161,7 +1161,7 @@ partial class Ops
         if (Has(n, "complete", "departing", "thank", "good day", "leaving", "abort"))   // #5 (issue): "abort" ends the refueling like "complete"
         {
             bool first = l.FirstOrDefault(o => o.tank >= 2) == this;   // had the spot (e.g. after a deliberate partial amount, OnRefuel tank 3): the next one moves up (A66/A128)
-            tank = 0; OffLine();
+            tank = 0; afterFull = false; OffLine();
             var total = offload > 0 ? $"total offload {offload / 1000:0.0}, " : "";   // thousand lb; without known internal tank size no amount
             offload = 0;
             var dep = T($"{c}, {tk.Name}, {total}cleared to depart, " + (AwacsContact(air, me, Freqs.GetValueOrDefault("AWACS", 251.0)) is { } aw ? $"contact {aw}." : OneOf("frequency change approved.", "frequency change approved, good day.")));
@@ -1172,7 +1172,7 @@ partial class Ops
         {
             var dc = T($"{c}, {tk.Name}, {OneOf("copy disconnect", "roger disconnect")}, move to the right wing.");
             if (tank != 3) return dc;
-            tank = 2; disc = true; OffLine();   // without DCS event (OnRefuel) only the report frees the spot, the next gets it as in OnRefuel (A65)
+            tank = 2; disc = true; afterFull = false; OffLine();   // without DCS event (OnRefuel) only the report frees the spot, the next gets it as in OnRefuel (A65)
             if (l.FirstOrDefault(o => o.tank >= 2) is { } nx) dc.Add(new("Tanker", tk.Name, $"{nx.cs}, {tk.Name}, cleared pre-contact.", To: nx));
             return dc;
         }
@@ -1187,11 +1187,11 @@ partial class Ops
         {
             if (tp != null && Along(tp, tk.A) > 0.5 * NM)   // TP5 (ATP-56(C)): join only from astern
                 return T($"{c}, {tk.Name}, negative, rejoin from astern, {Clock(tp, tk)}, report visual.");
-            Menu = ("intent", tk.A.Group);   // TP6: DCS "Intent to refuel" only now, not with the request
+            Menu = ("join", tk.A.Group);   // TP6: DCS "Intent to refuel" only now, not with the request
             dcsCleared = false;
             if (!l.Contains(this)) l.Add(this);
             Arrive(l);
-            tank = 2; disc = false;
+            tank = 2; disc = false; afterFull = false;
             var ahead = l.Where(o => o.tank >= 2).ToList();   // Order after arrival (A65)
             var order = ahead.Count > 1 ? $" {ahead[0].cs} first, then {string.Join(", then ", ahead.Skip(1).Select(o => o.cs))}." : "";
             return T($"{c}, {tk.Name}, {neg}cleared to join, left observation, number {Pos(l)}.{order}");
@@ -1202,10 +1202,10 @@ partial class Ops
             if (tank < 2) return Join("negative, not cleared pre-contact, ");   // R287 (ATP-56(C)): pre-contact only after "cleared to join"
             if (!l.Contains(this)) l.Add(this);   // refuel without a new request: line up at the back
             Arrive(l);
-            if (Pos(l) > 1) { tank = 2; return T($"{c}, {tk.Name}, negative, hold left observation, number {Pos(l)}."); }
-            if (tank < 1 || !DcsIntent) { Menu = ("intent", tk.A.Group); dcsCleared = false; }
-            else if (!dcsCleared) Menu = ("precontact", tk.A.Group);
-            tank = 3; disc = false;
+            if (Pos(l) > 1) { tank = 2; afterFull = false; return T($"{c}, {tk.Name}, negative, hold left observation, number {Pos(l)}."); }
+            if (tank < 1 || !DcsIntent) { Menu = ("intent", tk.A.Group); dcsCleared = false; }   // always a menu step: the DCS stage decides what is pressed
+            else Menu = (dcsCleared ? "cleared" : "precontact", tk.A.Group);
+            tank = 3; disc = false; afterFull = false;
             return T($"{c}, cleared contact, {(Boom(tk.A) ? "boom" : "basket")} ready.");
         }
         if (tank < 2 && (Has(n, "judy", "radar contact") || Regex.IsMatch(n, @"\b(?:negative|no|not) (?:visual|tally|joy|contact)\b|\bnot in sight\b|\bblind\b"))) {   // "negative visual" is no "visual" (vectors go on)
@@ -1217,14 +1217,14 @@ partial class Ops
             if (far) return Far();
             if (tank < 2) return Join("");   // R287: without "cleared to join" no "cleared pre-contact"
             if (!l.Contains(this)) l.Add(this);
-            tank = 2; disc = false;
+            tank = 2; disc = false; afterFull = false;
             return T(Pos(l) > 1 ? $"{c}, {tk.Name}, stabilize left observation, number {Pos(l)}." : $"{c}, {tk.Name}, cleared pre-contact.");
         }
         // Only a real request starts the rendezvous; chatter with the tanker (fuel state etc.) does not reset contact
         if (tank >= 2 || !Has(n, "join", "rejoin", "rendezvous", "refuel", "fuel", "tank", "gas", "check in", "checking in", "aar", "a a r", "texaco", "shell", "arco"))
             return new() { new("Tanker", tk.Name, $"{c}, {tk.Name}, say again.") };
         if (tank == 1 && was == tk.A.Group) return T($"{c}, {tk.Name}, continue, {brg}report visual.");   // TP1: repeated request during the rendezvous: no restart, no radio menu
-        tank = 1; offload = 0;
+        tank = 1; offload = 0; afterFull = false;
         if (!l.Contains(this)) l.Add(this);
         // R56: rendezvous 1000 ft below the tanker (ATP-56(C)), climb only with "cleared to join"
         if (tp == null) return T($"{c}, {tk.Name}, {TkInfo(tk)}. Join 1000 feet below, report visual.");
@@ -1363,7 +1363,7 @@ partial class Ops
         // R236: waiting for the range ("continue, one aircraft in") -> free: "cleared hot" if position and heading still fit, otherwise silent (new "in")
         if (waitHot && Range is { } zw && !hot.Any(o => o != this) && InHot(me, zw, now) is var ih && (isHot || isDry)) { HotEdge(now); return new() { R(ih) }; }
         var tk = tank >= 2 ? Tankers(air, me).FirstOrDefault(k => k.A.Group == tanker) : null;
-        if (tk != null && Dist(t.X, t.Z, tk.A.X, tk.A.Z) > 25 * NM) { tank = 0; OffLine(); tk = null; }   // away from the tanker (LA16: join from up to 20 NM)
+        if (tk != null && Dist(t.X, t.Z, tk.A.X, tk.A.Z) > 25 * NM) { tank = 0; afterFull = false; OffLine(); tk = null; }   // away from the tanker (LA16: join from up to 20 NM)
         if (tk != null && TankerCoach(me, t, tk, now) is { } tc) return new() { tc };
         return awacs && AwacsAuto(me, t, air, now) is { } call ? new() { call } : new();
     }
@@ -1405,7 +1405,7 @@ partial class Ops
         // Breakaway (P3-TK3, ATP-56(C)): too close to the tanker, closure too fast, or in contact out of the envelope; repeated every 15 s, priority over everything else
         if (tank >= 3 && now - breakAt >= 15 && Math.Abs(lat) < 30 && Math.Abs(vert) < 30 && along < 40 &&
             ((along > -20 && Math.Abs(lat) < 20 && Math.Abs(vert) < 20) || (closure > 6 && along > -50) || (tank == 4 && (Math.Abs(lat) > 25 || Math.Abs(vert) > 25))))
-        { breakAt = now; Breakaways++; if (tank == 3) tank = 2; return Say($"{c}, breakaway, breakaway, breakaway."); }   // R289: back to observation, contact only after a new clearance (in contact: with the disconnect)
+        { breakAt = now; Breakaways++; if (tank == 3) tank = 2; afterFull = false; return Say($"{c}, breakaway, breakaway, breakaway."); }   // R289: back to observation, contact only after a new clearance (in contact: with the disconnect)
         if (turn != null) return Say(turn, true);
         if (tank == 4 || tank == 2 && disc || along > 0 || along < -300 || Math.Abs(lat) > 60 || now - coachAt < 8) return null;   // LA16: after the disconnect no coaching until pre-contact
         if (closure > 3 && along > -150) return Say($"{c}, slow closure.");   // > 6 kt
@@ -1464,17 +1464,22 @@ partial class Ops
         {
             DcsIntent = dcsCleared = true;   // a contact means the DCS tanker dialog is open
             if (tank == 4) { if (fullAt > -1e8) contactAt = now; fullAt = -1e9; return new(); }   // new contact while "full" is pending: same contact goes on
-            if (tank != 3)   // #19 reporting duty: contact only after "pre-contact" -> "cleared contact" (ATP-56(C)); at most every 30 s (DCS reports every hookup)
+            // Forum (jojojung): "full" counts the internal tank only; slipping off while the external tanks still fill, then contact again = the same sequence, if nobody else waits for the spot
+            var fl = Line(tkr?.A.Group ?? tanker);
+            bool resume = afterFull && tank == 2 && !fl.Any(o => o != this && o.tank >= 2);
+            if (resume && !fl.Contains(this)) fl.Add(this);
+            if (tank != 3 && !resume)   // #19 reporting duty: contact only after "pre-contact" -> "cleared contact" (ATP-56(C)); at most every 30 s (DCS reports every hookup)
             {
                 if (now - ncAt < 30) return new();
                 ncAt = now;
                 Debrief.Add(L($"Verstoß: Kontakt an {name} ohne Freigabe", $"Deviation: contact with {name} without clearance"));
                 // uncertain: another receiver is already on this tanker -> breakaway (ATP-56(C)) instead of orderly disconnect
                 if (line.GetValueOrDefault(tkr?.A.Group ?? "")?.Any(o => o != this && o.tank == 4) == true) { Breakaways++; return new() { new("Tanker", name, $"{Cs(me)}, breakaway, breakaway, breakaway.") }; }
-                return new() { new("Tanker", name, $"{Cs(me)}, {name}, you are not cleared contact, disconnect, return to left observation.") };
+                var first = tank >= 2 && Pos(fl) == 1;   // Forum (jojojung): already joined and next in line: back to pre-contact (what the call "pre-contact" gets from tank 2 anyway), otherwise observation
+                return new() { new("Tanker", name, $"{Cs(me)}, {name}, you are not cleared contact, disconnect, return to {(first ? "pre-contact" : "left observation")}.") };
             }
-            bool again = broken && tank >= 2 && now - lastStop < 120;   // back on the basket: no new "Contact.", quantity and time continue
-            tank = 4; contactAt = now; broken = false; fullAt = -1e9;
+            bool again = resume || broken && tank >= 2 && now - lastStop < 120;   // back on the basket: no new "Contact.", quantity and time continue
+            tank = 4; contactAt = now; broken = false; fullAt = -1e9; afterFull = false;
             if (again) return new();
             fuelAtContact = fuel; contactSum = 0; dbText = null; rowLb = 0;
             return new() { new("Tanker", name, "Contact.") };
@@ -1487,10 +1492,10 @@ partial class Ops
         var row = L("Luftbetankung", "Air refueling") + $" {name}: {contactSum:0} s " + L("Kontakt", "contact") + $", " + L("Tank", "fuel") + $" {fuelAtContact * 100:0} -> {fuel * 100:0} %{(lb > 0 ? $", {lb:0} lb" : "")}";
         if (dbText != null && Debrief.IndexOf(dbText) is var i and >= 0) Debrief[i] = row; else Debrief.Add(row);
         dbText = row; lastStop = now;
-        if (fuel < 0.97 && breakAt >= contactAt) { tank = 2; disc = true; broken = false; return new(); }   // R289: disconnect after breakaway: observation, no "return to pre-contact", contact only after a new clearance
+        if (fuel < 0.97 && breakAt >= contactAt) { tank = 2; disc = true; broken = false; afterFull = false; return new(); }   // R289: disconnect after breakaway: observation, no "return to pre-contact", contact only after a new clearance
         if (fuel < 0.97)   // unwanted, stays in the queue (ponytail: desired quantity only with N37)
         {
-            tank = 3; disc = false; broken = true;
+            tank = 3; disc = false; broken = true; afterFull = false;
             return new() { new("Tanker", name, $"{Cs(me)}, {name}, disconnect, return to pre-contact.") };
         }
         fullAt = now; fullLb = lb;
@@ -1503,7 +1508,7 @@ partial class Ops
         var tkr = (tanker != "" ? Tankers(air, me, true).FirstOrDefault(k => k.A.Group == tanker) : null) ?? Tankers(air, me).FirstOrDefault();
         var name = tkr?.Name ?? "Tanker";
         double lb = fullLb;
-        tank = 2; disc = true; broken = false;
+        tank = 2; disc = true; broken = false; afterFull = true;
         DcsIntent = dcsCleared = false;   // full: DCS ends its dialog ("refueling complete"), more fuel needs "Intent to refuel" again
         OffLine();
         var next = line.GetValueOrDefault(tkr?.A.Group ?? "")?.FirstOrDefault(o => o.tank >= 2);
@@ -1968,7 +1973,7 @@ partial class Ops
         od.DcsIntent = true;
         var dp = od.OnTranscript("Tanker", "Texaco, ready pre contact", meN, air, f, 1);
         var dk = od.OnRefuel(me, true, 0.4, air, 2);
-        check(dj.Count == 1 && dj[0].Text.Contains("report visual") && dm == null && dv.Count == 1 && dv[0].Text.Contains("cleared to join") && dv2?.Step == "intent"
+        check(dj.Count == 1 && dj[0].Text.Contains("report visual") && dm == null && dv.Count == 1 && dv[0].Text.Contains("cleared to join") && dv2?.Step == "join"
               && dq0.Count == 1 && dq0[0].Text.Contains("cleared contact") && dq?.Step == "intent" && dp.Count == 1 && od.Menu?.Step == "precontact" && dk.FirstOrDefault()?.Text == "Contact.",
               $"Tanker R304: Lotse spricht, Menü {dm} -> {dv2} -> {dq} -> {od.Menu} | {string.Join(" | ", dj.Concat(dv).Concat(dq0).Concat(dp).Concat(dk).Select(x => x.Text))}");
         {   // forum (jojojung): after a slip off the basket "pre contact" presses nothing in DCS (F1 would be "Abort refuel" or "Flight"), after a full tank "Intent to refuel" again
@@ -1980,7 +1985,7 @@ partial class Ops
             od.OnRefuel(me, false, 0.99, air, 60);
             od.Tick(meN, air, 66);   // "full" comes 5 s after the stop
             od.OnTranscript("Tanker", "Texaco, pre contact", meN, air, f, 68);
-            check(slipDc.FirstOrDefault()?.Text.Contains("return to pre-contact") == true && afterSlip == null && od.Menu?.Step == "intent" && !od.DcsIntent,
+            check(slipDc.FirstOrDefault()?.Text.Contains("return to pre-contact") == true && afterSlip?.Step == "cleared" && od.Menu?.Step == "intent" && !od.DcsIntent,
                   $"Tanker DCS-Menü nach Kontakt: Abrutschen {slipDc.FirstOrDefault()?.Text} -> Menü {afterSlip}, voll -> Menü {od.Menu}, DcsIntent {od.DcsIntent}");
             od.Menu = null;
         }
@@ -2000,9 +2005,41 @@ partial class Ops
             ox.OnRefuel(me, true, 0.4, air, 40);   // pre-contact call sets tank 3; DCS reports the next contact
             ox.OnRefuel(me, false, 0.99, air, 50);
             var xe = ox.Tick(meN, air, 55);
-            check(xs.Count == 0 && xt.All(x => !x.Text.Contains("disconnect")) && xc.Count == 0 && xm == null && xe.Any(x => x.Text.Contains("you received") || x.Text.Contains("disconnect")),
+            check(xs.Count == 0 && xt.All(x => !x.Text.Contains("disconnect")) && xc.Count == 0 && xm?.Step == "cleared" && xe.Any(x => x.Text.Contains("you received") || x.Text.Contains("disconnect")),
                   $"Tanker Zusatztanks: Stopp + neuer Kontakt = derselbe Kontakt, voll erst 5 s nach Stopp | {string.Join(" | ", xs.Concat(xt).Concat(xc).Concat(xe).Select(x => x.Text))}");
             line.Clear();
+        }
+        {   // forum (jojojung): "full" (internal tank) + contact again without a call continues, no violation; with another receiver waiting it is still one; wording without clearance
+            var tg = "Texaco (KC-135MPRS Korb)";
+            bool Viol(Ops q) => q.Debrief.Any(d => d.Contains("Verstoß") || d.Contains("Deviation"));
+            Ops Full5(out List<Call> fullCalls)
+            {
+                var q = new Ops();
+                q.OnTranscript("Tanker", "Texaco, request rejoin", me, air, f, 0); q.OnTranscript("Tanker", "Texaco, visual", meN, air, f, 1); q.OnTranscript("Tanker", "Texaco, ready pre contact", meN, air, f, 1);
+                q.OnRefuel(me, true, 0.4, air, 2); q.OnRefuel(me, false, 0.99, air, 30);
+                fullCalls = q.Tick(meN, air, 36);
+                return q;
+            }
+            line.Clear();
+            var o1F = Full5(out var f1);
+            var c1F = o1F.OnRefuel(me, true, 0.99, air, 40);
+            var back = o1F.tank == 4 && Line(tg).Contains(o1F);
+            o1F.OnRefuel(me, false, 0.99, air, 50);
+            var rows1 = o1F.Debrief.Count(d => d.Contains("Air refueling") || d.Contains("Luftbetankung"));
+            line.Clear();
+            var o2F = Full5(out _);
+            var w2 = new Ops { tank = 2, tanker = tg }; Line(tg).Add(w2);
+            var c2F = o2F.OnRefuel(me, true, 0.99, air, 40);
+            line.Clear();
+            var w3 = new Ops { tank = 2, tanker = tg };   // joined, first in line: back to pre-contact
+            var c3 = w3.OnRefuel(me, true, 0.4, air, 100);
+            line.Clear();
+            var c4F = new Ops().OnRefuel(me, true, 0.4, air, 100);   // never joined: observation
+            line.Clear();
+            check(f1.Any(x => x.Text.Contains("move to the right wing")) && c1F.Count == 0 && back && !Viol(o1F) && rows1 == 1
+                  && c2F.Count == 1 && c2F[0].Text.Contains("you are not cleared contact") && c2F[0].Text.EndsWith("return to left observation.") && Viol(o2F)
+                  && c3.Count == 1 && c3[0].Text.EndsWith("return to pre-contact.") && c4F.Count == 1 && c4F[0].Text.EndsWith("return to left observation."),
+                  $"Tanker nach voll: Kontakt ohne Ruf geht weiter ({c1F.Count}, {back}, {rows1} Zeile), mit Wartendem Verstoss | {string.Join(" | ", c2F.Concat(c3).Concat(c4F).Select(x => x.Text))}");
         }
         {   // TP1/TP2/TP5/TP3: queries without state change or menu, second request without restart, join only from astern, "judy" ends the vectors
             var oq = new Ops();
@@ -2485,7 +2522,7 @@ partial class Ops
         var (n19, n19b, n19c) = (Rf(c19, me, true, 0.4, 10), Rf(c19, me, false, 0.5, 15), Rf(c19, me, true, 0.5, 20));
         var (ok19, ct19) = (K(c19, nr1, "Texaco, Enfield 1-1, pre contact"), Rf(c19, me, true, 0.5, 50));
         var aw240 = new Ops().OnTranscript("AWACS", "Overlord, Enfield 1-1, vector to tanker", me, air, f, 0)[0].Text;
-        check(n19 is [{ Text: "Enfield one one, Texaco one one, you are not cleared contact, disconnect, return to left observation." }] && n19b.Count == 0 && n19c.Count == 0
+        check(n19 is [{ Text: "Enfield one one, Texaco one one, you are not cleared contact, disconnect, return to pre-contact." }] && n19b.Count == 0 && n19c.Count == 0
               && c19.Debrief.Count(d => d.StartsWith("Verstoß: Kontakt an Texaco one one")) == 1 && c19.Debrief.Count == 1 && ok19.Contains("cleared contact") && ct19 is [{ Text: "Contact." }]
               && aw240.Contains("nearest tanker Texaco one one, anchor Alpha") && aw240.EndsWith("contact Texaco one one, two five five decimal five."), $"#19/R240: Kontakt ohne Freigabe -> {n19.FirstOrDefault()?.Text} | {ok19} | {aw240}");
         TankerFreq[Tankers(air, me)[0].A.Group] = 225.0;   // TP7: mission frequency of the tanker in the AWACS handoff and the radio wheel

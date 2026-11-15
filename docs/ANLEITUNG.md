@@ -134,7 +134,7 @@ DCS-ATC läuft auch auf einem PC mit DCS Dedicated Server (`DCS_server.exe`), an
 | HOTAS (falls belegt) | Rad-Knopf öffnet und schließt das Rad. Hat hoch/runter bewegt die Markierung, rechts wählt, links geht zurück. |
 | Push-to-Talk, Standard rechte `Strg` | Nur, wenn SRS nicht verbunden ist. Mit SRS sprichst du mit deiner normalen SRS-Sprechtaste. |
 
-Alle Funkrad-Einträge stehen unter [Funkrad](#funkrad). Das F10-Funkmenü **ATC** bietet dieselben Einträge im Spiel. In VR siehst du das Desktop-Rad nicht, deshalb erscheint es zusätzlich als Text im Spiel (siehe [Funkrad als Text im Spiel](#funkrad-als-text-im-spiel-vr)).
+Alle Funkrad-Einträge stehen unter [Funkrad](#funkrad). Das F10-Funkmenü **DCS-ATC** bietet dieselben Einträge im Spiel. In VR siehst du das Desktop-Rad nicht, deshalb erscheint es zusätzlich als Text im Spiel (siehe [Funkrad als Text im Spiel](#funkrad-als-text-im-spiel-vr)).
 
 ### Dein erster Flug: Kaltstart in Kutaisi
 
@@ -266,7 +266,7 @@ Du kannst DCS-ATC auf vier Wegen ansprechen und sie im Flug beliebig mischen:
 |---|---|---|
 | **Sprechen über SRS** | SRS-Sprechtaste auf der Lotsenfrequenz drücken und Englisch sprechen | Alle in der Mission, auch Multiplayer-Mitspieler |
 | **Funkrad** | Rad-Taste drücken und einen Spruch mit Zifferntasten oder HOTAS wählen | Missions-Host und Einzelspieler (Mitspieler bekommen ein eingeschränktes Rad, siehe unten) |
-| **F10-Menü** | DCS-Funkmenü → **F10 Andere → ATC** | Jeder Spieler-Slot der Mission |
+| **F10-Menü** | DCS-Funkmenü → **F10 Andere → DCS-ATC** | Jeder Spieler-Slot der Mission |
 | **Chat-Text** | Im Multiplayer-Chat `ATC>` und dann den Spruch tippen | Nur Multiplayer |
 
 Egal welcher Weg: Die Lotsen antworten gleich, per Stimme über SRS auf ihrer Frequenz und als Text im Spiel.
@@ -611,7 +611,7 @@ Dieselbe Wahl im Einstellungsfenster → *Funkrad im Spiel (VR)*: Text automatis
 
 ### F10-Menü
 
-In jeder Mission mit DCS-ATC bekommt jede Spielergruppe **F10 Andere → ATC**. Teilen sich mehrere Spieler eine Gruppe, bekommt jeder ein eigenes Untermenü mit seinem Rufzeichen. Die Menüsprache folgt deiner Wahl im Setup (Deutsch oder Englisch).
+In jeder Mission mit DCS-ATC bekommt jede Spielergruppe **F10 Andere → DCS-ATC**. Teilen sich mehrere Spieler eine Gruppe, bekommt jeder ein eigenes Untermenü mit seinem Rufzeichen. Die Menüsprache folgt deiner Wahl im Setup (Deutsch oder Englisch).
 
 | Untermenü | Einträge |
 |---|---|
@@ -1782,7 +1782,7 @@ Beide sind freiwillig. Du kannst weiter direkt „Marshal, checking in“ rufen 
 
 Red Crown macht nur Check-in, Identifizierung und Übergabe, keine Luftlage.
 
-Funkrad: Seite **Carrier** (Strike check in / check out, Red Crown check in / check out), F10: `ATC → Carrier → Strike / Red Crown`. Die Einträge erscheinen in der Luft, solange du noch nicht bei Marshal eingecheckt bist. Die Frequenz steht auf dem Kniebrett. Strike und Red Crown gehören zum Modul „Carrier“.
+Funkrad: Seite **Carrier** (Strike check in / check out, Red Crown check in / check out), F10: `DCS-ATC → Carrier → Strike / Red Crown`. Die Einträge erscheinen in der Luft, solange du noch nicht bei Marshal eingecheckt bist. Die Frequenz steht auf dem Kniebrett. Strike und Red Crown gehören zum Modul „Carrier“.
 
 ### Bingo und Ausweichen
 
@@ -1943,7 +1943,7 @@ Du erreichst eine Station auf drei Wegen:
 
 - **SRS (Stimme):** Frequenz der Station rasten und senden. DCS-ATC leitet jeden Spruch nach deiner Frequenz.
 - **Stationsname im Spruch:** auf einer Platzfrequenz oder mit Sprechtaste ohne SRS erreicht ein Spruch mit Stationsnamen sie trotzdem: *Overlord / AWACS / Magic / Moscow / Darkstar / Wizard / Focus*, *Texaco / Shell / Arco / Tanker* (auch *refuel*), *Range Alpha / Range control*, *JTAC / FAC A / forward air controller* oder das Rufzeichen des Lotsen (*Axeman one one*). Manche Wörter gehen direkt ans AWACS: *picture*, *bogey dope*, *declare*, *spike*, *request sort*.
-- **Funkrad** oder F10-Menü **ATC → AWACS / Tanker / Center**. Ist die Pilotenstimme an (`"PilotVoice"`), wird deine Anfrage zuerst vorgesprochen, etwa *„Overlord, Enfield 1-1, request picture.“*
+- **Funkrad** oder F10-Menü **DCS-ATC → AWACS / Tanker / Center**. Ist die Pilotenstimme an (`"PilotVoice"`), wird deine Anfrage zuerst vorgesprochen, etwa *„Overlord, Enfield 1-1, request picture.“*
 
 Funkrad-Einträge:
 
@@ -2087,8 +2087,8 @@ DCS bedient Korb bzw. Boom aber nur über seinen eigenen Tankerdialog im F-Menü
 - Der DCS-ATC-Tanker hört und spricht auf der Missionsfrequenz des Tankers (AWACS und Funkrad nennen sie) und auf dem Standard 255.5. Mit Easy Communication rastet DCS dein Funkgerät selbst auf die Missionsfrequenz. Teilt sie sich der Tanker mit einem Platz (etwa 261.0 = Senaki UHF), wechselt DCS-ATC deshalb nicht den Platz.
 - Das nutzt `"CommsKey"` (DCS-Funkmenü-Taste als Scancode, Standard `43`, also `\` auf US- und `#` auf deutschen Tastaturen). Mit `0` drückt DCS-ATC das Menü nicht. Ältere `config.jsonc` enthalten die Zeile nicht, dann gilt der Standard. Ist deine Menütaste eine andere, die Zeile ergänzen, z. B. `"CommsKey": 43,`.
 - Das DCS-Funkmenü muss zu sein, wenn DCS-ATC drückt. Leg die SRS-PTT nicht auf dieselben Knöpfe wie eine DCS-Funk-PTT, die das Menü öffnet (z. B. COMM 1 / COMM 2 der Hornet mit Easy Communication): Der Druck von DCS-ATC landet sonst im offenen Menü und schließt es.
-- *Ready pre-contact* wird bis zu deinem ersten Kontakt gedrückt. Danach drückt ein weiteres „pre-contact“ nichts mehr: Rutschst du vom Korb, behält DCS seine Freigabe, und F1 im DCS-Menü wäre dann *Abort refuel* oder, wenn DCS seinen Tankerdialog geschlossen hat, das *Flight*-Menü. Einfach wieder andocken. Nach vollem Tank sendet ein neues „pre-contact“ wieder *Intent to refuel*; für *Ready pre-contact* noch einmal „pre-contact“ melden.
-- Ist das DCS-Funkmenü offen, wenn DCS-ATC es drücken will, oder bleibt es danach offen, weil DCS eine Taste verpasst hat, schließt DCS-ATC es und drückt die Tasten noch einmal. Das braucht den KI-Wingmen-Teil des Mods (`DcsAtcWing.lua`); ohne ihn werden die Tasten wie bisher einmal gedrückt.
+- DCS-ATC fragt DCS, in welcher Stufe sein Tankerdialog steht, und drückt nur, was dazu passt: *Intent to refuel*, wenn es keinen Tankerdialog gibt, *Ready pre-contact*, wenn DCS darauf wartet und du „pre-contact“ gemeldet hast, ab *cleared contact* nichts, denn F1 wäre dann *Abort refuel*. Ein weiteres „pre-contact“ nach dem Abrutschen vom Korb drückt deshalb nichts; einfach wieder andocken. Nach vollem Tank beendet DCS seinen Dialog, und ein neues „pre-contact“ sendet wieder *Intent to refuel*. Ohne den KI-Wingmen-Teil des Mods (`DcsAtcWing.lua`) kann DCS-ATC nicht fragen und rät nach dem, was es vorher gedrückt hat.
+- Ist das DCS-Funkmenü offen, wenn DCS-ATC es drücken will, schließt DCS-ATC es zuerst. Bleibt das Hauptmenü danach offen, weil DCS eine Taste verpasst hat, schließt es DCS-ATC und drückt die Tasten noch einmal. Zeigt DCS stattdessen einen eigenen Dialog (oder fehlt `DcsAtcWing.lua`), wird nichts mehr gedrückt.
 - Mit Easy Communication aus drückt DCS-ATC das Menü auch nicht: *Intent to refuel* und *Ready pre-contact* sendest du dann selbst mit der Menütaste deines Funkgeräts (oder VAICOM).
 - **Andere Spieler** im Multiplayer bedienen das DCS-Tankermenü selbst.
 
@@ -2138,7 +2138,7 @@ DCS-ATC reagiert auf den echten DCS-Tankkontakt:
 
 **Kontakt und Anschluss nur mit Freigabe** (Tanker-Stimme von DCS-ATC, siehe oben):
 
-- **Kontakt ohne „cleared contact“:** *„Enfield one one, Texaco, you are not cleared contact, disconnect, return to left observation.“* und ein Verstoß. Hängt schon ein anderer Empfänger an diesem Tanker, kommt stattdessen *„breakaway, breakaway, breakaway.“*
+- **Kontakt ohne „cleared contact“:** *„Enfield one one, Texaco, you are not cleared contact, disconnect, return to pre-contact.“* (*„... return to left observation.“*, wenn du noch nicht gejoint hast oder nicht an erster Stelle stehst) und ein Verstoß. Hängt schon ein anderer Empfänger an diesem Tanker, kommt stattdessen *„breakaway, breakaway, breakaway.“*
 - **Zu nah vor „cleared to join“:** hast du ums Tanken gebeten, aber noch keine Anschlussfreigabe, und kommst innerhalb 1 NM und ±500 ft an den Tanker: *„Enfield one one, Texaco, not cleared to join, remain 1000 feet below, report visual.“* Bist du 30 s später noch dort: Verstoß.
 
 #### Beispiel (Multiplayer-Mitspieler, DCS-ATC-Tankerstimme)
@@ -2239,7 +2239,7 @@ Range:  Enfield one one, Range Alpha, check switches safe. 1 pass, best impact 4
 Ein JTAC ist ein Lotse am Boden, ein FAC(A) einer in der Luft. Beide sprechen dich auf ein Bodenziel ein: Lage, 9-Liner, Readback, Markierung, Freigabe und Wirkungsmeldung. DCS-ATC liefert nur die Stimme. Der Lotse muss in der Mission vorhanden sein, und der Feind muss in seiner Sicht liegen.
 
 - **Was als Lotse zählt:** eine Bodengruppe mit FAC-Aufgabe oder „JTAC“ im Namen ist ein JTAC. Eine Flugzeug- oder Hubschraubergruppe mit FAC-Aufgabe, der Aufgabe AFAC oder „JTAC“ im Namen ist ein FAC(A). „FACA“ im Gruppennamen macht sie immer zum FAC(A). Eine Gruppe, die ein Spieler fliegt, ist nie ein Lotse.
-- **Rufzeichen und Frequenz:** das Rufzeichen ist der FAC-Callname aus dem Mission Editor (Axeman, Darknight, Warrior …). Die Frequenz ist die an der FAC-Aufgabe eingestellte, sonst `"JTAC": 133.5`. Der Laser-Code ist der an der Aufgabe, sonst 1688.
+- **Rufzeichen und Frequenz:** das Rufzeichen ist der FAC-Callname aus dem Mission Editor (Axeman, Darknight, Warrior …). Die Frequenz ist die an der FAC-Aufgabe eingestellte, sonst `"JTAC": 133.5`. Auf der eigenen Missionsfrequenz sendet der Lotse in der Modulation aus der Mission (AM oder FM; das Funkgerät passend einstellen), auf der Config-Frequenz in `Modulation`. Der Laser-Code ist der an der Aufgabe, sonst 1688.
 - **Was er sieht:** ein JTAC sieht feindliche Gruppen bis 8 km, ein FAC(A) bis 15 km, jeweils nur mit Sichtlinie. Er weist eine Gruppe nach der anderen ein: erst Luftabwehr, dann bewegte Gruppen, dann die nächste.
 - **IP:** ein Navigationspunkt der Mission auf deiner Seite, der 3 bis 60 km vom Ziel liegt, dient als IP in Zeile 1.
 - **Ohne Lotse** auf deiner Seite antwortet niemand und der Eintrag **JTAC** im Funkrad bleibt ausgeblendet. Das Modul lässt sich auch im Setup abwählen.
@@ -2421,7 +2421,7 @@ Steigt ein Pilot deiner Seite über Land aus, kann ein Hubschrauber-Spieler ihn 
 
 ### Bodenpersonal und Crew Chief
 
-Das Bodenpersonal ist **standardmäßig aus**. Einschalten im F10-Menü **ATC → Einstellungen → Bodenpersonal an/aus** (*Anzeigen* zeigt den aktuellen Stand). Als Standard für alle Missionen `crew = true` in `Saved Games\DCS\Scripts\DcsAtc\DcsAtcOptions.lua` setzen. Eine einzelne Mission kann das per Trigger *Mission Start* mit Aktion *DO SCRIPT* und dem Code `DCSATC_OPTIONS = { crew = true }` überschreiben. Das Bodenpersonal besteht nur aus Soldaten und Fahrzeugen; DCS-ATC spawnt weiterhin keine Flugzeuge.
+Das Bodenpersonal ist **standardmäßig aus**. Einschalten im F10-Menü **DCS-ATC → Einstellungen → Bodenpersonal an/aus** (*Anzeigen* zeigt den aktuellen Stand). Als Standard für alle Missionen `crew = true` in `Saved Games\DCS\Scripts\DcsAtc\DcsAtcOptions.lua` setzen. Eine einzelne Mission kann das per Trigger *Mission Start* mit Aktion *DO SCRIPT* und dem Code `DCSATC_OPTIONS = { crew = true }` überschreiben. Das Bodenpersonal besteht nur aus Soldaten und Fahrzeugen; DCS-ATC spawnt weiterhin keine Flugzeuge.
 
 Was passiert:
 
@@ -2509,7 +2509,7 @@ Spieler müssen DCS-ATC gar nicht installieren. Läuft es beim Host (oder auf de
 
 - **Sprechen über SRS.** Mit dem SRS-Server des Hosts verbinden, Lotsenfrequenz rasten und auf Englisch sprechen. Beispiel:
   > "Kutaisi Ground, Enfield 1-2, request startup"
-- **F10-Menü.** `F10 -> ATC` hat dieselben Anfragen wie das Funkrad (Ground, Tower, Approach, AWACS / Tanker / Center, Allgemein, Notfall …). Jeder Spieler bekommt sein eigenes `ATC`-Menü. Teilen sich mehrere Spieler eine Gruppe, hat das `ATC`-Menü je Spieler ein Untermenü mit seinem Rufzeichen.
+- **F10-Menü.** `F10 -> DCS-ATC` hat dieselben Anfragen wie das Funkrad (Ground, Tower, Approach, AWACS / Tanker / Center, Allgemein, Notfall …). Jeder Spieler bekommt sein eigenes `DCS-ATC`-Menü. Teilen sich mehrere Spieler eine Gruppe, hat das `DCS-ATC`-Menü je Spieler ein Untermenü mit seinem Rufzeichen.
 - **Lotsentext** erscheint im Spiel für deine Gruppe, die Stimme kommt über SRS.
 
 Funkrad und ENTER-Vorschlag bekommen sie nicht. Ihre F10-Anfragen spricht trotzdem die Pilotenstimme, wie bei allen anderen.
@@ -2714,7 +2714,7 @@ Neben `charts.jsonc` liest DCS-ATC jede Datei im selben Ordner, deren Name mit `
 | `ground` → `ramp_only` | `true` = nach der Landung nennt Ground an diesem Platz nur das Vorfeld, keinen Parkplatz | Deine Entscheidung |
 | `ground` → `stands` | Parkplatznummer in DCS und ihr Name auf der Karte. Brauchst du nicht: DCS-ATC sagt die Parkplatznamen, die DCS selbst zeigt | – |
 
-`"crs"` in der Vorlage ist nur eine Notiz des gedruckten Kurses, DCS-ATC liest es nicht. Schlüssel, die du weglässt, behalten ihren allgemeinen Wert. Ein Platz mit Meldepunkten braucht je Bahn mindestens einen `entry` und einen `exit`.
+`"crs"` in der Vorlage ist nur eine Notiz des gedruckten Kurses, DCS-ATC liest es nicht. Schlüssel, die du weglässt, behalten ihren allgemeinen Wert. Ein Platz mit Meldepunkten braucht je Bahn mindestens einen `entry`. Ohne `exit` wird der Abflug wie an einem Platz ohne Verfahren freigegeben; eine Bahn ohne `entry` wird wie an einem Platz ohne Verfahren behandelt (Radar-Vektoren zum Initial).
 
 #### Rollwege hin und zurück (Vorfelder)
 
@@ -2867,7 +2867,7 @@ Die erzeugten Zeilen in `frequencies.jsonc` enthalten die Platznamen schon. Sons
   ```
 - **`airfields.txt`** in `%LOCALAPPDATA%\Programs\DCS-ATC` enthält die Plätze der zuletzt geflogenen Karte. Jeder Platz ist eine Zeile mit `A;` am Anfang, etwa `A;Anapa-Vityazevo;…`. Das zweite Feld ist der genaue Name.
 - **Das Funkrad:** Allgemein -> „Platz wählen“ listet die 8 nächsten Plätze.
-- **Das F10-Menü:** `ATC -> Ground -> IFR clearance` listet bis zu 8 Plätze deiner Seite mit Namen.
+- **Das F10-Menü:** `DCS-ATC -> Ground -> IFR clearance` listet bis zu 8 Plätze deiner Seite mit Namen.
 - **Die F10-Karte** zeigt die DCS-Platznamen.
 - **atc-log.txt:** passt ein Name in `frequencies.jsonc` zu mehreren Plätzen, nennt die Logzeile die getroffenen Plätze.
 
@@ -3048,7 +3048,7 @@ Eigene Frequenzen je Platz und Lotse stehen nicht in `config.jsonc`, sondern in 
 
 **Optionen je Mission.** Bodenpersonal (Tank-/Munitionswagen, Feuerwehr) ist eine Missionsoption, nicht Teil von `config.jsonc`:
 
-- **Im Spiel:** F10 → ATC → Einstellungen.
+- **Im Spiel:** F10 → DCS-ATC → Einstellungen.
 - **Standard für alle Missionen:** `Saved Games\DCS\Scripts\DcsAtc\DcsAtcOptions.lua` (`crew = false`).
 - **Andere Werte für eine Mission:** im Missionseditor einen Trigger „Mission Start“ → DO SCRIPT: `DCSATC_OPTIONS = { crew = true }`.
 
@@ -3088,7 +3088,7 @@ Einfacher: Unter Erweitert, Diagnose, packt **Diagnose-Zip erstellen …** alles
 - **Text im Spiel, aber keine Stimme?** Zeigt das DCS-ATC-Fenster „(SRS-Server nicht erreichbar)“, läuft der SRS-Server nicht lokal oder auf einem anderen Port. Dein SRS-Client muss mit dem SRS-Server auf dem DCS-ATC-PC verbunden sein (`127.0.0.1`), nicht mit einem anderen Server, sonst geht in keine Richtung Ton. Beides erscheint auch einmal als Text im Spiel.
 - **Virenscanner oder Firewall:** Sie können Piper und andere Teile von DCS-ATC oder den SRS-Ton über UDP blockieren, während SRS weiter „verbunden“ zeigt. Bleibt die Stimme aus, trage Ausnahmen für den DCS-ATC-Ordner und `C:\Program Files\DCS-SimpleRadio-Standalone` ein, auch in der Firewall.
 - **VoiceAttack, VAICOM, WhisperAttack:** DCS-ATC braucht sie nicht, nur SRS und deine SRS-Sprechtaste. Kommst du nicht durch, schalte sie aus und teste nur mit SRS.
-- **Kein F10 → ATC und falsches Rufzeichen?** DCS-ATC hat keine Missionsdaten, `MissionScripting.lua` ist also nicht angepasst. Siehe „Nach einem DCS-Update“ unten.
+- **Kein F10 → DCS-ATC und falsches Rufzeichen?** DCS-ATC hat keine Missionsdaten, `MissionScripting.lua` ist also nicht angepasst. Siehe „Nach einem DCS-Update“ unten.
 
 **Falsche Frequenz**
 - **Platzanfrage auf einer Stationsfrequenz.** Fragst du auf der AWACS-, Tanker-, Range- oder Trägerfrequenz nach Rollen oder Landen, kommt ein Texthinweis statt einer Antwort, etwa „Du funkst auf AWACS 251.5. Kutaisi Ground: 263.0 / 134.0“.

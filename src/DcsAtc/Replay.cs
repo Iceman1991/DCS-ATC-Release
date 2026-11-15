@@ -72,7 +72,7 @@ static partial class Program
                 var q = Regex.Match(body, @"QNH ((?:(?:zero|one|two|three|four|five|six|seven|eight|niner) ?)+)");
                 wx.Add((t, w.Success ? Spoken(w.Groups[1].Value) ?? 0 : 0, w.Success ? Spoken(w.Groups[2].Value) ?? 0 : 0, q.Success ? Spoken(q.Groups[1].Value) ?? 1013 : 1013));
             }
-            else if (kat == "LOG" && said.Match(body) is { Success: true } sm) old.Add((t, sm.Groups["t"].Value));
+            else if (kat == "LOG" && said.Match(body) is { Success: true } sm) old.Add((t, Regex.Replace(sm.Groups["t"].Value, @"^(.+?) \(\d+\.\d( [AF]M)?\): ", "$1: ")));   // newer logs: "Station (134.0): text"
             if (t0 >= 0) tEnd = t;
         }
         var outp = new List<(double T, int Ord, string Tag, string Text)>();

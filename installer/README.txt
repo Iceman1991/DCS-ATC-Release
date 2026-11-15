@@ -1,4 +1,4 @@
-DCS-ATC 0.23.10 ALPHA – talking air traffic control for DCS World (all maps, tested on Caucasus)
+DCS-ATC 0.23.11 ALPHA – talking air traffic control for DCS World (all maps, tested on Caucasus)
 ========================================================================
 
 !! ALPHA VERSION !!
@@ -44,7 +44,7 @@ Usage
      The radio wheel shows the frequency of the current airfield. Also: ATIS 263.5 · AWACS 251.5 · Tanker 255.5 · JTAC 133.5
   3. Talk: SRS push-to-talk on the frequency, in English, e.g.
        "Kutaisi Ground, Enfield 1-1, request startup"  ·  "Overlord, Enfield 1-1, request picture"
-     Or without talking: radio wheel with the ' (apostrophe) key or F10 menu -> ATC.
+     Or without talking: radio wheel with the ' (apostrophe) key or F10 menu -> DCS-ATC.
      Radio menu: 1–9 to select, Enter = suggested radio call, Backspace back, Esc close.
      While the radio wheel is open, Print Screen saves a screenshot with the wheel to Pictures\DCS-ATC.
      In VR the radio wheel is shown as text in the game (Settings -> "Radio wheel in game (VR)").
@@ -60,7 +60,7 @@ Usage
   After landing, Ground guides you back to your start position with direction and distance.
 
 Settings
-  In the game: F10 -> ATC -> Settings (ground crew).
+  In the game: F10 -> DCS-ATC -> Settings (ground crew).
   Default for all missions: Saved Games\DCS\Scripts\DcsAtc\DcsAtcOptions.lua
   Callsign, volume, radio, radio wheel, language: Start menu -> DCS-ATC -> Settings (window, applies immediately)
   Voices, frequencies and everything else: "All options (config.jsonc)" in the settings window

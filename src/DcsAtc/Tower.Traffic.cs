@@ -12,6 +12,10 @@ public partial class Tower
     /// Entry points of the runway from the map (Kutaisi: North/South always, West only for 07, East only for 25). Otherwise the nearest.
     List<string> Allowed(string rw) => F.Entry.TryGetValue(rw, out var e) ? e.Select(x => x.Crp).ToList() : new();
 
+    /// A chart can leave out a runway end, its entries or its exits (no published procedure): then that part works as without a chart.
+    bool EntryChart(string rw) => Allowed(rw).Count > 0;
+    bool ExitChart(string rw) => F.Exit.TryGetValue(rw, out var x) && x.Count > 0;
+
     string AssignEntry(Telemetry? t, string rw, string? wanted)
     {
         var allowed = Allowed(rw);

@@ -3,6 +3,7 @@
 -- The app writes "par;wMsgLeader..." to %TMP%\DcsAtc-Wing.txt (par as in the DCS radio menu: 1-3 wingman 2-4, 5 flight). Performs the menu item
 -- that sends this message to that recipient, with the menu's own parameters: independent of the module's numbering and of the DCS language, no keys.
 -- Reply as event file %TMP%\DcsAtc-Menu\*.evt "WING;result;par;msg".
+-- "MENU;state" (read only) replies "<open|closed> <main|dialog> <stage>": menu shown, DCS shows its own dialog instead of the main menu, stage of its tanker dialog ('-' none).
 local tmp = os.getenv('TMP') or os.getenv('TEMP') or ''
 local wingFile, inDir, n = tmp .. '\\DcsAtc-Wing.txt', tmp .. '\\DcsAtc-Menu', 0   -- '\\' required: Lua 5.1 turns '\D' into just 'D'
 
@@ -52,9 +53,26 @@ local function wingPoll()
   h:close()
   os.remove(wingFile)
   local ok, r
-  if text:match('^MENU') then   -- "MENU;state": is the radio menu shown? (the app closes a leftover open menu before its key presses); read only
+  if text:match('^MENU') then   -- "MENU;state": "<open|closed> <main|dialog> <stage>", read only (the app closes a leftover open menu before its key presses)
     local P = package.loaded['RadioCommandDialogsPanel'] or rawget(_G, 'RadioCommandDialogsPanel')
-    ok, r = pcall(function() return P and P.isVisible and (P.isVisible() and 'open' or 'closed') or 'no radio menu' end)
+    ok, r = pcall(function()
+      if not (P and P.isVisible) then return 'no radio menu' end
+      local s = P.isVisible() and 'open' or 'closed'
+      -- Forum (jojojung): DCS opens its own "Tanker" dialog after "Intent to refuel", where the same keys mean other things; stage = its fsm state, '-' = no such dialog.
+      -- Found by its stage 'Cleared contact' (stage names are not localised, the dialog name is). Internals missing (other DCS version): old one-word reply.
+      local ok2, more = pcall(function()
+        assert(P.commonCommandMenuIt)
+        local stage = '-'
+        for _, byName in pairs(P.commandDialogIts) do
+          for _, it in pairs(byName) do
+            local d = it.element_
+            if d.dialogFsmData.transitions['Cleared contact'] then stage = tostring(d.dialogFsm.state) end
+          end
+        end
+        return (P.curDialogIt ~= P.commonCommandMenuIt and 'dialog' or 'main') .. ' ' .. stage
+      end)
+      return ok2 and s .. ' ' .. more or s
+    end)
   else
     local par, name = text:match('^(%d+);([%w_]+)')
     ok, r = pcall(wing, tonumber(par), name or '')

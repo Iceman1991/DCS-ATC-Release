@@ -1,4 +1,4 @@
-DCS-ATC 0.23.10 ALPHA – sprechende Flugsicherung für DCS World (alle Karten, getestet im Kaukasus)
+DCS-ATC 0.23.11 ALPHA – sprechende Flugsicherung für DCS World (alle Karten, getestet im Kaukasus)
 =====================================================================
 
 !! ALPHA-VERSION !!
@@ -45,7 +45,7 @@ Benutzung
      Das Funkrad zeigt die Frequenz des aktuellen Platzes. Dazu: ATIS 263.5 · AWACS 251.5 · Tanker 255.5 · JTAC 133.5
   3. Sprechen: SRS-Sprechtaste auf der Frequenz, englisch, z. B.
        "Kutaisi Ground, Enfield 1-1, request startup"  ·  "Overlord, Enfield 1-1, request picture"
-     Oder ohne Sprechen: Funkrad mit Taste ' (Apostroph) bzw. F10-Menü -> ATC.
+     Oder ohne Sprechen: Funkrad mit Taste ' (Apostroph) bzw. F10-Menü -> DCS-ATC.
      Funkrad: 1–9 wählen, Enter = vorgeschlagener Funkspruch, Rücktaste zurück, Esc zu.
      Bei offenem Funkrad speichert die Druck-Taste einen Screenshot mit Rad unter Bilder\DCS-ATC.
      In VR wird das Funkrad als Text im Spiel angezeigt (Einstellungen -> "Funkrad im Spiel (VR)").
@@ -61,7 +61,7 @@ Benutzung
   Nach der Landung lotst Ground mit Richtung und Entfernung zurück zu deiner Startposition.
 
 Einstellungen
-  Im Spiel: F10 -> ATC -> Einstellungen (Bodenpersonal).
+  Im Spiel: F10 -> DCS-ATC -> Einstellungen (Bodenpersonal).
   Standard für alle Missionen: Saved Games\DCS\Scripts\DcsAtc\DcsAtcOptions.lua
   Rufzeichen, Lautstärke, Funk, Funkrad, Sprache: Startmenü -> DCS-ATC -> Einstellungen (Fenster, wirkt sofort)
   Stimmen, Frequenzen und alles andere: im Einstellungen-Fenster "Alle Optionen (config.jsonc)"

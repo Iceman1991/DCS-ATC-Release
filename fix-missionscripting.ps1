@@ -1,5 +1,5 @@
 # Comments out sanitizeModule('os'/'io'/'lfs') in MissionScripting.lua (DCS updates reset the file).
-# Needs admin rights (Program Files). Without these three modules there is no F10 ATC menu and no airfield list.
+# Needs admin rights (Program Files). Without these three modules there is no F10 DCS-ATC menu and no airfield list.
 param([string]$Dcs = 'C:\Program Files\Eagle Dynamics\DCS World')
 $f = "$Dcs\Scripts\MissionScripting.lua"
 $t = [IO.File]::ReadAllText($f)

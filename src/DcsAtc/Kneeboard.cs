@@ -52,7 +52,7 @@ static class Kneeboard
             L($"  Sprache: PTT ({Wheel.KeyName(cfg.PttKey)}), englisch", $"  Voice: PTT ({Wheel.KeyName(cfg.PttKey)}), English"),
             L($"  Funkrad: Taste {Wheel.KeyName(cfg.WheelKey)} – 1-9 wählen,", $"  Radio wheel: key {Wheel.KeyName(cfg.WheelKey)} – 1-9 select,"),
             L("     0/Enter = Vorschlag, Rücktaste, Esc", "     0/Enter = suggestion, Backspace, Esc"),
-            "  F10 -> ATC -> Ground / Tower / Approach",
+            "  F10 -> DCS-ATC -> Ground / Tower / Approach",
             "",
             L("ABLAUF", "SEQUENCE"),
             "  Ground: request startup",

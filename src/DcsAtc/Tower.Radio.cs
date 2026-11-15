@@ -442,9 +442,10 @@ public partial class Tower
                         return Neg($"{c}, negative, {CrpSay(dq.Name)} departure is for runway {string.Join(" and ", dq.Rwy.Select(RwSay))}, runway {RwSay(rw)} in use. Report ready for departure.");
                     depRoute = dq;
                 }
-                if (F.Charted && dir != null && !F.Exit[rw].Contains(dir))   // K20: entry-only CRP is no exit of this runway on the chart
+                bool exitCh = F.Charted && ExitChart(rw);   // no exit in the chart for this runway: as without a chart
+                if (exitCh && dir != null && !F.Exit[rw].Contains(dir))   // K20: entry-only CRP is no exit of this runway on the chart
                     return Neg($"{c}, negative, no departure via {CrpSay(dir!)} from runway {RwSay(rw)}. Exit via {string.Join(", ", F.Exit[rw].Select(CrpSay))}, report ready for departure.");
-                exitDir = F.Charted ? dir ?? (exitDir != null && F.Exit[rw].Contains(exitDir) ? exitDir : F.Exit[rw][0]) : dir ?? exitDir;   // A92: without a map the named direction stays as the departure direction (no CRP)
+                exitDir = exitCh ? dir ?? (exitDir != null && F.Exit[rw].Contains(exitDir) ? exitDir : F.Exit[rw][0]) : dir ?? exitDir;   // A92: without a map the named direction stays as the departure direction (no CRP)
                 if (Has(n, "unrestricted", "spiral", "tactical departure", "combat departure"))   // kept until the takeoff clearance (also while still taxiing)
                     (climbOut, climbFt) = (Has(n, "spiral", "tactical", "combat") ? "tactical" : "free", AltSlot(n) ?? 0);
                 bool onRwy = t != null && OnRunwayPos(t.X, t.Z);
@@ -690,7 +691,7 @@ public partial class Tower
             case "pattern":
             {
                 if (t != null && Dist(t.X, t.Z, CX, CZ) > 5 * NM)
-                    return Neg($"{c}, negative, you are {Where(t)}, not in the pattern. Report {(F.Charted ? "C R P or " : "")}initial.");
+                    return Neg($"{c}, negative, you are {Where(t)}, not in the pattern. Report {(F.Charted && EntryChart(rw) ? "C R P or " : "")}initial.");
                 if (t != null && PatternOffset(t.X, t.Z, rw) < -900)
                     return Say($"{c}, wrong side, {Hand(rw)} pattern runway {RwSay(rw)}, report base.");
                 // A44: "base" after the break or in the pattern in base position (or already on final) is, like "final", the landing report; gear up without "gear down": first "check wheels down"
@@ -742,7 +743,7 @@ public partial class Tower
             {
                 arrRoute = null;
                 vec = null; crpAsked = crpWaved = false;   // new attempt to C R P: reporting obligation from the start
-                if (!F.Charted)   // without map: radar vectoring by terrain
+                if (!F.Charted || !EntryChart(rw))   // without map (or runway without entries in the chart): radar vectoring by terrain
                 {
                     var no = $"{c}, negative, no reporting points at {F.Name.Replace('-', ' ')}. ";
                     if (holding) return Neg(no + "Continue holding.");
@@ -833,7 +834,7 @@ public partial class Tower
                     return Say(info + $"{Cap(Steer(t, fix, "the hold"))}, {AltTo(t, holdFt)}{HoldSpd(t)}, {(HoldAt(fix) is { } hr2 ? $"hold {hr2}, {MilesTxt(hd)} to go" : $"{MilesTxt(hd)} to the holding point")}, " +
                                $"I will call you there. {Cap(hold)}");
                 }
-                if (!F.Charted)
+                if (!F.Charted || !EntryChart(rw))
                 {
                     entry = null;
                     Phase = Phase.Entering; lastAltFt = PatternFt;   // R256: altitude already given

@@ -171,11 +171,19 @@ static partial class Program
         {   // menu state reply of DcsAtcWing.lua is no wingman result: sets the state, no info message
             while (SayQueue.TryTake(out _)) { }
             menuReply.Reset(); OnEvent("WING;open;MENU;state");
-            var mo = menuOpen; var mq = SayQueue.Count;
+            var mo = menuState; var mq = SayQueue.Count;
             OnEvent("WING;no radio menu;MENU;state");
-            if (mo != true || !menuReply.IsSet || menuOpen != null || mq != 0 || SayQueue.Count != 0) throw new Exception($"Menue-Antwort: {mo} {menuOpen} {mq}");
-            menuReply.Reset(); menuOpen = null;
+            if (mo != new MenuState(true, null, null) || !menuReply.IsSet || menuState != MenuUnknown || mq != 0 || SayQueue.Count != 0) throw new Exception($"Menue-Antwort: {mo} {menuState} {mq}");
+            menuReply.Reset(); menuState = MenuUnknown;
             Console.WriteLine("OK   Funkmenue-Zustand: Antwort von DcsAtcWing.lua setzt offen/unbekannt, keine Wingman-Meldung");
+        }
+        {   // forum (jojojung): three-word reply (menu, main/dialog, stage with spaces), old one-word reply; what to press per DCS stage
+            string Ms(string r) { var s = ParseMenuState(r); return $"{s.Open}/{s.Dialog}/{s.Stage}"; }
+            var ms = string.Join(",", new[] { "open dialog Pre-contact", "closed main -", "open dialog Cleared contact", "open", "closed", "no radio menu", "open main" }.Select(Ms));
+            var ta = string.Join(",", new[] { ("join", (string?)null), ("precontact", null), ("cleared", null), ("intent", "-"), ("join", "Closed"), ("join", "Pre-contact"), ("precontact", "Trail"), ("intent", "Pre-contact"),
+                ("cleared", "Cleared contact"), ("precontact", "Contact"), ("intent", "Fuel transfering") }.Select(t => TankerAction(t.Item1, t.Item2)));
+            if (ms != "True/True/Pre-contact,False/False/-,True/True/Cleared contact,True//,False//,//,True//" || ta != "intent,precontact,none,intent,intent,none,precontact,precontact,none,none,none") throw new Exception($"Funkmenue-Stufe: {ms} | {ta}");
+            Console.WriteLine("OK   Funkmenue-Stufe: Antwort mit drei Woertern (und alte mit einem) gelesen, Tanker-Taste je nach DCS-Dialogstufe (nur Ready pre-contact zur Stufe Pre-contact/Trail, nie Abort refuel)");
         }
         {   // forum (jojojung): the flight frequency of the own AI wingmen is monitored (it was not: orders spoken there never arrived), a controller frequency is not taken twice
             var ku = Flights.Units;

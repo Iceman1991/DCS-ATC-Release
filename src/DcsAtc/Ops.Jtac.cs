@@ -53,6 +53,8 @@ partial class Ops
             ?? mine.FirstOrDefault(l => l.Id == casL)
             ?? (me.Tel is { } t ? mine.OrderBy(l => Dist(t.X, t.Z, l.X, l.Z)).FirstOrDefault() : mine.FirstOrDefault());
     }
+    /// Modulation of the mission leader on this frequency (JTAC on FM); null = none or not set in the mission.
+    internal static string? ModOn(double mhz) => Leaders.FirstOrDefault(l => !string.IsNullOrEmpty(l.Mod) && l.Freq > 0 && Math.Abs(l.Freq - mhz) < 0.01)?.Mod.ToUpperInvariant();
     /// K3 (#7): frequency of the JTAC / FAC(A) the player would reach (mission frequency, otherwise config); 0 = none.
     public double JtacFreqFor(Me me) => LeaderFor(me) is { } l ? (l.Freq > 0 ? l.Freq : DefFreq) : 0;
     (string Name, double X, double Z)? IpFor(Me me, Trg t) =>
@@ -559,6 +561,7 @@ partial class Ops
         check(o6.JtacFreqFor(m6 with { Freq = 251.5 }) == 251.5 && o6.JtacFreqFor(m6 with { Freq = DefFreq }) == DefFreq && o6.JtacFreqFor(m6 with { Coalition = 1 }) == 0,
               "K3 (#7): Funkrad nennt die Missionsfrequenz des JTAC, ohne eigene die Config, ohne JTAC keine");
         Leaders = new() { fa };
+        check(ModOn(251.5) == "FM" && ModOn(251.505) == "FM" && ModOn(DefFreq) == null && ModOn(134.0) == null, "JTAC auf FM in der Mission: Sendung auf dessen Frequenz in FM, Config-Frequenz/Tower ohne Leiter -> Cfg.Modulation");
         var f1 = o6.OnTranscript("JTAC", "Rover checking in", m6, none, fl, 40, false);
         check(f1.Count == 1 && f1[0].Role == "FACA" && f1[0].Freq == 251.5 && f1[0].Text.Contains("Type 1 control") && f1[0].Text.Contains("two APCs moving"), "J8: FAC(A) mit Sicht auf den Spieler -> Type 1, Rolle FACA, eigene Frequenz -> " + string.Join(" | ", f1.Select(c => c.Text)));
         var fn = Say(o6, m6, "JTAC: ready to copy", 41);
