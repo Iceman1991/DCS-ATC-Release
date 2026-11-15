@@ -82,6 +82,7 @@ public class Config
     public string Mode { get; set; } = "host";         // "client" = radio wheel only for fellow players (requests via DCS chat to the host)
     public bool Dedicated { get; set; } = false;       // dedicated server without a player at the PC: no radio wheel/overlay/keys/microphone, only mission data + SRS; automatic when DCS_server runs without DCS
     public string SrsPath { get; set; } = @"C:\Program Files\DCS-SimpleRadio-Standalone";
+    public bool SrsStart { get; set; } = true;   // start SRS server and client if they are not running; false = start neither (server admins with their own SRS server, forum Killg0re NL)
     public bool SrsAutoConnect { get; set; } = true;   // connect SRS client to the local SRS server after start (like the SRS DCS hook), only if not yet connected
     public int TelemetryPort { get; set; } = 18500;
 }
@@ -1085,7 +1086,8 @@ static partial class Program
         foreach (var (name, full) in new[] { ("SRS-Server", server), ("SRS-Client", client) }.Take(Dedicated ? 1 : 2))   // Dedicated server: no SRS client (nobody listens at the PC)
         {
             if (full == null) { Console.WriteLine("      " + L($"{name} nicht gefunden in \"{Cfg.SrsPath}\" – SrsPath in config.jsonc bzw. Einstellungen prüfen.", $"{name} not found in \"{Cfg.SrsPath}\" – check SrsPath in config.jsonc or the settings.")); continue; }
-            if (Process.GetProcessesByName(Path.GetFileNameWithoutExtension(full)).Length > 0 || (full == server && PortOpen(SrsPort))) continue;   // already running (also command-line server)
+            if (!Cfg.SrsStart) { Console.WriteLine("      " + L("SRS wird nicht gestartet (SrsStart aus).", "SRS is not started (SrsStart off).")); break; }
+            if (Process.GetProcessesByName(Path.GetFileNameWithoutExtension(full)).Length > 0 || (full == server && (PortOpen(SrsPort) || Process.GetProcessesByName("SRS-Server").Length + Process.GetProcessesByName("SR-Server").Length > 0))) continue;   // already running (also command-line server, or started from another folder)
             Process.Start(new ProcessStartInfo(full) { WorkingDirectory = Path.GetDirectoryName(full)!, UseShellExecute = true });
             Console.WriteLine($"      {Path.GetFileName(full)} " + L("gestartet.", "started."));
             if (full == server)   // wait until the server accepts connections

@@ -109,6 +109,7 @@ DCS-ATC can also run on a PC that hosts a DCS dedicated server (`DCS_server.exe`
   - Success shows `SRS client connected to 127.0.0.1:5002.`
   - Failure shows `SRS client did not connect – enter 127.0.0.1:5002 in the client and press Connect.`
   - To turn this off, set `"SrsAutoConnect": false`.
+- **Your own SRS server.** If you start the SRS server yourself (a dedicated server with its own SRS setup), set `"SrsStart": false` in `config.jsonc`. DCS-ATC then starts neither the SRS server nor the SRS client and uses the server that is running.
 - **Multiplayer.** Everyone connects their SRS client to the SRS server on the host's PC, which is the PC running DCS-ATC.
 - **Tuning frequencies.** All frequencies are AM.
   - **Airfields** use their own DCS frequency, the one shown on the F10 map. Ground, Tower and Approach share it, and you can use either the UHF or the VHF frequency. Examples on Caucasus: Kutaisi 263.0 / 134.0, Senaki 261.0 / 132.0, Batumi 260.0 / 131.0.
@@ -2085,6 +2086,7 @@ DCS still only operates the basket or boom through its own F-menu tanker dialog.
 - This uses `"CommsKey"` (the DCS radio menu key as a scan code, default `43`, which is `\` on US and `#` on German keyboards). With `0`, DCS-ATC doesn't press the menu. Older `config.jsonc` files don't list it; the default applies. If your menu key is a different one, add the line, e.g. `"CommsKey": 43,`.
 - The DCS radio menu must be closed when DCS-ATC presses it. Don't put your SRS PTT on the same buttons as a DCS radio PTT that opens the menu (e.g. the Hornet's COMM 1 / COMM 2 with Easy Communication): DCS-ATC's press then lands in the open menu and closes it.
 - *Ready pre-contact* is pressed until your first contact. After that a further "pre-contact" call presses nothing: when you slip off the basket DCS keeps its clearance, and F1 in the DCS menu would then be *Abort refuel* or, once DCS has closed its tanker dialog, the *Flight* menu. Just plug in again. After a full tank a new "pre-contact" sends *Intent to refuel* again; call "pre-contact" once more for *Ready pre-contact*.
+- If the DCS radio menu is open when DCS-ATC wants to press it, or stays open afterwards because DCS missed a key, DCS-ATC closes it and presses the keys once more. This needs the AI wingmen part of the mod (`DcsAtcWing.lua`); without it the keys are pressed once as before.
 - With Easy Communication off, DCS-ATC doesn't press the menu either: send *Intent to refuel* and *Ready pre-contact* yourself with your radio's own menu key (or VAICOM).
 - **Other players** in multiplayer operate the DCS tanker menu themselves.
 
@@ -2821,7 +2823,7 @@ The chart editor is a page in the browser that writes reporting points and route
 
 ### Kneeboard pages
 
-At every mission start DCS-ATC puts its kneeboard pages into `Saved Games\DCS\Kneeboard`. DCS shows them in the kneeboard of every aircraft. The pages: radio, airfields with frequencies, patterns and CRPs, arrival and departure routes, navaids, AWACS and tankers. The frequencies are those of the running mission.
+At every mission start DCS-ATC puts its kneeboard pages into `Saved Games\DCS\Kneeboard`. DCS shows them in the kneeboard of every aircraft. The pages: radio, airfields with frequencies, patterns and CRPs, arrival and departure routes, navaids, AWACS and tankers, and two pages with the radio phrases for tanker, carrier, wingmen, JTAC and range. The frequencies are those of the running mission.
 
 - On every map, in the language of the interface (German or English). On maps with many airfields the tables run over several pages.
 - Patterns, CRPs and routes are listed for the airfields with procedures: built in for the Caucasus, otherwise from your `charts.jsonc` (see [Own airfield procedures](#own-airfield-procedures-chartsjsonc)). The routes page gives the runways of each route, its fixes in order and their altitudes ("9000+" = at or above, "5000-" = at or below).
@@ -2984,6 +2986,7 @@ The file is in the installation folder: `%LOCALAPPDATA%\Programs\DCS-ATC\config.
 | `SrsPath` | `"C:\\Program Files\\DCS-SimpleRadio-Standalone"` | SRS folder. If it is wrong, DCS-ATC uses the registry entry or the running SRS. |
 | `SrsListen` | `true` | Hear all players' calls through SRS. With SRS connected, your own push-to-talk key is ignored. |
 | `SrsAutoConnect` | `true` | Automatically connect an SRS client that isn't connected yet to the local SRS server. |
+| `SrsStart` | `true` | Start the SRS server and client if they are not running. `false`: DCS-ATC starts neither, for a server whose SRS you start yourself. |
 | `TelemetryPort` | `18500` | Local UDP port for your own aircraft's data. The export script sends to 18500, so leave this as it is. |
 
 Own frequencies per airfield and controller are not in `config.jsonc` but in the separate file `frequencies.jsonc`; they apply as soon as you save it. See [Custom frequencies per airfield](#custom-frequencies-per-airfield).

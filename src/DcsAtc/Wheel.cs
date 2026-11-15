@@ -686,7 +686,10 @@ sealed class Wheel : Form
     struct KeyInput { [FieldOffset(0)] public int Type; [FieldOffset(10)] public ushort Scan; [FieldOffset(12)] public uint Flags; }
 
     /// Operate the DCS radio menu: tap scancodes one after another, only while DCS is in front (otherwise the keys land elsewhere).
-    public static void PressDcs(params ushort[] scans) => new Thread(() =>
+    public static void PressDcs(params ushort[] scans) => new Thread(() => PressDcsSync(scans)) { IsBackground = true }.Start();
+
+    /// Same on the calling thread (blocks for the key timings).
+    public static void PressDcsSync(params ushort[] scans)
     {
         foreach (var s in scans)
         {
@@ -697,7 +700,7 @@ sealed class Wheel : Form
                 Thread.Sleep(up == 0 ? 60 : 90);   // DCS polls keys per frame (≥ 1 frame pressed, 2–3 frames until the next): menu only briefly visible
             }
         }
-    }) { IsBackground = true }.Start();
+    }
 
     static bool DcsInFront()
     {

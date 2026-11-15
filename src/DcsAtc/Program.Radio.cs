@@ -38,6 +38,7 @@ static partial class Program
             if (WingChatter(tx.FreqMHz, p, text)) { Trace("SRS", $"{tx.FreqMHz:0.000} MHz unit {tx.UnitId} '{tx.Name}': Flight-Frequenz, kein Wingman-Befehl: {text}"); return; }
             if (p != null) p.CalledOn = tx.FreqMHz;   // K2: reply names this frequency
             if (p != null && role is "AWACS" or "Tanker" or "Carrier") role = OpsPick(p, tx.FreqMHz, text, role);   // #3, #17: shared AWACS/tanker/carrier frequency
+            if (p != null && role != null) role = OpsNamed(p, text, role);
             if (p != null && shared.Via is { } sv)
             {
                 if (SharedChoice(p, tx.FreqMHz, text, sv, role!) is not { } toField) return;   // unclear: asked back
@@ -80,6 +81,11 @@ static partial class Program
         if ((Ops.RoleOf(n, p.Callsign) is ("AWACS" or "Tanker") and var r0 ? r0 : cv && p.Boat.Wants(n) ? "Carrier" : null) is { } r) p.OpsPick = (mhz, r);
         return p.OpsPick is { } op && Math.Abs(op.Mhz - mhz) < 0.01 ? op.Role : role;
     }
+
+    /// Forum (jojojung, log): AWACS or tanker called by name on the JTAC or range frequency (wrong radio): the named station answers, not the JTAC with a 9-line.
+    /// Name within the first three words: "picture" or "spike" later in a JTAC call stays with the JTAC.
+    internal static string OpsNamed(Pilot p, string text, string role) =>
+        role is "JTAC" or "Range" && Ops.RoleOf(string.Join(' ', Tower.Normalize(text).Split(' ').Take(3)), p.Callsign) is ("AWACS" or "Tanker") and var named ? named : role;
 
     /// Role of a called frequency: the tanker frequency DCS tuned for the sender (R387, also if it equals an airfield frequency), config, mission AWACS/carrier; null = airfield frequency or unknown.
     internal static string? SrsRole(Pilot? p, double mhz) =>
@@ -315,6 +321,7 @@ static partial class Program
         if (e.Length < 2) return;
         if (e[0] == "WING")   // DcsAtcHook.lua: wingman command performed ("ok") or why not
         {
+            if (e.Length > 2 && e[2] == "MENU") { menuOpen = e[1] == "open" ? true : e[1] == "closed" ? false : null; menuReply.Set(); return; }   // answer to MenuOpen(), not a wingman result
             if (e[1] == "ok") return;
             Log($"[DCS] Wingman-Befehl nicht gesendet: {e[1]} ({string.Join(";", e.Skip(2))})");
             lock (TowerLock) SayQueue.Add(new Tx(L($"Wingman: Befehl nicht gesendet ({e[1]}). Nimm das DCS-Funkmenü.", $"Wingman: command not sent ({e[1]}). Use the DCS radio menu."), "Info", "", Host()?.Gid ?? 0));
@@ -344,7 +351,7 @@ static partial class Program
                 if (mi is >= 1 and <= 10 && Cfg.CommsKey != 0)
                 {
                     Log($"[DCS] Funkmenü {e[2]} {mi}/{e[4]}");
-                    Wheel.PressDcs(MenuKeys(e[2], mi, int.Parse(e[4])));
+                    PressMenu(MenuKeys(e[2], mi, int.Parse(e[4])));
                     if (e[2] == "tanker") p.TankMenuAt = Now();   // R304: DCS then tunes the tanker frequency itself (Pick)
                 }
                 else if (mi == 0)
@@ -493,7 +500,7 @@ static partial class Program
                 var calls = p.Ops.OnTranscript(opsRole, text, MeOf(p) with { Freq = src == "SRS" ? p.CalledOn : 0 }, TrafficFor(p), Fields, Now(), conf < MinConf, Cfg.Frequencies.GetValueOrDefault("AWACS", 251.5), FieldWxOf);
                 if (p.Ops.Menu is { } mn && Cfg.CommsKey != 0 && MissionData && p == Host())   // basket/boom only via the DCS menu: "Intent to refuel" (mission looks it up in the list) or "Ready pre-contact"
                 {
-                    if (mn.Step == "precontact") { Log("[DCS] Funkmenü tanker Ready pre-contact"); Wheel.PressDcs((ushort)Cfg.CommsKey, 0x3B); p.TankMenuAt = Now(); }
+                    if (mn.Step == "precontact") { Log("[DCS] Funkmenü tanker Ready pre-contact"); PressMenu((ushort)Cfg.CommsKey, 0x3B); p.TankMenuAt = Now(); }
                     else AiCmd($"MENU;{p.Unit};tanker;{mn.Group};s");   // R304: s = DCS tanker stays mute, our controller speaks (without s: audible 15 s like the airfields); mission refuses without Easy Communication (issue #5)
                 }
                 p.Ops.Menu = null;
@@ -759,6 +766,38 @@ static partial class Program
         WingFq.Any(f => Math.Abs(f - mhz) < 0.005) && (p == null || p != Host() || WingCmd(Tower.Normalize(text), p.Callsign) == null);
 
     static readonly string WingFile =Path.Combine(Path.GetTempPath(), "DcsAtc-Wing.txt");   // DcsAtcHook.lua performs the radio menu item, reply as event "WING;result;par;msg"
+
+    static readonly ManualResetEventSlim menuReply = new(false);
+    static bool? menuOpen;   // written before menuReply.Set()
+    static readonly object menuKeysLock = new();
+
+    /// Is the DCS radio menu shown? "MENU;state" to DcsAtcWing.lua (read only). null = no answer / no radio menu (script missing, older mod files, DCS busy).
+    /// Waits for the event file that PollMenu delivers: never call while holding TowerLock.
+    static bool? MenuOpen()
+    {
+        menuReply.Reset(); menuOpen = null;
+        try { File.WriteAllText(WingFile + ".tmp", "MENU;state"); File.Move(WingFile + ".tmp", WingFile, true); }
+        catch (IOException) { return null; }
+        return menuReply.Wait(1000) ? menuOpen : null;
+    }
+
+    /// DCS radio menu sequence (starts with CommsKey, a toggle): closes a menu left open first; if a key got lost and the menu stays open, closes it and tries once more.
+    static void PressMenu(params ushort[] keys) => new Thread(() =>
+    {
+        lock (menuKeysLock)
+        {
+            var close = (ushort)Cfg.CommsKey;
+            for (int round = 0; round < 2; round++)
+            {
+                if (MenuOpen() == true) Wheel.PressDcsSync(close);
+                Wheel.PressDcsSync(keys);
+                Thread.Sleep(700);
+                if (MenuOpen() != true) return;
+                Wheel.PressDcsSync(close);
+                if (round == 0) Log("[DCS] Funkmenü blieb offen, Tasten erneut");
+            }
+        }
+    }) { IsBackground = true }.Start();
 
     /// K2/K4: airfield frequency on which p hears the controller: tuned (SRS, most recently called first), otherwise the called (SRS state may be older than the call), otherwise VHF (= map), otherwise UHF. 0 = without Radio.lua.
     /// any: any controller frequency of the airfield (Tower.HeardOn, own per controller from AirfieldFrequencies), otherwise that of the tower.

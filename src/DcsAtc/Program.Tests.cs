@@ -168,6 +168,15 @@ static partial class Program
             "Texaco 1-2, Enfield 1-1, request rejoin", "Two, unable", "flight level 240", "Kutaisi Tower, Enfield 1-1, ready for departure", "Two, echelon left", "Three, radar off" }.Select(Wc));
         if (wcs != "1:GoTrail,2:JoinUp,5:EngageBandits,3:FulfilTheTaskAndReturnToBase,5:FlightCheckIn,1:EngageMyTarget,-,-,-,-,1:EchelonLeft,2:RadarOff") throw new Exception("Wingman-Befehle: " + wcs);
         Console.WriteLine("OK   Wingman-Befehle: Two/Enfield 1-3/Flight + Befehl -> Empfaenger wie im DCS-Menue, fremdes Rufzeichen und Rottenfunk ohne Befehl nicht");
+        {   // menu state reply of DcsAtcWing.lua is no wingman result: sets the state, no info message
+            while (SayQueue.TryTake(out _)) { }
+            menuReply.Reset(); OnEvent("WING;open;MENU;state");
+            var mo = menuOpen; var mq = SayQueue.Count;
+            OnEvent("WING;no radio menu;MENU;state");
+            if (mo != true || !menuReply.IsSet || menuOpen != null || mq != 0 || SayQueue.Count != 0) throw new Exception($"Menue-Antwort: {mo} {menuOpen} {mq}");
+            menuReply.Reset(); menuOpen = null;
+            Console.WriteLine("OK   Funkmenue-Zustand: Antwort von DcsAtcWing.lua setzt offen/unbekannt, keine Wingman-Meldung");
+        }
         {   // forum (jojojung): the flight frequency of the own AI wingmen is monitored (it was not: orders spoken there never arrived), a controller frequency is not taken twice
             var ku = Flights.Units;
             Flights.Units = new() { ["w2"] = new Flights.Unit("w2", "Enfield", "FA-18C_hornet", "Enfield12", 2, 0, 0, 6000, true, 0.8, 124, new[] { 0, 0, 0, 0, 0 }, Gid: 7),
@@ -1459,6 +1468,11 @@ static partial class Program
         Carrier.Boats = boats17; Ops.TankerFreq.Clear(); pr.OpsPick = null;
         if (i17 != "Carrier Carrier Tanker Tanker Carrier") throw new Exception("Issue #17 Träger und Tanker auf einer Frequenz: " + i17);
         Console.WriteLine("OK   Issue #17: Träger und Tanker auf einer Frequenz, Marshal/Mother/Ball entscheiden für den Träger, Tankername für den Tanker");
+        // Forum (jojojung): AWACS/tanker named on the JTAC or range frequency: the named station answers, a JTAC call stays with the JTAC
+        var onm = string.Join(" ", new[] { ("Overlord, Enfield 1-1, airborne", "JTAC"), ("Texaco 1-1, Enfield 1-1, ready for contact", "JTAC"), ("Axeman, Enfield 1-1, request picture", "JTAC"),
+                                           ("Enfield 1-1, in hot", "Range"), ("Overlord, Enfield 1-1, picture", "AWACS") }.Select(t => OpsNamed(pr, t.Item1, t.Item2)));
+        if (onm != "AWACS Tanker JTAC Range AWACS") throw new Exception("Forum jojojung AWACS/Tanker auf JTAC-Frequenz: " + onm);
+        Console.WriteLine("OK   Forum jojojung: AWACS oder Tanker mit Namen auf der JTAC-/Range-Frequenz antwortet die genannte Station, nicht der JTAC");
         // R393: "say again" without a station goes to the controller who spoke last (ops role within 5 minutes), otherwise to the airfield (which clears it)
         pr.LastOps = ("Tanker", Now());
         Request(pr, "Enfield 1-1, say again", "RAD", false);

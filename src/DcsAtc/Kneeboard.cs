@@ -11,7 +11,7 @@ static class Kneeboard
     /// All file names DCS-ATC may write (Program.WriteKneeboard: the ones not written get a note and go when the mission ends). DCS shows the pages in
     /// name order: a table continues on "ATC-3a2-…", "ATC-3a3-…", which sort between "ATC-3-" and "ATC-3b-".
     public static readonly string[] Names = new[] { "ATC-1-Funk", "ATC-2-Kutaisi" }.Concat(PageNames("ATC-3-Plaetze", FieldPages)).Append("ATC-3b-Platzrunden").Append("ATC-3c-Routen")
-        .Concat(PageNames("ATC-4-Navigation", NavPages)).Append("ATC-5-AWACS").Append("ATC-6-Hinweise").ToArray();
+        .Concat(PageNames("ATC-4-Navigation", NavPages)).Append("ATC-5-AWACS").Append("ATC-5b-Funksprueche").Append("ATC-5c-Funksprueche").Append("ATC-6-Hinweise").ToArray();
     static IEnumerable<string> PageNames(string name, int n) => Enumerable.Range(1, n).Select(i => i == 1 ? name : name.Insert(name.IndexOf('-', 4), "a" + i));
 
     /// Writes the pages of this map and returns their files: radio, airfields (frequencies of the mission), patterns/CRPs and named routes of the charted
@@ -144,6 +144,8 @@ static class Kneeboard
         }
         Table("ATC-4-Navigation", NavPages, L("NAVIGATIONSANLAGEN", "NAVAIDS"), new[] { L("PLATZ", "AIRFIELD").PadRight(18) + " ILS              TACAN    VOR" }, nav);
         One("ATC-5-AWACS", "AWACS / TANKER", AwacsLines(cfg));   // N35
+        One("ATC-5b-Funksprueche", L("FUNKSPRÜCHE 1/2", "PHRASES 1/2"), PhraseLines(1), true);   // forum: phrases on the kneeboard
+        One("ATC-5c-Funksprueche", L("FUNKSPRÜCHE 2/2", "PHRASES 2/2"), PhraseLines(2), true);
         if (cauc) One("ATC-6-Hinweise", L("HINWEISE (KARTE)", "NOTES (CHART)"), NotesLines());   // K27/K40
         Console.WriteLine(L($"Kneeboard-Seiten in {dir}", $"Kneeboard pages in {dir}"));
         return done;
@@ -191,6 +193,59 @@ static class Kneeboard
         L("ANTWORT-STICHWORTE", "REPLY KEYWORDS"),
         "  hostile, bogey, neutral | single, two contacts,",
         "  heavy | hot, flank, beam, drag + " + L("Himmelsrichtung", "compass direction"),
+    };
+
+    /// Phrases of tanker, carrier, wingmen (page 1) and JTAC, range (page 2); the words are those of docs/MANUAL.md (Ops.OnTranscript, Carrier, WingCmds).
+    internal static string[] PhraseLines(int page) => page == 1 ? new[]
+    {
+        L("TANKER (Rufname der Mission, z. B. Texaco)", "TANKER (callsign from the mission, e.g. Texaco)"),
+        "  request rejoin",
+        "  visual               " + L("(ab 8 NM: cleared to join)", "(within 8 NM: cleared to join)"),
+        "  observation left wing",
+        "  pre-contact          (-> cleared contact)",
+        L("  Kontakt und Abreißen meldet DCS-ATC selbst", "  Contact and disconnect are called by DCS-ATC"),
+        "  disconnect, right wing",
+        "  refuel complete",
+        "  say position / altitude / speed / TACAN",
+        "",
+        L("TRÄGER (Case I/II/III)", "CARRIER (Case I/II/III)"),
+        "  Marshal, Enfield 1-1, checking in,",
+        "    mother's 360 for 35, angels 18, state 6.2",
+        "  see you at angels 2 (I) / angels 6 (II, III)",
+        "  commencing, angels 6, state 5.2   (II, III)",
+        "  platform | up and on | down and left",
+        "  Hornet ball, 5.2",
+        "  pigeons | state 4.5",
+        "  airborne | on top, angels 8       (" + L("Start", "launch") + ")",
+        "",
+        L("WINGMEN (Flug-Frequenz, Nummer zuerst)", "WINGMEN (flight frequency, number first)"),
+        "  Two, go trail | Flight, engage bandits",
+        "  rejoin | cover me | RTB | hold position",
+        "  wedge | echelon right | finger four",
+        "  radar off | ECM on | smoke on | jettison",
+        "  Flight, check in",
+    } : new[]
+    {
+        L("JTAC / FAC(A) (Rufname der Mission, z. B. Axeman)", "JTAC / FAC(A) (callsign from the mission, e.g. Axeman)"),
+        "  Axeman, Enfield 1-1, checking in, 4 GBU-12,",
+        "    playtime 30 minutes",
+        "  ready to copy",
+        "  readback, line 4 ..., line 6 ...,",
+        "    restrictions final attack heading ...",
+        "  request mark | laser on",
+        "  tally target",
+        "  in from the west     (-> cleared hot)",
+        "  bombs away | off",
+        "  ready for next target | request re-attack",
+        "  say again line 6 | laser code | threats",
+        "  checking out",
+        "",
+        L("RANGE (Zone \"Range…\" in der Mission)", "RANGE (trigger zone \"Range…\" in the mission)"),
+        "  Range Alpha, Enfield 1-1, checking in",
+        "  IP inbound",
+        "  in hot | in dry      " + L("(erst nach cleared hot werfen)", "(release only after cleared hot)"),
+        "  off safe | winchester",
+        "  checking out",
     };
 
     /// K27/K40: fixed list of notes from the VADs (restricted areas and neighbor references are not rebuilt, DCS-ATC does not know them), without coordinates.
@@ -311,6 +366,15 @@ static class Kneeboard
             w = Write(tmp, many, cfg);
             if (Has(w, "ATC-2-Kutaisi") || Has(w, "ATC-6-Hinweise") || !Has(w, "ATC-3c-Routen") || !Has(w, "ATC-3a2-Plaetze") || !Has(w, "ATC-3a3-Plaetze") || Has(w, "ATC-3a4-Plaetze") || !Has(w, "ATC-1-Funk"))
                 throw new Exception("Kneeboard: Seiten andere Karte: " + string.Join(" ", w.Select(Path.GetFileName)));
+                foreach (var en2 in new[] { false, true })   // phrases pages: written, block headings, nothing wider than the page (Consolas 21 px, 56 chars)
+            {
+                Ui.En = en2;
+                var ph1 = PhraseLines(1); var ph2 = PhraseLines(2);
+                if (!Has(w, "ATC-5b-Funksprueche") || !Has(w, "ATC-5c-Funksprueche") || !ph1.Any(l => l.StartsWith("TANKER")) || !ph1.Any(l => l.StartsWith("CARRIER") || l.StartsWith("TRÄGER")) ||
+                    !ph1.Any(l => l.StartsWith("WINGMEN")) || !ph2.Any(l => l.StartsWith("JTAC")) || !ph2.Any(l => l.StartsWith("RANGE")) || ph1.Concat(ph2).Any(l => l.Length > 56))
+                    throw new Exception("Kneeboard: Funkspruch-Seiten: " + string.Join("|", ph1.Concat(ph2).Where(l => l.Length > 56)));
+            }
+            Ui.En = true;
             var awEn = AwacsLines(cfg);
             if (!awEn[0].StartsWith("FREQUENCIES") || awEn.Concat(NotesLines()).Any(l => l.Contains("Rufname") || l.Contains("Platz")) || NotesLines().Any(l => l.Length > 54) || RouteLines(many)[0] != "+ = at or above, - = at or below (ft)")
                 throw new Exception("Kneeboard: englische Seiten: " + string.Join("|", awEn));

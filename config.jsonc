@@ -68,6 +68,7 @@
   "ReplyPause": 1.5,   // Sekunden Pause zwischen zwei Funksprüchen auf einer Frequenz (Pilot -> Lotse -> Rücklesen)
   "AiChatter": true,   // KI-Flüge funken hörbar mit (Anfrage, Antwort, Rücklesen)
   "SrsListen": true,   // alle Spieler sprechen direkt über SRS auf der Lotsen-Frequenz (PTT-Taste oben nur ohne SRS)
+  "SrsStart": true,   // SRS-Server und -Client starten, wenn sie nicht laufen; false = DCS-ATC startet keinen (z. B. Server mit eigener SRS-Instanz)
   "SrsAutoConnect": true,   // SRS-Client nach dem Start automatisch mit dem lokalen SRS-Server verbinden (127.0.0.1, Port aus der server.cfg), nur wenn er noch nicht verbunden ist; false = selbst verbinden
   "Atis": true,      // ATIS-Dauersendung für Plätze mit Spielern im Umkreis von 40 NM
   "RunwayLights": "silent",   // Bahnbefeuerung nachts über das DCS-ATC-Menü: "silent" (Platz bleibt stumm), "dcs" (DCS-Lotse antwortet 15 s hörbar), "off"

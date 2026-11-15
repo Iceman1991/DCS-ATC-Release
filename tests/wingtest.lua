@@ -98,6 +98,14 @@ load('Mods\\aircraft\\TF-51D\\comm.lua', 2)
 r, s = wing('1;wMsgLeaderJoinUp')
 check(r == 'ok' and s:find('^wMsgLeaderJoinUp%(1'), 'TF-51D (FighterWWII) Two rejoin -> ' .. tostring(r) .. ' ' .. s)
 
+local vis = true
+package.loaded.RadioCommandDialogsPanel.isVisible = function() return vis end
+r, s = wing('MENU;state')
+check(r == 'open' and s == '', 'MENU;state, Menue sichtbar -> ' .. tostring(r))
+vis = false
+r, s = wing('MENU;state')
+check(r == 'closed' and s == '', 'MENU;state, Menue zu -> ' .. tostring(r))
+
 tick = nil
 afterStart()
 check(started and tick ~= nil, 'Missionsstart: afterStart von DCS laeuft weiter, Abfrage neu gestartet')

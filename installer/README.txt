@@ -1,4 +1,4 @@
-DCS-ATC 0.23.9 ALPHA – talking air traffic control for DCS World (all maps, tested on Caucasus)
+DCS-ATC 0.23.10 ALPHA – talking air traffic control for DCS World (all maps, tested on Caucasus)
 ========================================================================
 
 !! ALPHA VERSION !!
@@ -20,7 +20,8 @@ Requirements
   - SRS (DCS-SimpleRadio-Standalone) in the default folder C:\Program Files\DCS-SimpleRadio-Standalone.
     DCS-ATC starts the SRS server and client itself (different folder: "SrsPath" in the settings).
     An SRS client that is not yet connected is connected to the local SRS server automatically
-    (via SRS's own auto-connect; to turn it off: "SrsAutoConnect": false in config.jsonc).
+    (via SRS's own auto-connect; to turn it off: "SrsAutoConnect": false in config.jsonc;
+    to stop DCS-ATC from starting SRS at all: "SrsStart": false).
   - Microphone; radio calls are in English
   - approx. 1.2 GB disk space. Speech recognition runs on a dedicated graphics card (under 1 second
     per radio call, about 1 GB video memory), otherwise on the CPU (a few seconds per radio call).

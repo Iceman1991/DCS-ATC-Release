@@ -111,6 +111,7 @@ DCS-ATC läuft auch auf einem PC mit DCS Dedicated Server (`DCS_server.exe`), an
   - Erfolg: `SRS-Client mit 127.0.0.1:5002 verbunden.`
   - Fehlschlag: `SRS-Client hat sich nicht verbunden – im Client 127.0.0.1:5002 eintragen und Connect drücken.`
   - Abschalten mit `"SrsAutoConnect": false`.
+- **Eigener SRS-Server.** Startest du den SRS-Server selbst (Dedicated Server mit eigenem SRS), setze `"SrsStart": false` in `config.jsonc`. DCS-ATC startet dann weder SRS-Server noch SRS-Client und nutzt den laufenden Server.
 - **Multiplayer.** Alle verbinden ihren SRS-Client mit dem SRS-Server auf dem PC des Hosts, also dem PC mit DCS-ATC.
 - **Frequenzen rasten.** Alle Frequenzen sind AM.
   - **Flugplätze** nutzen ihre eigene DCS-Frequenz, die auf der F10-Karte. Ground, Tower und Approach teilen sie sich, UHF oder VHF geht beides. Beispiele Kaukasus: Kutaisi 263.0 / 134.0, Senaki 261.0 / 132.0, Batumi 260.0 / 131.0.
@@ -2087,6 +2088,7 @@ DCS bedient Korb bzw. Boom aber nur über seinen eigenen Tankerdialog im F-Menü
 - Das nutzt `"CommsKey"` (DCS-Funkmenü-Taste als Scancode, Standard `43`, also `\` auf US- und `#` auf deutschen Tastaturen). Mit `0` drückt DCS-ATC das Menü nicht. Ältere `config.jsonc` enthalten die Zeile nicht, dann gilt der Standard. Ist deine Menütaste eine andere, die Zeile ergänzen, z. B. `"CommsKey": 43,`.
 - Das DCS-Funkmenü muss zu sein, wenn DCS-ATC drückt. Leg die SRS-PTT nicht auf dieselben Knöpfe wie eine DCS-Funk-PTT, die das Menü öffnet (z. B. COMM 1 / COMM 2 der Hornet mit Easy Communication): Der Druck von DCS-ATC landet sonst im offenen Menü und schließt es.
 - *Ready pre-contact* wird bis zu deinem ersten Kontakt gedrückt. Danach drückt ein weiteres „pre-contact“ nichts mehr: Rutschst du vom Korb, behält DCS seine Freigabe, und F1 im DCS-Menü wäre dann *Abort refuel* oder, wenn DCS seinen Tankerdialog geschlossen hat, das *Flight*-Menü. Einfach wieder andocken. Nach vollem Tank sendet ein neues „pre-contact“ wieder *Intent to refuel*; für *Ready pre-contact* noch einmal „pre-contact“ melden.
+- Ist das DCS-Funkmenü offen, wenn DCS-ATC es drücken will, oder bleibt es danach offen, weil DCS eine Taste verpasst hat, schließt DCS-ATC es und drückt die Tasten noch einmal. Das braucht den KI-Wingmen-Teil des Mods (`DcsAtcWing.lua`); ohne ihn werden die Tasten wie bisher einmal gedrückt.
 - Mit Easy Communication aus drückt DCS-ATC das Menü auch nicht: *Intent to refuel* und *Ready pre-contact* sendest du dann selbst mit der Menütaste deines Funkgeräts (oder VAICOM).
 - **Andere Spieler** im Multiplayer bedienen das DCS-Tankermenü selbst.
 
@@ -2824,7 +2826,7 @@ Der Verfahrens-Editor ist eine Seite im Browser, die Meldepunkte und Routen für
 
 ### Kneeboard-Seiten
 
-Bei jedem Missionsstart legt DCS-ATC seine Kneeboard-Seiten in `Saved Games\DCS\Kneeboard` ab. DCS zeigt sie im Kneeboard jedes Flugzeugs. Die Seiten: Funk, Plätze mit Frequenzen, Platzrunden und CRPs, An- und Abflugrouten, Navigationsanlagen, AWACS und Tanker. Die Frequenzen sind die der laufenden Mission.
+Bei jedem Missionsstart legt DCS-ATC seine Kneeboard-Seiten in `Saved Games\DCS\Kneeboard` ab. DCS zeigt sie im Kneeboard jedes Flugzeugs. Die Seiten: Funk, Plätze mit Frequenzen, Platzrunden und CRPs, An- und Abflugrouten, Navigationsanlagen, AWACS und Tanker, dazu zwei Seiten mit den Funksprüchen für Tanker, Träger, Wingmen, JTAC und Range. Die Frequenzen sind die der laufenden Mission.
 
 - Auf jeder Karte, in der Sprache der Oberfläche (Deutsch oder Englisch). Auf Karten mit vielen Plätzen laufen die Tabellen über mehrere Seiten.
 - Platzrunden, CRPs und Routen stehen für die Plätze mit Verfahren drin: Kaukasus eingebaut, sonst aus deiner `charts.jsonc` (siehe [Eigene Platzverfahren](#eigene-platzverfahren-chartsjsonc)). Die Routen-Seite nennt je Route die Bahnen, die Fixes in Reihenfolge und ihre Höhen („9000+“ = oder höher, „5000-“ = oder tiefer).
@@ -2987,6 +2989,7 @@ Die Datei liegt im Installationsordner: `%LOCALAPPDATA%\Programs\DCS-ATC\config.
 | `SrsPath` | `"C:\\Program Files\\DCS-SimpleRadio-Standalone"` | SRS-Ordner. Stimmt er nicht, nimmt DCS-ATC den Registry-Eintrag oder das laufende SRS. |
 | `SrsListen` | `true` | Sprüche aller Spieler über SRS hören. Mit SRS-Verbindung wird deine eigene Sprechtaste ignoriert. |
 | `SrsAutoConnect` | `true` | Einen noch nicht verbundenen SRS-Client automatisch mit dem lokalen SRS-Server verbinden. |
+| `SrsStart` | `true` | SRS-Server und -Client starten, wenn sie nicht laufen. `false`: DCS-ATC startet keinen von beiden, für einen Server, dessen SRS du selbst startest. |
 | `TelemetryPort` | `18500` | Lokaler UDP-Port für die Daten deines Flugzeugs. Das Export-Skript sendet an 18500, also so lassen. |
 
 Eigene Frequenzen je Platz und Lotse stehen nicht in `config.jsonc`, sondern in der eigenen Datei `frequencies.jsonc`; sie gelten sofort nach dem Speichern. Siehe [Eigene Frequenzen je Platz](#eigene-frequenzen-je-platz).

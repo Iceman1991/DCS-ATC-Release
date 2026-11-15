@@ -51,8 +51,14 @@ local function wingPoll()
   local text = h:read('*a') or ''
   h:close()
   os.remove(wingFile)
-  local par, name = text:match('^(%d+);([%w_]+)')
-  local ok, r = pcall(wing, tonumber(par), name or '')
+  local ok, r
+  if text:match('^MENU') then   -- "MENU;state": is the radio menu shown? (the app closes a leftover open menu before its key presses); read only
+    local P = package.loaded['RadioCommandDialogsPanel'] or rawget(_G, 'RadioCommandDialogsPanel')
+    ok, r = pcall(function() return P and P.isVisible and (P.isVisible() and 'open' or 'closed') or 'no radio menu' end)
+  else
+    local par, name = text:match('^(%d+);([%w_]+)')
+    ok, r = pcall(wing, tonumber(par), name or '')
+  end
   r = ok and r or 'error ' .. tostring(r)
   lfs.mkdir(inDir)
   n = n + 1
