@@ -4714,6 +4714,22 @@ public partial class Tower
             Check(T(f4a) == "Enfield one one, report final." && f4b.Any(m => m.Text.StartsWith("Enfield one one, go around, no landing clearance")) &&
                   f4b.Any(m => m.Role == "Info" && m.Text.StartsWith(L("Verstoß: keine Landemeldung Kutaisi 25", "Deviation: no landing report Kutaisi 25"))) && w4.Phase != Phase.ClearedLand,
                   "Meldepflicht #4 Platzrunde ohne Landemeldung: " + T(f4a) + " / " + T(f4b));
+            // #44: on the way to the overhead along the final at pattern altitude: no "report final", no go-around; low and gear down it stays an approach
+            var w44 = new Tower("Enfield 1-1");
+            w44.Tick(atC, none, 0);
+            (w44.Phase, w44.nav, w44.navName) = (Phase.Entering, ovh, "overhead");
+            var m44 = new List<Msg>();
+            for (int i = 0; i <= 74; i++) { var (x44, z44) = P("25", (4 - i * 0.05) * NM); m44.AddRange(w44.Tick(At(x44, z44, PatternFt * Ft - FieldElev, LandHdg("25"), 360 * Kt), none, 1 + i * 5)); }
+            var w44b = new Tower("Enfield 1-1");
+            w44b.Tick(atC, none, 0);
+            (w44b.Phase, w44b.nav, w44b.navName) = (Phase.Entering, ovh, "overhead");
+            var (x44a, z44a) = P("25", 2.4 * NM);
+            var (x44c, z44c) = P("25", 0.7 * NM);
+            var b44a = w44b.Tick(At(x44a, z44a, 2.4 * NM * Math.Tan(3 * Math.PI / 180) + 15, LandHdg("25"), 70) with { Gear = 1 }, none, 1);
+            var b44b = w44b.Tick(At(x44c, z44c, 0.7 * NM * Math.Tan(3 * Math.PI / 180) + 15, LandHdg("25"), 70) with { Gear = 1 }, none, 30);
+            Check(!m44.Any(m => m.Text.Contains("report final") || m.Text.Contains("go around") || m.Role == "Info") && w44.Phase == Phase.Entering &&
+                  b44a.Any(m => m.Text.Contains("report final")) && b44b.Any(m => m.Text.StartsWith("Enfield one one, go around, no landing clearance")),
+                  "#44 Weg zum Overhead entlang des Endanflugs in Platzrundenhöhe: " + T(m44) + " / " + T(b44a) + " / " + T(b44b));
             // Review l1: after "no clearance to join, remain outside the pattern" nevertheless in the pattern or after "remain outside the control zone" further into the zone:
             // once redirect with violation (debriefing), the notice "possible pilot deviation" comes separately
             var kow = new Tower("Enfield 1-1");

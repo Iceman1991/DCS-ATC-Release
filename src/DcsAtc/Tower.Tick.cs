@@ -624,7 +624,9 @@ public partial class Tower
             // A11: go-around with occupied runway also without landing clearance (Entering, Initial deep in final, Pattern), not Away (R11)
             // afterwards 60 s quiet on final: otherwise per tick again "go around" or in the climb right away "continue approach"/"cleared to land"
             bool gaQuiet = now - lastGa < 60;
-            if (!gaQuiet && !unannounced && (onRwy || !Emergency && EmgWithin(4)) && along < 0.8 * NM && (Phase != Phase.Initial || t.Agl < 150) && OnFinal(t.X, t.Z, t.Hdg, t.Agl, rw, 3 * NM))
+            // #44: on the way to the overhead at pattern altitude along the runway axis: no approach yet, the "overhead" call comes first (below pattern altitude it is one)
+            bool toOvh = Phase == Phase.Entering && navName == "overhead" && IndFt(t) >= PatternFt - 300;
+            if (!gaQuiet && !unannounced && !toOvh && (onRwy || !Emergency && EmgWithin(4)) && along < 0.8 * NM && (Phase != Phase.Initial || t.Agl < 150) && OnFinal(t.X, t.Z, t.Hdg, t.Agl, rw, 3 * NM))
             {
                 lastGa = now;
                 wentAround |= Phase == Phase.ClearedLand;   // N4: landing clearance withdrawn; new approach: too-low warning possible again (A97)
@@ -649,7 +651,7 @@ public partial class Tower
             }
             // Reporting duty: landing clearance only on the landing report (base, final, four mile final), then automatically once runway and preceding traffic are clear.
             // Without a report once "report final" (final 2.5 NM or base), below 0.8 NM or 300 ft "go around, no landing clearance" and debriefing
-            bool appr = !unannounced && !Emergency && Phase is Phase.Entering or Phase.Pattern && !(Phase == Phase.Entering && navName == "initial");   // on the way to the break: the "initial" call comes first
+            bool appr = !unannounced && !toOvh && !Emergency && Phase is Phase.Entering or Phase.Pattern && !(Phase == Phase.Entering && navName == "initial");   // on the way to the break: the "initial" call comes first
             if (appr && !landCall && !gaQuiet && fin3 && (along < 0.8 * NM || t.Agl < 300 * Ft))
             {
                 lastGa = now;

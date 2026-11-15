@@ -1266,6 +1266,7 @@ partial class Ops
     {
         HotEdge(now);
         var res = Flush(me, now);   // A72: completed drop (3 s without impact) as one call, also on the ground
+        if (tank == 4 && fullAt > -1e8 && now - fullAt >= 5) res.AddRange(Full(me, air));   // pending "full" (see fullAt)
         if (TankerBlock(me, air, now, lead) is { } tb) res.Add(tb);   // N44
         res.AddRange(TickLive(me, air, now, awacs));
         if (lead == null) res.AddRange(JtacTick(me, now));   // J9/J10 (wingmen: lead only)
@@ -1450,6 +1451,9 @@ partial class Ops
     /// DCS also reports the disconnect on every slip off the basket: it is wanted only with a (nearly) full tank, otherwise back to pre-contact (A66).
     double fuelAtContact, contactSum, rowLb, lastStop = -99;
     double ncAt = -1e9;   // #19: last contact without clearance
+    // Forum (jojojung, Hornet with external tanks): getFuel counts the internal tank, DCS reports stop + new contact while the external tanks fill;
+    // "full" is called only after 5 s without a new contact.
+    double fullAt = -1e9, fullLb;
     bool broken;      // last disconnect unintended: contact shortly afterwards continues the same sequence
     string? dbText;   // Debriefing line of this sequence, each disconnect replaces it
     public List<Call> OnRefuel(Me me, bool start, double fuel, IReadOnlyList<Traffic> air, double now, double kgMax = 0)
@@ -1458,8 +1462,8 @@ partial class Ops
         var name = tkr?.Name ?? "Tanker";
         if (start)
         {
-            dcsCleared = true;
-            if (tank == 4) return new();
+            DcsIntent = dcsCleared = true;   // a contact means the DCS tanker dialog is open
+            if (tank == 4) { if (fullAt > -1e8) contactAt = now; fullAt = -1e9; return new(); }   // new contact while "full" is pending: same contact goes on
             if (tank != 3)   // #19 reporting duty: contact only after "pre-contact" -> "cleared contact" (ATP-56(C)); at most every 30 s (DCS reports every hookup)
             {
                 if (now - ncAt < 30) return new();
@@ -1470,7 +1474,7 @@ partial class Ops
                 return new() { new("Tanker", name, $"{Cs(me)}, {name}, you are not cleared contact, disconnect, return to left observation.") };
             }
             bool again = broken && tank >= 2 && now - lastStop < 120;   // back on the basket: no new "Contact.", quantity and time continue
-            tank = 4; contactAt = now; broken = false;
+            tank = 4; contactAt = now; broken = false; fullAt = -1e9;
             if (again) return new();
             fuelAtContact = fuel; contactSum = 0; dbText = null; rowLb = 0;
             return new() { new("Tanker", name, "Contact.") };
@@ -1489,6 +1493,16 @@ partial class Ops
             tank = 3; disc = false; broken = true;
             return new() { new("Tanker", name, $"{Cs(me)}, {name}, disconnect, return to pre-contact.") };
         }
+        fullAt = now; fullLb = lb;
+        return new();
+    }
+
+    List<Call> Full(Me me, IReadOnlyList<Traffic> air)
+    {
+        fullAt = -1e9;
+        var tkr = (tanker != "" ? Tankers(air, me, true).FirstOrDefault(k => k.A.Group == tanker) : null) ?? Tankers(air, me).FirstOrDefault();
+        var name = tkr?.Name ?? "Tanker";
+        double lb = fullLb;
         tank = 2; disc = true; broken = false;
         DcsIntent = dcsCleared = false;   // full: DCS ends its dialog ("refueling complete"), more fuel needs "Intent to refuel" again
         OffLine();
@@ -1964,12 +1978,32 @@ partial class Ops
             var afterSlip = od.Menu;
             od.OnRefuel(me, true, 0.5, air, 20);
             od.OnRefuel(me, false, 0.99, air, 60);
-            od.OnTranscript("Tanker", "Texaco, pre contact", meN, air, f, 62);
+            od.Tick(meN, air, 66);   // "full" comes 5 s after the stop
+            od.OnTranscript("Tanker", "Texaco, pre contact", meN, air, f, 68);
             check(slipDc.FirstOrDefault()?.Text.Contains("return to pre-contact") == true && afterSlip == null && od.Menu?.Step == "intent" && !od.DcsIntent,
                   $"Tanker DCS-Menü nach Kontakt: Abrutschen {slipDc.FirstOrDefault()?.Text} -> Menü {afterSlip}, voll -> Menü {od.Menu}, DcsIntent {od.DcsIntent}");
             od.Menu = null;
         }
         line.Clear();
+        {   // forum (jojojung, external tanks): stop at >= 97 % + new contact 2 s later = same contact; "full" only 5 s after the last stop
+            var ox = new Ops();
+            ox.OnTranscript("Tanker", "Texaco, request rejoin", me, air, f, 0); ox.Menu = null;
+            ox.OnTranscript("Tanker", "Texaco, visual", meN, air, f, 1); ox.Menu = null;
+            ox.DcsIntent = true;
+            ox.OnTranscript("Tanker", "Texaco, ready pre contact", meN, air, f, 1); ox.Menu = null;
+            ox.OnRefuel(me, true, 0.4, air, 2);
+            var xs = ox.OnRefuel(me, false, 0.98, air, 30);
+            var xt = ox.Tick(meN, air, 33);
+            var xc = ox.OnRefuel(me, true, 0.98, air, 32);
+            ox.OnTranscript("Tanker", "Texaco, pre contact", meN, air, f, 34);
+            var xm = ox.Menu;
+            ox.OnRefuel(me, true, 0.4, air, 40);   // pre-contact call sets tank 3; DCS reports the next contact
+            ox.OnRefuel(me, false, 0.99, air, 50);
+            var xe = ox.Tick(meN, air, 55);
+            check(xs.Count == 0 && xt.All(x => !x.Text.Contains("disconnect")) && xc.Count == 0 && xm == null && xe.Any(x => x.Text.Contains("you received") || x.Text.Contains("disconnect")),
+                  $"Tanker Zusatztanks: Stopp + neuer Kontakt = derselbe Kontakt, voll erst 5 s nach Stopp | {string.Join(" | ", xs.Concat(xt).Concat(xc).Concat(xe).Select(x => x.Text))}");
+            line.Clear();
+        }
         {   // TP1/TP2/TP5/TP3: queries without state change or menu, second request without restart, join only from astern, "judy" ends the vectors
             var oq = new Ops();
             var meA = me with { Tel = me.Tel! with { X = 2 * NM, Z = 30 * NM } };   // 2 NM ahead of Texaco (flies north)
@@ -2408,7 +2442,8 @@ partial class Ops
         var h2 = K(k2, nr2, "Texaco, Enfield 1-2, pre contact");
         var c1 = K(k1, nr1, "Texaco, Enfield 1-1, pre contact");
         k1.OnRefuel(me, true, 0.4, air, 10, 4899);
-        var d1 = k1.OnRefuel(me, false, 0.97, air, 70, 4899);
+        k1.OnRefuel(me, false, 0.97, air, 70, 4899);
+        var d1 = k1.Tick(me, air, 75).Where(x => x.Text.Contains("disconnect") || x.Text.Contains("cleared pre-contact")).ToList();   // "full" 5 s after the stop
         var c2 = K(k2, nr2, "Texaco, Enfield 1-2, pre contact");
         check(r1.Contains("bearing zero eight four, 30 miles, anchor Alpha, block 21 to 23") && r1.Contains("Expect the join in 4 minutes, 1000 feet below, report visual"), "Tanker V11: Rendezvous -> " + r1);
         check(vFar.Contains("continue, 30 miles, report visual.") && v1.Contains("cleared to join, left observation, number 1.") && !v1.Contains("first, then") && h2.Contains("number 2") && c1.Contains("cleared contact"), $"Tanker V11/R56: Reihenfolge -> {vFar} | {v1} | {h2}");
@@ -2428,19 +2463,21 @@ partial class Ops
         var wait2 = K(a2, nr2, "Texaco, Enfield 1-2, pre contact");
         check(slip.Count == 1 && slip[0].Text == "Enfield one one, Texaco one one, disconnect, return to pre-contact." && a1.tank == 3 && wait2.Contains("number 2"), $"Tanker A66: Abrutschen bleibt in der Reihe -> {slip.FirstOrDefault()?.Text} | {wait2}");
         var again = Rf(a1, me, true, 0.6, 50);
-        var full = Rf(a1, me, false, 0.99, 100);
+        Rf(a1, me, false, 0.99, 100);
+        var full = a1.Tick(me, air, 105).Where(x => x.Text.Contains("disconnect") || x.Text.Contains("cleared pre-contact")).ToList();
         check(again.Count == 0 && full.Count == 2 && full[0].Text == "Enfield one one, Texaco one one, disconnect, you received 3.9, move to the right wing." && full[1].To == a2
               && a1.Debrief.Count == 1 && a1.Debrief[0].Contains("70 s") && a1.Debrief[0].Contains("40 -> 99 %") && a1.offload == 3900, $"Tanker A66/A124: Fortsetzung, voll -> {string.Join(" | ", full.Select(x => x.Text))} | {string.Join("", a1.Debrief)}");
         line.Clear();   // a2 still waiting
         var a3 = new Ops { tank = 3 };   // #19: cleared contact
         a3.OnRefuel(me, true, 0.4, air, 10);
-        var a3t = a3.OnRefuel(me, false, 0.98, air, 40)[0].Text;
+        a3.OnRefuel(me, false, 0.98, air, 40);
+        var a3t = a3.Tick(me, air, 45).First(x => x.Text.Contains("disconnect")).Text;
         check(a3t == "Enfield one one, Texaco one one, disconnect, move to the right wing. Report complete, or pre-contact for more.", "Tanker A124: ohne Innentank (alte Mission) keine Menge -> " + a3t);
         var a3s = string.Join(" | ", a3.DebriefSummary());
         check(a3s.Contains(": 1 ") && !a3s.Contains("lb"), "N39: Tanker-Zusammenfassung ohne bekannte Menge ohne lb -> " + a3s);
         var a4 = new Ops { tank = 3 };
         Rf(a4, me, true, 0.4, 10); Rf(a4, me, false, 0.6, 30);
-        check(Rf(a4, me, true, 0.6, 200).FirstOrDefault()?.Text == "Contact." && Rf(a4, me, false, 0.99, 230).Count == 1 && a4.Debrief.Count == 2, "Tanker A66: Kontakt nach über 2 min ist ein neuer Vorgang");
+        check(Rf(a4, me, true, 0.6, 200).FirstOrDefault()?.Text == "Contact." && Rf(a4, me, false, 0.99, 230).Count == 0 && a4.Tick(me, air, 235).Count(x => x.Text.Contains("disconnect")) == 1 && a4.Debrief.Count == 2, "Tanker A66: Kontakt nach über 2 min ist ein neuer Vorgang");
         // #19: contact without "cleared contact" (joined but no pre-contact) -> rejected + violation, at most every 30 s, no transaction; R240: AWACS names the tanker with full call sign
         line.Clear();
         var c19 = new Ops();
