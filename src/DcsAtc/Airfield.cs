@@ -469,9 +469,13 @@ public class Airfield
         return f;
     }
 
+    /// Chart entries of the last Load that failed with the runways known (airfield, message); those airfields are loaded without chart data.
+    public static readonly List<(string Name, string Message)> ChartFaults = new();
+
     /// File from the mission script: "A;Name;x;z;elev" followed by "R;Name;course;x;z;length". Kutaisi always from the map, Caucasus airfields with chart data get it (ApplyChart).
     public static List<Airfield> Load(string? file)
     {
+        ChartFaults.Clear();
         var list = new List<Airfield> { Kutaisi() };
         if (file == null || !File.Exists(file)) return list;
         string? name = null;
@@ -482,7 +486,19 @@ public class Airfield
         void Flush()
         {
             if (name == "Kutaisi") list[0].Spots = spots.ToList();
-            else if (name != null && rw.Count > 0) { var f = FromDcs(name, ax, az, el, rw).ApplyChart(); f.Id = id; f.Side = side; f.Spots = spots.ToList(); list.Add(f); }
+            else if (name != null && rw.Count > 0)
+            {
+                Airfield f;
+                // (#48, LtJaeger) a faulty chart entry that only shows with the runways (land_rwy not on this airfield) must not end the program
+                try { f = FromDcs(name, ax, az, el, rw).ApplyChart(); }
+                catch (Exception e)
+                {
+                    // ponytail: the airfield then has no procedures at all, also not the built-in Caucasus ones; fall back to the built-in entry if that ever matters
+                    ChartFaults.Add((name, e.Message));
+                    f = FromDcs(name, ax, az, el, rw);
+                }
+                f.Id = id; f.Side = side; f.Spots = spots.ToList(); list.Add(f);
+            }
             spots.Clear();
             rw.Clear();
         }

@@ -114,6 +114,11 @@ static partial class Program
             foreach (var n in notes) Log(n);
         }
         Fields = Airfield.Load(file);
+        foreach (var (n, m0) in Airfield.ChartFaults)
+        {
+            var msg = m0.StartsWith(n + ": ") ? m0[(n.Length + 2)..] : m0;   // ApplyChart's own messages start with the airfield name
+            Log(L($"[Karten] {n}: Eintrag fehlerhaft, wird nicht benutzt: {msg}", $"[Charts] {n}: chart entry is faulty and not used: {msg}"));
+        }
         standStamp = default;   // new airfield objects: stand names again (TickAll)
         Tower.All = Fields;
         Ops.MagVar = MapMagVar(Fields);

@@ -1355,6 +1355,18 @@ local function start()
       end
     end
   end
+  local function jAdd(name, kind, side, acc, src)   -- new leader; src = leader it is a copy of (inherits callsign, frequency, code)
+    local f = tonumber(acc.frequency)
+    if f and f > 1e6 then f = f / 1e6 end   -- editor stores Hz
+    local L = { name = name, kind = kind, side = side, range = kind == "faca" and 15000 or 8000,
+      cs = FACCS[tonumber(acc.callname) or 0] or FACCS[(#jLeaders % #FACCS) + 1],
+      freq = f and f > 0 and string.format("%.3f", f) or "", mod = f and f > 0 and (tonumber(acc.modulation) == 1 and "FM" or "AM") or "",
+      code = tostring(tonumber(acc.laserCode or acc.code) or "") }
+    if src then L.cs, L.freq, L.mod, L.code = src.cs, src.freq, src.mod, src.code end
+    jLeaders[#jLeaders + 1] = L
+    jBy[clean(name)] = L
+    log(string.format("JTAC/FAC(A): %s %s '%s' side %d freq %s code %s", kind, L.cs, name, side, L.freq, L.code))
+  end
   if on("jtac") then pcall(function()
     for sideName, coa in pairs(env.mission.coalition or {}) do
       local side = sideName == "red" and 1 or sideName == "blue" and 2
@@ -1369,17 +1381,7 @@ local function start()
               elseif up:find("FACA") then kind = "faca"
               elseif ground then kind = (acc.has or up:find("JTAC")) and "jtac" or nil
               else kind = (acc.has or g.task == "AFAC" or up:find("JTAC")) and "faca" or nil end
-              if kind and not jBy[clean(name)] then
-                local f = tonumber(acc.frequency)
-                if f and f > 1e6 then f = f / 1e6 end   -- editor stores Hz
-                local L = { name = name, kind = kind, side = side, range = kind == "faca" and 15000 or 8000,
-                  cs = FACCS[tonumber(acc.callname) or 0] or FACCS[(#jLeaders % #FACCS) + 1],
-                  freq = f and f > 0 and string.format("%.3f", f) or "", mod = f and f > 0 and (tonumber(acc.modulation) == 1 and "FM" or "AM") or "",
-                  code = tostring(tonumber(acc.laserCode or acc.code) or "") }
-                jLeaders[#jLeaders + 1] = L
-                jBy[clean(name)] = L
-                log(string.format("JTAC/FAC(A): %s %s '%s' side %d freq %s code %s", kind, L.cs, name, side, L.freq, L.code))
-              end
+              if kind and not jBy[clean(name)] then jAdd(name, kind, side, acc) end
             end
           end
         end
@@ -1389,7 +1391,30 @@ local function start()
         if nm and n.x and n.y then jNav[#jNav + 1] = string.format("N;%d;%s;%.1f;%.1f", side, clean(nm), n.x, n.y) end   -- editor y = DCS z
       end
     end
-  end) end
+  end)
+  -- Leaders that appear during the mission (forum Killg0re NL: UAV spawned by a script). DCS gives a script no way to read the task of a
+  -- spawned group, so the name is all there is: "FACA"/"JTAC" in it, or a copy of a leader of the mission ("Reaper#001", "Reaper-1").
+  -- ponytail: the F10 JTAC menu is built per player at spawn (HAS.jtac), so a later leader shows there only for players who spawn afterwards; voice and radio wheel work at once.
+  world.addEventHandler({ onEvent = function(_, e)
+    if e.id ~= world.event.S_EVENT_BIRTH or not e.initiator then return end
+    pcall(function()
+      local u = e.initiator
+      if not (u.getGroup and u.getPlayerName) or u:getPlayerName() then return end   -- units only (statics have no group); not via getCategory, whose meaning for units changed between DCS versions
+      local name = u:getGroup():getName()
+      if slots[name] or jBy[clean(name)] then return end
+      local up, kind, src = name:upper()
+      if up:find("FACA") then kind = "faca"
+      elseif up:find("JTAC") then kind = air(u) and "faca" or "jtac"
+      else
+        for _, L in ipairs(jLeaders) do   -- longest leader name that is a prefix, followed by a non-letter/digit
+          if name:sub(1, #L.name) == L.name and name:sub(#L.name + 1):find("^[^%w]") and (not src or #L.name > #src.name) then src = L end
+        end
+        kind = src and src.kind
+      end
+      if kind then jAdd(name, kind, u:getCoalition(), {}, src) end
+    end)
+  end })
+  end
   HAS.jtac = function(side)   -- F10 JTAC group: own side has a leader that is not dead
     for _, L in ipairs(jLeaders) do if L.side == side and not L.dead then return true end end
     return false

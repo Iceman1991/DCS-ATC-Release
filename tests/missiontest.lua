@@ -622,6 +622,26 @@ do   -- fog off in the ME (fog2.mode 1 / older missions without enable_fog): lef
   assert(nLL == 49, "FI2 Lat/Lon-Raster: " .. nLL .. " L-Zeilen")
   pl[#pl], w.enable_fog, FOG[1], FOG[2], env.mission.version = nil, nil, 0, 0, nil
 end
+do   -- JTAC/FAC(A) born during the mission (forum Killg0re NL): "JTAC" in the name, copy of a mission leader ("Reaper#001"), unrelated name = nothing
+  local pl = env.mission.coalition.blue.country[1].plane.group
+  pl[#pl + 1] = { name = "Reaper", task = "AFAC", units = { {} }, route = { points = { { type = "Turning Point", task = { id = "FAC", params = { frequency = 251000000, callname = 2 } } } } } }
+  for i = #queue, 1, -1 do queue[i] = nil end
+  for i = #handlers, 1, -1 do handlers[i] = nil end
+  DCSATC, DCSATC_SPAWNTEST, DCSATC_OPTIONS, MENU = nil, nil, { crew = true }, {}
+  dofile(arg[1])
+  run(T + 3)
+  local born = {}
+  for _, n in ipairs({ "Reaper", "Reaper#001", "Spawned JTAC UAV", "Random#001" }) do
+    local g = coalition.addGroup(2, 0, { name = n, units = { { name = n .. "-1", x = 100, y = 0, alt = 3000 } } })
+    born[#born + 1] = g
+    if n ~= "Reaper" then fire({ id = world.event.S_EVENT_BIRTH, initiator = g:getUnit() }) end
+  end
+  run(T + 12)
+  local s = stateFile()
+  assert(s:find("\nJ;Reaper#001;faca;Darknight;2;[^\n]*;251%.000;AM;;1\n") and s:find("\nJ;Spawned JTAC UAV;faca;") and not s:find("J;Random#001", 1, true), "JTAC/FAC(A) zur Laufzeit: " .. s)
+  for _, g in ipairs(born) do g:destroy() end
+  pl[#pl] = nil
+end
 -- Hook: file paths with a real backslash (Lua 5.1: '\D' becomes 'D' -> %TMP%DcsAtc-..., autostart/session/DCS folder never arrived)
 local opened = {}
 io.open = function(p) opened[#opened + 1] = p end

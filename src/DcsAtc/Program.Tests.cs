@@ -502,6 +502,16 @@ static partial class Program
             try { Airfield.FromDcs("Banias", 22735.7, 5935.4, 8, rw).ApplyChart(); throw new Exception("charts.jsonc: land_rwy 28 auf Banias nicht erkannt"); }
             catch (FormatException fe) when (fe.Message.Contains("\"land_rwy\": \"28\"")) { }
             Console.WriteLine("OK   charts.jsonc: Route STRYK mit je einer Variante für 09 und 27, land_rwy/dep_rwy gelesen, unbekannte Bahn gemeldet");
+            // #48 (LtJaeger): land_rwy that is not a runway of the real airfield only fails in Load; the airfield stays (without chart data), the others keep theirs
+            File.WriteAllText(ownF, """{ "Banias": { "land_rwy": "99" }, "Damascus": { "ctr_top_ft": 3500 } }""");
+            Airfield.OwnChart = OwnChart(ownF);
+            var af = ownF + ".txt";
+            File.WriteAllText(af, "M;Syria\nA;Banias;22735.7;5935.4;8\nR;09;0;22735.7;5935.4;2000\nA;Damascus;0;0;600\nR;09;0;0;0;2000\n");
+            var lf = Airfield.Load(af);
+            File.Delete(af);
+            if (!lf.Any(x => x.Name == "Banias") || Airfield.ChartFaults.Count != 1 || Airfield.ChartFaults[0].Name != "Banias" || lf.First(x => x.Name == "Damascus").CtrTopFt != 3500)
+                throw new Exception($"charts.jsonc fehlerhafter Eintrag beim Laden: {lf.Count} {string.Join(" | ", Airfield.ChartFaults)}");
+            Console.WriteLine("OK   charts.jsonc: Bahn aus land_rwy gibt es nicht - Platz bleibt ohne Verfahren, Fehler gemerkt, anderer Platz behält seinen Eintrag");
         }
         finally { (Airfield.OwnChart, Airfield.Theatre) = (null, th); File.Delete(ownF); }
     }
