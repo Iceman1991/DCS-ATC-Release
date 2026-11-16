@@ -2080,9 +2080,9 @@ Overlord: Enfield one one, Overlord, Kutaisi bears 245, 62 miles.
 
 #### Wer spricht, Korb und Boom
 
-Es spricht immer der **DCS-ATC-Tanker**, auch wenn die Mission einen eigenen DCS-Tanker hat. Er führt den ganzen Ablauf wie unten beschrieben. Die DCS-eigenen Tanker bleiben stumm.
+Es spricht immer der **DCS-ATC-Tanker**, auch wenn die Mission einen eigenen DCS-Tanker hat. Er führt den ganzen Ablauf wie unten beschrieben.
 
-DCS bedient Korb bzw. Boom aber nur über seinen eigenen Tankerdialog im F-Menü. Für **den Spieler am PC mit DCS-ATC** drückt DCS-ATC deshalb im Hintergrund das DCS-Funkmenü für dich: *Intent to refuel* erst beim Join (*„cleared to join“*), nicht schon bei der Anfrage, *Ready pre-contact* bei deinem „pre-contact“. Der DCS-Tanker antwortet darauf nicht hörbar.
+DCS bedient Korb bzw. Boom aber nur über seinen eigenen Tankerdialog im F-Menü. Für **den Spieler am PC mit DCS-ATC** drückt DCS-ATC deshalb im Hintergrund das DCS-Funkmenü für dich: *Intent to refuel* erst beim Join (*„cleared to join“*), nicht schon bei der Anfrage, *Ready pre-contact* bei deinem „pre-contact“. Darauf muss der DCS-Tanker selbst antworten, sonst fährt DCS Korb oder Boom nicht aus, und ein stummer DCS-Tanker reagiert auf das Menü gar nicht. Bis zum Join schweigt der DCS-Tanker der Mission deshalb, ab *„cleared to join“* hörst du ihn zusätzlich zum DCS-ATC-Tanker. 15 Minuten nach dem letzten dieser Schritte schweigt er wieder.
 
 - Der DCS-ATC-Tanker hört und spricht auf der Missionsfrequenz des Tankers (AWACS und Funkrad nennen sie) und auf dem Standard 255.5. Mit Easy Communication rastet DCS dein Funkgerät selbst auf die Missionsfrequenz. Teilt sie sich der Tanker mit einem Platz (etwa 261.0 = Senaki UHF), wechselt DCS-ATC deshalb nicht den Platz.
 - Das nutzt `"CommsKey"` (DCS-Funkmenü-Taste als Scancode, Standard `43`, also `\` auf US- und `#` auf deutschen Tastaturen). Mit `0` drückt DCS-ATC das Menü nicht. Ältere `config.jsonc` enthalten die Zeile nicht, dann gilt der Standard. Ist deine Menütaste eine andere, die Zeile ergänzen, z. B. `"CommsKey": 43,`.
@@ -2771,7 +2771,7 @@ Eine Route ist eine Kette benannter Fixes, die an einem Meldepunkt endet, etwa d
 
 - `"rwy"`: die Bahnen, für die die Route gilt. Fragst du sie an, während eine andere Bahn in Betrieb ist, nennt Approach die passenden Bahnen.
 - `"to"`: der Meldepunkt am Ende. Er muss für jede dieser Bahnen ein `entry` sein.
-- `"pts"`: die Fixes der Reihe nach. `"above"` = in oder über, `"at"` = in dieser Höhe, `"below"` = in oder unter, jeweils in Fuß. Alles darf fehlen.
+- `"pts"`: die Fixes der Reihe nach. `"above"` = in oder über, `"at"` = in dieser Höhe, `"below"` = in oder unter, jeweils in Fuß. Steht `"above"` zusammen mit `"below"` am selben Fix, heißt das zwischen den beiden Höhen, etwa `"above": 5000, "below": 7000`; der Lotse sagt dann „cross Flex between 5000 and 7000 feet“. Alles darf fehlen.
 - `"say"`: weitere Namen, mit denen du die Route anfordern kannst, für einen Namen, den die Spracherkennung nicht versteht: `"say": ["ECHO"]` lässt „request Echo recovery“ ARCOE wählen. Optional, auch für Abflugrouten.
 
 Ein Name für mehrere Bahnen: statt einer Route eine Liste von Varianten. Du fragst wie gewohnt nach „STRYK“, DCS-ATC nimmt die Variante für die Bahn in Betrieb.
@@ -2815,7 +2815,7 @@ Der Verfahrens-Editor ist eine Seite im Browser, die Meldepunkte und Routen für
 - **Öffnen:** Startmenü → DCS-ATC → *Verfahrens-Editor*, oder `http://localhost:18600/chart`, während DCS-ATC läuft (das Lagebild hat einen Link). Ohne laufende Mission zeigt er die Plätze der letzten Mission.
 - **Platz wählen** oben rechts. Die Karte zeigt seine Bahnen, die Meldepunkte und Routen, die er schon hat (blau, grün, orange), und die Nachbarplätze. Ziehen verschiebt die Karte, das Mausrad zoomt. Unten links stehen missweisende Peilung und Entfernung des Mauszeigers vom Platz, um einen Punkt von einer echten Karte zu setzen.
 - **Meldepunkt:** auf die Karte klicken und den Namen eintippen. In der Liste wählst du, ob er Einflug (über Initial oder Overhead) und Ausflug ist. Das gilt für alle Bahnen des Platzes.
-- **Anflugroute:** Namen der Route eintippen, die Fixes der Reihe nach anklicken, dann den Meldepunkt anklicken, an dem die Route endet, dann *Finish route*. Klickst du nach einem Meldepunkt weiter, geht die Route über ihn hinaus, und der Punkt wird einer ihrer Fixes. Die Höhe je Fix stellst du in der Liste ein (oder höher, genau, oder tiefer; leer = keine). Die Route gilt für jede Bahn, die den Endpunkt als Einflug hat.
+- **Anflugroute:** Namen der Route eintippen, die Fixes der Reihe nach anklicken, dann den Meldepunkt anklicken, an dem die Route endet, dann *Finish route*. Klickst du nach einem Meldepunkt weiter, geht die Route über ihn hinaus, und der Punkt wird einer ihrer Fixes. Die Höhe je Fix stellst du in der Liste ein (oder höher, genau, oder tiefer, zwischen mit einer zweiten Höhe; leer = keine). Die Route gilt für jede Bahn, die den Endpunkt als Einflug hat.
 - **Abflugroute:** Namen eintippen, die Fixes der Reihe nach anklicken, dann *Finish route*.
 - Ein Klick auf einen Punkt, den es schon gibt, nimmt diesen Punkt mit Namen und Position.
 - **Ergebnis:** Im Textfeld steht der vollständige Eintrag des Platzes: was er bisher hatte (auch die eingebauten Kaukasus-Daten mit den Rollwegen) plus deine Ergänzungen. Mit *Copy* kopieren und in `charts.jsonc` innerhalb der äußeren `{ }` einfügen, anstelle des Eintrags des Platzes, falls die Datei schon einen hat. Gilt ab dem nächsten Missionsstart. Positionen stehen als DCS-Koordinaten `[x, z]` drin.
@@ -2829,7 +2829,7 @@ Der Verfahrens-Editor ist eine Seite im Browser, die Meldepunkte und Routen für
 Bei jedem Missionsstart legt DCS-ATC seine Kneeboard-Seiten in `Saved Games\DCS\Kneeboard` ab. DCS zeigt sie im Kneeboard jedes Flugzeugs. Die Seiten: Funk, Plätze mit Frequenzen, Platzrunden und CRPs, An- und Abflugrouten, Navigationsanlagen, AWACS und Tanker, dazu zwei Seiten mit den Funksprüchen für Tanker, Träger, Wingmen, JTAC und Range. Die Frequenzen sind die der laufenden Mission.
 
 - Auf jeder Karte, in der Sprache der Oberfläche (Deutsch oder Englisch). Auf Karten mit vielen Plätzen laufen die Tabellen über mehrere Seiten.
-- Platzrunden, CRPs und Routen stehen für die Plätze mit Verfahren drin: Kaukasus eingebaut, sonst aus deiner `charts.jsonc` (siehe [Eigene Platzverfahren](#eigene-platzverfahren-chartsjsonc)). Die Routen-Seite nennt je Route die Bahnen, die Fixes in Reihenfolge und ihre Höhen („9000+“ = oder höher, „5000-“ = oder tiefer).
+- Platzrunden, CRPs und Routen stehen für die Plätze mit Verfahren drin: Kaukasus eingebaut, sonst aus deiner `charts.jsonc` (siehe [Eigene Platzverfahren](#eigene-platzverfahren-chartsjsonc)). Die Routen-Seite nennt je Route die Bahnen, die Fixes in Reihenfolge und ihre Höhen („9000+“ = oder höher, „5000-“ = oder tiefer, „5000-7000“ = zwischen).
 - Nur im Kaukasus: die Seite Kutaisi und die Hinweise zur Karte.
 - DCS liest die Seitenliste beim Laden der Mission. Eine Seite, die es bisher nicht gab (andere Karte, mehr Tabellenseiten), erscheint deshalb erst ab der nächsten Mission. Eine Seite, die diese Mission nicht braucht, zeigt einen Hinweis und ist ab der nächsten Mission weg.
 - Ausschalten: `"KneeboardPages": false` in `config.jsonc`.

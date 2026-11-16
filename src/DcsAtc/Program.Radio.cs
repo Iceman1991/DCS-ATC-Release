@@ -835,7 +835,7 @@ static partial class Program
             else if (act == "none") Trace("DCS", $"Funkmenü tanker nichts gedrückt (Schritt {step}), DCS-Stufe {stage ?? "?"}");
             else
             {
-                AiCmd($"MENU;{unit};tanker;{group};s");   // R304: s = DCS tanker stays mute, our controller speaks (without s: audible 15 s like the airfields); mission refuses without Easy Communication (issue #5)
+                AiCmd($"MENU;{unit};tanker;{group}");   // the mission keeps the DCS tanker audible for 15 min (a muted one ignores the menu), our controller speaks too; mission refuses without Easy Communication (issue #5)
                 if (step == "join") return;
                 for (int i = 0; i < 10; i++)   // our tanker has already cleared the contact: DCS still wants Ready pre-contact once its tanker has answered
                 {

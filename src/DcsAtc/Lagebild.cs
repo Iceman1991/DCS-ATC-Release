@@ -189,7 +189,7 @@ function entry() {
     (o.routes ??= {})[r.name] = { rwy: F.ends.map(e => e.n).filter(rw => entries(rw).includes(r.to)), to: r.to, pts: r.pts.map(fix) };
   for (const r of a.deps) if (r.pts.length) (o.departures ??= {})[r.name] = { rwy: F.ends.map(e => e.n), pts: r.pts.map(fix) };
   return o;
-  function fix(p) { return { fix: p.fix, pos: pos(p), ...(p.alt > 0 ? { [p.cross]: +p.alt } : {}) }; }
+  function fix(p) { return { fix: p.fix, pos: pos(p), ...(p.cross == "between" ? (p.alt > 0 && p.alt2 > 0 ? { above: +p.alt, below: +p.alt2 } : {}) : p.alt > 0 ? { [p.cross]: +p.alt } : {}) }; }   // #31: between = both keys
 }
 
 function render() {
@@ -206,8 +206,9 @@ function render() {
         ${r.open ? `<button onclick="A().${key}[${i}].open=false;changed()">Finish route</button>` : ""}
         <button onclick="A().${key}.splice(${i},1);changed()">&times;</button></div>` +
         r.pts.map((p, j) => `<div class="row">&nbsp; ${esc(label(p.fix))}
-          ${sel(p.cross, [["above", "at or above"], ["at", "at"], ["below", "at or below"]], `A().${key}[${i}].pts[${j}].cross=this.value;changed()`)}
+          ${sel(p.cross, [["above", "at or above"], ["at", "at"], ["below", "at or below"], ["between", "between"]], `A().${key}[${i}].pts[${j}].cross=this.value;changed()`)}
           <input class="alt" type="number" min="0" step="100" placeholder="ft" value="${esc(p.alt)}" onchange="A().${key}[${i}].pts[${j}].alt=this.value;changed()">
+          ${p.cross == "between" ? `and <input class="alt" type="number" min="0" step="100" placeholder="ft" value="${esc(p.alt2 ?? "")}" onchange="A().${key}[${i}].pts[${j}].alt2=this.value;changed()">` : ""}
           <button onclick="A().${key}[${i}].pts.splice(${j},1);changed()">&times;</button></div>`).join("");
     });
   $("list").innerHTML = h || "Nothing yet.";

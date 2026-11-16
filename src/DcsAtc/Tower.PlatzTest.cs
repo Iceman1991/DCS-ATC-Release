@@ -169,8 +169,8 @@ public partial class Tower
             (double X, double Z) P(double nm) => (c.X + nm * NM, c.Z);
             k.Crp["CRAIG"] = c;
             k.Entry["25"].Insert(0, ("CRAIG", "overhead", null));
-            k.Routes["MINTT#1"] = new("MINTT", new[] { "07" }, "CRAIG", new[] { ("YANKEE", P(20).X, P(20).Z, 0.0, "") });   // variant for the other runway listed first: 25 in use takes the 25 one
-            k.Routes["MINTT"] = new("MINTT", new[] { "25" }, "CRAIG", new[] { ("MINTT", P(25).X, P(25).Z, 15000.0, "at or above"), ("GASS_PEAK", P(12).X, P(12).Z, 9000.0, "at or above") });
+            k.Routes["MINTT#1"] = new("MINTT", new[] { "07" }, "CRAIG", new[] { ("YANKEE", P(20).X, P(20).Z, 0.0, "", 0.0) });   // variant for the other runway listed first: 25 in use takes the 25 one
+            k.Routes["MINTT"] = new("MINTT", new[] { "25" }, "CRAIG", new[] { ("MINTT", P(25).X, P(25).Z, 15000.0, "at or above", 0.0), ("GASS_PEAK", P(12).X, P(12).Z, 9000.0, "at or above", 0.0) });
             var e25 = k.Ends.First(e => e.Name == "25");
             Telemetry At(double x) => new(k.Elev + 1000, 1000, 150 * Kt, Math.PI, x, c.Z, 0, 0, 760);
             Tower Fly(double x) { var w = new Tower(k, "Enfield 1-1") { FieldWind = (-e25.Dx * 5, -e25.Dz * 5) }; w.Tick(At(x), none, 0); w.Runway = "25"; return w; }
@@ -192,7 +192,7 @@ public partial class Tower
                 r3.Count == 1 && r3[0].Text == "Enfield one one, roger, report Craig." && wf.navName == "Craig" && Airfield.Say("north") == "C R P north",
                 $"Route MINTT ({string.Join(",", seen)}, {w.Phase}): " + J(r1) + " / " + ho?.Text + " / " + J(r2) + " / " + J(r3) + $" ({wf.navName})");
             {   // #36: next fix with a 90 degree turn at 450 kt: the heading to it is spoken before the current fix, not miles behind it
-                k.Routes["MINTT"] = new("MINTT", new[] { "25" }, "CRAIG", new[] { ("MINTT", P(25).X, P(25).Z, 15000.0, "at or above"), ("GASS_PEAK", P(10).X, c.Z + 15 * NM, 9000.0, "at or above") });   // 45 degree turn at MINTT
+                k.Routes["MINTT"] = new("MINTT", new[] { "25" }, "CRAIG", new[] { ("MINTT", P(25).X, P(25).Z, 15000.0, "at or above", 0.0), ("GASS_PEAK", P(10).X, c.Z + 15 * NM, 9000.0, "at or above", 0.0) });   // 45 degree turn at MINTT
                 var wt = Fly(c.X + 40 * NM);
                 wt.OnTranscript("Kutaisi Approach, Enfield 11, inbound via mint", At(c.X + 40 * NM), none, 2);
                 double tx = c.X + 40 * NM, ts = 2, said = double.NaN;
@@ -221,9 +221,9 @@ public partial class Tower
             var k = Airfield.Kutaisi();
             var e = k.End("25");
             var (pa, pb) = (e.At(-e.Len - 6 * NM, 0), e.At(-e.Len - 10 * NM, 4 * NM));
-            k.Departures["TIKI#1"] = new("TIKI", new[] { "07" }, "", new[] { ("YANKEE", pb.X, pb.Z, 0.0, "") });   // variant for the other runway listed first: 25 in use takes the 25 one
-            k.Departures["TIKI"] = new("TIKI", new[] { "25" }, "", new[] { ("ALPHA", pa.X, pa.Z, 3000.0, "at or below"), ("BRAVO", pb.X, pb.Z, 6000.0, "at or above") });
-            k.Departures["ZULU"] = new("ZULU", new[] { "07" }, "", new[] { ("ALPHA", pa.X, pa.Z, 0.0, "") });
+            k.Departures["TIKI#1"] = new("TIKI", new[] { "07" }, "", new[] { ("YANKEE", pb.X, pb.Z, 0.0, "", 0.0) });   // variant for the other runway listed first: 25 in use takes the 25 one
+            k.Departures["TIKI"] = new("TIKI", new[] { "25" }, "", new[] { ("ALPHA", pa.X, pa.Z, 3000.0, "at or below", 0.0), ("BRAVO", pb.X, pb.Z, 6000.0, "at or above", 0.0) });
+            k.Departures["ZULU"] = new("ZULU", new[] { "07" }, "", new[] { ("ALPHA", pa.X, pa.Z, 0.0, "", 0.0) });
             var hp = e.At(150, 100);
             Telemetry G0() => new(k.Elev, 0, 0, e.Hdg * Math.PI / 180, hp.X, hp.Z, 0, 0, 760);
             Telemetry Air((double X, double Z) p, double hdg) => new(k.Elev + 500, 500, 150 * Kt, hdg * Math.PI / 180, p.X, p.Z, 0, 0, 760);
@@ -259,7 +259,7 @@ public partial class Tower
                 && new Tower("Enfield 1-1").UnknownProc("departure via dream") == null,
                 "#23 unbekannte Departure angesagt: " + J(ru));
             // #40 (log Nellis 14:40/14:43: "request clearance, dream" / "request clearance to fitter" got the plain runway-heading clearance): the departure named in the clearance request is cleared and kept for takeoff
-            k.Departures["FYTTR"] = new("FYTTR", new[] { "25" }, "", new[] { ("ALPHA", pa.X, pa.Z, 0.0, "") });
+            k.Departures["FYTTR"] = new("FYTTR", new[] { "25" }, "", new[] { ("ALPHA", pa.X, pa.Z, 0.0, "", 0.0) });
             var (wc, wf) = (Hold(), Hold());
             var (rc, rf) = (wc.OnTranscript("Kutaisi Ground, Enfield 11, request clearance, tiki departure", G0(), none, 10), wf.OnTranscript("Kutaisi Ground, Enfield 11 with kilo, request clearance to fitter.", G0(), none, 10));
             Chk(rc.Any(m => m.Text.Contains("after departure fly the Tiki departure")) && wc.depRoute?.Name == "TIKI" && rf.Any(m => m.Text.Contains("after departure fly the Fyttr departure")) && wf.depRoute?.Name == "FYTTR"
@@ -271,7 +271,7 @@ public partial class Tower
                 && r1.Any(m => m.Text.Contains("proceed direct Alpha, cross Alpha at or below 3000 feet")),
                 "#31 Takeoff-Freigabe nach Clearance kurz: " + J(rt));
             // #31: departure with a higher "at or above" fix: cleared altitude raised to the next 1000 ft, no "expect" below it, Departure says the same
-            k.Departures["HIGH"] = new("HIGH", new[] { "25" }, "", new[] { ("ALPHA", pa.X, pa.Z, 4000.0, "at or above"), ("BRAVO", pb.X, pb.Z, 19200.0, "at or above"), ("CHARLIE", pb.X, pb.Z, 25000.0, "at or below") });
+            k.Departures["HIGH"] = new("HIGH", new[] { "25" }, "", new[] { ("ALPHA", pa.X, pa.Z, 4000.0, "at or above", 0.0), ("BRAVO", pb.X, pb.Z, 19200.0, "at or above", 0.0), ("CHARLIE", pb.X, pb.Z, 25000.0, "at or below", 0.0) });
             var wh = Hold();
             var rh = wh.OnTranscript("Kutaisi Ground, Enfield 11, request clearance, high departure", G0(), none, 10);
             Chk(rh.Any(m => m.Text.Contains("after departure fly the High departure, climb and maintain flight level two zero zero, ") && !m.Text.Contains("expect")) && wh.depFt == 20000 && wh.cruiseFt >= 20000

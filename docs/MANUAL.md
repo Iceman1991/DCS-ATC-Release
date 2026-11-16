@@ -2078,9 +2078,9 @@ Overlord: Enfield one one, Overlord, Kutaisi bears 245, 62 miles.
 
 #### Who does the talking, basket and boom
 
-**DCS-ATC's tanker** always does the talking, even when the mission has its own DCS tanker. It runs the whole sequence as described below. DCS's own tankers stay silent.
+**DCS-ATC's tanker** always does the talking, even when the mission has its own DCS tanker. It runs the whole sequence as described below.
 
-DCS still only operates the basket or boom through its own F-menu tanker dialog. So for **the player on the PC that runs DCS-ATC**, DCS-ATC presses the DCS radio menu for you in the background: *Intent to refuel* only at the join (*"cleared to join"*), not already at your request, *Ready pre-contact* when you call "pre-contact". The DCS tanker doesn't answer out loud.
+DCS still only operates the basket or boom through its own F-menu tanker dialog. So for **the player on the PC that runs DCS-ATC**, DCS-ATC presses the DCS radio menu for you in the background: *Intent to refuel* only at the join (*"cleared to join"*), not already at your request, *Ready pre-contact* when you call "pre-contact". The DCS tanker has to answer these itself, otherwise DCS doesn't extend the basket or boom, and a muted DCS tanker ignores the menu completely. So the mission's DCS tanker is silent until you join, and from *"cleared to join"* on you hear it in addition to DCS-ATC's tanker. It goes silent again 15 minutes after the last of these steps.
 
 - DCS-ATC's tanker listens and talks on the tanker's mission frequency (the AWACS and the radio wheel name it) as well as on the default 255.5. With Easy Communication, DCS tunes your radio to the mission frequency by itself. If the tanker shares it with an airfield (e.g. 261.0 = Senaki UHF), DCS-ATC doesn't switch you to that airfield.
 - This uses `"CommsKey"` (the DCS radio menu key as a scan code, default `43`, which is `\` on US and `#` on German keyboards). With `0`, DCS-ATC doesn't press the menu. Older `config.jsonc` files don't list it; the default applies. If your menu key is a different one, add the line, e.g. `"CommsKey": 43,`.
@@ -2769,7 +2769,7 @@ A route is a chain of named fixes that ends at a reporting point, like the MINTT
 
 - `"rwy"`: the runways the route serves. Asked for with another runway in use, Approach says which runways it is for.
 - `"to"`: the reporting point at the end. It has to be an `entry` of each of these runways.
-- `"pts"`: the fixes in order. `"above"` = at or above, `"at"` = at that altitude, `"below"` = at or below, in feet. All can be left out.
+- `"pts"`: the fixes in order. `"above"` = at or above, `"at"` = at that altitude, `"below"` = at or below, in feet. Put `"above"` and `"below"` on the same fix and it means between the two, for example `"above": 5000, "below": 7000`; the controller then says "cross Flex between 5000 and 7000 feet". All can be left out.
 - `"say"`: other names you can ask for the route with, for a name the speech recognition does not get: `"say": ["ECHO"]` lets "request Echo recovery" pick ARCOE. Optional, also for departure routes.
 
 One name for several runways: write a list of variants instead of a single route. You ask for "STRYK" as usual, and DCS-ATC takes the variant for the runway in use.
@@ -2813,7 +2813,7 @@ The chart editor is a page in the browser that writes reporting points and route
 - **Open it:** Start menu → DCS-ATC → *Chart editor*, or `http://localhost:18600/chart` while DCS-ATC is running (the situation map has a link). Without a running mission it shows the airfields of the last mission.
 - **Pick the airfield** at the top right. The map shows its runways, the reporting points and routes it already has (blue, green, orange) and the neighbouring airfields. Drag moves the map, the mouse wheel zooms. At the bottom left you see the magnetic bearing and distance of the mouse pointer from the airfield, to place a point from a real chart.
 - **Reporting point:** click on the map and type the name. In the list, choose whether it is an entry (via initial or via overhead) and an exit. This applies to all runways of the airfield.
-- **Arrival route:** type the route's name, click the fixes in order, then click the reporting point where the route ends, then *Finish route*. If you click on after a reporting point, the route goes past it and that point becomes one of its fixes. Set the altitude of each fix in the list (at or above, at, at or below; empty = none). The route serves every runway that has the end point as an entry.
+- **Arrival route:** type the route's name, click the fixes in order, then click the reporting point where the route ends, then *Finish route*. If you click on after a reporting point, the route goes past it and that point becomes one of its fixes. Set the altitude of each fix in the list (at or above, at, at or below, between, which takes a second altitude; empty = none). The route serves every runway that has the end point as an entry.
 - **Departure route:** type the name, click the fixes in order, then *Finish route*.
 - A click on a point that already exists uses that point, with its name and position.
 - **Result:** the text box holds the airfield's complete entry: what it had so far (also the built-in Caucasus data with its taxiways) plus your additions. *Copy* it and paste it inside the outer `{ }` of `charts.jsonc`, in place of the airfield's entry if the file already has one. It applies from the next mission start. Positions are written as DCS coordinates `[x, z]`.
@@ -2826,7 +2826,7 @@ The chart editor is a page in the browser that writes reporting points and route
 At every mission start DCS-ATC puts its kneeboard pages into `Saved Games\DCS\Kneeboard`. DCS shows them in the kneeboard of every aircraft. The pages: radio, airfields with frequencies, patterns and CRPs, arrival and departure routes, navaids, AWACS and tankers, and two pages with the radio phrases for tanker, carrier, wingmen, JTAC and range. The frequencies are those of the running mission.
 
 - On every map, in the language of the interface (German or English). On maps with many airfields the tables run over several pages.
-- Patterns, CRPs and routes are listed for the airfields with procedures: built in for the Caucasus, otherwise from your `charts.jsonc` (see [Own airfield procedures](#own-airfield-procedures-chartsjsonc)). The routes page gives the runways of each route, its fixes in order and their altitudes ("9000+" = at or above, "5000-" = at or below).
+- Patterns, CRPs and routes are listed for the airfields with procedures: built in for the Caucasus, otherwise from your `charts.jsonc` (see [Own airfield procedures](#own-airfield-procedures-chartsjsonc)). The routes page gives the runways of each route, its fixes in order and their altitudes ("9000+" = at or above, "5000-" = at or below, "5000-7000" = between).
 - Caucasus only: the Kutaisi page and the notes on the map.
 - DCS reads the page list when the mission loads. A page that did not exist before (another map, more table pages) therefore shows from the next mission on. A page this mission does not need shows a note and is gone from the next mission on.
 - Switch off: `"KneeboardPages": false` in `config.jsonc`.

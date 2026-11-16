@@ -90,7 +90,7 @@ local function unit(name, x, z, player, side)
   function u:getCallsign() return name end
   function u:getTypeName() return "FA-18C_hornet" end
   function u:getID() return 1 end
-  function u:getGroup() return { getName = function() return u.group end, getID = function() return 1 end } end
+  function u:getGroup() return { getName = function() return u.group end, getID = function() return 1 end, getController = function() return groups[u.group]:getController() end } end
   function u:getCategory() return 1 end
   function u:hasAttribute(a) return a == "AWACS" and (self.group or ""):find("Overlord", 1, true) ~= nil end
   return u
@@ -344,12 +344,15 @@ Unit = { getByName = function(n) return n == "P1" and p1 or nil end }
 coord = { LOtoLL = function() return 42.18, 42.48 end }   -- Kutaisi; Caucasus UTC+4, 21 June: sunset ~20:45
 local function ev() return table.concat(events, " ") end
 timer.getAbsTime = function() return 19 * 3600 end
-files["9-5.cmd"] = "MENU;P1;tanker;" .. find("ATC Texaco")[1]:getName() .. ";s"   -- R304: s = tanker stays silent
+files["9-5.cmd"] = "MENU;P1;tanker;" .. find("ATC Texaco")[1]:getName()   -- tanker audible from the first menu press (a muted DCS tanker ignores the menu)
 files["9-6.cmd"] = "MENU;P1;atc;26"
 files["9-7.cmd"] = "MENU;P1;atc;77"
 run(T + 1)
 assert(has("M;P1;tanker;1;1"), "MENU tanker fehlt")
-assert(gSilent[find("ATC Texaco")[1]:getName()] == true, "R304: Tanker nicht stumm (Spawn bzw. MENU mit s)")
+do local tk, t0 = find("ATC Texaco")[1]:getName(), T   -- tanker menu: audible, stays so through the 60 s ticks of the 900 s window, muted again afterwards
+  assert(gSilent[tk] == false, "Tanker nach MENU nicht hoerbar")
+  run(t0 + 300); assert(gSilent[tk] == false, "Tanker im 900-s-Fenster wieder stumm")
+  run(t0 + 1000); assert(gSilent[tk] == true, "Tanker nach dem Fenster nicht wieder stumm") end
 assert(gSilent["Hornet CV"] == true and gSilent.P1 == nil, "R308: KI-Flug der Mission nicht stumm bzw. Spielergruppe stumm")
 assert(gNoWp["Hornet CV"] == true and gNoWp.P1 == nil, "R312: Wegpunktmeldung des KI-Flugs nicht verboten")
 assert(ev():find("M;P1;atc;0;Tag (Sonne 1", 1, true) and has("M;P1;atc;0;Platz 77 nicht in der Mission"), "Befeuerung am Tag / Platz unbekannt: " .. ev())

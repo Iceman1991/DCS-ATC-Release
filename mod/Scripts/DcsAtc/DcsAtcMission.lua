@@ -26,6 +26,7 @@ DCSATC = { ai = {} }   -- ai[groupName] = "dep|dep-go|arr|arr-hold:airfield"
 -- Groups with a player stay unmuted (wingman replies). Birth handler before mission start -> also the starting lineup immediately
 -- (otherwise "Overlord, on station" / "passing waypoint 1" came before the first pass); plus every 0.5 s in the first 10 s, then every 60 s.
 local SILENCE, NO_WP_REPORT = 7, 19
+local loud = {}   -- group name -> mission time until which the group stays audible (DCS tanker during refuelling)
 local function silenceGroup(g) pcall(function()
   local c = g:getController()
   c:setOption(SILENCE, true)
@@ -33,6 +34,7 @@ local function silenceGroup(g) pcall(function()
 end) end
 local function silenceAi(g)
   for _, u in ipairs(g:getUnits() or {}) do if u:getPlayerName() then return false end end
+  if (loud[g:getName()] or 0) > timer.getTime() then return false end
   silenceGroup(g)
   return true
 end
@@ -1667,10 +1669,11 @@ local function start()
             timer.scheduleFunction(function() pcall(f.ab.setRadioSilentMode, f.ab, true) end, nil, timer.getTime() + 15)
           end
           dlg[unit] = true   -- the answer opens the DCS dialog (until takeoff or shutdown)
-        elseif not fl:find("s") then   -- R304 tanker: s = stays silent (our controller speaks), without s audible for 15 s like the airfields
+        elseif not fl:find("s") then   -- R304 tanker: a muted DCS tanker ignores "Intent to refuel" (forum jojojung, Hornet/KC-130 log), so it is audible while refuelling
           local g = o:getGroup()
-          pcall(function() g:getController():setOption(SILENCE, false) end)
-          timer.scheduleFunction(function() silence(g) end, nil, timer.getTime() + 15)
+          -- ponytail: fixed 15 min window after the last menu press; let the app report the end of the refuelling if that ever matters
+          loud[g:getName()] = timer.getTime() + 900
+          pcall(function() g:getController():setOption(SILENCE, false) end)   -- the periodic silenceAll mutes it again after the window
         end
         return evt(string.format("M;%s;%s;%d;%d", clean(unit), kind, i, #list))
       end

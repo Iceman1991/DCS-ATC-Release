@@ -388,7 +388,7 @@ public partial class Tower
                 if (dpq != null && !dpq.Rwy.Contains(rw))
                     return Neg($"{c}, negative, {CrpSay(dpq.Name)} departure is for runway {string.Join(" and ", dpq.Rwy.Select(RwSay))}, runway {RwSay(rw)} in use. Say request.");
                 depRoute = dpq ?? depRoute; depSaid = dpq;
-                if (dpq != null && dpq.Pts.Where(p => p.Cross == "at or above").Select(p => p.Ft).DefaultIfEmpty(0).Max() is var need && need > depFt)   // #31 (log Nellis): cleared altitude not below what the departure requires
+                if (dpq != null && dpq.Pts.Where(p => p.Cross is "at or above" or "between").Select(p => p.Ft).DefaultIfEmpty(0).Max() is var need && need > depFt)   // #31 (log Nellis): cleared altitude not below what the departure requires
                     cruiseFt = Math.Max(cruiseFt, depFt = Math.Ceiling(need / 1000) * 1000);
                 return Say($"{hdr}, {rwAck}cleared {(dest != null ? $"to {dest.Name.Replace('-', ' ')} airport" : "out of the control zone")} via radar vectors, " +
                            $"after departure {(dpq != null ? $"fly the {CrpSay(dpq.Name)} departure" : "fly runway heading")}, climb and maintain {Alt(depFt)}, {(cruiseFt > depFt ? $"expect {Alt(cruiseFt)} ten minutes after departure, " : "")}" +

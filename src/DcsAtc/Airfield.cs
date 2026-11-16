@@ -72,7 +72,7 @@ public class Airfield
     public HashSet<string> Backtrack = new();                                  // Runways whose holding point leads only to the middle: backtrack on the runway
     public List<string> Notes = new();                                         // Airfield notes (English) from the chart
     public Dictionary<string, string> StandChart = new();                      // DCS stand (Term_Index) -> stand name on the chart, only where unambiguous
-    public record Route(string Name, string[] Rwy, string To, (string Fix, double X, double Z, double Ft, string Cross)[] Pts, string[]? Say = null);   // Say: other spoken names (#23: "ECHO" for ARCOE, which the speech recognition does not get)   // Cross: "at or above", "at", "at or below" (Ft 0 = none)
+    public record Route(string Name, string[] Rwy, string To, (string Fix, double X, double Z, double Ft, string Cross, double Ft2)[] Pts, string[]? Say = null);   // Say: other spoken names (#23: "ECHO" for ARCOE, which the speech recognition does not get)   // Cross: "at or above", "at", "at or below", "between" (Ft..Ft2) (Ft 0 = none)
     public Dictionary<string, Route> Routes = new();                           // Forum (Lt_Jaeger): named arrival chains (charts.jsonc "routes"), after the last point the CRP "to" = handover to Tower
     public Dictionary<string, Route> Departures = new();                       // Forum: named departure chains (charts.jsonc "departures"), after the last fix own navigation (To unused)
     /// Chart point written in capitals ("CRAIG", "GASS_PEAK") = named fix, said by its name ("Gass Peak"); otherwise "C R P north".
@@ -343,7 +343,13 @@ public class Airfield
                         var (x, z) = Pos(p.GetProperty("pos"));
                         var (cross, ft) = new[] { ("above", "at or above"), ("at", "at"), ("below", "at or below") }
                             .Select(k => p.TryGetProperty(k.Item1, out var v) ? (k.Item2, v.GetDouble()) : default).FirstOrDefault(k => k.Item1 != null, ("", 0));
-                        return (p.GetProperty("fix").GetString()!, x, z, ft, cross);
+                        double ft2 = 0;
+                        if (p.TryGetProperty("above", out var lo) && p.TryGetProperty("below", out var hi))   // #31 (LtJaeger): both keys = between
+                        {
+                            (cross, ft, ft2) = ("between", lo.GetDouble(), hi.GetDouble());
+                            if (ft > ft2) throw new FormatException($"{Name} {key} {r.Name}: fix \"{p.GetProperty("fix").GetString()}\": \"above\" {ft:0} is higher than \"below\" {ft2:0}");
+                        }
+                        return (p.GetProperty("fix").GetString()!, x, z, ft, cross, ft2);
                     }).ToArray();
                     if (pts.Length == 0) throw new FormatException($"{Name} {key} {r.Name}: \"pts\" is empty");
                     if (!dep && rws.FirstOrDefault(rw => !(Entry.TryGetValue(rw, out var en) && en.Any(e => e.Crp == to))) is { } bad)

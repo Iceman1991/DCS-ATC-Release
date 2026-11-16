@@ -308,7 +308,7 @@ static class Kneeboard
             {
                 rows.Add(Trim($"  {r.Name.Replace('_', ' ')} {(dep ? "departure" : "recovery")}  RWY {string.Join(" ", r.Rwy)}{(dep ? "" : " -> " + Airfield.Label(r.To))}", 56));
                 var line = "   ";
-                foreach (var p in r.Pts.Select(p => $" {p.Fix.Replace('_', ' ')}{(p.Ft > 0 ? $" {p.Ft:0}{(p.Cross == "at or above" ? "+" : p.Cross == "at or below" ? "-" : "")}" : "")},"))
+                foreach (var p in r.Pts.Select(p => $" {p.Fix.Replace('_', ' ')}{(p.Ft > 0 ? $" {p.Ft:0}{(p.Cross == "between" ? $"-{p.Ft2:0}" : p.Cross == "at or above" ? "+" : p.Cross == "at or below" ? "-" : "")}" : "")},"))
                 {
                     if (line.Length > 3 && line.Length + p.Length > 56) { rows.Add(line); line = "   "; }
                     line += p;
@@ -343,8 +343,8 @@ static class Kneeboard
             throw new Exception("Kneeboard: Hinweisseite unvollständig oder zu breit: " + string.Join("|", nt));
         if (!Names.OrderBy(n => n + ".png", StringComparer.Ordinal).SequenceEqual(Names) || Names.Distinct().Count() != Names.Length)
             throw new Exception("Kneeboard: Dateinamen nicht in Seitenreihenfolge: " + string.Join(" ", Names));
-        var route = new Airfield { Name = "Nellis", Routes = { ["MINTT"] = new("MINTT", new[] { "03L", "03R" }, "CRAIG", new[] { ("MINTT", 0.0, 0.0, 15000.0, "at or above"), ("GASS_PEAK", 0.0, 0.0, 9000.0, "at or above"), ("SIMNS", 0.0, 0.0, 5500.0, "at") }) },
-                                   Departures = { ["FLEX"] = new("FLEX", new[] { "03L" }, "", new[] { ("FLEX", 0.0, 0.0, 5000.0, "at or below"), ("APEX", 0.0, 0.0, 0.0, "") }) } };
+        var route = new Airfield { Name = "Nellis", Routes = { ["MINTT"] = new("MINTT", new[] { "03L", "03R" }, "CRAIG", new[] { ("MINTT", 0.0, 0.0, 15000.0, "at or above", 0.0), ("GASS_PEAK", 0.0, 0.0, 9000.0, "at or above", 0.0), ("SIMNS", 0.0, 0.0, 5500.0, "at", 0.0) }) },
+                                   Departures = { ["FLEX"] = new("FLEX", new[] { "03L" }, "", new[] { ("FLEX", 0.0, 0.0, 5000.0, "at or below", 0.0), ("APEX", 0.0, 0.0, 0.0, "", 0.0) }) } };
         var rl = RouteLines(new[] { kut, route });
         if (rl.Length != 7 || rl[2] != "NELLIS" || rl[3] != "  MINTT recovery  RWY 03L 03R -> CRAIG" || rl[4] != "    MINTT 15000+, GASS PEAK 9000+, SIMNS 5500" || rl[5] != "  FLEX departure  RWY 03L" || rl[6] != "    FLEX 5000-, APEX")
             throw new Exception("Kneeboard: Routen-Seite: " + string.Join("|", rl));

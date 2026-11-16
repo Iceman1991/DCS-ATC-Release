@@ -1142,7 +1142,7 @@ partial class Ops
             return new() { new("Tanker", wt.Name, $"{c}, {wt.Name}, negative, {Kind(wt)} only, {ok}.") };
         }
         if (tk == null) return new() { any.Count == 0 ? new("Tanker", "Tanker", $"{c}, no tanker airborne.") : new("Tanker", any[0].Name, $"{c}, {any[0].Name}, negative, no compatible tanker.") };
-        List<Call> T(string s) => new() { new("Tanker", tk.Name, s) };   // R304: our controller always speaks, the DCS tanker is mute (only radio menu for basket/boom)
+        List<Call> T(string s) => new() { new("Tanker", tk.Name, s) };   // R304: our controller always speaks, the DCS tanker is audible too while refuelling (radio menu for basket/boom)
         var tp = me.Tel;
         double dTk = tp == null ? 0 : Dist(tp.X, tp.Z, tk.A.X, tk.A.Z);
         var brg = tp == null ? "" : $"bearing {Brg(Bearing(tp.X, tp.Z, tk.A.X, tk.A.Z))}, {MilesTxt(dTk)}, ";

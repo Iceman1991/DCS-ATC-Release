@@ -484,12 +484,18 @@ static partial class Program
             File.WriteAllText(ownF, """
                 { "Banias": { "crp": { "TEST": [1, 2] }, "rwy": { "09": { "entry": { "TEST": { "via": "initial" } }, "exit": { "TEST": {} } } },
                   "routes": { "MINTT": { "rwy": ["09"], "to": "TEST", "pts": [ { "fix": "ALPHA", "pos": [5, 6], "above": 15000 }, { "fix": "BRAVO", "pos": [7, 8] } ] } },
-                  "departures": { "FLEX": { "rwy": ["09"], "pts": [ { "fix": "DELTA", "pos": [9, 10], "below": 5000 } ] } } } }
+                  "departures": { "FLEX": { "rwy": ["09"], "pts": [ { "fix": "DELTA", "pos": [9, 10], "below": 5000 }, { "fix": "ECHO", "pos": [11, 12], "above": 5000, "below": 7000 } ] } } } }
                 """);
             Airfield.OwnChart = OwnChart(ownF);
             var ed = Airfield.FromDcs("Banias", 22735.7, 5935.4, 8, rw).ApplyChart();
             if (Airfield.OwnChart == null || ed.Entry["09"][0] != ("TEST", "initial", null) || ed.Exit["09"][0] != "TEST" || ed.Routes["MINTT"].Pts.Length != 2 || ed.Routes["MINTT"].Pts[0].Cross != "at or above" || ed.Departures["FLEX"].Pts[0].Ft != 5000)
                 throw new Exception("Verfahrens-Editor: Eintrag der Seite wird nicht gelesen");
+            // #31 (LtJaeger): "above" + "below" on one fix = between: parsed, spoken, kneeboard row
+            var bt = ed.Departures["FLEX"];
+            if (bt.Pts[1] != ("ECHO", 11.0, 12.0, 5000.0, "between", 7000.0) || !Tower.CrossTxt(bt).EndsWith("Echo between 5000 and 7000 feet") || !Kneeboard.RouteLines(new[] { ed }).Any(l => l.Contains("ECHO 5000-7000")))
+                throw new Exception("Hoehe between: " + Tower.CrossTxt(bt));
+            File.WriteAllText(ownF, """{ "Banias": { "crp": { "TEST": [1, 2] }, "rwy": { "09": { "entry": { "TEST": { "via": "initial" } }, "exit": { "TEST": {} } } }, "departures": { "FLEX": { "rwy": ["09"], "pts": [ { "fix": "ECHO", "pos": [11, 12], "above": 7000, "below": 5000 } ] } } } }""");
+            if (OwnChart(ownF) != null) throw new Exception("Hoehe between: above > below nicht erkannt");   // OwnChart reports format errors and drops the file
             Console.WriteLine("OK   Verfahrens-Editor: Platzdaten als JSON mit dem Eintrag wie geschrieben, Eintrag der Seite (Punkt, An- und Abflugroute) wird gelesen");
             File.WriteAllText(ownF, """{ "Banias": { "land_rwy": "28" } }""");
             Airfield.OwnChart = OwnChart(ownF);
