@@ -18,6 +18,7 @@ static partial class Program
         c = WithConfigValue(WithConfigValue(WithConfigValue(c, "Volume", "0.8", ""), "Atis", "false", ""), "MyCallsign", "\"Viper 1-1\"", "Callsign");
         c = WithConfigValue(c, "MyCallsign", "\"\"", "Callsign");
         if (!c.Contains("\"Volume\": 0.8,   // leiser") || !c.Contains("\"Atis\": false") || !c.Contains("\"Callsign\": \"Enfield 1-1\",\n  \"MyCallsign\": \"\",") ||
+            !WithConfigValue("{\n  \"SrsPath\": \"\",\n  \"Atis\": true\n}", "SrsStart", "false", "SrsPath").Contains("\"SrsPath\": \"\",\n  \"SrsStart\": false,\n  \"Atis\"") ||   // forum (Killg0re NL): saved into a file without the key
             WithConfigValue("{\n}", "RunwayLights", "\"dcs\"", "Fehlt") != "{\n  \"RunwayLights\": \"dcs\",\n}" || JsonSerializer.Deserialize<Config>("{ \"WheelStyle\": \"hud\" }") == null || NormCallsign("viper11") != "Viper 1-1" || NormCallsign("Viper") != null ||
             UnitCallsign("VICTORY 9-1") != "Victory 9-1" || UnitCallsign("WOLF-2-1") != "Wolf 2-1" || UnitCallsign("Aerial-1-1") != null || UnitCallsign("F-4E ADVERSARIES NELLIS 1-1") != null)
             throw new Exception("Einstellungen: " + c);
@@ -1568,6 +1569,29 @@ static partial class Program
         Fields = new();
         if (calm != "25" || windy != "07" || kb.Main != "07") throw new Exception($"Bahnwahl wie DCS: {calm} {windy} gelernt {kb.Main}");
         Console.WriteLine("OK   Bahn wie DCS (3 m/s Rückenwind -> Hauptbahn 25, 4 m/s -> 07, KI-Landung lehrt 07)");
+        // Forum (RedeyeStorm, log Nellis): AI lands on one end and departs on the other end of the same strip: landing and departure runway are learned separately and stay put
+        var kn = Airfield.Kutaisi();
+        Fields = new() { kn };
+        var light = new Dictionary<string, (double, double, double, double)> { ["Kutaisi"] = (1.0, 0.0, 15.0, 100000.0) };
+        var land = new Traffic(2, "F-16C_50", kn.X, kn.Z, 100, kn.End("07").Hdg * Math.PI / 180, 70, "L2", "arr:Kutaisi");
+        var dpt = new Traffic(3, "F-16C_50", kn.X, kn.Z, 0, kn.End("25").Hdg * Math.PI / 180, 70, "D2", "dep:Kutaisi", false);
+        for (int i = 0; i < 3; i++)
+        {
+            LearnMain(new() { land }, new() { land with { InAir = false } }, light);
+            LearnMain(new() { dpt }, new() { dpt with { InAir = true } }, light);
+        }
+        Fields = new();
+        string nl = kn.BestRunway(0, 0), nd = kn.BestRunway(0, 0, dep: true), nw = kn.BestRunway(4 * e25.Dx, 4 * e25.Dz, dep: true), nwl = kn.BestRunway(4 * e25.Dx, 4 * e25.Dz);
+        var same = Airfield.Kutaisi();   // landing and takeoff on the same end: after the landing departures stay on the old main runway until the AI takeoff moves them too
+        same.Main = "25";
+        Fields = new() { same };
+        LearnMain(new() { land }, new() { land with { InAir = false } }, light);
+        string sd0 = same.BestRunway(0, 0, dep: true);   // after the landing only: departure runway has not jumped along
+        LearnMain(new() { dpt with { Hdg = same.End("07").Hdg * Math.PI / 180 } }, new() { dpt with { Hdg = same.End("07").Hdg * Math.PI / 180, InAir = true } }, light);
+        Fields = new();
+        if (kn.Main != "07" || kn.DepMain != "25" || nl != "07" || nd != "25" || nw != "07" || nwl != "07" || sd0 != "25" || same.BestRunway(0, 0) != "07" || same.BestRunway(0, 0, dep: true) != "07" || same.DepMain != "07")
+            throw new Exception($"Lande-/Startbahn getrennt: {kn.Main}/{kn.DepMain} {nl} {nd} Wind {nw} {nwl}; gleiche Richtung {sd0} {same.BestRunway(0, 0)} {same.BestRunway(0, 0, dep: true)} [{same.DepMain}]");
+        Console.WriteLine("OK   Lande- und Startbahn getrennt gelernt (KI landet 07, startet 25: stabil, Starkwind -> Gegenwind 07; gleiche Richtung wie bisher)");
     }
 
 }

@@ -450,6 +450,7 @@ static class Settings
         Row(L("SRS-Ordner *", "SRS folder *"), srsRow);
         var listen = Check(L("Über SRS auf der Lotsen-Frequenz sprechen (aus: eigene Sprechtaste) *", "Talk via SRS on the controller frequency (off: own push-to-talk key) *"), cfg.SrsListen);
         var auto = Check(L("SRS-Client beim Start mit dem lokalen SRS-Server verbinden *", "Connect the SRS client to the local SRS server on start *"), cfg.SrsAutoConnect);
+        var srsStart = Check(L("SRS-Server und SRS-Client starten, wenn sie nicht laufen *", "Start the SRS server and SRS client if they are not running *"), cfg.SrsStart);   // forum (Killg0re NL): off for servers that start SRS themselves
         Group(L("Funk über SRS", "Radio via SRS"));
         var iffc = Check(L("Transponder prüfen (Code, Ident, Mode 4, über SRS)", "Check transponder (code, ident, Mode 4, via SRS)"), cfg.IffCheck);
         var spos = Check(L("Lotsen senden mit Standort (SRS-Reichweite und Sichtlinie)", "Controllers transmit with their position (SRS range and line of sight)"), cfg.StationPositions);
@@ -561,7 +562,7 @@ static class Settings
                 ("WheelInGame", J(ingames[ingame.SelectedIndex]), "WheelSize"), ("MicName", J(mic.SelectedIndex == 0 ? "" : mics[mic.SelectedIndex - 1]), "WheelSize"), ("SrsPath", J(srs.Text.Trim()), "DebugLog"),
                 ("KneeboardPages", J(knee.Checked), "DebugLog"), ("F10Drawings", J(f10.Checked), "KneeboardPages"),("AiFlightRadiusNm", D(aiNm.Value), "AiFlightComms"), ("AiOwnWingmen", J(wingmen.Checked), "AiFlightRadiusNm"), ("TankerVectors", J(tvec.Checked), "AiOwnWingmen"),
                 ("AiFollowAwacs", J(follow.Checked), "AiFlightComms"), ("Modulation", J(modu.Text), "AwacsNewGroupNm"), ("Coalition", side.SelectedIndex == 1 ? "1" : "2", "Modulation"),
-                ("WheelSize", D(wsize.Value / 100), "WheelButton"), ("SrsListen", J(listen.Checked), "AiChatter"), ("SrsAutoConnect", J(auto.Checked), "SrsListen"),
+                ("WheelSize", D(wsize.Value / 100), "WheelButton"), ("SrsListen", J(listen.Checked), "AiChatter"), ("SrsAutoConnect", J(auto.Checked), "SrsListen"), ("SrsStart", J(srsStart.Checked), "SrsPath"),
                 ("AsrGpu", J(gpu.Checked), "DebugLog"), ("AsrApiUrl", J(apiUrl.Text.Trim()), "AsrGpu"), ("AsrApiKey", J(apiKey.Text.Trim()), "AsrApiUrl"), ("AsrApiModel", J(apiModel.Text.Trim()), "AsrApiKey"),
                 ("MapPort", mapPort.ToString(), "DebugLog"), ("MapLan", J(lan.Checked), "MapPort"), ("UpdateCheck", J(updAuto.Checked), "DebugLog"),
             };

@@ -109,7 +109,7 @@ DCS-ATC can also run on a PC that hosts a DCS dedicated server (`DCS_server.exe`
   - Success shows `SRS client connected to 127.0.0.1:5002.`
   - Failure shows `SRS client did not connect – enter 127.0.0.1:5002 in the client and press Connect.`
   - To turn this off, set `"SrsAutoConnect": false`.
-- **Your own SRS server.** If you start the SRS server yourself (a dedicated server with its own SRS setup), set `"SrsStart": false` in `config.jsonc`. DCS-ATC then starts neither the SRS server nor the SRS client and uses the server that is running.
+- **Your own SRS server.** If you start the SRS server yourself (a dedicated server with its own SRS setup), set `"SrsStart": false` in `config.jsonc`. DCS-ATC then starts neither the SRS server nor the SRS client and uses the server that is running. The same option is a checkbox on the SRS page of the settings window.
 - **Multiplayer.** Everyone connects their SRS client to the SRS server on the host's PC, which is the PC running DCS-ATC.
 - **Tuning frequencies.** All frequencies are AM.
   - **Airfields** use their own DCS frequency, the one shown on the F10 map. Ground, Tower and Approach share it, and you can use either the UHF or the VHF frequency. Examples on Caucasus: Kutaisi 263.0 / 134.0, Senaki 261.0 / 132.0, Batumi 260.0 / 131.0.
@@ -817,7 +817,7 @@ The ATIS broadcasts continuously for every airfield that has a player within 40 
 
 ### Runway selection
 
-- **Wind up to 3.5 m/s (about 7 kt):** DCS's main runway is in use. If AI aircraft are seen using the other direction in light wind, DCS-ATC follows them.
+- **Wind up to 3.5 m/s (about 7 kt):** DCS's main runway is in use. If AI aircraft are seen using the other direction in light wind, DCS-ATC follows them. Landing and departure direction are learned separately, so where the AI lands on one end of a runway and departs from the other (Nellis: lands 21, departs 03), DCS-ATC uses the same split and the ATIS names both.
 - **Stronger wind:** the runway with the most headwind is used. This matches where DCS lands its AI.
 - **Parallel runways** are named L/R/C by their position, for example 30L/30R. Landings go to the main runway's side.
 - **When the runway changes:** the active runway changes only while you are parked or not working the airfield. A procedure in progress keeps its runway.
@@ -2792,7 +2792,7 @@ One name for several runways: write a list of variants instead of a single route
 
 A departure route is a chain of fixes you fly after takeoff, then own navigation. Name it with the taxi request ("request taxi, FLEX departure") or with "ready for departure, FLEX departure".
 
-- The takeoff clearance carries it: "after departure Flex departure, proceed direct Flex, cross Flex at or below 5000 feet, Apex at or above 9000 feet, then own navigation, runway zero three left, wind …, cleared for takeoff." With an IFR clearance it ends with "then climb and maintain …" instead.
+- The takeoff clearance carries it: "after departure Flex departure, proceed direct Flex, cross Flex at or below 5000 feet, Apex at or above 9000 feet, then own navigation, runway zero three left, wind …, cleared for takeoff." With an IFR clearance it ends with "then climb and maintain …" instead. If the IFR clearance already named the departure, the takeoff clearance only repeats the name ("after departure fly the Flex departure, runway …, cleared for takeoff"). The altitude in that IFR clearance is never below the highest "at or above" altitude of the departure, rounded up to the next 1000 ft (the "expect" part is left out when it is not higher).
 - When you check in with Departure, the answer is "Continue Flex departure". Departure follows you from fix to fix; after the last fix you are on your own navigation.
 - Asked for with another runway in use, Tower says which runways the departure is for.
 

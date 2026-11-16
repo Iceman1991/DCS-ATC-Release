@@ -79,6 +79,7 @@ public partial class Tower
         if (depRoute is { } dr && dr.Rwy.Contains(Runway) && !IsHeli)   // charts.jsonc departure: fixes with altitudes, then own navigation (IFR: climb to the cleared altitude)
         {
             (depAt, nav, navName) = (0, (dr.Pts[0].X, dr.Pts[0].Z), CrpSay(dr.Pts[0].Fix));
+            if (depClr && depSaid == dr) return $"{c}, after departure fly the {CrpSay(dr.Name)} departure, {clr}";   // #31 (log Nellis): Ground already cleared it by name, no second reading of the fixes
             var cross = CrossTxt(dr);
             return $"{c}, after departure {CrpSay(dr.Name)} departure, proceed direct {CrpSay(dr.Pts[0].Fix)}{(cross != "" ? ", cross " + cross : "")}, " +
                    $"then {(depClr ? $"climb and maintain {Alt(depFt)}" : "own navigation")}, {clr}";

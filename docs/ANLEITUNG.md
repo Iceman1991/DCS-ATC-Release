@@ -111,7 +111,7 @@ DCS-ATC läuft auch auf einem PC mit DCS Dedicated Server (`DCS_server.exe`), an
   - Erfolg: `SRS-Client mit 127.0.0.1:5002 verbunden.`
   - Fehlschlag: `SRS-Client hat sich nicht verbunden – im Client 127.0.0.1:5002 eintragen und Connect drücken.`
   - Abschalten mit `"SrsAutoConnect": false`.
-- **Eigener SRS-Server.** Startest du den SRS-Server selbst (Dedicated Server mit eigenem SRS), setze `"SrsStart": false` in `config.jsonc`. DCS-ATC startet dann weder SRS-Server noch SRS-Client und nutzt den laufenden Server.
+- **Eigener SRS-Server.** Startest du den SRS-Server selbst (Dedicated Server mit eigenem SRS), setze `"SrsStart": false` in `config.jsonc`. DCS-ATC startet dann weder SRS-Server noch SRS-Client und nutzt den laufenden Server. Dieselbe Option gibt es auch als Haken auf der Seite SRS der Einstellungen.
 - **Multiplayer.** Alle verbinden ihren SRS-Client mit dem SRS-Server auf dem PC des Hosts, also dem PC mit DCS-ATC.
 - **Frequenzen rasten.** Alle Frequenzen sind AM.
   - **Flugplätze** nutzen ihre eigene DCS-Frequenz, die auf der F10-Karte. Ground, Tower und Approach teilen sie sich, UHF oder VHF geht beides. Beispiele Kaukasus: Kutaisi 263.0 / 134.0, Senaki 261.0 / 132.0, Batumi 260.0 / 131.0.
@@ -819,7 +819,7 @@ Die ATIS sendet dauerhaft für jeden Platz mit einem Spieler im Umkreis von 40 N
 
 ### Bahnwahl
 
-- **Wind bis 3,5 m/s (etwa 7 kt):** die DCS-Hauptbahn ist aktiv. Nutzen KI-Flugzeuge bei schwachem Wind die Gegenrichtung, folgt DCS-ATC ihnen.
+- **Wind bis 3,5 m/s (etwa 7 kt):** die DCS-Hauptbahn ist aktiv. Nutzen KI-Flugzeuge bei schwachem Wind die Gegenrichtung, folgt DCS-ATC ihnen. Lande- und Startrichtung lernt DCS-ATC getrennt: landet die KI an einem Ende der Bahn und startet am anderen (Nellis: Landung 21, Start 03), macht DCS-ATC es genauso, und das ATIS nennt beide.
 - **Stärkerer Wind:** die Bahn mit dem meisten Gegenwind. So landet auch die DCS-KI.
 - **Parallelbahnen** heißen nach Lage L/R/C, etwa 30L/30R. Landungen gehen auf die Seite der Hauptbahn.
 - **Wann die Bahn wechselt:** nur, solange du parkst oder nicht mit dem Platz arbeitest. Ein laufendes Verfahren behält seine Bahn.
@@ -2794,7 +2794,7 @@ Ein Name für mehrere Bahnen: statt einer Route eine Liste von Varianten. Du fra
 
 Eine Abflugroute ist eine Kette von Fixes, die du nach dem Start abfliegst, danach eigene Navigation. Du nennst sie mit der Rollanfrage („request taxi, FLEX departure“) oder mit „ready for departure, FLEX departure“.
 
-- Die Startfreigabe enthält sie: „after departure Flex departure, proceed direct Flex, cross Flex at or below 5000 feet, Apex at or above 9000 feet, then own navigation, runway zero three left, wind …, cleared for takeoff.“ Mit IFR-Freigabe endet sie stattdessen mit „then climb and maintain …“.
+- Die Startfreigabe enthält sie: „after departure Flex departure, proceed direct Flex, cross Flex at or below 5000 feet, Apex at or above 9000 feet, then own navigation, runway zero three left, wind …, cleared for takeoff.“ Mit IFR-Freigabe endet sie stattdessen mit „then climb and maintain …“. Hat schon die IFR-Freigabe den Abflug genannt, wiederholt die Startfreigabe nur den Namen („after departure fly the Flex departure, runway …, cleared for takeoff“). Die Höhe in dieser IFR-Freigabe liegt nie unter der höchsten „at or above“-Höhe des Abflugs, aufgerundet auf die nächsten 1000 ft („expect“ entfällt, wenn sie nicht höher ist).
 - Beim Check-in bei Departure lautet die Antwort „Continue Flex departure“. Departure verfolgt dich von Fix zu Fix, nach dem letzten Fix fliegst du eigene Navigation.
 - Fragst du sie an, während eine andere Bahn in Betrieb ist, nennt der Tower die passenden Bahnen.
 

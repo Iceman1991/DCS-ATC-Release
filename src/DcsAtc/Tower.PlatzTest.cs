@@ -265,7 +265,19 @@ public partial class Tower
             Chk(rc.Any(m => m.Text.Contains("after departure fly the Tiki departure")) && wc.depRoute?.Name == "TIKI" && rf.Any(m => m.Text.Contains("after departure fly the Fyttr departure")) && wf.depRoute?.Name == "FYTTR"
                 && Hold().OnTranscript("Kutaisi Ground, Enfield 11, request clearance, zulu departure", G0(), none, 10).Any(m => m.Text.Contains("Zulu departure is for runway zero seven")),
                 "#40 Clearance mit Departure: " + J(rc) + " / " + J(rf));
-            n += 6;
+            // #31 (log Nellis): takeoff clearance after the IFR clearance names the departure only (no second list of fixes); VFR keeps the long form
+            var rt = wc.OnTranscript("Kutaisi Tower, Enfield 11, ready for departure", G0(), none, 20);
+            Chk(rt.Any(m => m.Text.Contains("after departure fly the Tiki departure, runway") && m.Text.Contains("cleared for takeoff") && !m.Text.Contains("cross")) && wc.navName == "Alpha"
+                && r1.Any(m => m.Text.Contains("proceed direct Alpha, cross Alpha at or below 3000 feet")),
+                "#31 Takeoff-Freigabe nach Clearance kurz: " + J(rt));
+            // #31: departure with a higher "at or above" fix: cleared altitude raised to the next 1000 ft, no "expect" below it, Departure says the same
+            k.Departures["HIGH"] = new("HIGH", new[] { "25" }, "", new[] { ("ALPHA", pa.X, pa.Z, 4000.0, "at or above"), ("BRAVO", pb.X, pb.Z, 19200.0, "at or above"), ("CHARLIE", pb.X, pb.Z, 25000.0, "at or below") });
+            var wh = Hold();
+            var rh = wh.OnTranscript("Kutaisi Ground, Enfield 11, request clearance, high departure", G0(), none, 10);
+            Chk(rh.Any(m => m.Text.Contains("after departure fly the High departure, climb and maintain flight level two zero zero, ") && !m.Text.Contains("expect")) && wh.depFt == 20000 && wh.cruiseFt >= 20000
+                && rc.Any(m => m.Text.Contains("expect")),
+                $"#31 Hoehe nach Departure: {wh.depFt}/{wh.cruiseFt} " + J(rh));
+            n += 8;
         }
 
         // Forum (Heling): chart with entries but no exit (Andersen: no published VFR exits) - departure as without a chart, arrival still from the entries; runway end missing in the chart: as without a chart

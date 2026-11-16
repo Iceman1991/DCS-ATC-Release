@@ -89,10 +89,12 @@ static partial class Program
             if (was.FirstOrDefault(o => o.Id == a.Id) is { } w0 && w0.InAir != a.InAir && a.Speed > 40 &&
                 Fields.FirstOrDefault(f => Dist(f.X, f.Z, a.X, a.Z) < 3000) is { } f && wx.TryGetValue(f.Name, out var w) &&
                 Math.Sqrt(w.Item1 * w.Item1 + w.Item2 * w.Item2) < 3.5 &&
-                f.Ends.Where(e => Tower.HdgDiff(e.Hdg, a.Hdg * 180 / Math.PI) < 20).MinBy(e => Math.Abs((a.X - e.CX) * e.Dz - (a.Z - e.CZ) * e.Dx)) is { } e && e.Name != f.Main)
-            {
-                Log($"[KI ] {f.Name}: DCS-Hauptbahn {e.Name} statt {f.Main} ({(a.InAir ? "Start" : "Landung")} {a.Group})");
-                f.Main = e.Name;
+                f.Ends.Where(e => Tower.HdgDiff(e.Hdg, a.Hdg * 180 / Math.PI) < 20).MinBy(e => Math.Abs((a.X - e.CX) * e.Dz - (a.Z - e.CZ) * e.Dx)) is { } e &&
+                e.Name != (a.InAir ? f.DepMain == "" ? f.Main : f.DepMain : f.Main))
+            {   // Forum (RedeyeStorm, log Nellis): landing and departure learned separately (Nellis: AI lands 21L, departs 03R, one learned runway flipped with every movement)
+                Log($"[KI ] {f.Name}: DCS-{(a.InAir ? "Startbahn" : "Landebahn")} {e.Name} statt {(a.InAir ? f.DepMain == "" ? f.Main : f.DepMain : f.Main)} ({(a.InAir ? "Start" : "Landung")} {a.Group})");
+                if (a.InAir) f.DepMain = e.Name;
+                else { if (f.DepMain == "") f.DepMain = f.Main; f.Main = e.Name; }   // departures stay where they were until an AI takeoff says otherwise (no jump of the departure runway on the first landing)
             }
     }
 
@@ -104,10 +106,10 @@ static partial class Program
     }
 
     /// Runway at the airfield like DCS-ATC (wind from the mission weather, Airfield.BestRunway): the AI lands accordingly.
-    static string FieldRunway(Airfield f)
+    static string FieldRunway(Airfield f, bool dep = false)
     {
         var w = Wx.GetValueOrDefault(f.Name);
-        return f.BestRunway(w.Wx, w.Wz, dcs: true);   // FI5: the AI ignores NOTAMs
+        return f.BestRunway(w.Wx, w.Wz, dcs: true, dep: dep);   // FI5: the AI ignores NOTAMs; Forum (RedeyeStorm, log Nellis): dep = AI departure (own runway in light wind)
     }
 
     /// All holdings of all airfields ("ai:Gruppe" / "p:Unit" -> point, altitude ft).
@@ -178,7 +180,7 @@ static partial class Program
             bool emergency = here.Any(t => t.Mayday);   // MAYDAY: AI holds, runway clear, AI radio at the airfield silent (A24); PAN priority only (UpdateQueues)
             // other AI at the airfield (A82): departure with takeoff clearance still on the ground ("ready") or rolling on the runway (takeoff, rollout)
             string FieldOf(Traffic o) => o.Flag.Split(':', 2) is [_, var n] ? n : "Kutaisi";
-            var rw = FieldRunway(fld);   // DCS assigns the runway, then the AI lands/takes off
+            var rw = FieldRunway(fld, flag.StartsWith("dep"));   // DCS assigns the runway, then the AI lands/takes off (departure runway may differ from the landing one)
             bool aiDep = Ai.Any(o => o.Group != g.Key && !o.InAir && o.Flag.StartsWith("dep-go") && FieldOf(o) == fld.Name && aiStage.GetValueOrDefault(o.Group) == "ready");
             bool luaw = here.Any(t => t.Phase == Phase.HoldShort && t.LineUp);   // A9/A10: waiting at the holding point blocks nothing, waiting on the runway does
             bool blocked = herePl.Any(p => Tower.Blocks(fld, rw, p.Tel!.X, p.Tel.Z, p.Tel.Agl, p.Tel.Hdg, Tower.Gs(p.Tel))) ||   // Player on the runway (A8: also standing, rollout above 6000 ft free)

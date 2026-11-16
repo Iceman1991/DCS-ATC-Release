@@ -151,10 +151,12 @@ public class Airfield
     /// Parallel runways: landing is on the runway matching the main runway (Main or its reciprocal, Program learns it from the AI), otherwise the first from getRunways.
     /// FI5: closed runways (NOTAM) are skipped; dcs = as the DCS AI picks it, it ignores NOTAMs.
     /// Forum (Lt_Jaeger): charts.jsonc land_rwy/dep_rwy picks the parallel runway (the strip, either end) for landing/departure, not for the AI (dcs).
+    /// Forum (RedeyeStorm, log Nellis): dep = departure: in light wind DepMain (learned from AI takeoffs, e.g. Nellis 03R out / 21L in) if set, otherwise Main; above 3.5 m/s the headwind decides for both.
     public string BestRunway(double wx, double wz, bool dcs = false, bool dep = false)
     {
         var open = dcs || Ends.All(e => Closed.Contains(e.Name)) ? Ends : Ends.Where(e => !Closed.Contains(e.Name)).ToList();
         var m = open.FirstOrDefault(e => e.Name == Main);
+        if (dep && open.FirstOrDefault(e => e.Name == DepMain) is { } md) m = md;
         var b = Math.Sqrt(wx * wx + wz * wz) < 3.5 && m != null ? m : open.MaxBy(e => -(wx * e.Dx + wz * e.Dz))!;
         var pref = (dcs ? null : Ends.FirstOrDefault(e => e.Name == (dep ? DepRwy : LandRwy))) ?? m;
         return open.Where(e => Diff(e.Hdg, b.Hdg) < 10).OrderBy(e => pref != null && e.CX == pref.CX && e.CZ == pref.CZ ? 0 : 1).First().Name;
@@ -163,6 +165,8 @@ public class Airfield
     /// DCS main runway = named direction from Airbase:getRunways (correct at all test airfields). Program corrects it
     /// when an AI takes off/lands differently in light wind.
     public string Main = "";
+    /// Forum (RedeyeStorm, log Nellis): main departure runway learned from AI takeoffs only ("" = same as Main, which is learned from AI landings only).
+    public string DepMain = "";
 
     /// FI5: NOTAMs of the day as the ATIS speaks them; Closed = runway ends out of use (whole strip), IlsOut = runways whose ILS is unserviceable.
     public List<string> Notams = new();
