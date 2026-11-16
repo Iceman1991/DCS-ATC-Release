@@ -314,7 +314,7 @@ local function start()
     end
     missionCommands.addCommandForGroup(gid, L("Anzeigen", "Show"), m, showOpt, gid)
   end
-  local built, roots = {}, {}
+  local built, roots, subs = {}, {}, {}
   local function addItems(gid, parent, items, gname, unit, u)
     for _, c in ipairs(items) do
       local a = { gid = gid, gname = gname, unit = unit, text = c[2] }
@@ -359,11 +359,19 @@ local function start()
       return
     end
     local key = u:getName()   -- several players in a group: one submenu per player
+    for k, s in pairs(subs) do   -- player changed aircraft: group menus are shared, so drop the submenu of a unit that has no player any more (forum Killg0re NL)
+      if s.gid == gid and k ~= key then
+        local o = Unit.getByName(k)
+        if not (o and o:isExist() and o:getPlayerName()) then missionCommands.removeItemForGroup(gid, s.path); subs[k], built[k] = nil, nil end
+      end
+    end
     if built[key] then return end
     built[key] = true
     if not roots[gid] then roots[gid] = missionCommands.addSubMenuForGroup(gid, "DCS-ATC"); if on("crew") then optMenu(gid, roots[gid]) end end
     local cs = (tostring(u:getCallsign() or key):gsub("^(%a+)(%d)(%d)$", "%1 %2-%3"))
-    addMenu(gid, missionCommands.addSubMenuForGroup(gid, cs, roots[gid]), gname, key, u)
+    local path = missionCommands.addSubMenuForGroup(gid, cs, roots[gid])
+    subs[key] = { gid = gid, path = path }
+    addMenu(gid, path, gname, key, u)
   end
 
   -- Weather, Bullseye, tanker TACAN -------------------------------------------------------------------
@@ -1403,14 +1411,12 @@ local function start()
       local name = u:getGroup():getName()
       if slots[name] or jBy[clean(name)] then return end
       local up, kind, src = name:upper()
+      for _, L in ipairs(jLeaders) do   -- longest leader name that is a prefix, followed by a non-letter/digit; also with FACA/JTAC in the name, else "FACA-UAV#001" loses callsign and frequency of its template (forum Killg0re NL)
+        if name:sub(1, #L.name) == L.name and name:sub(#L.name + 1):find("^[^%w]") and (not src or #L.name > #src.name) then src = L end
+      end
       if up:find("FACA") then kind = "faca"
       elseif up:find("JTAC") then kind = air(u) and "faca" or "jtac"
-      else
-        for _, L in ipairs(jLeaders) do   -- longest leader name that is a prefix, followed by a non-letter/digit
-          if name:sub(1, #L.name) == L.name and name:sub(#L.name + 1):find("^[^%w]") and (not src or #L.name > #src.name) then src = L end
-        end
-        kind = src and src.kind
-      end
+      else kind = src and src.kind end
       if kind then jAdd(name, kind, u:getCoalition(), {}, src) end
     end)
   end })
@@ -1458,7 +1464,11 @@ local function start()
           local d = d2(L.p, e.p)
           if d < L.range ^ 2 then cand[#cand + 1] = { e = e, d = d } end
         end
-        table.sort(cand, function(a, b) return a.d < b.d end)
+        -- sticky list (forum Killg0re NL): an orbiting FAC(A) would else swap the 5 nearest all the time and the app drops the target of a running 9-line;
+        -- groups listed last run come first, then nearest. ponytail: a listed group that stays visible keeps its slot for good, a nearer newcomer waits for a free one.
+        local prev, q = L.q or {}, {}
+        for _, c in ipairs(cand) do c.k = prev[c.e.g:getName()] and true or false end
+        table.sort(cand, function(a, b) if a.k ~= b.k then return a.k end return a.d < b.d end)
         local n = 0
         for _, c in ipairs(cand) do
           if n >= 5 then break end
@@ -1482,11 +1492,13 @@ local function start()
               if d < fd then fd, fx, fz = d, string.format("%.1f", f.p.x), string.format("%.1f", f.p.z) end
             end
             n = n + 1
+            q[g:getName()] = true
             jQ[#jQ + 1] = string.format("Q;%s;%s;%s;%d;%.1f;%.1f;%.1f;%d;%d;%s %s %05d %05d;%.6f;%.6f;%s;%s",
               clean(L.name), clean(g:getName()), clean(u1:getTypeName()), cnt, p.x, p.z, land.getHeight({ x = p.x, y = p.z }),
               v.x * v.x + v.z * v.z > 1 and 1 or 0, flak, m.UTMZone, m.MGRSDigraph, math.floor(m.Easting), math.floor(m.Northing), lat, lon, fx, fz)
           end
         end
+        L.q = q
       end
     end
   end

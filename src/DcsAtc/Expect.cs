@@ -72,7 +72,7 @@ static partial class Program
             "Approach: leaving the control zone" => flow == "leaving the control zone" || ask.Contains("leaving the control zone") || ask.Contains("clear of the zone"),   // R7 / N3: only when the report is due
             "Approach: report airspeed" => ask == "say airspeed" || flow == "report airspeed",
             "Range: checking in" => air && !h.Ops.RangeIn,
-            "JTAC: checking in" => air && h.Ops.Cas == 0,
+            "JTAC: checking in" => air && (h.Ops.Cas == 0 || h.Ops.Cas is 1 or 6 && Ops.Leaders.Count(l => l.Alive && l.Side == h.Coalition) > 1),   // forum Killg0re NL: again = next controller
             "JTAC: ready to copy" => h.Ops.Cas is 1 or 6,
             "JTAC: readback" => h.Ops.Cas == 2,
             "JTAC: tally target" or "JTAC: in" or "JTAC: laser on" or "JTAC: request mark" or "JTAC: request sparkle" => h.Ops.Cas is >= 3 and <= 5,
@@ -414,7 +414,8 @@ static partial class Program
         Want(Fit() == "checking in", "Funkrad JTAC vor Check-in: " + Fit());
         string Say(string t) => string.Join(" | ", p.Ops.OnTranscript("JTAC", t, MeOf(p), Array.Empty<Traffic>(), Fields, 0).Select(c => c.Text));
         Say("JTAC: checking in");
-        Want(Fit() == "ready to copy,checking out" && p.Ops.CasSuggest()?.Text == "ready to copy", "Funkrad JTAC nach Check-in: " + Fit() + " Enter " + p.Ops.CasSuggest());
+        var two = Ops.Leaders; Ops.Leaders = two.Take(1).ToList(); var one = Fit(); Ops.Leaders = two;   // forum Killg0re NL: "checking in" stays on the wheel while checked in only with a second controller on the side
+        Want(Fit() == "checking in,ready to copy,checking out" && one == "ready to copy,checking out" && p.Ops.CasSuggest()?.Text == "ready to copy", "Funkrad JTAC nach Check-in: " + Fit() + " / ein Lotse " + one + " Enter " + p.Ops.CasSuggest());
         Say("JTAC: ready to copy");
         Want(Fit() == "readback,checking out" && p.Ops.CasSuggest()?.Text == "readback", "Funkrad JTAC nach 9-Liner: " + Fit() + " Enter " + p.Ops.CasSuggest());
         Say("JTAC: " + p.Ops.CasWheel("readback"));

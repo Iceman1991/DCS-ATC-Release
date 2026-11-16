@@ -622,16 +622,49 @@ do   -- fog off in the ME (fog2.mode 1 / older missions without enable_fog): lef
   assert(nLL == 49, "FI2 Lat/Lon-Raster: " .. nLL .. " L-Zeilen")
   pl[#pl], w.enable_fog, FOG[1], FOG[2], env.mission.version = nil, nil, 0, 0, nil
 end
+do   -- player changes aircraft within a group with 2 player slots: the F10 submenu of the unit he left goes away (forum Killg0re NL)
+  local pl = env.mission.coalition.blue.country[1].plane.group
+  pl[#pl + 1] = { name = "Springfield", units = { { skill = "Client" }, { skill = "Client" } } }
+  local uA, uB, PU, getByName0 = unit("Spring-1", 5000, 5000), unit("Spring-2", 5050, 5000), {}, Unit.getByName
+  PU["Spring-1"], PU["Spring-2"] = uA, uB
+  Unit.getByName = function(n) return PU[n] or getByName0(n) end
+  missionCommands.removeItemForGroup = function(_, path) path.removed = true end
+  local list = { uA, uB }
+  local sg = { getUnits = function() return list end, getName = function() return "Springfield" end, getID = function() return 77 end, getUnit = function() return list[1] end,
+    getController = function() return { setOption = function() end } end }
+  for _, u in ipairs({ uA, uB }) do u.group = "Springfield"; u.getGroup = function() return sg end end
+  planes[#planes + 1] = { g = sg, u = uA }
+  for i = #queue, 1, -1 do queue[i] = nil end
+  for i = #handlers, 1, -1 do handlers[i] = nil end
+  DCSATC, DCSATC_SPAWNTEST, DCSATC_OPTIONS, MENU, GROUPS = nil, nil, { crew = true }, {}, {}
+  dofile(arg[1])
+  local function subs(n) local c, r = 0, 0 for _, x in ipairs(GROUPS) do if x.name == n then c = c + 1; if x.removed then r = r + 1 end end end return c, r end
+  function uA:getPlayerName() return self.pn end
+  function uB:getPlayerName() return self.pn end
+  uA.pn = "PA"
+  run(T + 12)
+  assert(select(1, subs("Spring-1")) == 1 and subs("Spring-2") == 0, "F10 Spieler in A: nur Untermenue A")
+  PU["Spring-1"], list, uB.pn = nil, { uB }, "PB"   -- A gone, player now in B
+  run(T + 12)
+  local c1, r1 = subs("Spring-1")
+  assert(c1 == 1 and r1 == 1 and subs("Spring-2") == 1 and select(2, subs("Spring-2")) == 0, "F10 Wechsel A -> B: Untermenue A bleibt oder B fehlt")
+  PU["Spring-1"], list = uA, { uA, uB }   -- back in A, B keeps his player: both stay
+  run(T + 12)
+  c1, r1 = subs("Spring-1")
+  assert(c1 == 2 and r1 == 1 and select(2, subs("Spring-2")) == 0, "F10 zurueck in A: Untermenue A nicht neu gebaut")
+  Unit.getByName, missionCommands.removeItemForGroup, planes[#planes], pl[#pl] = getByName0, nil, nil, nil
+end
 do   -- JTAC/FAC(A) born during the mission (forum Killg0re NL): "JTAC" in the name, copy of a mission leader ("Reaper#001"), unrelated name = nothing
   local pl = env.mission.coalition.blue.country[1].plane.group
   pl[#pl + 1] = { name = "Reaper", task = "AFAC", units = { {} }, route = { points = { { type = "Turning Point", task = { id = "FAC", params = { frequency = 251000000, callname = 2 } } } } } }
+  pl[#pl + 1] = { name = "FACA-UAV", units = { {} }, route = { points = { { type = "Turning Point", task = { id = "FAC", params = { frequency = 243000000, callname = 8 } } } } } }
   for i = #queue, 1, -1 do queue[i] = nil end
   for i = #handlers, 1, -1 do handlers[i] = nil end
   DCSATC, DCSATC_SPAWNTEST, DCSATC_OPTIONS, MENU = nil, nil, { crew = true }, {}
   dofile(arg[1])
   run(T + 3)
   local born = {}
-  for _, n in ipairs({ "Reaper", "Reaper#001", "Spawned JTAC UAV", "Random#001" }) do
+  for _, n in ipairs({ "Reaper", "Reaper#001", "Spawned JTAC UAV", "Random#001", "FACA-UAV#001" }) do
     local g = coalition.addGroup(2, 0, { name = n, units = { { name = n .. "-1", x = 100, y = 0, alt = 3000 } } })
     born[#born + 1] = g
     if n ~= "Reaper" then fire({ id = world.event.S_EVENT_BIRTH, initiator = g:getUnit() }) end
@@ -639,8 +672,25 @@ do   -- JTAC/FAC(A) born during the mission (forum Killg0re NL): "JTAC" in the n
   run(T + 12)
   local s = stateFile()
   assert(s:find("\nJ;Reaper#001;faca;Darknight;2;[^\n]*;251%.000;AM;;1\n") and s:find("\nJ;Spawned JTAC UAV;faca;") and not s:find("J;Random#001", 1, true), "JTAC/FAC(A) zur Laufzeit: " .. s)
+  assert(s:find("\nJ;FACA%-UAV#001;faca;Finger;2;[^\n]*;243%.000;"), "Kopie mit FACA im Namen erbt Rufzeichen/Frequenz der Vorlage nicht: " .. s)   -- forum Killg0re NL
+  -- target list is sticky: a FAC(A) orbit must not swap the 5 nearest all the time (the app would lose the target of a running 9-line)
+  local red0, ents, land0, mgrs0 = REDGROUND, {}, land.isVisible, coord.LLtoMGRS
+  land.isVisible, coord.LLtoMGRS = function() return true end, function() return { UTMZone = "38T", MGRSDigraph = "KM", Easting = 1, Northing = 2 } end
+  REDGROUND = {}
+  for i = 1, 6 do
+    local g = coalition.addGroup(1, 2, { name = "RT" .. i, units = { { name = "RT" .. i .. "-1", x = i * 1000, y = 0 } } })
+    g.cat = 99; ents[i] = g; REDGROUND[i] = g
+  end
+  local function listed() local l = {} for n in stateFile():gmatch("\nQ;Reaper;RT(%d);") do l[#l + 1] = n end table.sort(l) return table.concat(l, ",") end
+  run(T + 12); assert(listed() == "1,2,3,4,5", "Q-Liste: die 5 naechsten: " .. listed())
+  groups["Reaper"]:getUnit().p = vec(6100, 0)   -- RT6 is now nearer than RT1
+  run(T + 12); assert(listed() == "1,2,3,4,5", "Q-Liste bleibt bei den bisherigen: " .. listed())
+  ents[2]:destroy(); table.remove(REDGROUND, 2)
+  run(T + 12); assert(listed() == "1,3,4,5,6", "Q-Liste: freier Platz geht an den neuen: " .. listed())
+  for i = 1, 6 do ents[i]:destroy() end
+  REDGROUND, land.isVisible, coord.LLtoMGRS = red0, land0, mgrs0
   for _, g in ipairs(born) do g:destroy() end
-  pl[#pl] = nil
+  pl[#pl], pl[#pl - 1] = nil, nil
 end
 -- Hook: file paths with a real backslash (Lua 5.1: '\D' becomes 'D' -> %TMP%DcsAtc-..., autostart/session/DCS folder never arrived)
 local opened = {}

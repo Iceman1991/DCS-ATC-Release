@@ -2240,11 +2240,12 @@ A JTAC is a controller on the ground, a FAC(A) one in the air. Both talk you ont
 - **Callsign and frequency:** the callsign is the FAC callname from the Mission Editor (Axeman, Darknight, Warrior …). The frequency is the one set on the FAC task, otherwise `"JTAC": 133.5`. On its own mission frequency the controller transmits in the modulation set in the mission (AM or FM; set your radio to match), on the config frequency in `Modulation`. The laser code is the one on the task, otherwise 1688.
 - **What it sees:** a JTAC sees enemy groups out to 8 km, a FAC(A) out to 15 km, and only with line of sight. It briefs one group at a time: air defence first, then moving groups, then the nearest.
 - **IP:** a mission navigation point of your side that is 3 to 60 km from the target is used as the IP in line 1.
+- **Console:** the DCS-ATC window writes a line for every controller it finds, also for one that a script spawns later, with callsign and frequency.
 - **Without a controller** on your side nobody answers, and the **JTAC** entry stays hidden in the radio wheel. The module can also be switched off in setup.
 
 #### Calls you can make
 
-Say the controller's callsign (*Axeman one one*) or *JTAC* / *FAC A* in the call. Over SRS the frequency is enough: the controller on that frequency answers. If two controllers share a frequency, the callsign in the call decides, otherwise the one you are working with, otherwise the nearest. In the radio wheel, "Check in" lists the controllers when your side has more than one; later calls go to the one you checked in with.
+Say the controller's callsign (*Axeman one one*) or *JTAC* / *FAC A* in the call. Over SRS the frequency is enough: the controller on that frequency answers. If two controllers share a frequency, the callsign in the call decides, otherwise the one you are working with, otherwise the nearest. In the radio wheel, "Check in" lists the controllers when your side has more than one. The F10 menu has no such list: there "Check in" reaches the nearest controller, and "Check in" again while you are checked in goes to the next one; a text line names it and its frequency. Later calls go to the one you checked in with.
 
 | You say (recognised words) | JTAC / FAC(A) answers |
 |---|---|

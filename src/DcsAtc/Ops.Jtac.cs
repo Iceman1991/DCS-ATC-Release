@@ -28,6 +28,9 @@ partial class Ops
     public static double DefFreq = 133.5;   // JTAC frequency from the config (leader without own frequency)
 
     static string CsKey(Leader l) => Normalize(l.Cs).Split(' ')[0];
+    /// "FAC(A)" / "133.500 FM" for the text line after a controller change and the console line (Program.ReadState).
+    internal static string KindTxt(Leader l) => l.Kind == "faca" ? "FAC(A)" : "JTAC";
+    internal static string FreqTxt(Leader l) => (l.Freq > 0 ? l.Freq : DefFreq).ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) + (l.Mod is { Length: > 0 } ? " " + l.Mod.ToUpperInvariant() : "");
     static bool Laser(string type) => Regex.IsMatch(type, @"^(?:A-10|FA-18|F/A-18|F-16|AV8B|AH-64|F-15E|F-14|Ka-50)");
     public static bool Keypad;        // config JtacKeypad: line 6 as 1 km grid square and keypad for every aircraft
     public static int MarkOffsetM;    // config JtacMarkOffsetM: smoke / WP this far beside the target, 0 = on the target
@@ -99,6 +102,13 @@ partial class Ops
         (casCs, casLast) = (me.Callsign, now);
         var l = LeaderFor(me, n);
         if (l == null) return new() { new("Info", "JTAC", L("JTAC: keiner auf deiner Seite.", "JTAC: none on your side.")) };
+        bool sw = false;
+        if (cas is 1 or 6 && l.Id == casL && me.Freq == 0 && Has(n, "checking in", "check in") && !(CsKey(l) is { Length: > 2 } ck && Has(n, ck)))   // forum Killg0re NL: menu / wheel "Check in" again while checked in = next controller of the side (no frequency, no name to pick one)
+        {
+            var own = Leaders.Where(x => x.Alive && x.Side == me.Coalition).ToList();
+            var nx = own[(own.FindIndex(x => x.Id == l.Id) + 1) % own.Count];
+            (sw, l) = (nx.Id != l.Id, nx);
+        }
         if (cas > 0 && l.Id != casL) CasEnd();
         List<Call> Say(string t) => new() { C(l, me, t) };
         var code = l.Code is { Length: > 0 } cd ? cd : "1688";
@@ -124,7 +134,12 @@ partial class Ops
         if (Has(n, "say again") && lastRole.TryGetValue("JTAC", out var lc)) return lc;
         if (Has(n, "laser code")) return Say($"laser code {Digits(code)}");
         if (Has(n, "threat", "air defense") && !Has(n, "readback", "read back")) return Say(Threats(l, cur) is { Length: > 0 } th ? th : OneOf("no threats observed", "no threats at this time"));
-        if (cas == 0) return CheckIn(l, me, n, now);
+        if (cas == 0)
+        {
+            var ci = CheckIn(l, me, n, now);
+            if (sw) ci.Add(new("Info", "JTAC", L($"JTAC: jetzt {l.Cs} ({KindTxt(l)}) auf {FreqTxt(l)}", $"JTAC: now {l.Cs} ({KindTxt(l)}) on {FreqTxt(l)}")));   // after the reply: Program.Request builds the pilot's call from calls[0]
+            return ci;
+        }
         if (PlayOf(n) is > 0 and var pt) { casPlay = now + pt * 60; return Say($"copy playtime {Digits(pt.ToString())} minutes"); }   // new playtime
         if (Has(n, "ready to copy", "ready for 9 line", "ready for nine line", "go ahead", "tasking", "next target", "ready for next", "ready for re attack", "re attack", "reattack", "ready for the 9 line", "send (?:it|the 9 line|9 line)") || cas == 1 && Regex.IsMatch(n, @"(?<!not )\bready\b"))   // 9-line (also new target / re-attack)
         {
@@ -551,6 +566,21 @@ partial class Ops
         var h9 = Say(o9, m9, "JTAC: ready to copy", 713);
         check(o8.Cas == 2 && h9.Contains("hold at") && o9.Cas == 1, "R418: beide eingecheckt -> zweiter haelt statt zweitem 9-Liner -> " + h9);
         o8.Leave(); o9.Leave();
+        {   // forum Killg0re NL: "Check in" again from the menu / wheel = next controller of the side, with an Info line (callsign, frequency); one controller changes nothing
+            var (l1, l2) = (Leaders[0], new Leader("JTAC-2", "jtac", "Hammer 2-1", 2, 40000, 0, 100, 241.5, "FM", "", true));
+            Leaders = new() { l1, l2 }; Targets = new() { t3, t3 with { Id = "JTAC-2", Group = "T-9" } };
+            var (mA, oA) = (Mk("Enfield 4-1", "FA-18C_hornet", 3000), new Ops());
+            var a1 = oA.OnTranscript("JTAC", "JTAC: checking in", mA, none, fl, 800);
+            var a2 = oA.OnTranscript("JTAC", "JTAC: checking in", mA, none, fl, 801);
+            var a3 = Say(oA, mA, "JTAC: ready to copy", 802);
+            check(a1.Count == 1 && a1[0].Text.Contains("Axeman") && a2.Count >= 2 && a2[0].Text.Contains("Hammer") && a2[^1].Role == "Info" && a2[^1].Text.Contains("Hammer 2-1") && a2[^1].Text.Contains("241.500 FM") && oA.casL == "JTAC-2" && a3.Contains("Hammer") && a3.Contains("Line 4"),
+                  "Check-in nochmal -> naechster Lotse, Info mit Rufzeichen/Frequenz, 9-Liner vom zweiten -> " + string.Join(" | ", a2.Select(c => c.Text)) + " / " + a3);
+            oA.Leave(); Leaders = new() { l1 };
+            var (mB, oB) = (Mk("Enfield 4-2", "FA-18C_hornet", 3000), new Ops());
+            Say(oB, mB, "JTAC: checking in", 810); var b2 = oB.OnTranscript("JTAC", "JTAC: checking in", mB, none, fl, 811);
+            check(oB.casL == "JTAC-1" && b2.All(c => c.Role != "Info"), "ein Lotse: zweiter Check-in aendert nichts");
+            oB.Leave();
+        }
         // FAC(A): Type 1, MGRS for the A-10C, mark and laser commands, handover when it is lost
         var fa = new Leader("FAC-1", "faca", "Rover 2-1", 2, -14000, 0, 3000, 251.5, "FM", "1514", true);
         Leaders = new() { fa };

@@ -41,6 +41,7 @@ static partial class Program
         else if (p[0] == "N" && p.Length >= 5) jn.Add(((int)D(1), p[2], D(3), D(4)));
     }
 
+    static readonly HashSet<string> JtacSeen = new();
     static void ReadState()
     {
         if (!File.Exists(StateFile)) return;
@@ -141,6 +142,9 @@ static partial class Program
         (Ops.Leaders, Ops.Targets, Ops.NavPts) = (jl, jt, jn);
         if (llg.Count > 0) LlGrid = llg.ToArray();
         Ops.DefFreq = Cfg.Frequencies.GetValueOrDefault("JTAC", 133.5);
+        foreach (var l in jl.Where(l => l.Alive && JtacSeen.Add(l.Id)))   // forum Killg0re NL: one console line per controller (also one a script spawns later), so he sees it was recognised
+            Log($"[JTAC] {l.Cs} ({Ops.KindTxt(l)}, {l.Id}) {Ops.FreqTxt(l)}");
+        JtacSeen.IntersectWith(jl.Where(l => l.Alive).Select(l => l.Id));
         Carrier.Boats = boats;
         Carrier.RadarShips = radars;
         Flights.Units = fu;

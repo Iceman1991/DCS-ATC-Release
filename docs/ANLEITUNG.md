@@ -2242,11 +2242,12 @@ Ein JTAC ist ein Lotse am Boden, ein FAC(A) einer in der Luft. Beide sprechen di
 - **Rufzeichen und Frequenz:** das Rufzeichen ist der FAC-Callname aus dem Mission Editor (Axeman, Darknight, Warrior …). Die Frequenz ist die an der FAC-Aufgabe eingestellte, sonst `"JTAC": 133.5`. Auf der eigenen Missionsfrequenz sendet der Lotse in der Modulation aus der Mission (AM oder FM; das Funkgerät passend einstellen), auf der Config-Frequenz in `Modulation`. Der Laser-Code ist der an der Aufgabe, sonst 1688.
 - **Was er sieht:** ein JTAC sieht feindliche Gruppen bis 8 km, ein FAC(A) bis 15 km, jeweils nur mit Sichtlinie. Er weist eine Gruppe nach der anderen ein: erst Luftabwehr, dann bewegte Gruppen, dann die nächste.
 - **IP:** ein Navigationspunkt der Mission auf deiner Seite, der 3 bis 60 km vom Ziel liegt, dient als IP in Zeile 1.
+- **Konsole:** das DCS-ATC-Fenster schreibt für jeden gefundenen Lotsen eine Zeile, auch für einen, den ein Skript später erzeugt, mit Rufzeichen und Frequenz.
 - **Ohne Lotse** auf deiner Seite antwortet niemand und der Eintrag **JTAC** im Funkrad bleibt ausgeblendet. Das Modul lässt sich auch im Setup abwählen.
 
 #### Deine Sprüche
 
-Nenne das Rufzeichen des Lotsen (*Axeman one one*) oder *JTAC* / *FAC A* im Spruch. Über SRS reicht die Frequenz: es antwortet der Lotse auf dieser Frequenz. Teilen sich zwei Lotsen eine Frequenz, entscheidet das Rufzeichen im Spruch, sonst der, mit dem du gerade arbeitest, sonst der nächste. Im Funkrad listet „Check in“ die Lotsen, wenn deine Seite mehrere hat; spätere Sprüche gehen an den, bei dem du eingecheckt hast.
+Nenne das Rufzeichen des Lotsen (*Axeman one one*) oder *JTAC* / *FAC A* im Spruch. Über SRS reicht die Frequenz: es antwortet der Lotse auf dieser Frequenz. Teilen sich zwei Lotsen eine Frequenz, entscheidet das Rufzeichen im Spruch, sonst der, mit dem du gerade arbeitest, sonst der nächste. Im Funkrad listet „Check in“ die Lotsen, wenn deine Seite mehrere hat. Das F10-Menü hat keine solche Liste: dort erreicht „Check in“ den nächstgelegenen Lotsen, und „Check in“ noch einmal, solange du eingecheckt bist, geht an den folgenden; eine Textzeile nennt ihn und seine Frequenz. Spätere Sprüche gehen an den, bei dem du eingecheckt hast.
 
 | Du sagst (erkannte Wörter) | JTAC / FAC(A) antwortet |
 |---|---|
