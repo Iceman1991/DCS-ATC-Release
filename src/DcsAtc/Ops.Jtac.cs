@@ -39,7 +39,7 @@ partial class Ops
     static readonly string[] Num = { "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten" };
     static string Meters(double m) => Digits(((int)Math.Round(m / 50) * 50).ToString()) + " meters";
     static string Cnt(int n) => n is >= 0 and <= 10 ? Num[n] : n.ToString();
-    static string Noun(Trg t) => t.Count == 1 ? Regex.Replace(TypeSay(t.Type), @"^(tank|APC|IFV|truck|vehicle)s$", "$1") : TypeSay(t.Type);
+    static string Noun(Trg t) => t.Count == 1 ? Regex.Replace(TypeSay(t.Type), @"^(tank|APC|IFV|truck|vehicle|technical)s$", "$1") : TypeSay(t.Type);
     static string Desc(Trg t) => $"{Cnt(t.Count)} {Noun(t)}";
     static double? CardOf(string n)
     {
@@ -50,7 +50,8 @@ partial class Ops
     Leader? LeaderFor(Me me, string n = "")
     {
         var mine = Leaders.Where(l => l.Alive && l.Side == me.Coalition).ToList();
-        return mine.FirstOrDefault(l => n != "" && CsKey(l) is { Length: > 2 } k && Has(n, k))
+        var own = Normalize(me.Callsign).Split(' ')[0];   // forum Killg0re NL: the pilot's own callsign word is no controller name (script-spawned FAC aircraft carry aircraft callsigns)
+        return mine.FirstOrDefault(l => n != "" && CsKey(l) is { Length: > 2 } k && k != own && Has(n, k))
             ?? (me.Freq > 0 && mine.Where(l => Math.Abs((l.Freq > 0 ? l.Freq : DefFreq) - me.Freq) < 0.01).ToList() is { Count: > 0 } on   // SRS: only controllers on the called frequency
                 ? on.FirstOrDefault(l => l.Id == casL) ?? (me.Tel is { } t0 ? on.OrderBy(l => Dist(t0.X, t0.Z, l.X, l.Z)).First() : on[0]) : null)
             ?? mine.FirstOrDefault(l => l.Id == casL)
@@ -580,6 +581,34 @@ partial class Ops
             Say(oB, mB, "JTAC: checking in", 810); var b2 = oB.OnTranscript("JTAC", "JTAC: checking in", mB, none, fl, 811);
             check(oB.casL == "JTAC-1" && b2.All(c => c.Role != "Info"), "ein Lotse: zweiter Check-in aendert nichts");
             oB.Leave();
+        }
+        {   // forum Killg0re NL: helicopter parked on the ground keeps the JTAC contact (no new situation update on every call), technicals, own callsign is no controller name
+            var gl = Leaders[0]; var g2 = new Leader("JTAC-2", "jtac", "Hammer 2-1", 2, 40000, 0, 100, 241.5, "FM", "", true);
+            Leaders = new() { gl }; Targets = new() { t3 };
+            var (mG, oG) = (new Me("Springfield 1-1", new Telemetry(0, 0, 0, 0, -15000, 0, 0, 0, 0), "AH-64D_BLK_II", 2), new Ops());
+            var g1 = Say(oG, mG, "JTAC: checking in", 900);
+            for (int s = 1; s <= 5; s++) oG.Tick(mG, none, 900 + s, false);
+            var g3 = Say(oG, mG, "JTAC: ready to copy", 906);
+            var cG = oG.Cas;
+            var g4 = Say(oG, mG, "JTAC: " + oG.CasWheel("readback"), 907);
+            check(g1.Contains("situation update") && g3.Contains("Line 1") && !g3.Contains("situation update") && cG == 2 && (g4.Contains("readback correct") || g4.Contains("good readback")),
+                  "Forum Killg0re NL: Hubschrauber am Boden - Check-in, Tick, ready to copy -> 9-Liner (kein neues Lagebild) -> " + g1 + " / " + g3 + " / " + g4);
+            oG.Leave();
+            Leaders = new() { gl, g2 }; Targets = new() { t3, t3 with { Id = "JTAC-2", Group = "T-9" } };
+            var (mH, oH) = (mG with { Callsign = "Springfield 1-2" }, new Ops());
+            oH.OnTranscript("JTAC", "JTAC: checking in", mH, none, fl, 910);
+            for (int s = 1; s <= 5; s++) oH.Tick(mH, none, 910 + s, false);
+            var h2 = oH.OnTranscript("JTAC", "JTAC: checking in", mH, none, fl, 916);
+            check(oH.casL == "JTAC-2" && h2.Count >= 2 && h2[0].Text.Contains("Hammer") && h2[^1].Role == "Info" && h2[^1].Text.Contains("Hammer 2-1"),
+                  "Forum Killg0re NL: Hubschrauber am Boden - Check-in nochmal -> zweiter Lotse mit Info -> " + string.Join(" | ", h2.Select(c => c.Text)));
+            oH.Leave();
+            check(TypeSay("tt_DSHK") == "technicals" && TypeSay("HL_KORD") == "technicals" && Desc(t3 with { Type = "tt_DSHK", Count = 1 }) == "one technical" && Desc(t3 with { Type = "tt_DSHK", Count = 6 }) == "six technicals",
+                  "Forum Killg0re NL: tt_DSHK / HL_KORD -> technicals -> " + TypeSay("tt_DSHK") + " / " + TypeSay("HL_KORD") + " / " + Desc(t3 with { Type = "tt_DSHK", Count = 1 }) + " / " + Desc(t3 with { Type = "tt_DSHK", Count = 6 }));
+            Leaders = new() { new("FAC-E", "faca", "Enfield", 2, 0, 0, 100, 0, "AM", "", true), new("JTAC-1", "jtac", "Axeman 1-1", 2, 0, 0, 100, 0, "AM", "", true) };
+            var oE = new Ops(); Targets = new() { t3 };
+            var e1 = Say(oE, Mk("Enfield 1-1", "FA-18C_hornet", 3000), "JTAC: Axeman, Enfield 1-1, checking in", 920);
+            check(e1.StartsWith("Enfield one one, Axeman") && oE.casL == "JTAC-1", "Forum Killg0re NL: eigenes Rufzeichenwort ist kein Lotsenname -> Axeman antwortet -> " + e1);
+            oE.Leave();
         }
         // FAC(A): Type 1, MGRS for the A-10C, mark and laser commands, handover when it is lost
         var fa = new Leader("FAC-1", "faca", "Rover 2-1", 2, -14000, 0, 3000, 251.5, "FM", "1514", true);

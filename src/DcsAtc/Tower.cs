@@ -83,7 +83,7 @@ public partial class Tower
     string? climbOut; double climbFt;   // requested departure: "free" (unrestricted climb) / "tactical" (spiral climb overhead), climbFt = requested altitude, 0 = none
     public static bool ParkSpot = true;   // config AssignParkingSpot: Ground names a stand after landing; false = only the ramp where the chart names one
     public static bool IffCheck;   // FI1: config IffCheck (code check, ident, 7600, AWACS parrot); 7700 always
-    public Iff? Iff;               // FI1: this pilot's transponder (SRS, Program.Prep), null = unknown or not fitted
+    public Iff? Iff;               // FI1: this pilot's transponder (SRS, Program.Prep), null = unknown (no SRS client or no "iff" data); transponder off = Status 0
     public string? Squawk;   // A90: transponder code, assigned once per flight (en-route clearance, VFR taxi clearance, flight following), moves along on airfield change (Program)
     double cruiseFt;         // A102: cruise altitude of the en-route clearance (semicircular rule), 0 = not yet calculated
     Ramp? home;

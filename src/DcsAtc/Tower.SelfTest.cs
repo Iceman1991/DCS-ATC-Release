@@ -184,13 +184,20 @@ public partial class Tower
         r = twId.OnTranscript("Kutaisi Approach, Enfield 11, airborne, passing 2000", airId, none, 20);
         var idA = twId.Tick(airId, none, 25).Count == 0 && twId.Tick(airId, none, 26) is [{ } idR] && idR.Role == "Approach" && idR.Contains("radar contact") && !idR.Contains("squawk") ? "ok" : "falsch";
         Check(r.Count == 1 && r[0].Contains("squawk") && !r[0].Contains("radar contact") && idA == "ok" && twId.Tick(airId, none, 40).Count == 0, "R128 airborne ohne Code: " + string.Join(" | ", r.Select(m => m.Text)) + " / " + idA);
-        // FI1 (issue #2): SRS "iff" -> Iff (control 2 / missing = unknown); IffCheck: "squawk … and ident", the ident identifies at once;
+        // FI1 (issue #2): SRS "iff" -> Iff (missing = unknown); IffCheck: "squawk … and ident", the ident identifies at once;
         // wrong code -> "reset transponder" once more, then radar contact; under radar service after 20 s at most twice (second into the debrief)
         {
             Iff? f1Pi(string json) { using var d = System.Text.Json.JsonDocument.Parse(json); return SrsListener.IffFrom(d.RootElement); }
             var (f1pi1, f1pi2, f1pi3, f1pi4) = (f1Pi("""{"iff":{"control":1,"mode1":51,"mode3":7700,"mode4":1,"status":2}}"""), f1Pi("""{"iff":{"control":0,"mode3":4521,"mode4":false,"status":1}}"""),
                                         f1Pi("""{"iff":{"control":2,"mode3":-1,"mode4":false,"status":0}}"""), f1Pi("""{"radios":[]}"""));
-            Check(f1pi1 == new Iff(7700, 2, true) && f1pi2 == new Iff(4521, 1, false) && f1pi3 == null && f1pi4 == null, $"FI1 SRS-IFF gelesen: {f1pi1} | {f1pi2} | {f1pi3} | {f1pi4}");
+            Check(f1pi1 == new Iff(7700, 2, true) && f1pi2 == new Iff(4521, 1, false) && f1pi3 == new Iff(-1, 0, false) && f1pi4 == null, $"FI1 SRS-IFF gelesen: {f1pi1} | {f1pi2} | {f1pi3} | {f1pi4}");
+            // #39 (LtJaeger): SRS 2.x sends "control":2 for every client (Transponder.Copy() drops it), so it must not discard the transponder
+            var i39on = f1Pi("""{"iff":{"control":2,"expansion":false,"mic":-1,"mode1":-1,"mode2":-1,"mode3":7736,"mode4":true,"status":1}}""");
+            var i39off = f1Pi("""{"iff":{"control":2,"mode1":-1,"mode2":-1,"mode3":-1,"mode4":false,"status":0}}""");
+            var l39 = new SrsListener(5002, new[] { 263.0 }, _ => false, _ => { });
+            l39.OnServerMessage("""{"MsgType":1,"Client":{"ClientGuid":"g39","Name":"Hauler","RadioInfo":{"unitId":16780546,"iff":{"control":2,"expansion":false,"mic":-1,"mode1":-1,"mode2":-1,"mode3":7736,"mode4":true,"status":1}}}}""");
+            Check(i39on == new Iff(7736, 1, true) && i39off == new Iff(-1, 0, false) && f1Pi("""{"radios":[]}""") == null && l39.IffOf(16780546) == new Iff(7736, 1, true),
+                $"#39: SRS control 2 verwirft den Transponder nicht: {i39on} | {i39off} | {l39.IffOf(16780546)}");
             var f1ic0 = IffCheck;
             try
             {

@@ -135,7 +135,7 @@ static class Update
     {
         foreach (var p in Process.GetProcessesByName("DcsAtc").Where(p => p.Id != Environment.ProcessId))
             try { p.Kill(); p.WaitForExit(5000); } catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception) { }
-        Process.Start(new ProcessStartInfo("cmd.exe", $"/c \"start \"\" /wait \"{setup}\" /SILENT /SUPPRESSMSGBOXES /NORESTART & start \"\" \"{Environment.ProcessPath}\" --settings\"") { CreateNoWindow = true, UseShellExecute = false });
+        Process.Start(new ProcessStartInfo("cmd.exe", $"/c \"start \"\" /wait \"{setup}\" /SILENT /SUPPRESSMSGBOXES /NORESTART /LOG & start \"\" \"{Environment.ProcessPath}\" --settings\"") { CreateNoWindow = true, UseShellExecute = false }); // /LOG: setup log in %TEMP% shows selected tasks and created icons (issue #35, LtJaeger: desktop icon gone after update, not reproduced)
     }
 
     /// --updatetest: the real thing against GitHub without installing (latest release, whatever its version: small or full zip, download, size, checksum, unpack).

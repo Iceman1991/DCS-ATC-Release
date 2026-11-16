@@ -667,12 +667,32 @@ do   -- JTAC/FAC(A) born during the mission (forum Killg0re NL): "JTAC" in the n
   for _, n in ipairs({ "Reaper", "Reaper#001", "Spawned JTAC UAV", "Random#001", "FACA-UAV#001" }) do
     local g = coalition.addGroup(2, 0, { name = n, units = { { name = n .. "-1", x = 100, y = 0, alt = 3000 } } })
     born[#born + 1] = g
+    if n == "FACA-UAV#001" then g:getUnit().getCallsign = function() return "Colt11" end end   -- own callsign must not beat the template's
     if n ~= "Reaper" then fire({ id = world.event.S_EVENT_BIRTH, initiator = g:getUnit() }) end
   end
   run(T + 12)
   local s = stateFile()
   assert(s:find("\nJ;Reaper#001;faca;Darknight;2;[^\n]*;251%.000;AM;;1\n") and s:find("\nJ;Spawned JTAC UAV;faca;") and not s:find("J;Random#001", 1, true), "JTAC/FAC(A) zur Laufzeit: " .. s)
   assert(s:find("\nJ;FACA%-UAV#001;faca;Finger;2;[^\n]*;243%.000;"), "Kopie mit FACA im Namen erbt Rufzeichen/Frequenz der Vorlage nicht: " .. s)   -- forum Killg0re NL
+  -- no template: the unit's own callsign ("Pontiac11" -> "Pontiac"); numeric callsign -> name from the JTAC list as before
+  for n, cs in pairs({ ["FACA-Scout"] = "Pontiac11", ["Plain JTAC"] = "101" }) do
+    local g = coalition.addGroup(2, 0, { name = n, units = { { name = n .. "-1", x = 100, y = 0, alt = 3000 } } })
+    born[#born + 1] = g
+    g:getUnit().getCallsign = function() return cs end
+    fire({ id = world.event.S_EVENT_BIRTH, initiator = g:getUnit() })
+  end
+  do   -- ground unit: what DCS gives as its callsign is no name to call it by, name from the JTAC list as before
+    local g = coalition.addGroup(2, 0, { name = "Truck JTAC", units = { { name = "Truck JTAC-1", x = 100, y = 0, alt = 0 } } })
+    born[#born + 1] = g
+    g:getUnit().getCallsign = function() return "Ground11" end
+    g:getUnit().getDesc = function() return { box = { max = { x = 8, z = 6 }, min = { x = -9 } }, category = 2 } end
+    fire({ id = world.event.S_EVENT_BIRTH, initiator = g:getUnit() })
+  end
+  run(T + 12)
+  s = stateFile()
+  assert(s:find("\nJ;Truck JTAC;jtac;%a%a%a%a+;") and not s:find("J;Truck JTAC;jtac;Ground", 1, true), "Boden-JTAC: Name aus der JTAC-Liste, nicht das Rufzeichen der Einheit: " .. s)
+  assert(s:find("\nJ;FACA%-Scout;faca;Pontiac;"), "Lotse ohne Vorlage nimmt Rufzeichen des Flugzeugs nicht: " .. s)
+  assert(s:find("\nJ;Plain JTAC;faca;%a%a%a%a+;") and not s:find("J;Plain JTAC;faca;101", 1, true), "Zahlen-Rufzeichen: Name aus der JTAC-Liste: " .. s)
   -- target list is sticky: a FAC(A) orbit must not swap the 5 nearest all the time (the app would lose the target of a running 9-line)
   local red0, ents, land0, mgrs0 = REDGROUND, {}, land.isVisible, coord.LLtoMGRS
   land.isVisible, coord.LLtoMGRS = function() return true end, function() return { UTMZone = "38T", MGRSDigraph = "KM", Easting = 1, Northing = 2 } end

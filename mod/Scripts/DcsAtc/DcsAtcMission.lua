@@ -1363,13 +1363,14 @@ local function start()
       end
     end
   end
-  local function jAdd(name, kind, side, acc, src)   -- new leader; src = leader it is a copy of (inherits callsign, frequency, code)
+  local function jAdd(name, kind, side, acc, src, cs)   -- new leader; src = leader it is a copy of (inherits callsign, frequency, code); cs = callsign of the spawned aircraft
     local f = tonumber(acc.frequency)
     if f and f > 1e6 then f = f / 1e6 end   -- editor stores Hz
     local L = { name = name, kind = kind, side = side, range = kind == "faca" and 15000 or 8000,
       cs = FACCS[tonumber(acc.callname) or 0] or FACCS[(#jLeaders % #FACCS) + 1],
       freq = f and f > 0 and string.format("%.3f", f) or "", mod = f and f > 0 and (tonumber(acc.modulation) == 1 and "FM" or "AM") or "",
       code = tostring(tonumber(acc.laserCode or acc.code) or "") }
+    if cs then L.cs = cs end
     if src then L.cs, L.freq, L.mod, L.code = src.cs, src.freq, src.mod, src.code end
     jLeaders[#jLeaders + 1] = L
     jBy[clean(name)] = L
@@ -1417,7 +1418,12 @@ local function start()
       if up:find("FACA") then kind = "faca"
       elseif up:find("JTAC") then kind = air(u) and "faca" or "jtac"
       else kind = src and src.kind end
-      if kind then jAdd(name, kind, u:getCoalition(), {}, src) end
+      local own   -- ponytail: the name can equal a player's callsign word (default "Enfield11"); the app skips a controller named like the caller in its name match
+      if kind and not src and air(u) then   -- aircraft only: what DCS gives as callsign of a ground unit is no name to call it by
+        local ok, c = pcall(u.getCallsign, u)
+        own = ok and type(c) == "string" and c:match("^%a%a%a+") or nil   -- "Pontiac11" -> "Pontiac"; "101" or empty keeps the JTAC-list name
+      end
+      if kind then jAdd(name, kind, u:getCoalition(), {}, src, own) end
     end)
   end })
   end

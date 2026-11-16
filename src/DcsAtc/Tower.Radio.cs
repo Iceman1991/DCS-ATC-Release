@@ -390,8 +390,10 @@ public partial class Tower
                 depRoute = dpq ?? depRoute; depSaid = dpq;
                 if (dpq != null && dpq.Pts.Where(p => p.Cross is "at or above" or "between").Select(p => p.Ft).DefaultIfEmpty(0).Max() is var need && need > depFt)   // #31 (log Nellis): cleared altitude not below what the departure requires
                     cruiseFt = Math.Max(cruiseFt, depFt = Math.Ceiling(need / 1000) * 1000);
-                return Say($"{hdr}, {rwAck}cleared {(dest != null ? $"to {dest.Name.Replace('-', ' ')} airport" : "out of the control zone")} via radar vectors, " +
-                           $"after departure {(dpq != null ? $"fly the {CrpSay(dpq.Name)} departure" : "fly runway heading")}, climb and maintain {Alt(depFt)}, {(cruiseFt > depFt ? $"expect {Alt(cruiseFt)} ten minutes after departure, " : "")}" +
+                var lastFix = df == null ? dpq?.Pts.LastOrDefault().Fix : null;   // #31: departure without a named airfield: its last fix is the limit, not the next airfield
+                return Say($"{hdr}, {rwAck}cleared " + (!string.IsNullOrEmpty(lastFix) ? $"to {CrpSay(lastFix)} via the {CrpSay(dpq!.Name)} departure, " :
+                           $"{(dest != null ? $"to {dest.Name.Replace('-', ' ')} airport" : "out of the control zone")} via radar vectors, " +
+                           $"after departure {(dpq != null ? $"fly the {CrpSay(dpq.Name)} departure" : "fly runway heading")}, ") + $"climb and maintain {Alt(depFt)}, {(cruiseFt > depFt ? $"expect {Alt(cruiseFt)} ten minutes after departure, " : "")}" +
                            $"{(F.Own.ContainsKey("Departure") ? $"departure frequency {FreqSay(FreqOf(F, "Departure"))}" : $"departure {Contact("Approach")}")}, squawk {Digits(TakeSquawk())}.");   // own departure frequency (AirfieldFrequencies): the one in the clearance
             }
 

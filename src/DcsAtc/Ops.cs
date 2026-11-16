@@ -519,7 +519,7 @@ partial class Ops
         // J12: ground targets as a JTAC says them
         (@"^(?:T-\d\d|M-1 |M-60|Leopard|Challenger|Merkava)", "tanks"), (@"^(?:BTR|BRDM|M-113|M1126|LAV|Stryker|MTLB|AAV)", "APCs"), (@"^(?:BMP|M-2 Bradley|Marder|Warrior|BMD)", "IFVs"),
         (@"^ZSU-23", "Shilka"), (@"^2S6", "Tunguska"), (@"^Strela", "Strela"), (@"^Osa", "SA-8"), (@"^2S1", "Gvozdika"), (@"^(?:SA-18|Igla|Stinger)", "MANPADS"),
-        (@"^(?:Ural|KAMAZ|ZIL|GAZ|M 818|M-818)", "trucks"), (@"^(?:Hummer|HMMWV)", "vehicles"), (@"^(?:Soldier|Infantry|Paratrooper)", "infantry"),
+        (@"^(?:Ural|KAMAZ|ZIL|GAZ|M 818|M-818)", "trucks"), (@"^(?:Hummer|HMMWV)", "vehicles"), (@"^(?:tt|HL)_", "technicals"), (@"^(?:Soldier|Infantry|Paratrooper)", "infantry"),
     };
     internal static string TypeSay(string type) => TypeNames.FirstOrDefault(n => Regex.IsMatch(type, n.Re)).Name
         ?? Regex.Replace(type.Split('_')[0], @"(?<=[A-Za-z])-?(?=\d)", " ");
@@ -1336,7 +1336,7 @@ partial class Ops
             {
                 radarContact = awacsIn = hadContacts = onStation = false; awId = -1;
                 groupsTold.Clear(); committed.Clear(); threatTold.Clear(); mergeTold.Clear(); judy.Clear(); members.Clear(); seenAt.Clear(); heard.Clear(); mine.Clear(); lastPos.Clear(); watching = false;   // LK3: group names belong to the side, not the flight
-                if (cas > 0) CasEnd();   // R418: landed and stopped or gone: the JTAC is free for the next flight
+                if (cas > 0 && t == null) CasEnd();   // R418: telemetry gone; forum Killg0re NL: standing on the ground is no end of the contact (helicopter on the ground / FARP), "checking out" and the 10-minute idle rule in JtacTick free the controller
                 RangeReset(); checkedIn = false;   // R131: landing/shutdown ends the range visit (debrief and rgPasses stay), touch-and-go stays checked in; the new flight starts with check-in again
             }
             return new();

@@ -262,9 +262,18 @@ public partial class Tower
             k.Departures["FYTTR"] = new("FYTTR", new[] { "25" }, "", new[] { ("ALPHA", pa.X, pa.Z, 0.0, "", 0.0) });
             var (wc, wf) = (Hold(), Hold());
             var (rc, rf) = (wc.OnTranscript("Kutaisi Ground, Enfield 11, request clearance, tiki departure", G0(), none, 10), wf.OnTranscript("Kutaisi Ground, Enfield 11 with kilo, request clearance to fitter.", G0(), none, 10));
-            Chk(rc.Any(m => m.Text.Contains("after departure fly the Tiki departure")) && wc.depRoute?.Name == "TIKI" && rf.Any(m => m.Text.Contains("after departure fly the Fyttr departure")) && wf.depRoute?.Name == "FYTTR"
+            Chk(rc.Any(m => m.Text.Contains("cleared to Bravo via the Tiki departure, climb and maintain") && !m.Text.Contains("radar vectors") && !m.Text.Contains("airport")) && wc.depRoute?.Name == "TIKI"
+                && rf.Any(m => m.Text.Contains("cleared to Alpha via the Fyttr departure, climb and maintain")) && wf.depRoute?.Name == "FYTTR"
                 && Hold().OnTranscript("Kutaisi Ground, Enfield 11, request clearance, zulu departure", G0(), none, 10).Any(m => m.Text.Contains("Zulu departure is for runway zero seven")),
                 "#40 Clearance mit Departure: " + J(rc) + " / " + J(rf));
+            // #31 (log Nellis, "request clearance to Dream" -> "cleared to North Las Vegas airport"): departure without a named airfield: the limit is its last fix, no airfield, no radar vectors;
+            // with a named airfield the wording stays
+            var allSv = Tower.All;
+            Tower.All = new[] { k, Airfield.FromDcs("Batumi", 90000, 90000, 10, new[] { ("13", -131 * Math.PI / 180, 100.0, 50.0, 2400.0) }) };
+            var rn = Hold().OnTranscript("Kutaisi Ground, Enfield 11, request clearance to Batumi, tiki departure", G0(), none, 10);
+            Tower.All = allSv;
+            Chk(rn.Any(m => m.Text.Contains("cleared to Batumi airport via radar vectors, after departure fly the Tiki departure")),
+                "#31: Clearance mit Flugplatz und Departure: " + J(rn));
             // #31 (log Nellis): takeoff clearance after the IFR clearance names the departure only (no second list of fixes); VFR keeps the long form
             var rt = wc.OnTranscript("Kutaisi Tower, Enfield 11, ready for departure", G0(), none, 20);
             Chk(rt.Any(m => m.Text.Contains("after departure fly the Tiki departure, runway") && m.Text.Contains("cleared for takeoff") && !m.Text.Contains("cross")) && wc.navName == "Alpha"
@@ -274,10 +283,10 @@ public partial class Tower
             k.Departures["HIGH"] = new("HIGH", new[] { "25" }, "", new[] { ("ALPHA", pa.X, pa.Z, 4000.0, "at or above", 0.0), ("BRAVO", pb.X, pb.Z, 19200.0, "at or above", 0.0), ("CHARLIE", pb.X, pb.Z, 25000.0, "at or below", 0.0) });
             var wh = Hold();
             var rh = wh.OnTranscript("Kutaisi Ground, Enfield 11, request clearance, high departure", G0(), none, 10);
-            Chk(rh.Any(m => m.Text.Contains("after departure fly the High departure, climb and maintain flight level two zero zero, ") && !m.Text.Contains("expect")) && wh.depFt == 20000 && wh.cruiseFt >= 20000
+            Chk(rh.Any(m => m.Text.Contains("via the High departure, climb and maintain flight level two zero zero, ") && !m.Text.Contains("expect")) && wh.depFt == 20000 && wh.cruiseFt >= 20000
                 && rc.Any(m => m.Text.Contains("expect")),
                 $"#31 Hoehe nach Departure: {wh.depFt}/{wh.cruiseFt} " + J(rh));
-            n += 8;
+            n += 9;
         }
 
         // Forum (Heling): chart with entries but no exit (Andersen: no published VFR exits) - departure as without a chart, arrival still from the entries; runway end missing in the chart: as without a chart

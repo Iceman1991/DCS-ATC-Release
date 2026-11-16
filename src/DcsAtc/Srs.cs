@@ -64,12 +64,13 @@ sealed class SrsListener
         lock (clients) return clients.Values.FirstOrDefault(c => c.UnitId == unit && c.Iff != null).Iff;
     }
 
-    /// FI1: "iff" of a SRS RadioInfo ({"control":0,"mode3":4521,"mode4":true,"status":1}); null = missing, control 2 (not fitted) or unreadable.
+    /// FI1: "iff" of a SRS RadioInfo ({"control":0,"mode3":4521,"mode4":true,"status":1}); null = missing or unreadable.
+    /// "control" is ignored: SRS 2.x sends 2 (default DISABLED) for every client, Transponder.Copy() does not copy it (#39).
     internal static Iff? IffFrom(JsonElement ri)
     {
         if (ri.ValueKind != JsonValueKind.Object || !ri.TryGetProperty("iff", out var x) || x.ValueKind != JsonValueKind.Object) return null;
         int? I(string k) => x.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var i) ? i : null;
-        if (I("control") == 2 || I("status") is not { } st || I("mode3") is not { } m3) return null;
+        if (I("status") is not { } st || I("mode3") is not { } m3) return null;
         bool m4 = x.TryGetProperty("mode4", out var v4) && (v4.ValueKind == JsonValueKind.True || I("mode4") == 1);   // bool, older clients 0/1
         return new Iff(m3, st, m4);
     }
