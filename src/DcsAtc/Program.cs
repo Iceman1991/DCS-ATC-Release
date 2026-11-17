@@ -131,7 +131,21 @@ class Pilot
 record Tx(string Text, string Role, string Station, int Gid, bool Pilot = false, string? Voice = null, uint Unit = 0, double[]? Freqs = null,   // Unit: intercom target (Role "Crew")
           int Prio = 1, Tx? Standby = null, double MaxAge = 0, bool Stress = false, int Side = 0, Func<string?>? Live = null, Action? Aired = null);   // MaxAge: afterwards text only (0 = per prio); Stress: combat voice; Side: SRS coalition of the sender (A133), 0 = Cfg.Coalition; Aired: when it goes out (Approach vectoring)
 
-class AtisInfo { public char Letter = 'A'; public string Key = "", Text = "", Mp3 = "", Call = ""; public double Sec, Clk, TempC; public (double X, double Z) W; }   // Call: announcement on new identifier; Clk/TempC/W: time, temperature and wind of the identifier (R344)
+class AtisInfo
+{
+    public char Letter = 'A';
+    public string Key = "", Call = "";
+    public double Clk, TempC;
+    public (double X, double Z) W;
+    public AtisBulletin Bulletin = new("");
+    public string Text => Bulletin.Text;
+}
+
+sealed class AtisBulletin(string text)
+{
+    public string Text { get; } = text;
+    public (byte[] Mp3, double Seconds)? Audio;   // shared by frequencies for this text only; accessed under lock(this)
+}
 
 static partial class Program
 {
@@ -156,13 +170,30 @@ static partial class Program
         SetErrorMode(0x0003);   // #8 (issue): SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX, inherited by child processes - a crashing ExternalAudio exits quietly instead of an "Unknown Hard Error" box over DCS
         var lang = Path.Combine(AppContext.BaseDirectory, "lang.txt");   // Installer: UI language
         Ui.En = File.Exists(lang) && File.ReadAllText(lang).Trim() == "en";
+        if (args is ["--installation-report"]) { Console.Write(Settings.InstallationReport(Root)); return 0; }
+        if (args.FirstOrDefault() == "--radio-selftest")
+        {
+            if (args.Length is < 2 or > 3) { Console.Error.WriteLine("DcsAtc --radio-selftest <WAV> [<DCS-ATC folder>]"); return 2; }
+            var package = args.ElementAtOrDefault(2) ?? Root;
+            Cfg = RadioCheckConfig(package, Console.Error.WriteLine);
+            return RadioSelfTest(package, -1, args[1], Cfg.SrsPath ?? "", Cfg.Voices?.GetValueOrDefault("Tower") ?? "random", Cfg.AsrGpu,
+                Console.WriteLine, CancellationToken.None).GetAwaiter().GetResult() ? 0 : 1;
+        }
         Tower.FreeLevel = FreeLevel;
         Ops.Callsigns = AiCallsign;
         TestRun = args.Any(a => a is "--selftest" or "--anflugtest" or "--mptest" or "--asr-test" or "--srs-test" or "--platztest" or "--replay");
         if (args.Length >= 1 && args[0] == "--charttest") { if (args.Length > 1) Airfield.ChartFile = args[1]; ChartTest(); return 0; }   // chart data check, optionally a file instead of the embedded one
         if (args.Contains("--platztest")) { Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); return 0; }
         if (args.Contains("--selftest")) { RadioTest(); ChartTest(); Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); Update.Test(); AtisTest(); CrewTest(); ExpectTest(); PromptTest(); GpuTest(); int rc = Tower.SelfTest(); ReplayTest(); return rc; }   // ReplayTest last: it runs the app loop (TickAll) and leaves static state behind
-        LoadConfig();
+        if (LoadConfig() is { } configError)
+        {
+            var message = configError + L("\nDatei korrigieren, speichern und DCS-ATC erneut starten.", "\nCorrect the file, save it and restart DCS-ATC.");
+            Console.Error.WriteLine(message);
+            if (args.Contains("--settings") && MessageBox.Show(message + L("\n\nDatei im Editor öffnen?", "\n\nOpen the file in Notepad?"),
+                    "DCS-ATC", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+                Process.Start(new ProcessStartInfo("notepad.exe") { ArgumentList = { ConfigPath } });
+            return 2;
+        }
         if (args.Length == 2 && args[0] == "--preview") { Preview(args[1]); return 0; }   // Test: DcsAtc --preview random (PC speakers, as the play button in the settings)
         if (args.Contains("--settings")) { Dedicated = DedicatedNow(); Settings.Show(Cfg); return 0; }   // language then also in the server's Saved Games
         if (args.Contains("--buttons")) { ShowButtons(); return 0; }
@@ -210,12 +241,17 @@ static partial class Program
         new Thread(() =>   // in the background: GitHub may be slow or unreachable
             {
                 Update.Clean();
-                if (Cfg.UpdateCheck && Update.Check() is { } up)
+                if (Cfg.UpdateCheck && Update.Check().Available is { } up)
                     Log(L($"[ATC] Neue Version {up.Version} verfügbar (installiert: {Update.Own}). Einstellungen -> Allgemein -> \"Jetzt aktualisieren\".",
                           $"[ATC] New version {up.Version} available (installed: {Update.Own}). Settings -> General -> \"Update now\"."));
             }) { IsBackground = true }.Start();
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);   // radio wheel error: no WinForms dialog, but crash -> restart
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Crash(e.ExceptionObject as Exception, args);
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            if (!Monitor.TryEnter(TowerLock, 250)) return;
+            try { liveDebriefs?.Retry(); } finally { Monitor.Exit(TowerLock); }
+        };
         if (auto)
         {
             if (Session()[0] == "client") Cfg.Mode = "client";
@@ -382,7 +418,7 @@ static partial class Program
 
     // follow along: console + atc-log.txt in the project folder
     static bool logDated;   // issue #7: date once per start, so a flight can be found
-    internal static void Log(string s) { if (SimLog != null) { SimLog.Add(s); return; } Console.WriteLine(s); Trace("LOG", s); try { File.AppendAllText(Path.Combine(Root, "atc-log.txt"), (logDated ? "" : $"===== {DateTime.Now:yyyy-MM-dd} =====\r\n") + $"{Clock:HH:mm:ss} {s}\r\n"); logDated = true; } catch (IOException) { } }
+    internal static void Log(string s) { if (SimLog != null) { SimLog.Add(s); return; } Console.WriteLine(s); Trace("LOG", s); try { File.AppendAllText(Path.Combine(Root, "atc-log.txt"), (logDated ? "" : $"===== {DateTime.Now:yyyy-MM-dd} =====\r\n") + $"{Clock:HH:mm:ss} {s}\r\n"); logDated = true; } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { } }
 
     // Debug log for bug reports: atc-debug.txt "HH:mm:ss.fff [KAT] Text", rolls over to atc-debug.old.txt via TraceMax. Live only with Config.DebugLog (TraceOn), tests without file.
     internal static bool TraceOn;
@@ -639,7 +675,7 @@ static partial class Program
             fixAsked = true;   // ask only once per app start
             Log(L("[ATC] DCS-ATC-Zeile in MissionScripting.lua oder autoexec.lua fehlt (DCS-Update, neue Version) -> Admin-Abfrage (UAC). DCS danach neu starten.",
                   "[ATC] DCS-ATC line missing in MissionScripting.lua or autoexec.lua (DCS update, new version) -> admin prompt (UAC). Restart DCS afterwards."));
-            Process.Start(new ProcessStartInfo("powershell", $"-NoProfile -ExecutionPolicy Bypass -File \"{fix}\" -Dcs \"{Path.GetDirectoryName(Path.GetDirectoryName(f))}\"")
+            Process.Start(new ProcessStartInfo("powershell", $"-NoProfile -ExecutionPolicy Bypass -File \"{fix}\" -DetectedDcs \"{Path.GetDirectoryName(Path.GetDirectoryName(f))}\"")
                 { UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden });
         }
         catch (Exception e)
@@ -893,7 +929,13 @@ static partial class Program
     static void ReloadLive()
     {
         var old = Cfg;
-        LoadConfig();
+        if (LoadConfig() is { } error)
+        {
+            if (error != lastConfigError) Log(error + L(" Aktuelle Einstellungen bleiben aktiv.", " Current settings remain active."));
+            lastConfigError = error;
+            return;
+        }
+        lastConfigError = null;
         var n = Cfg;
         Cfg = old;
         (Cfg.MyCallsign, Cfg.Volume, Cfg.SpeechRate, Cfg.ReplyPause, Cfg.RadioFx, Cfg.RadioText, Cfg.PilotVoice, Cfg.AiChatter, Cfg.AiFlightComms, Cfg.Atis, Cfg.AltimeterUnit, Cfg.WheelInGame, Cfg.AirspaceWatch, Cfg.RunwayLights, Cfg.CallsignFromUnit) =   // R392: RunwayLights is read per call (line ~995), applies immediately
@@ -992,6 +1034,7 @@ static partial class Program
     };
 
     static DateTime cfgAt;   // State of config.jsonc (ReloadLive)
+    static string? lastConfigError;
 
     /// Modules picked in the installer or the settings window: modules.txt next to the exe ("atc,awacs,…"), mission script: DcsAtcModules.txt. Missing file = all on.
     internal static readonly (string Id, string De, string En)[] Modules =
@@ -1018,20 +1061,32 @@ static partial class Program
     internal static void LoadModules(string? text) =>
         Mods = text?.ToLowerInvariant().Split(new[] { ',', ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).ToHashSet();
 
-    static void LoadConfig()
+    static string? LoadConfig()
     {
-        var mf = Path.Combine(AppContext.BaseDirectory, "modules.txt");
-        LoadModules(File.Exists(mf) && !TestRun ? File.ReadAllText(mf) : null);
         var path = ConfigPath;
-        cfgAt = File.GetLastWriteTimeUtc(path);
-        if (File.Exists(path))
+        var stamp = File.GetLastWriteTimeUtc(path);
+        try
         {
             string text = File.ReadAllText(path), mig = text;
             foreach (var (o, n) in ConfigMigrations) mig = mig.Replace(o, n);
-            if (mig != text && !TestRun) try { File.WriteAllText(path, mig); } catch (IOException) { }   // Tests (--anflugtest/--mptest from a worktree: root is the checkout with models) do not write config
             Cfg = JsonSerializer.Deserialize<Config>(mig,
-                new JsonSerializerOptions { ReadCommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }) ?? new();
+                new JsonSerializerOptions { ReadCommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }) ?? throw new JsonException(null, null, 0, 0);
+            if (mig != text && !TestRun) try { File.WriteAllText(path, mig); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         }
+        catch (FileNotFoundException) { }   // fresh installation: use defaults
+        catch (JsonException e)
+        {
+            cfgAt = stamp;   // retry after the next edit
+            return L($"Ungültige Konfiguration in {path} (Zeile {e.LineNumber + 1}, Byte {e.BytePositionInLine + 1}).",
+                     $"Invalid configuration in {path} (line {e.LineNumber + 1}, byte {e.BytePositionInLine + 1}).");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return L($"Konfiguration nicht lesbar: {path}.", $"Cannot read configuration: {path}.");
+        }
+        cfgAt = stamp;
+        var mf = Path.Combine(AppContext.BaseDirectory, "modules.txt");
+        LoadModules(File.Exists(mf) && !TestRun ? File.ReadAllText(mf) : null);
         foreach (var kv in new Config().Frequencies) Cfg.Frequencies.TryAdd(kv.Key, kv.Value);
         foreach (var kv in new Config().Voices) Cfg.Voices.TryAdd(kv.Key, kv.Value);
         (Tower.CenterNames, Tower.CenterSectors) = (new(Cfg.CenterNames, StringComparer.OrdinalIgnoreCase), Cfg.CenterSectors.Concat(OwnSectors).ToList());
@@ -1051,6 +1106,7 @@ static partial class Program
         if (!TestRun) Flights.Cmd = l => AiCmd(l);   // was only set by ReloadLive: without a config change the AI never got ENGAGE/RTB
         Flights.Follow = Cfg.AiFollowAwacs && On("awacs");   // LD1 ENGAGE only with AiFollowAwacs, LD7 RTB always
         Wheel.SaveSize = v => SetConfigValue("WheelSize", v.ToString(CultureInfo.InvariantCulture), "WheelButton");
+        return null;
     }
 
     /// SRS folder: configured path, otherwise from the SRS installation (registry) or the running SRS (other drive/directory, forum 0.9.5).

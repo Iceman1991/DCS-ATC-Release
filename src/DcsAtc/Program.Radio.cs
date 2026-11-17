@@ -263,26 +263,29 @@ static partial class Program
     /// Night after the end of civil twilight (sun below -6°, at the carrier or the first airfield, Y line); unknown sun = day.
     static string? Night() => Carrier.Sun < -6 ? L("Nacht", "night") : null;
 
-    /// Debrief: landings, traffic patterns, range, tanker, rejected radio calls. final -> file in debrief\ and reset.
-    static Tx DebriefTx(Pilot p, bool final)
+    static DebriefArchive? liveDebriefs;
+    static DebriefArchive Debriefs => liveDebriefs ??= new(Root, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DCS-ATC", "pending-debriefs"));
+    static DateTime nextDebriefRetry;
+
+    /// Debrief: landings, traffic patterns, range, tanker, rejected radio calls. Final reports own their text after the pilot leaves.
+    static Tx DebriefTx(Pilot p, bool final, DebriefArchive? archive = null)
     {
         var lines = new List<string> { $"DEBRIEFING {p.Callsign} ({p.Type})" + (p.Airborne is { } a ? L(" – Flugzeit ", " – flight time ") + $"{Clock - a:h\\:mm}" : "") };
         lines.AddRange(p.Ops.Debrief.Count > 0 ? p.Ops.Debrief : new List<string> { L("Noch keine Wertungen (Landung, Range, Tanker).", "No grades yet (landing, range, tanker).") });
         lines.AddRange(p.Ops.DebriefSummary());
         int rej = p.Towers.Values.Sum(t => t.Rejected) + (p.Lead?.Towers.Values.Sum(t => t.Rejected) ?? 0);
         if (rej > 0) lines.Add(L("Vom Lotsen abgelehnte Funksprüche: ", "Calls rejected by the controller: ") + rej);
-        if (final && !TestRun && p.Airborne is { } fa)   // FI3: the flight into the logbook, milestones and totals to the end
-            lines.AddRange(Logbook.Add(Path.Combine(Root, "logbook.json"), p.Name != "" ? p.Name : p.Callsign, p.Type, (Clock - fa).TotalMinutes, p.Ops.Debrief, p.Ops.TankerContacts, p.Ops.RangePasses));
+        if (final && !TestRun) archive ??= Debriefs;
+        if (final && archive != null && p.Airborne is { } fa)   // FI3: only the original finalization writes to the logbook
+            lines.AddRange(Logbook.Add(Path.Combine(archive.Root, "logbook.json"), p.Name != "" ? p.Name : p.Callsign, p.Type, (Clock - fa).TotalMinutes, p.Ops.Debrief, p.Ops.TankerContacts, p.Ops.RangePasses));
         var text = string.Join("\n", lines);
         if (final)
         {
-            try
+            if (archive?.Save(Clock, p.Callsign, text) is { } warning)
             {
-                var dir = Path.Combine(Root, "debrief");
-                Directory.CreateDirectory(dir);
-                File.WriteAllText(Path.Combine(dir, $"{Clock:yyyy-MM-dd_HHmm}_{Regex.Replace(p.Callsign, "[^A-Za-z0-9-]", "")}.txt"), text);
+                Log($"[ATC] {p.Callsign}: {warning}");   // a disconnected pilot cannot see the returned text
+                text += "\n" + warning;
             }
-            catch (IOException) { }
             p.Ops.ResetDebrief();
             (p.Airborne, p.AtcAt) = (null, -1e9);   // N51: next flight unknown again until the first call
         }
@@ -921,6 +924,12 @@ static partial class Program
         var outq = new List<Tx>();
         lock (TowerLock)
         {
+            if (!TestRun && DateTime.UtcNow >= nextDebriefRetry)
+            {
+                nextDebriefRetry = DateTime.UtcNow.AddSeconds(30);
+                int recovered = Debriefs.Retry();
+                if (recovered > 0) Log(L($"[ATC] Nachträglich gespeicherte Debriefings: {recovered}", $"[ATC] Recovered debriefings: {recovered}"));
+            }
             PauseCheck(CurrentTel());   // LA17
             if (Srs is { Connected: true, HasPlayers: false } && Host()?.Tel != null)   // Forum (Tony86): SRS client on another server: SrsAutoConnect leaves it alone, nothing goes either way
             {

@@ -14,6 +14,15 @@ static class Settings
     /// Ko-fi supporters, named on the "Thanks" page (only with their OK, under the name they want)
     static readonly string[] Supporters = { "Heling", "buur", "Pascali Alessandro" };
 
+    internal static string InstallationReport(string dir)
+    {
+        // Public support report: fixed package filenames and status only.
+        var lines = new List<string> { $"DCS-ATC {Update.Own}", RuntimeInformation.OSDescription, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss zzz}", "" };
+        foreach (var file in new[] { @"models\ggml-small.en.bin", @"tools\whisper\Release\whisper-cli.exe", @"tools\piper\piper.exe", @"tools\ffmpeg\ffmpeg.exe" })
+            lines.Add(Path.GetFileName(file) + ": " + (File.Exists(Path.Combine(dir, file)) ? L("vorhanden", "present") : L("fehlt", "missing")));
+        return string.Join(Environment.NewLine, lines) + Environment.NewLine;
+    }
+
     /// Bug report zip: logs, config (API key blanked), frequencies, modules, own charts*.jsonc (also in charts\), info.txt. Missing files skipped, logs read while the app writes them, at most the last 20 MB each.
     internal static void CollectDiagnostics(string dir, Stream output)
     {
@@ -246,10 +255,15 @@ static class Settings
             updState.Text = L("Suche nach Updates …", "Checking for updates …");
             Task.Run(() =>
             {
-                var r = Update.Check();
+                var (success, r) = Update.Check();
                 UpdUi(() =>
                 {
                     (updBusy, upd) = (false, r);
+                    if (!success)
+                    {
+                        updState.Text = L("Update-Prüfung fehlgeschlagen. Bitte erneut versuchen.", "Update check failed. Please try again.");
+                        return;
+                    }
                     updState.Text = r == null ? L($"Installiert: {Update.Own}. Nichts Neueres gefunden.", $"Installed: {Update.Own}. Nothing newer found.")
                                               : L($"Installiert: {Update.Own}. Neu: {r.Version} ({r.Size / 1048576} MB).", $"Installed: {Update.Own}. New: {r.Version} ({r.Size / 1048576} MB).");
                     if (r != null) (updBtn.Text, updBtn.BackColor, updBtn.ForeColor) = (L("Jetzt aktualisieren", "Update now"), Wheel.Accent, Wheel.Dark);
@@ -464,7 +478,47 @@ static class Settings
 
         Page(L("Erweitert", "Advanced"));
         Group(L("Diagnose", "Diagnostics"));
+        var radioCheck = Btn(L("Funk-Selbsttest starten", "Start radio self-test"), false);
+        Row(L("Funk-Selbsttest", "Radio self-test"), radioCheck);
+        Note(L("Beim Start vier Sekunden ins gewählte Windows-Mikrofon sprechen: „Radio check“. Whisper prüft die Aufnahme lokal. Die Testantwort bleibt stumm. SRS wird am lokalen TCP-Port geprüft.",
+               "At the start, say “Radio check” into the selected Windows microphone within four seconds. Whisper checks the recording locally. The test reply is silent. SRS is checked on its local TCP port."));
+        var result = new Label { AutoSize = true, MaximumSize = new Size(510, 0), UseMnemonic = false, Visible = false };
+        Wide(result);
+        CancellationTokenSource? radioStop = null;
+        f.FormClosed += (_, _) => radioStop?.Cancel();
+        radioCheck.Click += async (_, _) =>
+        {
+            if (radioStop != null) { radioStop.Cancel(); return; }
+            using var stop = new CancellationTokenSource();
+            radioStop = stop;
+            int device = mic.SelectedIndex - 1;
+            var folder = srs.Text;
+            var voice = voices.First(v => v.Key == "Tower").Get();
+            result.Text = "";
+            result.Visible = true;
+            radioCheck.Text = L("Selbsttest abbrechen", "Cancel self-test");
+            IProgress<string> progress = new Progress<string>(line =>
+            {
+                if (!f.IsDisposed && radioStop == stop) result.Text += (result.Text == "" ? "" : Environment.NewLine) + line;
+            });
+            try
+            {
+                await Task.Run(() => Program.RadioSelfTest(Program.Root, device, null, folder, voice, cfg.AsrGpu, progress.Report, stop.Token));
+            }
+            catch (OperationCanceledException) { if (!f.IsDisposed) result.Text += Environment.NewLine + L("Abgebrochen.", "Cancelled."); }
+            catch (Exception e) { if (!f.IsDisposed) result.Text += Environment.NewLine + e.Message; }
+            finally { radioStop = null; if (!f.IsDisposed) radioCheck.Text = L("Funk-Selbsttest starten", "Start radio self-test"); }
+        };
         var dbg = Check(L("Debug-Log für Fehlerberichte (atc-debug.txt)", "Debug log for bug reports (atc-debug.txt)"), cfg.DebugLog);
+        var report = Btn(L("Installationsbericht erstellen …", "Create installation report …"), false);
+        report.Click += (_, _) =>
+        {
+            using var save = new SaveFileDialog { FileName = "DCS-ATC-installation.txt", Filter = L("Textdatei (*.txt)|*.txt", "Text file (*.txt)|*.txt"), DefaultExt = "txt" };
+            if (save.ShowDialog(f) != DialogResult.OK) return;
+            try { File.WriteAllText(save.FileName, InstallationReport(Program.Root)); }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { MessageBox.Show(f, e.Message, "DCS-ATC"); }
+        };
+        Row(L("Version, Windows und mitgelieferte Sprachwerkzeuge", "Version, Windows and bundled speech tools"), report);
         var diag = Btn(L("Diagnose-Zip erstellen …", "Create diagnostics zip …"), false);
         diag.Click += (_, _) =>
         {

@@ -2,7 +2,7 @@
 
 [![Downloads](https://img.shields.io/github/downloads/Iceman1991/DCS-ATC-Release/total?label=Downloads&color=2ea44f)](https://github.com/Iceman1991/DCS-ATC-Release/releases) [![Latest release](https://img.shields.io/github/v/release/Iceman1991/DCS-ATC-Release?label=Version)](https://github.com/Iceman1991/DCS-ATC-Release/releases/latest) [![License](https://img.shields.io/badge/License-GPL--3.0-blue)](LICENSE)
 
-Voice ATC for DCS World. You talk to Ground, Tower, Approach, ATIS, AWACS, tankers and JTACs over SRS in English and they answer with their own voices. Speech recognition (Whisper) and the voices (Piper) run locally on your PC, nothing goes to the internet. Works on any map in any mission, single player and multiplayer (host or dedicated server). So far only tested on Caucasus.
+Voice ATC for DCS World. You talk to Ground, Tower, Approach, ATIS, AWACS, tankers and JTACs over SRS in English and they answer with their own voices. By default Whisper recognises speech on your PC, and Piper generates the voices locally. If you set `AsrApiUrl`, DCS-ATC sends radio audio from the monitored frequencies to that service. The app also checks GitHub for updates at startup unless you turn off `UpdateCheck`. Works on any map in any mission, single player and multiplayer (host or dedicated server). So far only tested on Caucasus.
 
 **Alpha:** early test version. Expect bugs (wrong or double calls, odd headings, hangs). Use at your own risk. Feedback and logs are welcome.
 
@@ -78,7 +78,11 @@ Update: settings window, page General, group "Update": "Check for updates", then
 
 ## Bug reports
 
-Open an [issue](../../issues) with time, airfield, a short description and `atc-log.txt` plus `atc-debug.txt` from `%LOCALAPPDATA%\Programs\DCS-ATC`. A short video with SRS audio helps a lot.
+Open an [issue](../../issues) with a short description. For installation problems, select **Advanced → Diagnostics → Create installation report**. The text file lists the app version, Windows version, time and which bundled speech components are present.
+
+For a silent radio, choose **Advanced → Diagnostics → Start radio self-test** and say “Radio check”. The four results cover microphone level, local Whisper, speech synthesis and the local SRS port.
+
+For an issue during a flight, include the time and airfield. **Create diagnostics zip** collects the logs and configuration. Logs can include callsigns and radio transcripts. Review the archive and share only the files or excerpts needed to show the problem.
 
 ## Community files
 
@@ -88,7 +92,7 @@ If a file works for you, upvote its thread. If something is wrong, write it ther
 
 ## Technology
 
-Two models are used while running, both locally on your PC:
+The default installation uses these models on your PC:
 
 | Purpose | Software | Model | License |
 |---|---|---|---|
@@ -105,7 +109,7 @@ Development: DCS-ATC is developed with an AI coding assistant ([Claude](https://
 The app is C# (.NET 8, `src/DcsAtc`), the DCS hook and mission scripts are Lua (`mod/`, `hooks/`, `mission/`, `export/`), plus tests (`tests/`) and the installer (`installer/`).
 
 - Build: .NET 8 SDK, `dotnet build src/DcsAtc -c Release`
-- Self-tests without DCS: `DcsAtc.exe --selftest`, `--anflugtest`, `--mptest`
+- Tests: run `tests\alle.cmd`. It runs the three C# suites and, when DCS is available, four Lua suites. For a custom installation, set `DCS_ROOT` to the DCS World folder containing `bin\luae.exe`. Without DCS the script reports a partial run. The installer build requires all seven suites to pass.
 - Installer: `installer\build.cmd` (Inno Setup 6, FFmpeg in PATH) builds the full setup, the small update setup and `manifest.json`. It also needs the Whisper model and Piper voices in `models\` and whisper.cpp/Piper in `tools\`. They are not in this repository because of their size, sources are listed in `installer/THIRD-PARTY-NOTICES.txt`, the layout is in `installer/DcsAtc.iss`.
 
 ## License

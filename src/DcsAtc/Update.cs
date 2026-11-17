@@ -19,7 +19,7 @@ static class Update
 
     public static string Own => System.Windows.Forms.Application.ProductVersion.Split('+')[0];   // "0.22.0-alpha+commit" -> "0.22.0-alpha"
 
-    static Version? Num(string s) => Regex.Match(s, @"(\d+)\.(\d+)\.(\d+)") is { Success: true } m ? new Version(int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value), int.Parse(m.Groups[3].Value)) : null;
+    static Version? Num(string s) => Version.TryParse(Regex.Match(s, @"\d+\.\d+\.\d+").Value, out var version) ? version : null;
     /// "v0.22.1-alpha" is newer than "0.22.0-alpha": the three numbers decide, anything unreadable is not newer.
     internal static bool Newer(string tag, string own) => Num(tag) is { } a && Num(own) is { } b && a > b;
 
@@ -69,11 +69,13 @@ static class Update
     });
 
     /// What to download: the small zip (app without models and tools) if the release has it with a manifest and every big file is already here, else the full zip.
-    /// load fetches the manifest. null = release without the full zip. No manifest or small zip, or the manifest cannot be loaded: full zip.
-    internal static Release? Pick(string json, string root, Func<string, byte[]> load)
+    /// load fetches the manifest. A current or older release returns null. No usable manifest or small zip: full zip.
+    internal static Release? Pick(string json, string root, Func<string, byte[]> load, string? newerThan = null)
     {
         var full = Parse(json);
-        if (full == null || Parse(json, SmallZip) is not { } small || Parse(json, Manifest) is not { } m) return full;
+        if (full == null || Num(full.Version) == null) throw new InvalidDataException("Release is missing its version or full setup.");
+        if (newerThan != null && !Newer(full.Version, newerThan)) return null;
+        if (Parse(json, SmallZip) is not { } small || Parse(json, Manifest) is not { } m) return full;
         try
         {
             var b = load(m.Url);
@@ -83,14 +85,14 @@ static class Update
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException) { return full; }
     }
 
-    // ponytail: hashes the ~780 MB of models and tools on every check that finds a release with a manifest (some seconds, background thread); cache the result if that hurts
-    static Release? Latest() => Pick(Http.GetStringAsync(Api).GetAwaiter().GetResult(), Path.GetDirectoryName(Environment.ProcessPath) ?? "", u => Http.GetByteArrayAsync(u).GetAwaiter().GetResult());
+    static Release? Latest(string? newerThan = null) => Pick(Http.GetStringAsync(Api).GetAwaiter().GetResult(), Path.GetDirectoryName(Environment.ProcessPath) ?? "", u => Http.GetByteArrayAsync(u).GetAwaiter().GetResult(), newerThan);
 
-    /// The latest release if it is newer than this build (small or full zip, see Pick); null = up to date, offline, GitHub not reachable.
-    public static Release? Check()
+    public static (bool Success, Release? Available) Check() => Check(() => Latest(Own));
+
+    static (bool Success, Release? Available) Check(Func<Release?> latest)
     {
-        try { return Latest() is { } r && Newer(r.Version, Own) ? r : null; }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException or KeyNotFoundException or InvalidOperationException) { return null; }
+        try { return (true, latest()); }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException or KeyNotFoundException or InvalidOperationException or InvalidDataException or FormatException) { return (false, null); }
     }
 
     static string Dir => Path.Combine(Path.GetTempPath(), "DcsAtc-Update");
@@ -175,6 +177,13 @@ static class Update
             string Rel(byte[] man, bool small = true) => $$"""{"tag_name":"v0.23.0-alpha","assets":[{"name":"DCS-ATC.zip","size":800,"browser_download_url":"{{rel}}DCS-ATC.zip"},{"name":"manifest.json","size":{{man.Length}},"digest":"sha256:{{Hex(SHA256.HashData(man))}}","browser_download_url":"{{rel}}manifest.json"}"""
                 + (small ? $$""",{"name":"DCS-ATC-Update.zip","size":70,"browser_download_url":"{{rel}}DCS-ATC-Update.zip"}""" : "") + "]}";
             byte[] good = Man("0.23.0-alpha", abc.ToUpperInvariant());
+            byte[] UnexpectedLoad(string url) => throw new Exception("Manifest requested without a newer release: " + url);
+            if (Check(() => Pick(Rel(good), root, UnexpectedLoad, "0.23.0-alpha")) is not (true, null) ||
+                Check(() => Pick(Rel(good), root, UnexpectedLoad, "0.24.0-alpha")) is not (true, null) ||
+                Check(() => Pick(Rel(good), root, _ => good, "0.22.0-alpha")) is not (true, { Size: 70 }) ||
+                Check(() => throw new HttpRequestException()) is not (false, null) ||
+                Check(() => Pick("{}", root, UnexpectedLoad, "0.23.0-alpha")) is not (false, null))
+                throw new Exception("Update: Status und Versionsprüfung vor der Manifestprüfung");
             long Size(byte[] man, bool small = true, byte[]? got = null) => Pick(Rel(man, small), root, _ => got ?? man)!.Size;
             bool pick = Size(good) == 70                                               // all there: small
                         && Size(good, small: false) == 800                             // release without the small zip

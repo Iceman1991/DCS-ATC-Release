@@ -807,6 +807,8 @@ DCS-ATC wählt den Platz in dieser Reihenfolge:
 
 Die ATIS sendet dauerhaft für jeden Platz mit einem Spieler im Umkreis von 40 NM. Teilen sich mehrere Plätze eine ATIS-Frequenz, wechseln sie sich ab. Das Wetter kommt aus der Mission.
 
+Ändert sich die Meldung während der Spracherzeugung, verwirft die Dauersendung die überholte Aufnahme. Das gilt auch dann, wenn der Kennbuchstabe gleich bleibt. Mehrere ATIS-Frequenzen eines Platzes können denselben aktuellen Wetterbericht senden.
+
 > **ATIS:** Kutaisi information Alpha, time zero eight zero zero Zulu. Runway two five in use, left hand pattern, 2000 feet. Wind two four zero degrees, eight knots. Visibility one zero kilometers or more, sky clear. Temperature one five. QNH one zero one three, altimeter two niner niner two. Tower one three four decimal zero, UHF two six three decimal zero. Advise on initial contact you have information Alpha.
 
 - **Wolken** werden als Wolkenuntergrenze über dem Platz genannt („clouds 2500 feet“). **Wind** ist missweisend, unter 3 kt „wind calm“.
@@ -1423,6 +1425,8 @@ Das Debriefing sammelt:
 - Einträge von Range, Tanker, Träger und AWACS
 
 Parkst du nach einem Flug, wird es automatisch gezeigt und unter `%LOCALAPPDATA%\Programs\DCS-ATC\debrief\<Datum>_<Uhrzeit>_<Rufzeichen>.txt` gespeichert. Jederzeit abrufbar über Rad oder F10 **Allgemein → Debriefing**.
+
+Gibt es den Dateinamen schon, erhält der nächste Bericht die Endung `-2.txt`, dann `-3.txt`. Ist der Zielordner gesperrt, legt DCS-ATC den fertigen Bericht unter `%LOCALAPPDATA%\DCS-ATC\pending-debriefs` ab. Die laufende App versucht den Export alle 30 Sekunden erneut, auch nach einem Neustart. Der Flug zählt dabei einmal im Logbuch. Meldet die App „nur im Arbeitsspeicher“, stelle vor dem Beenden den Schreibzugriff wieder her.
 
 **Arten von Verstößen:** Start ohne Freigabe; Bahn ohne Freigabe betreten; Landung ohne Freigabe; Landung nach Durchstartanweisung; Luftraumverletzung; Bahn ohne Freigabe überquert; aus der Reihenfolge genommen; Rollen ohne Freigabe; Anflug ohne Kontakt; keine Landemeldung; Durchstarten ohne Meldung; kein Check-in bei Departure (IFR); kein Check-in bei Approach nach dem Fehlanflug; keine Meldung „leaving the control zone“; keine Meldung „clear of the zone“. Träger, Tanker und Range tragen eigene ein (Approach-Zeit ohne „commencing“ verstrichen, Kontakt bzw. Annäherung an einen Tanker ohne Freigabe, kein „off“ auf der Range).
 
@@ -2914,6 +2918,8 @@ Links wählst du die Seite: Allgemein, Stimmen, Funk & Verkehr, AWACS, Frequenze
 | **Luftraum überwachen (Kontrollzonen, Verstöße, Debriefing)** | an/aus | `AirspaceWatch` |
 | **Debug-Log für Fehlerberichte (atc-debug.txt)** | an/aus | `DebugLog` |
 | **Diagnose-Zip erstellen …** | Knopf | legt `DCS-ATC-diagnostics-<Datum>-<Uhrzeit>.zip` auf den Desktop (siehe Fehlerbericht unten) |
+| **Installationsbericht erstellen …** | Knopf | Erstellt eine Textdatei mit DCS-ATC-Version, Windows-Version, Zeitpunkt und dem Installationsstatus der mitgelieferten Sprachkomponenten. |
+| **Funk-Selbsttest starten** | Knopf | Prüft Mikrofonpegel, lokale Spracherkennung, Erzeugung der Sprachantwort und den lokalen SRS-Port. |
 | **Bahnbefeuerung (nachts)** | stumm / mit DCS-Lotse (hörbar) / aus. Gilt ab dem nächsten Start. | `RunwayLights` |
 | **Höhenmesser-Einstellung** | automatisch (nach Flugzeugtyp) / hPa (QNH) / inHg (altimeter) | `AltimeterUnit` |
 | **Funkrad im Spiel (VR)** | Text automatisch (wenn DCS im VR-Modus) / Text immer / aus / Rad als Bild (Test) | `WheelInGame` |
@@ -3073,7 +3079,15 @@ Alle Logs liegen in `%LOCALAPPDATA%\Programs\DCS-ATC`:
 | `atc-debug.txt` | Ausführliches Log für Fehlerberichte: Spracherkennung, Platzwahl, Flugphasen, Flugzeugdaten alle 10 s. Nur mit `DebugLog`. Bei 20 MB wird sie zu `atc-debug.old.txt`, belegt also höchstens 2 × 20 MB. |
 | `crash-log.txt` | Fehlerdetails bei einem Absturz von DCS-ATC. DCS-ATC startet sich dann neu, außer es ist in seiner ersten Minute abgestürzt. |
 
-Für einen Fehlerbericht: Uhrzeit, Platz, kurze Beschreibung, `atc-log.txt` und `atc-debug.txt`. Bei einem Problem mit Vektoren oder dem Weg zur Bahn dazu `airfields.txt` aus dem DCS-ATC-Ordner, die Dateien `DcsAtc-Terrain-*.txt` aus `%TEMP%` und deine `charts.jsonc`: damit lässt sich der Flug aus deinem Log durch die aktuelle Version noch einmal abspielen (`DcsAtc.exe --replay atc-debug.txt`, die Dateien neben dem Log; listet die Lotsensprüche des Logs neben denen der aktuellen Version).
+Bei Installationsproblemen findest du unter **Erweitert → Diagnose → Installationsbericht erstellen …** einen kurzen Bericht. Er prüft, ob Whisper, das Whisper-Modell, Piper und das mitgelieferte FFmpeg vorhanden sind. Die Textdatei enthält außerdem die DCS-ATC-Version, die Windows-Version und den Zeitpunkt.
+
+Wenn der Funk stumm bleibt, wähle **Erweitert → Diagnose → Funk-Selbsttest starten**. Sage während der viersekündigen Aufnahme „Radio check“ ins gewählte Mikrofon. Die Anzeige nennt den Spitzenpegel und die von lokalem Whisper erkannten Wörter. Piper und FFmpeg erzeugen die Testantwort als MP3-Datei ohne Wiedergabe. Der letzte Schritt prüft SRS ExternalAudio und die Erreichbarkeit des lokalen TCP-Ports. Eine laufende Mission oder ein anderer Spieler wird dafür nicht benötigt. Der Test sendet weder Sprache über Funk noch Audio an einen externen Spracherkennungsdienst.
+
+Für eine wiederholbare Prüfung mit einer Datei ersetze das Mikrofon durch eine WAV-Aufnahme mit „Radio check“ (16 kHz, PCM 16 Bit, Mono, bis 30 Sekunden). Starte im DCS-ATC-Ordner `.\DcsAtc.exe --radio-selftest "C:\Pfad\funkprobe.wav"`. Der Befehl gibt alle Ergebnisse im Terminal aus.
+
+Wenn sich die Einstellungen nicht öffnen lassen, starte PowerShell im DCS-ATC-Programmordner. `.\DcsAtc.exe --installation-report` zeigt denselben Bericht auch bei einer ungültigen `config.jsonc`.
+
+Bei einem Problem während des Flugs helfen Uhrzeit, Platz, eine kurze Beschreibung und passende Auszüge aus `atc-log.txt` und `atc-debug.txt`. Bei einem Problem mit Vektoren oder dem Weg zur Bahn dazu `airfields.txt` aus dem DCS-ATC-Ordner, die Dateien `DcsAtc-Terrain-*.txt` aus `%TEMP%` und deine `charts.jsonc`: damit lässt sich der Flug aus deinem Log durch die aktuelle Version noch einmal abspielen (`DcsAtc.exe --replay atc-debug.txt`, die Dateien neben dem Log; listet die Lotsensprüche des Logs neben denen der aktuellen Version).
 
 Einfacher: Unter Erweitert, Diagnose, packt **Diagnose-Zip erstellen …** alles in eine Zip-Datei auf dem Desktop und zeigt sie im Explorer: `atc-log.txt`, `atc-debug.txt`, `config.jsonc`, `frequencies.jsonc`, `modules.txt`, alle `charts*.jsonc` (auch aus `charts\`) und `info.txt` mit Version, Windows und Uhrzeit. Der API-Schlüssel (`AsrApiKey`) fehlt in der Kopie, die Datei auf der Platte bleibt unverändert. Die Logs enthalten Rufzeichen und das, was auf dem Funk gesagt wurde; prüfe die Zip, bevor du sie weitergibst. Ist ein Log größer als 20 MB, steht nur sein Ende darin. Auch das Debug-Log enthält den API-Schlüssel nicht mehr; ältere Logs werden beim nächsten Start bereinigt. Wer einen `atc-debug.txt` gepostet hat, während ein Schlüssel eingetragen war, sollte diesen Schlüssel ersetzen.
 

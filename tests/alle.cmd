@@ -1,20 +1,26 @@
 @echo off
-rem All regression tests: selftest, approach test, multiplayer test, mission, crew and wingman Lua tests. Exit 1 on any failure, log in tmp\tests.log.
+rem Run the C# and DCS Lua suites. --require-lua also fails if DCS is missing.
 rem Every fixed bug gets a check in one of these suites; installer\build.cmd runs this first.
+setlocal
 cd /d "%~dp0.."
 if not exist tmp mkdir tmp
 set EXE=src\DcsAtc\bin\Release\net8.0-windows\DcsAtc.exe
-set LUAE=%ProgramFiles%\Eagle Dynamics\DCS World\bin\luae.exe
+if not defined DCS_ROOT set "DCS_ROOT=%ProgramFiles%\Eagle Dynamics\DCS World"
+set "LUAE=%DCS_ROOT%\bin\luae.exe"
 dotnet build src\DcsAtc -c Release -v q -nologo > tmp\tests.log || (echo Build fehlgeschlagen & type tmp\tests.log & exit /b 1)
 call :run selftest %EXE% --selftest || exit /b 1
 call :run anflugtest %EXE% --anflugtest || exit /b 1
 call :run mptest %EXE% --mptest * * || exit /b 1
-if not exist "%LUAE%" (echo luae.exe fehlt, Lua-Tests uebersprungen & goto ok)
+if not exist "%LUAE%" (
+  echo Teilpruefung: C#-Tests OK. Vier DCS-Lua-Suiten uebersprungen.
+  echo Fehlende Datei: "%LUAE%". DCS_ROOT auf den DCS-Installationsordner setzen.
+  if /i "%~1"=="--require-lua" exit /b 1
+  exit /b 0
+)
 call :run missiontest "%LUAE%" tests\missiontest.lua mod\Scripts\DcsAtc\DcsAtcMission.lua || exit /b 1
 call :run crewtest "%LUAE%" tests\crewtest.lua mission\KutaisiTraffic.lua || exit /b 1
-call :run wingtest "%LUAE%" tests\wingtest.lua mod\Scripts\DcsAtc\DcsAtcWing.lua "%ProgramFiles%\Eagle Dynamics\DCS World" || exit /b 1
+call :run wingtest "%LUAE%" tests\wingtest.lua mod\Scripts\DcsAtc\DcsAtcWing.lua "%DCS_ROOT%" || exit /b 1
 call :run hooktest "%LUAE%" tests\hooktest.lua mod\Scripts\Hooks\DcsAtcHook.lua || exit /b 1
-:ok
 echo Alle Testsuiten OK
 exit /b 0
 

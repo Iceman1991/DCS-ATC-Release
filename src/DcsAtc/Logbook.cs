@@ -21,12 +21,30 @@ class Logbook
     public static List<string> Add(string file, string who, string type, double minutes, IEnumerable<string> debrief, int tanker, int range)
     {
         Dictionary<string, Logbook> all;
-        try { all = File.Exists(file) ? JsonSerializer.Deserialize<Dictionary<string, Logbook>>(File.ReadAllText(file), Opts) ?? new() : new(); }
-        catch (Exception e) when (e is IOException or JsonException) { return new() { L("Logbuch: logbook.json nicht lesbar, Flug nicht eingetragen", "Logbook: logbook.json unreadable, flight not logged") }; }
+        try
+        {
+            all = JsonSerializer.Deserialize<Dictionary<string, Logbook>>(File.ReadAllText(file), Opts) ?? throw new JsonException();
+            if (all.Values.Any(entry => entry?.Minutes == null || entry.Landings == null)) throw new JsonException();
+        }
+        catch (FileNotFoundException) { all = new(); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return new() { L("Logbuch: logbook.json nicht lesbar, Flug nicht eingetragen", "Logbook: logbook.json unreadable, flight not logged") };
+        }
         var b = all.TryGetValue(who, out var o) ? o : all[who] = new();
         var was = JsonSerializer.Deserialize<Logbook>(JsonSerializer.Serialize(b, Opts), Opts)!;
         b.Record(type, minutes, debrief, tanker, range);
-        try { File.WriteAllText(file, JsonSerializer.Serialize(all, Opts)); } catch (IOException) { }
+        var temp = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(temp, JsonSerializer.Serialize(all, Opts));
+            File.Move(temp, file, overwrite: true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            try { File.Delete(temp); } catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException) { }
+            return new() { L("Logbuch: Speichern fehlgeschlagen, Flug nicht eingetragen", "Logbook: save failed, flight not logged") };
+        }
         return b.Miles(was, type).Append(b.Summary()).ToList();
     }
 
@@ -133,9 +151,20 @@ class Logbook
                 b.Checkrides != 1 || b.CheckridesPassed != 1 || b.Rescues != 1 || !f2.Contains(L("Meilenstein: erste Rettung", "Milestone: first rescue")) || !f2[^1].Contains(L("1 Prüfflug (1 bestanden)", "1 checkride (1 passed)")) || f2.Any(x => x.Contains(L("erste Landung", "first landing"))) ||
                 !f2[^1].Contains("2:05 h") || !f2[^1].Contains("Boarding Rate 50 %") || !f2[^1].Contains("GPA 2.75") || !f2[^1].Contains(L("2 Landungen (1 nachts) an 2 Plätzen", "2 landings (1 at night) at 2 airfields")))
                 throw new Exception("Logbuch: Summen/Meilensteine: " + string.Join(" | ", f1) + " || " + s2);
-            File.WriteAllText(file, "{ kaputt");
-            if (Add(file, "Ice", "F-16C_50", 30, Array.Empty<string>(), 0, 0).Single().Contains("2 Fl") || File.ReadAllText(file) != "{ kaputt")
-                throw new Exception("Logbuch: kaputte Datei überschrieben");
+            var before = File.ReadAllText(file);
+            using (File.Open(file, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                var error = Add(file, "Ice", "F-16C_50", 30, Array.Empty<string>(), 0, 0).Single();
+                if (!error.Contains(L("Speichern fehlgeschlagen", "save failed")) || File.ReadAllText(file) != before)
+                    throw new Exception("Logbuch: gesperrtes Ziel als gespeichert gemeldet oder verändert");
+            }
+            foreach (var invalid in new[] { "{ kaputt", "null", """{ "Ice": null }""", """{ "Ice": { "Minutes": null } }""" })
+            {
+                File.WriteAllText(file, invalid);
+                var error = Add(file, "Ice", "F-16C_50", 30, Array.Empty<string>(), 0, 0).Single();
+                if (!error.Contains(L("nicht lesbar", "unreadable")) || File.ReadAllText(file) != invalid)
+                    throw new Exception("Logbuch: kaputte Datei überschrieben oder falsche Rückmeldung");
+            }
         }
         finally { File.Delete(file); }
         Console.WriteLine("OK   FI3 Logbuch: zwei Flüge, Summen, Meilensteine, kaputte Datei bleibt");

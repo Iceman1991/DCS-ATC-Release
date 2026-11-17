@@ -460,13 +460,15 @@ static partial class Program
         bool nine = Regex.IsMatch(text, @"\b[Ll]ine \d,");   // 9-line: natural pace, digits single, longer pause after each line (the pilot writes it down)
         string sil = nine ? "0.7" : "0.2", say = ForPiper(text, nine), model = Path.Combine(Root, "models", parts[0] + ".onnx"),   // Pronunciation; digits bound: brisk as on the radio
                scale = ((pilot ? 0.95 : Cfg.SpeechRate) * VoicePace.GetValueOrDefault(parts[0], 1) * (stress ? 0.85 : 1) * pace).ToString("0.###", CultureInfo.InvariantCulture);   // Combat: faster
-        if (!PiperWarm(model, scale, sil, say, wav))
-            Run(Path.Combine(Root, "tools", "piper", "piper.exe"), say, "--model", model, "--length_scale", scale, "--sentence_silence", sil, "--output_file", wav);
+        if (!PiperWarm(model, scale, sil, say, wav) &&
+            Run(Path.Combine(Root, "tools", "piper", "piper.exe"), say, "--model", model, "--length_scale", scale, "--sentence_silence", sil, "--output_file", wav).exit != 0)
+            return 0;
         double sec = 0;
         for (int i = 0; ; i++)   // warm Piper reports the file before it closes it: otherwise 0.2 s transmission, call lost
             try { using var r = new WaveFileReader(wav); sec = r.TotalTime.TotalSeconds; break; }
             catch (IOException) when (i < 40) { Thread.Sleep(25); }
             catch (Exception e) { Trace("FEHLER", $"Piper-WAV {voice}: {e.GetType().Name}: {e.Message}"); break; }
+        if (sec <= 0) return 0;
         // ponytail: Piper medium models deliver 22050 Hz; other rate -> pitch slightly different
         var pre = Math.Abs(pitch - 1) > 0.01 ? FormattableString.Invariant($"asetrate={22050 * pitch:0},atempo={1 / pitch:0.###},") : "";
         var graph = Cfg.RadioFx
@@ -478,8 +480,8 @@ static partial class Program
               "anoisesrc=r=48000:c=pink:a=0.03:d=0.1,highpass=f=500,lowpass=f=3000,afade=t=out:d=0.1[sq];" +   // quiet squelch tail instead of a bang
               "[m][sq]concat=n=2:v=0:a=1,alimiter=limit=0.5:level=disabled[out]"                              // hard-limit peaks
             : $"[0:a]{pre}aresample=48000,alimiter=limit=0.5:level=disabled[out]";
-        Run(Ffmpeg, null, "-y", "-loglevel", "error", "-i", wav, "-filter_complex", graph, "-map", "[out]", "-ac", "1",
-            "-codec:a", "libmp3lame", "-q:a", "3", mp3);
+        if (Run(Ffmpeg, null, "-y", "-loglevel", "error", "-i", wav, "-filter_complex", graph, "-map", "[out]", "-ac", "1",
+            "-codec:a", "libmp3lame", "-q:a", "3", mp3).exit != 0) return 0;
         if (text.Length <= 30)   // remember short fixed phrases (LSO, "Roger ball."): no Piper/ffmpeg the next time
             try
             {

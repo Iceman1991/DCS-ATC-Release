@@ -38,7 +38,7 @@ static partial class Program
             a.Call = tw.AtisCall(a.Letter.ToString(), tel);
         }
         var text = tw.AtisText(a.Letter.ToString(), tel, w.TempC, Sky.Clouds, Sky.BaseM, Sky.VisM, a.Clk);   // R344: current values, time of the identifier
-        if (text != a.Text) { a.Text = text; a.Mp3 = ""; Log($"[ATIS] {a.Text}"); }
+        if (text != a.Text) { a.Bulletin = new(text); Log($"[ATIS] {text}"); }
         return neu;
     }
 
@@ -95,6 +95,36 @@ static partial class Program
             if (small || !smallTxt.Contains("Temperature one six") || !smallTxt.Contains("information " + Tower.Phonetic(l2.ToString())) || !UpdateAtis(fld) || a.Letter != (char)('A' + (l2 - 'A' + 1) % 26))
                 throw new Exception($"R344 ATIS kleine Windänderung: {small} {smallTxt} / {a.Text}");
             Console.WriteLine("OK   R344 ATIS: Wind +1 kt gleiche Kennung, +10 kt neue Kennung");
+            var audioDir = Directory.CreateTempSubdirectory("DcsAtc-AtisTest-");
+            try
+            {
+                var firstRadio = new AtisRadio(audioDir.FullName, 120.5);
+                var secondRadio = new AtisRadio(audioDir.FullName, 263.5);
+                double Render(string text, string file) { File.WriteAllText(file, text); return 7; }
+                double NoRender(string text, string file) => throw new Exception("ATIS: gültige Aufnahme erneut erzeugt");
+                var old = a.Bulletin;
+                var stale = firstRadio.Prepare(fld.Name, old, (text, file) =>
+                {
+                    Wx[fld.Name] = (-9 * k10, 4 * k10, 22, pa);   // new text, even if the identifier stays the same
+                    UpdateAtis(fld);
+                    if (secondRadio.Prepare(fld.Name, a.Bulletin, Render) != 7) throw new Exception("ATIS: neue Aufnahme fehlt");
+                    return Render(text, file);   // the old render finishes last
+                });
+                if (stale != null || a.Bulletin == old || File.ReadAllText(secondRadio.Mp3) != a.Text ||
+                    firstRadio.Prepare(fld.Name, a.Bulletin, NoRender) != 7 || File.ReadAllText(firstRadio.Mp3) != a.Text)
+                    throw new Exception("ATIS: veraltete Aufnahme gesendet oder neue Aufnahme überschrieben");
+                using (File.OpenRead(firstRadio.Mp3))
+                    if (firstRadio.Prepare(fld.Name, a.Bulletin, NoRender) != 7) throw new Exception("ATIS: identische Aufnahme erneut geschrieben");
+                var nextMission = new AtisInfo { Bulletin = new(a.Text) };
+                Atis[fld.Name] = nextMission;
+                if (firstRadio.Prepare(fld.Name, a.Bulletin, NoRender) != null ||
+                    firstRadio.Prepare(fld.Name, nextMission.Bulletin, (text, file) => { File.WriteAllText(file, "partial"); return 0; }) != null ||
+                    firstRadio.Prepare(fld.Name, nextMission.Bulletin, (_, _) => 7) != null ||
+                    firstRadio.Prepare(fld.Name, nextMission.Bulletin, Render) != 7)
+                    throw new Exception("ATIS: Missionswechsel oder fehlgeschlagene Synthese");
+                Console.WriteLine("OK   ATIS-Audio: zwei Frequenzen, Wetterwechsel während der Synthese, Cache, Missionswechsel und Wiederholung nach Renderfehler");
+            }
+            finally { Atis[fld.Name] = a; audioDir.Delete(true); }
             // Announcement only to players of this airfield, on the ground or under 20 NM
             Pilot P(double agl, double nm) => new() { Active = new Tower(fld, "x"), Tel = new Telemetry(fld.Elev + agl, agl, 50, 0, fld.X + nm * NM, fld.Z, 0, 0, 0) };
             var (ground, near, far) = (P(0, 0), P(500, 15), P(3000, 30));
@@ -198,13 +228,14 @@ static partial class Program
     static void AtisLoop(double freq)
     {
         int i = 0;
+        var radio = new AtisRadio(Path.Combine(Root, "tmp"), freq);
         while (true)
         {
             Thread.Sleep(3000);
             if (!Cfg.Atis || !On("atc")) continue;
             string name;
             int side;
-            AtisInfo? a;
+            AtisBulletin bulletin;
             lock (TowerLock)
             {
                 var near = Fields.Where(f => Atis.ContainsKey(f.Name) && FieldFreqs(f, "ATIS")!.Any(x => Math.Abs(x - freq) < 0.0005))
@@ -212,19 +243,61 @@ static partial class Program
                                                                 .Select(p => (f.Name, Side: SideOf(f, p))).Distinct()).ToList();
                 if (near.Count == 0) continue;
                 (name, side) = near[i++ % near.Count];
-                a = Atis[name];
+                bulletin = Atis[name].Bulletin;
             }
-            if (a.Mp3 == "")
-            {
-                var mp3 = Path.Combine(Root, "tmp", "atis-" + Regex.Replace(name, "[^A-Za-z]", "") + ".mp3");
-                a.Sec = Synth(a.Text, PickVoice(Cfg.Voices.GetValueOrDefault("ATIS", "en_US-ryan-medium@0.94"), name), mp3);   // "a|b" and "random" as for the other stations
-                a.Mp3 = mp3;
-            }
+            var seconds = radio.Prepare(name, bulletin, (text, path) =>
+                Synth(text, PickVoice(Cfg.Voices.GetValueOrDefault("ATIS", "en_US-ryan-medium@0.94"), name), path));
+            if (seconds == null || !Cfg.Atis || !On("atc")) continue;
             var sw = Stopwatch.StartNew();
-            Transmit(a.Mp3, freq, name + "ATIS", side: side);
-            var rest = a.Sec - sw.Elapsed.TotalSeconds;
+            Transmit(radio.Mp3, freq, name + "ATIS", side: side);
+            var rest = seconds.Value - sw.Elapsed.TotalSeconds;
             if (rest > 0) Thread.Sleep(TimeSpan.FromSeconds(rest));
         }
     }
 
+    // Each frequency owns its working files until Transmit returns. Multiple frequencies share the completed bulletin.
+    sealed class AtisRadio(string dir, double freq)
+    {
+        public string Mp3 { get; } = Path.Combine(dir, "atis-radio-" + freq.ToString("R", CultureInfo.InvariantCulture) + ".mp3");
+        AtisBulletin? onDisk;
+
+        public double? Prepare(string name, AtisBulletin bulletin, Func<string, string, double> render)
+        {
+            if (bulletin.Text.Length == 0) return null;
+            double seconds;
+            try
+            {
+                lock (bulletin)
+                {
+                    if (bulletin.Audio is { } cached)
+                    {
+                        if (onDisk != bulletin || !File.Exists(Mp3))
+                        {
+                            onDisk = null;
+                            File.WriteAllBytes(Mp3, cached.Mp3);
+                        }
+                        seconds = cached.Seconds;
+                    }
+                    else
+                    {
+                        onDisk = null;
+                        File.Delete(Mp3);
+                        File.Delete(Path.ChangeExtension(Mp3, ".wav"));
+                        seconds = render(bulletin.Text, Mp3);
+                        if (!(seconds > 0)) return null;
+                        var bytes = File.ReadAllBytes(Mp3);
+                        if (bytes.Length == 0) return null;
+                        bulletin.Audio = (bytes, seconds);
+                    }
+                    onDisk = bulletin;
+                }
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                Trace("FEHLER", $"ATIS {name}: {e.Message}");
+                return null;
+            }
+            lock (TowerLock) return Atis.GetValueOrDefault(name)?.Bulletin == bulletin ? seconds : null;
+        }
+    }
 }

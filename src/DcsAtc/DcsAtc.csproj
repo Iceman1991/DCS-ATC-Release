@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
+    <None Include="..\..\airfields.txt" Link="airfields.txt" CopyToOutputDirectory="PreserveNewest" />
     <EmbeddedResource Include="..\..\charts\caucasus.jsonc" LogicalName="caucasus.jsonc" />
   </ItemGroup>
 

@@ -1,7 +1,7 @@
 ﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe und (ISCC /DSmall) dist\DCS-ATC-Update-Setup.exe
 ; Small: update setup without the big files (models, tools) for the update from the app; only over an existing installation.
 ; installer\manifest.ps1 reads the big files from the block "#ifndef Small" in [Files].
-#define AppVer "0.23.16-alpha"
+#define AppVer "0.23.17-alpha"
 #define Src ".."
 
 [Setup]
@@ -251,10 +251,11 @@ begin
   Result := not ServerOnly;
 end;
 
-{ Update: untick modules missing in modules.txt (the settings window may have changed them since the last setup; Inno only remembers its own choice) }
-procedure Untick(S, Id: String);
+{ Settings may have changed a module in either direction since the previous setup. }
+procedure RestoreModule(S, Id: String);
 begin
-  if Pos(',' + Id + ',', S) = 0 then begin
+  if Pos(',' + Id + ',', S) > 0 then WizardSelectComponents(Id)
+  else begin
     WizardSelectComponents('!' + Id);
     WizardForm.TypesCombo.ItemIndex := 1;   { custom }
   end;
@@ -264,13 +265,18 @@ end;
 procedure CurPageChanged(CurPageID: Integer);
 var S: AnsiString;
 begin
-  if (CurPageID = wpSelectComponents) and not CompSet and not WizardSilent then begin
+  if (CurPageID = wpSelectComponents) and not CompSet then begin
     CompSet := True;
-    if LoadStringFromFile(ExpandConstant('{app}\modules.txt'), S) then begin
+    if (ExpandConstant('{param:COMPONENTS|unset}') = 'unset') and
+       (ExpandConstant('{param:TYPE|unset}') = 'unset') and
+       (ExpandConstant('{param:LOADINF|unset}') = 'unset') and
+       LoadStringFromFile(ExpandConstant('{app}\modules.txt'), S) then begin
       S := ',' + Lowercase(Trim(S)) + ',';
-      Untick(S, 'atc'); Untick(S, 'range'); Untick(S, 'awacs'); Untick(S, 'tanker'); Untick(S, 'carrier'); Untick(S, 'ai'); Untick(S, 'crew');
-      if Pos(',m2,', S) > 0 then Untick(S, 'jtac');   { m2: list written by 0.12.1+, knows jtac (an older list lacks it because it did not exist) }
-      if Pos(',m3,', S) > 0 then Untick(S, 'center');   { m3: list written with Center }
+      { A list from before a module was introduced inherits its initial enabled default. }
+      if Pos(',m2,', S) = 0 then S := S + 'jtac,';
+      if Pos(',m3,', S) = 0 then S := S + 'center,';
+      RestoreModule(S, 'atc'); RestoreModule(S, 'range'); RestoreModule(S, 'awacs'); RestoreModule(S, 'tanker');
+      RestoreModule(S, 'carrier'); RestoreModule(S, 'ai'); RestoreModule(S, 'crew'); RestoreModule(S, 'jtac'); RestoreModule(S, 'center');
     end;
   end;
   if (CurPageID = wpSelectTasks) and not TaskSet then begin

@@ -164,7 +164,7 @@ static partial class Program
         {
             Log($"[ATC] Spieler {Pilots[k].Name} weg");
             Pilots[k].Ops.Leave();   // Range free again; before the debriefing, a pass without "off" is still in it then (R58)
-            if (Pilots[k].Ops.Debrief.Count > 0) DebriefTx(Pilots[k], true);
+            if (Pilots[k].Airborne != null || Pilots[k].Ops.Debrief.Count > 0) DebriefTx(Pilots[k], true);
             Pilots[k].Boat.Leave();
             Pilots.Remove(k);
         }

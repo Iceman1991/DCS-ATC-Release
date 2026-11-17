@@ -14,10 +14,8 @@ body:
     id: map
     attributes:
       label: Map
-      description: The DCS map you were flying on.
+      description: For a problem during a flight, enter the DCS map you were flying on.
       placeholder: e.g. Caucasus, Nevada, Syria
-    validations:
-      required: true
 
   - type: input
     id: aircraft
@@ -36,6 +34,7 @@ body:
         - Multiplayer, I host
         - Multiplayer, client
         - Dedicated server
+        - Installation or startup
 
   - type: dropdown
     id: vr
@@ -70,7 +69,5 @@ body:
   - type: textarea
     id: logs
     attributes:
-      label: Logs
-      description: 'Attach the zip from the settings window button "Create diagnostics zip ...", or drag atc-log.txt and atc-debug.txt from the DCS-ATC folder into this box. The atc-debug.txt file only exists when the debug log is switched on in the settings. If you use your own procedures, attach your charts*.jsonc too.'
-    validations:
-      required: true
+      label: Installation report or logs
+      description: 'For installation problems, attach the text file from Advanced → Diagnostics → Create installation report. For a problem during a flight, Create diagnostics zip collects logs and configuration. Logs can contain callsigns and radio transcripts. Review the files and attach only what you want to share publicly.'

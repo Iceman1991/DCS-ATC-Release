@@ -2,7 +2,7 @@
 rem Builds dist\DCS-ATC-Setup.exe (everything), dist\DCS-ATC-Update-Setup.exe (without models and tools, for the update from the app)
 rem and dist\manifest.json (the files the small setup leaves out): self-contained app (no .NET prerequisite), bundles ffmpeg from PATH, Inno Setup.
 cd /d "%~dp0.."
-call tests\alle.cmd || (echo Tests fehlgeschlagen, kein Installer & exit /b 1)
+call tests\alle.cmd --require-lua || (echo Tests unvollstaendig oder fehlgeschlagen, kein Installer & exit /b 1)
 dotnet publish src\DcsAtc -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o tmp\sc || exit /b 1
 if not exist tmp\ffmpeg mkdir tmp\ffmpeg
 for %%f in (ffmpeg.exe) do copy /y "%%~$PATH:f" tmp\ffmpeg\ >nul || (echo ffmpeg nicht im PATH & exit /b 1)

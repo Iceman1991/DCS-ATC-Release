@@ -56,6 +56,34 @@ static partial class Program
             File.Delete(scrubF);
             File.WriteAllText(Path.Combine(dd, "config.jsonc"), "{ \"Volume\": 0.6, \"AsrApiKey\": \"sk-geheim-123\", \"AsrApiModel\": \"whisper-1\" }");
             File.WriteAllText(Path.Combine(dd, "charts", "charts-x.jsonc"), "{}");
+            Directory.CreateDirectory(Path.Combine(dd, "models"));
+            File.WriteAllText(Path.Combine(dd, "models", "ggml-small.en.bin"), "private model contents");
+            var report = Settings.InstallationReport(dd);
+            if (!report.Contains("ggml-small.en.bin: " + L("vorhanden", "present")) ||
+                !report.Contains("piper.exe: " + L("fehlt", "missing")) ||
+                report.Contains(dd) || report.Contains("private model contents") || report.Contains("sk-geheim") || report.Contains("sk-secret"))
+                throw new Exception("Installationsbericht: Dateistatus oder Datenschutz");
+            var sample = Path.Combine(dd, "level.wav");
+            using (var level = new WaveFileWriter(sample, new WaveFormat(16000, 16, 1)))
+                level.Write(new byte[] { 0, 128, 0, 0 }, 0, 4);
+            if (Math.Abs(RadioCheckLevel(sample)) > 0.001) throw new Exception("Funk-Selbsttest: PCM-Spitzenpegel");
+            using (var silent = new WaveFileWriter(sample, new WaveFormat(16000, 16, 1)))
+                silent.Write(new byte[64], 0, 64);
+            var stages = new List<string>();
+            if (RadioSelfTest(dd, -1, sample, dd, "random", false, stages.Add, CancellationToken.None).GetAwaiter().GetResult() ||
+                stages.Count != 4 || !stages[1].Contains(L("übersprungen", "skipped")) ||
+                !stages[2].Contains(L("Fehler", "Failed")) || !stages[3].StartsWith("SRS:"))
+                throw new Exception("Funk-Selbsttest: Folgeprüfungen nach stummem Eingang: " + string.Join(" | ", stages));
+            File.Delete(sample);
+            var checkFolder = Directory.CreateDirectory(Path.Combine(dd, "radio-check")).FullName;
+            var checkFile = Path.Combine(checkFolder, "config.jsonc");
+            File.WriteAllText(checkFile, "{ /* test */ \"SrsPath\":\"custom\", \"AsrGpu\":false, \"Voices\":{\"Tower\":\"sample\"}, }");
+            var selected = RadioCheckConfig(checkFolder, stages.Add);
+            if (selected.SrsPath != "custom" || selected.AsrGpu || selected.Voices["Tower"] != "sample" || stages.Count != 4)
+                throw new Exception("Funk-Selbsttest: gespeicherte Einstellungen nicht übernommen");
+            File.WriteAllText(checkFile, "{broken");
+            RadioCheckConfig(checkFolder, stages.Add);
+            if (stages.Count != 5 || File.ReadAllText(checkFile) != "{broken") throw new Exception("Funk-Selbsttest: defekte Konfiguration");
             var ms = new MemoryStream();
             Settings.CollectDiagnostics(dd, ms);
             var names = new System.IO.Compression.ZipArchive(new MemoryStream(ms.ToArray())).Entries.Select(e => e.FullName).OrderBy(n => n).ToArray();
@@ -77,6 +105,18 @@ static partial class Program
             Cfg.RunwayLights = "silent";
             cfgFile = live; ReloadLive();
             if (Cfg.RunwayLights != "off") throw new Exception("Einstellungen: RunwayLights nach ReloadLive " + Cfg.RunwayLights);
+            var active = Cfg;
+            const string invalid = "{\n  \"RunwayLights\": ]\n}";
+            File.WriteAllText(live, invalid);
+            var error = LoadConfig();
+            if (error == null || !error.Contains(live) || !error.Contains(L("Zeile 2", "line 2")))
+                throw new Exception("Einstellungen: ungültige Konfiguration ohne Pfad und Zeile");
+            ReloadLive();
+            if (Cfg != active || Cfg.RunwayLights != "off" || File.ReadAllText(live) != invalid)
+                throw new Exception("Einstellungen: fehlerhafter Reload hat aktive Einstellungen oder die Datei verändert");
+            File.WriteAllText(live, "{ \"RunwayLights\": \"dcs\" }");
+            ReloadLive();
+            if (Cfg.RunwayLights != "dcs") throw new Exception("Einstellungen: korrigierte Datei blieb wirkungslos");
         }
         finally { cfgFile = null; File.Delete(live); LoadConfig(); Cfg = kept; }
         Console.WriteLine("OK   Einstellungen: RunwayLights \"off\" gilt nach ReloadLive sofort (R392)");
@@ -256,11 +296,66 @@ static partial class Program
         Console.WriteLine("OK   #15: Lat/Lon auf jeder Karte aus dem Raster, GCI-Sektor mit Name und Frequenz wie das AWACS, kein Center");
     }
 
+    static void DebriefArchiveTest()
+    {
+        var root = Directory.CreateTempSubdirectory("DcsAtc-Debrief-").FullName;
+        var dir = Path.Combine(root, "debrief");
+        var backup = Path.Combine(root, "pending");
+        var archive = new DebriefArchive(root, backup);
+        var end = new DateTime(2026, 1, 2, 12, 34, 0);
+        var oldLog = SimLog;
+        try
+        {
+            SimLog = new();
+            // Concurrent flights can have the same sanitized callsign and minute. Keep both, even if their text matches.
+            Parallel.Invoke(() => archive.Save(end, "A B", "one"), () => archive.Save(end, "AB", "two"));
+            var normal = Path.Combine(dir, "2026-01-02_1234_AB");
+            if (!new[] { File.ReadAllText(normal + ".txt"), File.ReadAllText(normal + "-2.txt") }.Order().SequenceEqual(new[] { "one", "two" }))
+                throw new Exception("Debriefing: Namenskollision");
+            Directory.Move(dir, dir + "-previous");
+            File.WriteAllText(dir, "blocked");
+            var pilot = new Pilot { Callsign = "AZ", Name = "Test", Type = "Trainer", Airborne = Clock.AddMinutes(-10) };
+            pilot.Ops.Debrief.Add("archived marker");
+            var notice = DebriefTx(pilot, true, archive).Text;
+            if (!notice.Contains(L("zwischengespeichert", "queued")) || pilot.Airborne != null || pilot.Ops.Debrief.Count != 0 || SimLog.Count == 0)
+                throw new Exception("Debriefing: fehlende Rückmeldung oder Flug nicht abgeschlossen");
+            var pending = Directory.GetFiles(backup, "*.pending").Single();
+            string report = File.ReadAllText(pending), ledger = File.ReadAllText(Path.Combine(root, "logbook.json"));
+            using var book = JsonDocument.Parse(ledger);
+            if (!report.Contains("archived marker") || book.RootElement.GetProperty("Test").GetProperty("Flights").GetInt32() != 1)
+                throw new Exception("Debriefing: Bericht oder Logbuch fehlt");
+            var restarted = new DebriefArchive(root, backup);
+            if (restarted.Retry() != 0 || !File.Exists(pending)) throw new Exception("Debriefing: Wartedatei verloren");
+            File.Delete(dir);
+            if (restarted.Retry() != 1 || File.ReadAllText(Directory.GetFiles(dir).Single()) != report || File.Exists(pending))
+                throw new Exception("Debriefing: Wiederherstellung nach Neustart");
+            File.WriteAllText(pending, report);   // interruption after publish but before deleting the pending copy
+            restarted.Retry();
+            if (File.Exists(pending) || Directory.GetFiles(dir, "*.txt").Length != 1 || File.ReadAllText(Path.Combine(root, "logbook.json")) != ledger)
+                throw new Exception("Debriefing: Bericht oder Flug doppelt gezählt");
+
+            Directory.Move(dir, dir + "-recovered");
+            File.WriteAllText(dir, "blocked");
+            Directory.Delete(backup);
+            File.WriteAllText(backup, "blocked");
+            if (archive.Save(end, "A", "in memory")?.Contains(L("Arbeitsspeicher", "in memory")) != true)
+                throw new Exception("Debriefing: kein Hinweis auf fehlende Speicherung");
+            File.Delete(backup);
+            archive.Retry();   // recovery storage comes back before the normal output directory
+            File.Delete(dir);
+            if (new DebriefArchive(root, backup).Retry() != 1 || File.ReadAllText(Directory.GetFiles(dir).Single()) != "in memory")
+                throw new Exception("Debriefing: Bericht aus dem Arbeitsspeicher verloren");
+        }
+        finally { SimLog = oldLog; Directory.Delete(root, true); }
+        Console.WriteLine("OK   Debriefing: Kollision, Schreibfehler, Neustart und Wiederholung ohne doppelten Flug");
+    }
+
     /// Self-test: airfield frequencies from Radio.lua (only if DCS is installed).
     static void RadioTest()
     {
         Kneeboard.SelfTest();
         Logbook.SelfTest();
+        DebriefArchiveTest();
         Checkride.SelfTest();
         Csar.SelfTest();
         Lagebild.SelfTest();
@@ -342,7 +437,7 @@ static partial class Program
     static void ChartTest()
     {
         var file = Path.Combine(Root, "airfields.txt");
-        if (!File.Exists(file)) { Console.WriteLine("--   ChartTest: airfields.txt fehlt"); return; }
+        if (!File.Exists(file)) throw new FileNotFoundException("ChartTest: airfields.txt fehlt", file);
         var all = Airfield.Load(file);
         var err = new List<string>();
         var hints = new List<string>();

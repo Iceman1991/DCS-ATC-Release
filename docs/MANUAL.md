@@ -805,6 +805,8 @@ Over SRS, DCS-ATC listens on the frequencies of your current airfield and of the
 
 The ATIS broadcasts continuously for every airfield that has a player within 40 NM. If several airfields share an ATIS frequency, they take turns. The weather comes from the mission.
 
+If the bulletin changes while its audio is being generated, the continuous broadcast discards the outdated recording. This also applies when the information letter stays the same. Multiple ATIS frequencies at one airfield can broadcast the same current bulletin.
+
 > **ATIS:** Kutaisi information Alpha, time zero eight zero zero Zulu. Runway two five in use, left hand pattern, 2000 feet. Wind two four zero degrees, eight knots. Visibility one zero kilometers or more, sky clear. Temperature one five. QNH one zero one three, altimeter two niner niner two. Tower one three four decimal zero, UHF two six three decimal zero. Advise on initial contact you have information Alpha.
 
 - **Clouds** are given as the cloud base above the airfield ("clouds 2500 feet"). **Wind** is magnetic, and "wind calm" below 3 kt.
@@ -1421,6 +1423,8 @@ The debriefing collects:
 - range, tanker, carrier and AWACS entries
 
 When you park after a flight, it is shown automatically and saved to `%LOCALAPPDATA%\Programs\DCS-ATC\debrief\<date>_<time>_<callsign>.txt`. You can open it at any time with wheel or F10 **General → Debriefing**.
+
+If the name is already taken, the next report ends in `-2.txt`, then `-3.txt`. If the destination is locked, DCS-ATC keeps the completed report in `%LOCALAPPDATA%\DCS-ATC\pending-debriefs`. The running app retries the export every 30 seconds, including after a restart. The flight counts once in the logbook. If the app reports that the debriefing is held in memory, restore write access before closing it.
 
 **Deviation types:** takeoff without clearance; runway entered without clearance; landing without clearance; landing after go-around; airspace violation; runway crossed without clearance; removed from the sequence; taxi without clearance; approach without contact; no landing report; go-around without report; no check-in with departure (IFR); no check-in with approach after missed approach; no report "leaving the control zone"; no report "clear of the zone". Carrier, tanker and range add their own (approach time passed without "commencing", contact or approach to a tanker without clearance, no "off" call on the range).
 
@@ -2911,6 +2915,8 @@ Pick the page on the left: General, Voices, Radio & traffic, AWACS, Frequencies,
 | **Watch airspace (control zones, deviations, debriefing)** | on/off | `AirspaceWatch` |
 | **Debug log for bug reports (atc-debug.txt)** | on/off | `DebugLog` |
 | **Create diagnostics zip …** | button | writes `DCS-ATC-diagnostics-<date>-<time>.zip` to the desktop (see bug reports below) |
+| **Create installation report …** | button | Writes a text file with the DCS-ATC version, Windows version, time and the installation status of the bundled speech components. |
+| **Start radio self-test** | button | Checks microphone level, local speech recognition, speech synthesis and the local SRS port. |
 | **Runway lights (at night)** | silent / with DCS controller (audible) / off. Takes effect the next time DCS-ATC starts. | `RunwayLights` |
 | **Altimeter setting** | automatic (by aircraft type) / hPa (QNH) / inHg (altimeter) | `AltimeterUnit` |
 | **Radio wheel in game (VR)** | text automatic (when DCS is in VR mode) / text always / off / wheel as a picture (test) | `WheelInGame` |
@@ -3070,7 +3076,15 @@ All logs are in `%LOCALAPPDATA%\Programs\DCS-ATC`:
 | `atc-debug.txt` | Detailed log for bug reports: speech recognition, airfield choice, flight phases, aircraft data every 10 s. Written only when `DebugLog` is on. At 20 MB it is moved to `atc-debug.old.txt`, so it uses at most 2 × 20 MB. |
 | `crash-log.txt` | Error details if DCS-ATC crashes. DCS-ATC then restarts itself, unless it crashed within its first minute. |
 
-When you report a bug, include the time, the airfield, a short description, `atc-log.txt` and `atc-debug.txt`. For a problem with vectors or the way to the runway also add `airfields.txt` from the DCS-ATC folder, the files `DcsAtc-Terrain-*.txt` from `%TEMP%` and your `charts.jsonc`: with them the flight from your log can be played again through the current version (`DcsAtc.exe --replay atc-debug.txt`, the files next to the log; it lists the controller calls of the log next to the ones the current version makes).
+For an installation issue, choose **Advanced → Diagnostics → Create installation report …**. It checks whether Whisper, its model, Piper and the bundled FFmpeg are present. The text file also records the DCS-ATC version, Windows version and time.
+
+If the radio stays silent, choose **Advanced → Diagnostics → Start radio self-test**. Say “Radio check” into the selected microphone during the four-second recording. The results show the peak input level and the words that local Whisper recognized. Piper and FFmpeg encode the test reply as an MP3 without playing it. The last step checks for SRS ExternalAudio and an open local TCP port. You can run the test before starting a mission. It sends no radio traffic or audio to a remote speech service.
+
+To repeat the test with a file, use a WAV recording of “Radio check” (16 kHz, mono PCM16, up to 30 seconds). From the DCS-ATC folder, run `.\DcsAtc.exe --radio-selftest "C:\path\radio-check.wav"` to see the results in the terminal.
+
+If the settings window cannot open, start PowerShell in the DCS-ATC application folder. `.\DcsAtc.exe --installation-report` prints the same report even if `config.jsonc` is invalid.
+
+For a problem during a flight, include the time, the airfield, a short description and relevant excerpts from `atc-log.txt` and `atc-debug.txt`. For a problem with vectors or the way to the runway also add `airfields.txt` from the DCS-ATC folder, the files `DcsAtc-Terrain-*.txt` from `%TEMP%` and your `charts.jsonc`: with them the flight from your log can be played again through the current version (`DcsAtc.exe --replay atc-debug.txt`, the files next to the log; it lists the controller calls of the log next to the ones the current version makes).
 
 Easier: under Advanced, Diagnostics, **Create diagnostics zip …** puts everything into one zip file on the desktop and shows it in Explorer: `atc-log.txt`, `atc-debug.txt`, `config.jsonc`, `frequencies.jsonc`, `modules.txt`, every `charts*.jsonc` (also from `charts\`) and `info.txt` with the version, Windows and the time. The API key (`AsrApiKey`) is removed from the copy; the file on disk stays unchanged. The logs contain callsigns and what was said on the radio, so check the zip before you pass it on. If a log is larger than 20 MB, only its end is included. The debug log no longer contains the API key either; older logs are cleaned at the next start. If you posted an `atc-debug.txt` while a key was set, replace that key.
 
