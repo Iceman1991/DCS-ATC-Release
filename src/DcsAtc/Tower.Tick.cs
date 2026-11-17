@@ -432,6 +432,7 @@ public partial class Tower
         if (!ground && nav is { } goal)
         {
             double d = Dist(t.X, t.Z, goal.X, goal.Z);
+            const double FixLeadSec = 20;   // #36: reply pause + speaking the sentence + turn anticipation; lead = ground speed * this, 1.5..4 NM (250 kt 1.5, 350 kt 1.9, 450 kt 2.5 NM); arrival and departure routes
             // K21: knee point reached (Wp in the chart): now toward the initial/overhead
             if (kneeTo is { } kn && navName == "the turning point" && Phase == Phase.Entering && d < 0.7 * NM)
             {
@@ -442,7 +443,6 @@ public partial class Tower
             if (Rt is { } rt && routeAt < rt.Pts.Length && navName == CrpSay(rt.Pts[routeAt].Fix))
             {
                 var nx = routeAt + 1 < rt.Pts.Length ? (rt.Pts[routeAt + 1].X, rt.Pts[routeAt + 1].Z) : Crp[rt.To];
-                const double FixLeadSec = 20;   // #36: reply pause + speaking the sentence + turn anticipation; lead = ground speed * this, 1.5..4 NM (250 kt 1.5, 350 kt 1.9, 450 kt 2.5 NM)
                 if (d < Math.Clamp(Gs(t) * FixLeadSec, 1.5 * NM, 4 * NM) || Dist(t.X, t.Z, nx.Item1, nx.Item2) < Dist(goal.X, goal.Z, nx.Item1, nx.Item2))
                 {
                     (nav, navName, lastVector) = (nx, ++routeAt < rt.Pts.Length ? CrpSay(rt.Pts[routeAt].Fix) : CrpSay(rt.To), now - 46);   // 46: the heading check below (45 s) fires on the next tick if the course changes by more than 30 degrees
@@ -452,11 +452,11 @@ public partial class Tower
             }
             // charts.jsonc departure: the same from fix to fix, after the last fix own navigation (nav null, no more headings)
             if (DRt is { } dp && depAt < dp.Pts.Length && navName == CrpSay(dp.Pts[depAt].Fix) &&
-                (d < 1.5 * NM || depAt + 1 < dp.Pts.Length && Dist(t.X, t.Z, dp.Pts[depAt + 1].X, dp.Pts[depAt + 1].Z) < Dist(goal.X, goal.Z, dp.Pts[depAt + 1].X, dp.Pts[depAt + 1].Z)))
+                (d < Math.Clamp(Gs(t) * FixLeadSec, 1.5 * NM, depAt + 1 < dp.Pts.Length ? 4 * NM : 1.5 * NM) || depAt + 1 < dp.Pts.Length && Dist(t.X, t.Z, dp.Pts[depAt + 1].X, dp.Pts[depAt + 1].Z) < Dist(goal.X, goal.Z, dp.Pts[depAt + 1].X, dp.Pts[depAt + 1].Z)))
             {
                 if (++depAt < dp.Pts.Length) (nav, navName) = ((dp.Pts[depAt].X, dp.Pts[depAt].Z), CrpSay(dp.Pts[depAt].Fix));
                 else (nav, depRoute) = (null, null);
-                lastVector = now;
+                lastVector = now - 46;   // #49: as on the arrival route, the heading check (45 s) fires on the next tick if the course changes by more than 30 degrees
                 return new();
             }
             bool crpLeg = !holding && entry != null && Rt == null && (Phase == Phase.Inbound || Phase == Phase.Entering && navName == CrpSay(entry!));
@@ -625,7 +625,7 @@ public partial class Tower
             // afterwards 60 s quiet on final: otherwise per tick again "go around" or in the climb right away "continue approach"/"cleared to land"
             bool gaQuiet = now - lastGa < 60;
             // #44: on the way to the overhead at pattern altitude along the runway axis: no approach yet, the "overhead" call comes first (below pattern altitude it is one)
-            bool toOvh = Phase == Phase.Entering && navName == "overhead" && IndFt(t) >= PatternFt - 300;
+            bool toOvh = (Phase == Phase.Entering && navName == "overhead" || Phase == Phase.Pattern) && IndFt(t) >= PatternFt - 300;   // #49: Pattern too: right after the "overhead" call (join) it still flies along the final at pattern altitude
             if (!gaQuiet && !unannounced && !toOvh && (onRwy || !Emergency && EmgWithin(4)) && along < 0.8 * NM && (Phase != Phase.Initial || t.Agl < 150) && OnFinal(t.X, t.Z, t.Hdg, t.Agl, rw, 3 * NM))
             {
                 lastGa = now;
@@ -882,7 +882,7 @@ public partial class Tower
             if (stoppedSince < 0 || holdFor != null) stoppedSince = now;
             // #23 (log 12.11.): with a parking spot assigned by Ground only near that one; 30 s standing beside the runway near another spot (reading back the taxi clearance)
             // counted as parked, the flight was closed and the next readback taken as a taxi request for departure. Engine off at any stand still parks (EngineOff).
-            else if (now - stoppedSince > 30 && (taxiInTold && spot is { } own ? !OnRunwayPos(t.X, t.Z) && Dist(t.X, t.Z, own.X, own.Z) < 100 : AtSpot(t, 100))) Park();
+            else if (now - stoppedSince > 30 && (taxiInTold && spot is { } own ? !OnRunwayPos(t.X, t.Z) && Dist(t.X, t.Z, own.X, own.Z) < 100 : AtSpot(t, 100) && !OnRunwayPos(t.X, t.Z, 150))) Park();   // #49: without taxi-in clearance not on a taxiway beside the runway (a spot within 100 m is no stand yet)
         }
         else stoppedSince = -1;
 

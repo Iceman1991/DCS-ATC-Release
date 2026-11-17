@@ -136,7 +136,7 @@ sealed class Wheel : Form
     public static Func<bool> Jtac = () => true;   // J11: own side has a living JTAC / FAC(A), Program sets it (fellow players, preview: yes)
     public static Func<bool> Cv = () => true;   // the mission has a carrier, Program sets it (fellow players: the host has the mission, preview: yes)
     public static Func<bool> Cen = () => true;   // the map has a Center for the own side (module on), Program sets it (fellow players, preview: yes)
-    public static Func<string[]> Jtacs = Array.Empty<string>;   // callsigns of the own JTAC / FAC(A), Program sets it; with two or more "Check in" asks which one
+    public static Func<(string Cs, double Freq)[]> Jtacs = Array.Empty<(string, double)>;   // callsigns of the own JTAC / FAC(A), Program sets it; with two or more "Check in" asks which one
     /// R307: does this radio call fit right now (Program.WheelFits: phase, open question, traffic advisory, Range/Tanker/Carrier)? Fellow players/preview: no state, everything.
     public static Func<Func<string, bool>> Fits = () => _ => true;
     /// R307: visible with text if it fits; submenu if one in it fits; with neither (Platz wählen) always. At most 9 (keys 1–9); if nothing fits, everything.
@@ -162,10 +162,10 @@ sealed class Wheel : Form
         int? lb = null;   // switch on, device silent at first, a dropout in between: no press; released and pressed again: one press
         var ed = new int?[] { null, b32, null, b32, 0, b32, b32 }.Select(r => Edge(ref lb, r, b32)).ToArray();
         check(ed.SequenceEqual(new[] { false, false, false, false, false, true, false }), "#25 Funkrad: ausgefallene Joystick-Abfrage zählt nicht als losgelassen: " + string.Join(",", ed));
-        var oj = Jtacs; Jtacs = () => new[] { "Axeman 1-1", "Pontiac 1-1" };
+        var oj = Jtacs; Jtacs = () => new[] { ("Axeman 1-1", 133.5), ("Pontiac 1-1", 135.4) };
         var jp = JtacPick(new("Check in", "JTAC: checking in"));
-        check(jp?.Length == 2 && jp[1].Text == "JTAC: Pontiac 1-1, checking in" && JtacPick(new("In", "JTAC: in")) == null, "Funkrad: zwei JTAC -> Check in fragt welcher");
-        Jtacs = () => new[] { "Axeman 1-1" }; check(JtacPick(new("Check in", "JTAC: checking in")) == null, "Funkrad: ein JTAC -> Check in direkt"); Jtacs = oj;
+        check(jp?.Length == 2 && jp[1].Text == "JTAC: Pontiac 1-1, checking in" && jp[1].Label == "Pontiac 1-1 135.4" && jp[0].Label == "Axeman 1-1 133.5" && JtacPick(new("In", "JTAC: in")) == null, "Funkrad: zwei JTAC -> Check in fragt welcher, Name + Frequenz -> " + jp?[1].Label);
+        Jtacs = () => new[] { ("Axeman 1-1", 133.5) }; check(JtacPick(new("Check in", "JTAC: checking in")) == null, "Funkrad: ein JTAC -> Check in direkt"); Jtacs = oj;
         // R307: without state (fellow players, preview) everything as before: Approach the first 9, without Say again/Request higher
         var apC = string.Join(",", Vis(All.First(i => i.Label == "Approach").Sub!, _ => true).Select(i => i.Label));
         check(apC == $"{L("Airborne (nach Start)", "Airborne (after takeoff)")},Inbound for landing,Inbound, pattern work,Request ILS / straight in,Flight following,{L("Abmelden (cancel approach)", "Cancel approach")},{L("Verkehr", "Traffic")},C R P,{L("Fahrt melden", "Report airspeed")}",
@@ -432,7 +432,7 @@ sealed class Wheel : Form
         $"DCS-ATC – {title}\n" + string.Join("\n", Slots().Select(s => $"{(s.Mark ? "> " : "   ")}{s.Num} {s.Label}{(s.Freq != null ? "  " + s.Freq : "")}"));
 
     /// Two or more own JTAC / FAC(A): "Check in" lists them, the callsign in the call picks one (later calls stay with it).
-    internal static Item[]? JtacPick(Item it) => it.Text == "JTAC: checking in" && Jtacs() is { Length: > 1 } js ? js.Select(c => new Item(c, $"JTAC: {c}, checking in")).ToArray() : null;
+    internal static Item[]? JtacPick(Item it) => it.Text == "JTAC: checking in" && Jtacs() is { Length: > 1 } js ? js.Select(c => new Item($"{c.Cs} {c.Freq.ToString("0.0##", System.Globalization.CultureInfo.InvariantCulture)}", $"JTAC: {c.Cs}, checking in")).ToArray() : null;
 
     void Choose(int i)
     {

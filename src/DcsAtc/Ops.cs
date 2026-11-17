@@ -601,15 +601,17 @@ partial class Ops
             return new() { A($"{c}, {awName}, {sig}, {ef.Name.Replace('-', ' ')} bears {Brg(Bearing(t!.X, t.Z, ef.X, ef.Z))}, {Miles(Dist(t.X, t.Z, ef.X, ef.Z))}, " +
                              $"contact {ef.StationOf("Approach")} {FreqSay(ef.FreqsOf("Approach") is { } af ? af.FirstOrDefault(x => x >= 200, af[0]) : Freqs.GetValueOrDefault("Approach", 266.5))}.") };
         }
-        if (Has(n, "check out", "checking out"))
+        bool toTanker = last?.Contains("nearest tanker") == true && Has(n, "pushing", "switching", "frequency change", "contacting");   // i49 (log): after the tanker vector, the switch to the tanker is the frequency change, not a new request
+        if (toTanker || Has(n, "check out", "checking out"))
         {
             awacsIn = onStation = false; awId = -1; Abm.Release(side, Flight(me));   // no more calls by itself; LK9: no longer planned
             var home = t == null ? null : fields.Where(f => f.Side == 0 || f.Side == me.Coalition).MinBy(f => Dist(t.X, t.Z, f.X, f.Z));
-            if (home != null && Dist(t!.X, t.Z, home.X, home.Z) > 60 * NM && CenterFor(me.Coalition, t.X, t.Z) is { } cn)   // A6: home farther than 60 NM -> the Center takes over
+            if (!toTanker && home != null && Dist(t!.X, t.Z, home.X, home.Z) > 60 * NM && CenterFor(me.Coalition, t.X, t.Z) is { } cn)   // A6: home farther than 60 NM -> the Center takes over
                 return new() { A($"{c}, {awName}, copy checking out, contact {cn.Name} {FreqSay(cn.Freq)}.") };
             return new() { A($"{c}, {awName}, copy checking out, {OneOf("good day", "good luck")}.") };
         }
         if (t != null && OnGround(t)) { awacsIn = wasIn; return new() { A($"{c}, {awName}, check in airborne.") }; }   // R51: no radar contact on the ground (parked deletes the check-in via TickLive anyway)
+        if (Regex.IsMatch(n, @"\b(?:leaving|climbing|descending|level|passing|maintaining) (?:angels|flight level)\b")) return new() { A($"{c}, {awName}, copy.") };   // i49 (log): altitude report is no request, "leaving angels 15" no check-out
         if (Has(n, "unable"))   // LD14 (ATP 1-02.1 UNABLE): tasking declined -> Abm gives the group to the next flight; winchester/bingo: no longer planned
         {
             ask = null; Abm.Unable(side, Flight(me), now);
@@ -1185,8 +1187,7 @@ partial class Ops
         bool far = dTk > 2 * NM;
         List<Call> Join(string neg)   // "cleared to join, left observation" (R287: before that without clearance "negative, not cleared pre-contact, ")
         {
-            if (tp != null && Along(tp, tk.A) > 0.5 * NM)   // TP5 (ATP-56(C)): join only from astern
-                return T($"{c}, {tk.Name}, negative, rejoin from astern, {Clock(tp, tk)}, report visual.");
+            var astern = tp != null && Along(tp, tk.A) > 0.5 * NM ? $" Rejoin from astern, {Clock(tp, tk)}." : "";   // TP5 (ATP-56(C)) / i49: ahead of the 3-9 line the join is cleared with the hint, the receiver sorts it out
             Menu = ("join", tk.A.Group);   // TP6: DCS "Intent to refuel" only now, not with the request
             dcsCleared = false;
             if (!l.Contains(this)) l.Add(this);
@@ -1194,7 +1195,7 @@ partial class Ops
             tank = 2; disc = false; afterFull = false;
             var ahead = l.Where(o => o.tank >= 2).ToList();   // Order after arrival (A65)
             var order = ahead.Count > 1 ? $" {ahead[0].cs} first, then {string.Join(", then ", ahead.Skip(1).Select(o => o.cs))}." : "";
-            return T($"{c}, {tk.Name}, {neg}cleared to join, left observation, number {Pos(l)}.{order}");
+            return T($"{c}, {tk.Name}, {neg}cleared to join, left observation, number {Pos(l)}.{order}{astern}");
         }
         if (Has(n, "pre contact", "precontact", "in position", "ready for contact", "stabilized", "ready to refuel") && !Has(n, "observation"))   // K1: "stabilized (left) observation" is the observation report
         {
@@ -2058,8 +2059,8 @@ partial class Ops
             var me15 = me with { Tel = me.Tel! with { Z = 15 * NM } };
             var j = oj.OnTranscript("Tanker", "Texaco, judy", me15, air, f, 0);
             int jv = Enumerable.Range(1, 300).Sum(s => oj.Tick(me15, air, s, false).Count);
-            check(q0.Contains("angels") && q0.EndsWith("knots.") && q1 == q0 && q2 == q0 && r2.Contains("continue, bearing") && a5.Contains("negative, rejoin from astern, Texaco one one 6 o'clock, 2 miles")
-                  && qp2.Contains("bearing") && !qp2.Contains("contact") && string.Join(",", tkq.Select(x => x[..2].Trim())) == "0,1,1,1,1,2M,2,2"
+            check(q0.Contains("angels") && q0.EndsWith("knots.") && q1 == q0 && q2 == q0 && r2.Contains("continue, bearing") && a5.Contains("cleared to join, left observation") && a5.EndsWith("Rejoin from astern, Texaco one one 6 o'clock, 2 miles.") && !a5.Contains("negative")
+                  && qp2.Contains("bearing") && !qp2.Contains("contact") && string.Join(",", tkq.Select(x => x[..2].Trim())) == "0,1,1,1,2M,2,2,2"
                   && j.Count == 1 && j[0].Text.EndsWith("roger, report visual.") && jv == 0 && oj.tank == 1,
                   $"Tanker TP1/TP2/TP5: Abfragen, zweiter Request, Join von vorn, judy -> {string.Join(" / ", tkq)} / {jv}");
             line.Clear();
@@ -2521,6 +2522,14 @@ partial class Ops
         K(c19, nr1, "Texaco, Enfield 1-1, request rejoin"); K(c19, nr1, "Texaco, Enfield 1-1, visual");
         var (n19, n19b, n19c) = (Rf(c19, me, true, 0.4, 10), Rf(c19, me, false, 0.5, 15), Rf(c19, me, true, 0.5, 20));
         var (ok19, ct19) = (K(c19, nr1, "Texaco, Enfield 1-1, pre contact"), Rf(c19, me, true, 0.5, 50));
+        {   // i49 log: altitude report to the AWACS -> copy (not "say again"); after the tanker vector "pushing/switching/frequency change" -> frequency change approved once, no second vector
+            string Aq(Ops o, string s) => string.Join(" | ", o.OnTranscript("AWACS", s, me, air, f, 0).Select(x => x.Text));
+            var oi49 = new Ops(); Aq(oi49, "Overlord, Enfield 1-1, check in");
+            var ar = new[] { "Overlord, Enfield 1-1, leaving angels 15, climbing angels 25", "Overlord leaving Nellis corridor, climbing angels 25", "Overlord, Enfield 1-1, leaving flight level 250", "Overlord, Enfield 1-1, level angels 25" }.Select(s => Aq(oi49, s)).ToList();
+            var fq = new[] { "Overlord, Enfield 1-1, pushing Texaco", "Overlord, Enfield 1-1, frequency change to Texaco", "Overlord, Enfield 1-1, switching" }.Select(s => { var oc = new Ops(); Aq(oc, "Overlord, Enfield 1-1, check in"); Aq(oc, "Overlord, Enfield 1-1, vector to tanker"); return Aq(oc, s); }).ToList();
+            check(ar.All(x => x.EndsWith("copy.")) && fq.All(x => x.Contains("copy checking out") && !x.Contains("contact")),
+                  $"AWACS i49: Hoehenmeldung -> copy, Frequenzwechsel nach Tankervektor -> freigegeben -> {string.Join(" | ", ar)} // {string.Join(" | ", fq)}");
+        }
         var aw240 = new Ops().OnTranscript("AWACS", "Overlord, Enfield 1-1, vector to tanker", me, air, f, 0)[0].Text;
         check(n19 is [{ Text: "Enfield one one, Texaco one one, you are not cleared contact, disconnect, return to pre-contact." }] && n19b.Count == 0 && n19c.Count == 0
               && c19.Debrief.Count(d => d.StartsWith("Verstoß: Kontakt an Texaco one one")) == 1 && c19.Debrief.Count == 1 && ok19.Contains("cleared contact") && ct19 is [{ Text: "Contact." }]

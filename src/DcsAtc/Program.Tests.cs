@@ -226,6 +226,36 @@ static partial class Program
             if (ms != "True/True/Pre-contact,False/False/-,True/True/Cleared contact,True//,False//,//,True//" || ta != "intent,precontact,none,intent,intent,none,precontact,precontact,none,none,none") throw new Exception($"Funkmenue-Stufe: {ms} | {ta}");
             Console.WriteLine("OK   Funkmenue-Stufe: Antwort mit drei Woertern (und alte mit einem) gelesen, Tanker-Taste je nach DCS-Dialogstufe (nur Ready pre-contact zur Stufe Pre-contact/Trail, nie Abort refuel)");
         }
+        {   // Forum (Killg0re NL): 9-line in the game text one item per line, role JTAC/FACA only
+            var nl = "Enfield one one, standby for 9-line. Line 1, IP Alpha. Line 4, elevation four niner zero zero feet. Line 5, one tank, stationary. Line 6, MGRS 38T LM 123 456. Remarks, final attack heading 270. Read back lines 4, 6 and restrictions";
+            string[] want = { "Enfield one one, standby for 9-line.", "Line 1, IP Alpha.", "Line 4, elevation four niner zero zero feet.", "Line 5, one tank, stationary.", "Line 6, MGRS 38T LM 123 456.", "Remarks, final attack heading 270.", "Read back lines 4, 6 and restrictions" };
+            var j = ShownText("JTAC", nl).Split('\n'); var fa = ShownText("FACA", nl).Split('\n');
+            var tw = "Runway clear. Line up, wait. Line 3 is busy"; var jc = "Enfield one one, Darknight, loud and clear";
+            if (!j.SequenceEqual(want) || !fa.SequenceEqual(want) || ShownText("Tower", tw) != tw || ShownText("JTAC", jc) != jc) throw new Exception($"9-Line Spieltext: {string.Join("<NL>", j)}");
+            if (RadioLabel("Kabul Ground", 284.25) != "Kabul Ground (284.25): " || RadioLabel("Kutaisi Tower", 265.0) != "Kutaisi Tower (265.0): ") throw new Exception($"Funkrad-Label rundet die Frequenz: {RadioLabel("Kabul Ground", 284.25)} | {RadioLabel("Kutaisi Tower", 265.0)}");
+            Console.WriteLine("OK   9-Line Spieltext: JTAC/FACA je Line/Remarks/Read back eine Zeile, andere Rollen und Texte ohne 9-Line unveraendert");
+        }
+        {   // jojo (Discord, F/A-18): easy comms retunes COM2 while the first intent goes out, the DCS tanker never answers: intent once more (not at refusal, never Ready at join)
+            var (ah0, ts0, tsl0) = (AiHook, TankerStage, TankerSleep);
+            try
+            {
+                int Run(string step, bool intent, params string?[] stages)
+                {
+                    var n = 0; var q = new Queue<string?>(stages); string? last = stages[^1];
+                    AiHook = l => { if (l.StartsWith("MENU;")) n++; };
+                    TankerSleep = _ => { };
+                    TankerStage = () => q.Count > 0 ? q.Dequeue() : last;
+                    var tp = new Pilot { Unit = "TK1", Gid = 1, Id = 1 };
+                    lock (TowerLock) tp.Ops.DcsIntent = intent;
+                    TankerMenu(tp, step, "g").Join();
+                    return n;
+                }
+                var tr = new[] { Run("join", true, "-"), Run("join", true, "-", "Pre-contact"), Run("join", false, "-"), Run("intent", true, "-"), Run("join", true, "-", null) };
+                if (string.Join(",", tr) != "2,1,1,2,1") throw new Exception($"Tanker-Intent erneut: {string.Join(",", tr)}");
+                Console.WriteLine("OK   Tanker-Intent erneut: antwortet der DCS-Tanker nicht (Stufe bleibt -), einmal wiederholen (auch bei join); nicht bei Mission-Ablehnung, nicht wenn er antwortet oder die Stufe unbekannt ist");
+            }
+            finally { (AiHook, TankerStage, TankerSleep) = (ah0, ts0, tsl0); }
+        }
         {   // forum (jojojung): the flight frequency of the own AI wingmen is monitored (it was not: orders spoken there never arrived), a controller frequency is not taken twice
             var ku = Flights.Units;
             Flights.Units = new() { ["w2"] = new Flights.Unit("w2", "Enfield", "FA-18C_hornet", "Enfield12", 2, 0, 0, 6000, true, 0.8, 124, new[] { 0, 0, 0, 0, 0 }, Gid: 7),

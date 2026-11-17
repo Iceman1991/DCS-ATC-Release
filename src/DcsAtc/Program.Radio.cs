@@ -825,30 +825,40 @@ static partial class Program
         }
     }) { IsBackground = true }.Start();
 
+    internal static Func<string?> TankerStage = () => MenuNow().Stage;   // test seams
+    internal static Action<int> TankerSleep = Thread.Sleep;
+
     /// Tanker step of the radio call: asks DCS for the stage of its tanker dialog (waits, so on its own thread) and presses only what fits it.
-    static void TankerMenu(Pilot p, string step, string group)
+    static Thread TankerMenu(Pilot p, string step, string group)
     {
         var unit = p.Unit;
-        new Thread(() =>
+        var th = new Thread(() =>
         {
             void Ready() { Log("[DCS] Funkmenü tanker Ready pre-contact"); PressMenu((ushort)Cfg.CommsKey, 0x3B); lock (TowerLock) p.TankMenuAt = Now(); }
-            var stage = MenuNow().Stage;
+            var stage = TankerStage();
             var act = TankerAction(step, stage);
             if (act == "precontact") Ready();
             else if (act == "none") Trace("DCS", $"Funkmenü tanker nichts gedrückt (Schritt {step}), DCS-Stufe {stage ?? "?"}");
             else
             {
-                AiCmd($"MENU;{unit};tanker;{group}");   // the mission keeps the DCS tanker audible for 15 min (a muted one ignores the menu), our controller speaks too; mission refuses without Easy Communication (issue #5)
-                if (step == "join") return;
-                for (int i = 0; i < 10; i++)   // our tanker has already cleared the contact: DCS still wants Ready pre-contact once its tanker has answered
+                for (int t = 0; t < 2; t++)
                 {
-                    Thread.Sleep(1500);
-                    var s = MenuNow().Stage;
-                    if (s is "Pre-contact" or "Trail") { Ready(); return; }
-                    if (s is not ("-" or "Closed")) return;
+                    AiCmd($"MENU;{unit};tanker;{group}");   // the mission keeps the DCS tanker audible for 15 min (a muted one ignores the menu), our controller speaks too; mission refuses without Easy Communication (issue #5)
+                    for (int i = 0; i < 10; i++)   // DCS wants Ready pre-contact once its tanker has answered (not at join: our tanker has not cleared the contact yet)
+                    {
+                        TankerSleep(1500);
+                        var s = TankerStage();
+                        if (s is "Pre-contact" or "Trail") { if (step != "join") Ready(); return; }
+                        if (s is not ("-" or "Closed")) return;
+                    }
+                    bool sent; lock (TowerLock) sent = p.Ops.DcsIntent;
+                    if (!sent) return;   // mission refused (no easy comms)
+                    if (t == 0) Log("[DCS] Funkmenü tanker: DCS-Tanker hat nicht geantwortet, Intent erneut");   // jojo (Discord, F/A-18): easy comms retunes COM2 to the tanker frequency while the first "Intent to refuel" goes out, the DCS tanker never hears it
                 }
             }
-        }) { IsBackground = true }.Start();
+        }) { IsBackground = true };
+        th.Start();
+        return th;
     }
 
     /// K2/K4: airfield frequency on which p hears the controller: tuned (SRS, most recently called first), otherwise the called (SRS state may be older than the call), otherwise VHF (= map), otherwise UHF. 0 = without Radio.lua.

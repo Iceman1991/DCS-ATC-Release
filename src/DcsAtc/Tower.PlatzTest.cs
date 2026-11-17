@@ -249,6 +249,24 @@ public partial class Tower
             Chk(rz.Count == 1 && rz[0].Text.Contains("negative, Zulu departure is for runway zero seven") && clr && ci.Any(m => m.Text.Contains("Continue Tiki departure")) &&
                 string.Join(",", seen) == "Alpha,Bravo" && w.nav == null && w.depRoute == null,
                 $"Abflug TIKI ({string.Join(",", seen)}, {w.Phase}, nav {w.nav != null}, dep {w.depRoute != null}, at {w.depAt}): " + J(rz) + " / " + J(r1) + " / " + J(ci) + " // " + J(msgs));
+            {   // #49/#36 (log Nellis: heading to the next departure fix came 30 s after the fix at 400 kt): the heading to Bravo is spoken before Alpha, like on the arrival route
+                var wd = Hold();
+                wd.OnTranscript("Kutaisi Tower, Enfield 11, ready for departure, tiki departure", G0(), none, 10);
+                double dsay = double.NaN, ds = 20; var dall = new List<Msg>();
+                var dfrom = e.At(-e.Len, 0);
+                double dlen = Dist(dfrom.X, dfrom.Z, pa.X, pa.Z), dhd = Bearing(dfrom.X, dfrom.Z, pa.X, pa.Z);
+                var a0 = Air(dfrom, dhd);   // takeoff, handover to Departure, check-in; then 450 kt along the route
+                wd.Tick(a0, none, 15);
+                wd.OnTranscript("Kutaisi Approach, Enfield 11, airborne", a0, none, 17);
+                for (double q = 1000; q <= dlen + 3000 && double.IsNaN(dsay); q += 450 * Kt * 5)
+                {
+                    var at = new Telemetry(k.Elev + 3000, 3000, 450 * Kt, dhd * Math.PI / 180, dfrom.X + (pa.X - dfrom.X) * q / dlen, dfrom.Z + (pa.Z - dfrom.Z) * q / dlen, 0, 0, 760);
+                    var dm = wd.Tick(at, none, ds += 5).ToList();
+                    dall.AddRange(dm);
+                    if (dm.Any(m => m.Text.Contains("Bravo"))) dsay = dlen - q;
+                }
+                Chk(dsay > 0, $"Departure #49: Kurs zum naechsten Fix vor dem Fix bei 450 kt ({dsay / NM:0.0} NM davor, {wd.navName}, {wd.Phase}): " + J(dall));
+            }
             // #23 (log 12.11.): a departure asked for by name that the chart does not have is said so; known names, CRPs and ordinary wordings are not
             var ru = Hold().OnTranscript("Kutaisi Tower, Enfield 11, ready for departure, departure via Dream", G0(), none, 10);
             var hu = Hold();

@@ -11,6 +11,10 @@ using NAudio.Wave;
 namespace DcsAtc;
 static partial class Program
 {
+    /// In-game text only (TTS unchanged), forum Killg0re NL: JTAC 9-line one item per line like DCS's own JTAC.
+    internal static string ShownText(string role, string text) =>
+        role is "JTAC" or "FACA" ? Regex.Replace(text, @"\. (?=Line [1-9]\b|Remarks\b|Read back\b)", ".\n") : text;
+
     // ------------------------------------------------------------ Speech recognition (whisper.cpp)
     /// Text and mean word confidence (0–1, Whisper token probabilities from -ojf).
     /// role: controller of the receiving frequency (SrsRole/FreqRoute, null = unknown, local push-to-talk), via: airfield of that frequency.
@@ -363,11 +367,11 @@ static partial class Program
             Heard(tx);   // Question to a player: radio wheel Enter suggests the answer
             bool info = tx.Role == "Info";
             double freq = FreqOf(tx);
-            var label = info ? "" : tx.Pilot || freq < 0 ? $"{tx.Station}: " : $"{tx.Station} ({freq:0.0}): ";
+            var label = info ? "" : tx.Pilot || freq < 0 ? $"{tx.Station}: " : RadioLabel(tx.Station, freq);
             if (!info && !tx.Pilot && tx.Gid > 0) label = ">>> " + label;   // to me (own group): DCS text knows no colors
             var mod = tx.Role is "JTAC" or "FACA" && freq > 0 ? Ops.ModOn(freq) : null;   // JTAC on its own mission frequency: its modulation (FM) instead of Cfg.Modulation
             var fm = mod != null && !mod.Equals(Cfg.Modulation, StringComparison.OrdinalIgnoreCase) ? " " + mod : "";
-            if (!tx.Pilot) Log(info ? $"[INF] {tx.Text}" : $"[{tx.Role[..3].ToUpperInvariant()}] {tx.Station}{(freq > 0 ? $" ({freq:0.0}{fm})" : "")}: {tx.Text}");
+            if (!tx.Pilot) Log(info ? $"[INF] {tx.Text}" : $"[{tx.Role[..3].ToUpperInvariant()}] {tx.Station}{(freq > 0 ? $" ({freq:0.0##}{fm})" : "")}: {tx.Text}");
             double freq2 = tx.Freqs is { Length: > 1 } f2 ? f2[1] : 0;
             var text = tx.Text;   // LD4: may change until sending (live)
             void Show()   // Text for the mission (*.out in the game, to the player's group; Gid -1 = speech only)
@@ -380,13 +384,13 @@ static partial class Program
                     try
                     {
                         var f = Path.Combine(MenuDir, Clock.Ticks + "-" + gid + (gid == 0 && tx.Side > 0 ? "-c" + tx.Side : ""));   // R356: Lua shows "-c{side}" to that coalition only
-                        File.WriteAllText(f + ".tmp", $"{gid}|{dur}|{label}{text}");
+                        File.WriteAllText(f + ".tmp", $"{gid}|{dur}|{label}{ShownText(tx.Role, text)}");
                         File.Move(f + ".tmp", f + ".out");
                     }
                     catch (IOException e) { Trace("FEHLER", $"Text an die Mission: {e.Message}"); }
             }
             if (info || freq == 0) { Show(); return; }   // Crew without SRS unit ID: text only
-            if (tx.Role == "Flight") Log($"[KI-FUNK] {tx.Station} ({freq:0.0}): {tx.Text}");
+            if (tx.Role == "Flight") Log($"[KI-FUNK] {RadioLabel(tx.Station, freq)}{tx.Text}");
             if ((tx.Prio == 2 || tx.Role == "Flight") && freq != Flights.Guard && !ShowTo(tx.Gid, freq, freq2).Any()) { Trace("TTS", $"{tx.Station} {freq:0.0##}: niemand gerastet, nicht gesprochen: {tx.Text}"); return; }   // nobody tuned: no Piper (KF14)
             var mp3 = Path.Combine(Root, "tmp", $"say{++n}.mp3");   // unambiguous: do not overwrite waiting calls
             double sec;
@@ -420,6 +424,8 @@ static partial class Program
 
     /// Display duration of the text in the game (seconds, part of the .out line "gid|sek|text"): other AI radio is heard, not read (6–8 s),
     /// otherwise reading time at least 20 s, longer for long texts.
+    internal static string RadioLabel(string station, double freq) => $"{station} ({freq:0.0##}): ";   // label of the in-game text
+
     internal static int ShowSec(Tx tx, string label) =>
         (int)Math.Ceiling(tx.Prio == 2 || tx.Role == "Flight" ? Math.Clamp(tx.Text.Length / 8.0, 6, 8) : Math.Max(20, (label + tx.Text).Length / 8.0));
 

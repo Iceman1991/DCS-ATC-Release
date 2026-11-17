@@ -1521,6 +1521,23 @@ public partial class Tower
             Check(ph1 == Phase.TaxiIn && sd.Count == 1 && sd[0].Text == "Enfield one one, roger." && tsd.Phase == Phase.Parked && sd2.All(m => !m.Text.Contains("say again")),
                   $"#28 shutting down -> geparkt, Stehen vor der Rollfreigabe zählt nicht: {ph1} / {string.Join(" | ", sd.Select(m => m.Text))} / {tsd.Phase} / {string.Join(" | ", sd2.Select(m => m.Text))}");
         }
+        {   // #49 (log Nellis 17.11.): stopped on taxiway Alpha 89 m from the runway without a taxi clearance: not parked; the first calls to Ground afterwards are taxi requests; "at parking" parks
+            var nearRwy = At(CX - 89 * Uz, CZ + 89 * Ux, 0, 254, 0);
+            var tnr = Landed();
+            var nm = Enumerable.Range(10, 60).SelectMany(s => tnr.Tick(nearRwy, none, s)).ToList();
+            Check(tnr.Phase == Phase.TaxiIn && !nm.Any(m => m.Role == "Info"), $"#49 Stehen 89 m neben der Bahn ohne Rollfreigabe ist nicht geparkt: {tnr.Phase} / " + string.Join(" | ", nm.Select(m => m.Text)));
+            var tq = new[] { "Kutaisi Ground, Enfield 11, at alpha.", "Enfield 11, cleared runway at Alpha.", "Kutaisi Ground, Enfield 11, cleared runway at Alpha.",
+                             "Kutaisi Ground, Enfield 11, clear of the runway at alpha.", "Kutaisi Ground, Enfield 11, runway vacated." }
+                .Select(s => (s, r: Landed() is var lw ? lw.OnTranscript(s, nearRwy, none, 40) : null)).Where(x => x.r!.Count != 1 || !x.r[0].Text.Contains("taxi to")).Select(x => $"{x.s} -> {string.Join(" | ", x.r!.Select(m => m.Text))}").ToList();
+            Check(tq.Count == 0, "#49 erste Meldung bei Ground nach dem Verlassen der Bahn = Rollwunsch: " + string.Join(" || ", tq));
+            var tpk = Landed();
+            tpk.OnTranscript("Kutaisi Ground, Enfield 11, runway vacated, request taxi to parking", offRwy with { Ias = 0 }, none, 40);
+            var pk1 = tpk.OnTranscript("Kutaisi Ground, Enfield 11, at parking, chatting down.", offRwy with { Ias = 0 }, none, 100);
+            var pkPh = tpk.Phase;
+            var pk2 = tpk.OnTranscript("Kutaisi Ground, Enfield 11, at parking.", offRwy with { Ias = 0 }, none, 110);
+            Check(pk1 is [{ } p1] && p1.Text == "Enfield one one, roger." && pkPh == Phase.Parked && pk2 is [{ } p2] && p2.Text == "Enfield one one, roger.",
+                  $"#49 at parking nach der Rollfreigabe: kurze Bestätigung, geparkt ({pkPh}): " + string.Join(" | ", pk1.Concat(pk2).Select(m => m.Text)));
+        }
         // #13: standing off the runway with headwind (export IAS shows the wind) is not taxiing
         var tw13w = new Tower("Enfield 1-1");
         tw13w.Tick(At(CX, CZ, 300, 254, 80), none, 0); tw13w.Tick(At(CX, CZ, 0, 254, 20), none, 5); tw13w.Tick(At(CX, CZ, 0, 254, 5), none, 8);
@@ -1838,6 +1855,11 @@ public partial class Tower
             var fr = fq.Select(s => (s, r: Rb(twRa, west, 7, s))).Where(x => x.r != "").Select(x => $"{x.s} -> {x.r}").ToList();
             Check(fr.Count == 0 && twRa.ReadbackOnly("324, 2004, Enfield 1-1.", west) && !twRa.ReadbackOnly("325, 2004, Enfield 1-1.", west) && !twRa.ReadbackOnly("324, 5, Enfield 1-1.", west),
                   "#38/#40 Frequenz-Rücklesung, \"switching\" -> still: " + string.Join(" || ", fr));
+            // #49 (log Nellis: "Victory 9-1 pushing." / "Pushing departure, Victory 9-1." after the handover -> "say again"): "pushing" is "switching"
+            twRa.last = new Msg("Tower", "Enfield one one, contact Kutaisi Departure three eight five decimal four.");
+            var pu = new[] { "Pushing, Enfield 1-1", "Pushing.", "Enfield 1-1 pushing.", "Pushing departure, Enfield 1-1.", "Push, Enfield 1-1" }
+                .Select(s => (s, r: Rb(twRa, west, 8, s))).Where(x => x.r != "").Select(x => $"{x.s} -> {x.r}").ToList();
+            Check(pu.Count == 0, "#49 \"pushing\" nach der Übergabe -> still: " + string.Join(" || ", pu));
         }
         var twRv = new Tower("Enfield 1-1");   // real vector transmission ("…, downwind"): readback with "downwind" is not a pattern report
         twRv.Tick(west, none, 0);
@@ -1901,6 +1923,13 @@ public partial class Tower
             tn3.Tick(nh03L, none, 100);
             Check(tn3.Suggest(nh03L) is { } sg10 && tn3.IntentOf("Ground: Ground, Enfield 1-1 holding short zero three left.", nh03L) is "cross" && tn3.IntentOf(sg10.Text, nh03L) == "cross",
                   "LA10 \"holding short\" (0.64) am Rollhalt der Parallelbahn ist der erwartete Spruch");   // Program then accepts it from 0.50
+            // #49 (log Nellis 14:43: "Nellis Ground, Victory 9-1. Hold short. 21 right at Delta." -> "say again"): "hold short <runway>" as a new call at the holding point is the same report as "holding short"
+            var tn3h = new Tower(nel, "Enfield 1-1");
+            tn3h.Tick(np, none, 0);
+            tn3h.OnTranscript("Nellis Ground, Enfield 1-1, request taxi, runway 03 right", np, none, 1);
+            tn3h.Tick(nh03L, none, 100);
+            var hs3 = tn3h.OnTranscript("Nellis Ground, Enfield 1-1. Hold short. 03 left at Delta.", nh03L, none, 101);
+            Check(hs3 is [{ } h3] && h3.Text.Contains("cross runway zero three left"), "#49 \"hold short 03 left at Delta\" am Rollhalt = Meldung (Kreuzen): " + string.Join(" | ", hs3.Select(m => m.Text)));
             var x3 = tn3.OnTranscript("Nellis Tower, Enfield 1-1, ready for departure", nh03L, none, 101);
             var c3 = new[] { 20.0, 0, -20 }.SelectMany((l, i) => tn3.Tick(NT(Pt(-1400, l), 36 * Kt) with { Hdg = h + 51 * Math.PI / 180 }, none, 102 + i)).ToList();
             Check(x3 is [{ } tx3] && tx3.Text.Contains("cross runway zero three left") && c3.Count == 0 && tn3.Phase == Phase.TaxiOut,
@@ -4737,6 +4766,18 @@ public partial class Tower
             Check(!m44.Any(m => m.Text.Contains("report final") || m.Text.Contains("go around") || m.Role == "Info") && w44.Phase == Phase.Entering &&
                   b44a.Any(m => m.Text.Contains("report final")) && b44b.Any(m => m.Text.StartsWith("Enfield one one, go around, no landing clearance")),
                   "#44 Weg zum Overhead entlang des Endanflugs in Platzrundenhöhe: " + T(m44) + " / " + T(b44a) + " / " + T(b44b));
+            {   // #49 (log Nellis 15:33): "overhead" called 1.9 NM out along the final at pattern altitude (just below it): join, no "go around, no landing clearance" 0.45 s later, no "report final" while high
+                var w49 = new Tower("Enfield 1-1");
+                w49.Tick(atC, none, 0);
+                (w49.Phase, w49.nav, w49.navName) = (Phase.Entering, ovh, "overhead");
+                var hi49 = PatternFt * Ft - FieldElev - 47 * Ft;
+                var (x49, z49) = P("25", 0.6 * NM);   // log: 0.6 NM before the threshold (half runway 1439 m), i.e. along < 0.8 NM
+                var o49 = w49.OnTranscript("Kutaisi Tower, Enfield 11, overhead", At(x49, z49, hi49, LandHdg("25"), 360 * Kt), none, 1);
+                var m49 = new List<Msg>();
+                for (int i = 0; i < 12; i++) { var (xx, zz) = P("25", (0.6 - i * 0.05) * NM); m49.AddRange(w49.Tick(At(xx, zz, hi49, LandHdg("25"), 360 * Kt), none, 1.45 + i * 3)); }
+                Check(o49.Any(m => m.Text.Contains("join")) && !m49.Any(m => m.Text.Contains("go around") || m.Text.Contains("report final") || m.Role == "Info"),
+                      "#49 Overhead-Meldung entlang des Endanflugs in Platzrundenhöhe: kein Durchstarten, kein report final: " + T(o49) + " / " + T(m49));
+            }
             // Review l1: after "no clearance to join, remain outside the pattern" nevertheless in the pattern or after "remain outside the control zone" further into the zone:
             // once redirect with violation (debriefing), the notice "possible pilot deviation" comes separately
             var kow = new Tower("Enfield 1-1");

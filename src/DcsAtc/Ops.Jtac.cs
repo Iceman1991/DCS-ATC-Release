@@ -59,6 +59,9 @@ partial class Ops
     }
     /// Modulation of the mission leader on this frequency (JTAC on FM); null = none or not set in the mission.
     internal static string? ModOn(double mhz) => Leaders.FirstOrDefault(l => !string.IsNullOrEmpty(l.Mod) && l.Freq > 0 && Math.Abs(l.Freq - mhz) < 0.01)?.Mod.ToUpperInvariant();
+    /// Radio wheel pick list: living controllers of the side, nearest first (without telemetry in list order), at most 8, with their frequency (mission, else config).
+    internal static (string Cs, double Freq)[] JtacList(int side, Telemetry? t) =>
+        Leaders.Where(l => l.Alive && l.Side == side).OrderBy(l => t == null ? 0 : Dist(t.X, t.Z, l.X, l.Z)).Take(8).Select(l => (l.Cs, l.Freq > 0 ? l.Freq : DefFreq)).ToArray();
     /// K3 (#7): frequency of the JTAC / FAC(A) the player would reach (mission frequency, otherwise config); 0 = none.
     public double JtacFreqFor(Me me) => LeaderFor(me) is { } l ? (l.Freq > 0 ? l.Freq : DefFreq) : 0;
     (string Name, double X, double Z)? IpFor(Me me, Trg t) =>
@@ -609,6 +612,16 @@ partial class Ops
             var e1 = Say(oE, Mk("Enfield 1-1", "FA-18C_hornet", 3000), "JTAC: Axeman, Enfield 1-1, checking in", 920);
             check(e1.StartsWith("Enfield one one, Axeman") && oE.casL == "JTAC-1", "Forum Killg0re NL: eigenes Rufzeichenwort ist kein Lotsenname -> Axeman antwortet -> " + e1);
             oE.Leave();
+            // forum Killg0re NL: wheel pick list nearest first with frequency, the call text of the 2nd entry reaches that controller, plain "checking in" the nearest
+            Leaders = new() { new("JTAC-2", "jtac", "Pontiac 1-1", 2, 5000, 0, 100, 135.4, "AM", "", true), new("JTAC-1", "jtac", "Axeman 1-1", 2, -14000, 0, 100, 0, "AM", "", true) };
+            var mP = Mk("Enfield 1-1", "FA-18C_hornet", 3000);
+            var jl = JtacList(2, mP.Tel);
+            var (oP, oQ) = (new Ops(), new Ops());
+            var p1 = Say(oP, mP, "JTAC: " + jl[1].Cs + ", checking in", 930);
+            var p2 = Say(oQ, mP, "JTAC: checking in", 930);
+            check(jl.Length == 2 && jl[0] == ("Axeman 1-1", DefFreq) && jl[1] == ("Pontiac 1-1", 135.4) && p1.Contains("Pontiac") && oP.casL == "JTAC-2" && p2.Contains("Axeman") && oQ.casL == "JTAC-1",
+                  "Forum Killg0re NL: Funkrad-Auswahl nächster zuerst mit Frequenz, 2. Eintrag erreicht Pontiac, ohne Namen der nächste -> " + string.Join(",", jl) + " / " + p1 + " / " + p2);
+            oP.Leave(); oQ.Leave();
         }
         // FAC(A): Type 1, MGRS for the A-10C, mark and laser commands, handover when it is lost
         var fa = new Leader("FAC-1", "faca", "Rover 2-1", 2, -14000, 0, 3000, 251.5, "FM", "1514", true);

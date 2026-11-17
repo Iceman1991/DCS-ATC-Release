@@ -331,7 +331,7 @@ static partial class Program
         Wheel.Cv = () => Carrier.Boats.Count > 0;
         Wheel.Cen = () => { lock (TowerLock) { var h = Host(); return h != null && Tower.CenterName(h.Coalition) != null; } };   // Center: the map has one for the own side (module on)
         Wheel.Jtac = () => { lock (TowerLock) { var h = Host(); return h != null && Ops.Leaders.Any(l => l.Alive && l.Side == h.Coalition); } };   // J11
-        Wheel.Jtacs = () => { lock (TowerLock) { var h = Host(); return h == null ? Array.Empty<string>() : Ops.Leaders.Where(l => l.Alive && l.Side == h.Coalition).Select(l => l.Cs).ToArray(); } };   // several JTAC / FAC(A): check in picks one
+        Wheel.Jtacs = () => { lock (TowerLock) { var h = Host(); return h == null ? Array.Empty<(string, double)>() : Ops.JtacList(h.Coalition, h.Tel); } };   // several JTAC / FAC(A): check in picks one
         Wheel.Log = Log;   // screenshot (press with wheel open) into atc-log
         Wheel.InGame = text =>   // VR: headset shows only DCS, wheel additionally as in-game text (mission reads .cmd every 0.25 s)
         {

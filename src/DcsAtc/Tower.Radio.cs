@@ -115,7 +115,8 @@ public partial class Tower
         // forum 0.15: "Kutaisi Departure, Enfield 1-1" right after a Departure call without readback is the acknowledgement, not a new call-up (after a handover the last call is another station's)
         bool stAck = addressed != null && last != null && Dep(addressed) == last.Role && now - lastAt < 30 + last.Text.Split(' ').Length / 2.5 && AckOnly(spoken, true);
         bool request = Addressed(spoken) != null && !stAck && !(Has(n, "squawk", "qnh", "altimeter") && ReadsBack(n, intent)) || Has(n, "request", "requesting", "again", "confirm", "verify", "still", "say");   // #27: "Tbilisi Control, squawk 4321, Enfield 1-1" reads back, no new call
-        bool readback = intent != "fieldinsight" && (Has(n, "report", "wilco", "roger", "copy", "cleared", "will do", "will comply", "affirm", "approved") || ReadsBack(n, intent) || AckOnly(spoken) || stAck);   // R115: "field in sight" is a report, not a readback; forum 0.9.7: "start up approved, Enfield 1-1" or just the callsign (AIM 4-2-3) is an acknowledgement
+        // #49: before the taxi clearance "cleared runway at Alpha" is the request, not a readback
+        bool readback = intent != "fieldinsight" && !(intent == "taxiin" && Phase == Phase.TaxiIn && !taxiInTold) && (Has(n, "report", "wilco", "roger", "copy", "cleared", "will do", "will comply", "affirm", "approved") || ReadsBack(n, intent) || AckOnly(spoken) || stAck);   // R115: "field in sight" is a report, not a readback; forum 0.9.7: "start up approved, Enfield 1-1" or just the callsign (AIM 4-2-3) is an acknowledgement
         // Readback window from the end of the controller's transmission: lastAt is the call, the transmission lasts ~2.5 words/s (taxi clearance ~15 s)
         bool repeat = intent == lastIntent && now - lastAt < 30 + (last?.Text.Split(' ').Length ?? 0) / 2.5 && !Has(n, "ready") && !(intent == "fieldinsight" && visAsk);   // R115: after "negative field in sight", "field in sight" is the requested report, not a repeat
         // R8: route clearance read back with the assigned code -> "readback correct" (FAA JO 7110.65 4-2-1, ICAO Doc 4444 4.5.7.5)
@@ -987,7 +988,7 @@ public partial class Tower
     /// Forum 0.9.7: acknowledgement without readback of a controller transmission: only the own callsign (AIM 4-2-3) and/or "approved", "starting up", "rolling", "taxiing", "lining up" …
     /// station: the station name may stand in front ("Kutaisi Departure, Enfield 1-1"); forum 0.15: "okay"/"thanks" are acknowledgements too
     bool AckOnly(string n, bool station = false) => last != null &&
-        Regex.Replace(NoCs(n), @"\b(?:roger|copy|copied|wilco|affirm(?:ative)?|approved|understood|okay|ok|thanks|thank you|starting(?: up| engines?)?|rolling|taxiing|lining up|switching(?: over)?"
+        Regex.Replace(NoCs(n), @"\b(?:roger|copy|copied|wilco|affirm(?:ative)?|approved|understood|okay|ok|thanks|thank you|starting(?: up| engines?)?|rolling|taxiing|lining up|switching(?: over)?|push(?:ing)?(?: (?:to )?(?:ground|tower|approach|departure|radar))?"
             + (station ? "|ground|tower|approach|departure|radar|" + string.Join("|", $"{F.Name}-{F.Callsign}".ToLowerInvariant().Split('-', ' ', StringSplitOptions.RemoveEmptyEntries).Select(Regex.Escape)) : "") + @")\b", " ").Trim() == "";
     /// Transmission without the own callsign (also misheard)
     string NoCs(string n) => Regex.Replace(n, @"\b([a-z]{3,}) \d(?: ?\d)?\b", m => !NotCallsign.Contains(m.Groups[1].Value) && (SameCallsign(m.Value, callsign) || Digits(m.Value) == Digits(callsign)) ? " " : m.Value);
@@ -1013,18 +1014,21 @@ public partial class Tower
         {
             if (Has(n, "clearance", "ifr to") && !Has(n, "takeoff", "take off", "landing")) return "clearance";
             if (Has(n, "progressive") && (Phase == Phase.TaxiOut || Phase == Phase.TaxiIn && taxiInTold)) return "progressive";   // N26: otherwise part of the taxi request (taxi/taxiin)
-            if (Phase == Phase.TaxiIn && taxiInTold && lastTel is { } it && CrossIn(it) is { } ix && NearRwy(it, ix) && Has(n, "cross", "holding short")) return "cross";   // LA06: holding short of a runway on the way to parking
+            if (Phase == Phase.TaxiIn && taxiInTold && lastTel is { } it && CrossIn(it) is { } ix && NearRwy(it, ix) && Has(n, "cross", "hold(?:ing)? short")) return "cross";   // LA06: holding short of a runway on the way to parking
             // #28 (log Nellis): "at parking, shutting down" after landing is the report that he is parked (also off a DCS stand), not a taxi request
-            if (Phase is Phase.TaxiIn or Phase.Parked && taxiInTold && Has(n, "shutting down", "shut ?down", "engines? (?:off|shut)", "parked", "in (?:the )?(?:chocks|blocks)") && !Has(n, "request")) return "shutdown";
+            if (Phase is Phase.TaxiIn or Phase.Parked && taxiInTold && Has(n, "shutting down", "shut ?down", "engines? (?:off|shut)", "parked", "in (?:the )?(?:chocks|blocks)", "(?:shutting|chatting) down", "at (?:the )?(?:parking|ramp|apron|stand|spot)") && !Has(n, "request")) return "shutdown";
             // A7: parking spot/apron before departure only as destination ("taxi to parking"), "parking spot 12, information Charlie, request taxi" states the location
-            if (Has(n, "vacated", "clear of") && !Has(n, "holding point", "departure", "take off", "takeoff") || Regex.IsMatch(n, (Phase is Phase.ClearedLand or Phase.TaxiIn ? @"\b" : @"\bto (?:the )?") + "(?:parking|ramp|apron)") ||   // R267: "runway vacated, request taxi to holding point" (after aborted takeoff) = back to the start
+            // #49 (log Nellis): the first call after vacating, before any taxi clearance: "at alpha", "cleared runway at Alpha" is the taxi request
+            bool firstAfterLand = Phase == Phase.ClearedLand || Phase == Phase.TaxiIn && !taxiInTold;
+            if (Has(n, "vacated", "clear of") && !Has(n, "holding point", "departure", "take off", "takeoff") ||
+                firstAfterLand && Regex.IsMatch(n, @"\bcleared (?:the )?runway\b|\bat (?:taxiway )?(?:" + string.Join("|", Spell) + @")\b") || Regex.IsMatch(n, (Phase is Phase.ClearedLand or Phase.TaxiIn ? @"\b" : @"\bto (?:the )?") + "(?:parking|ramp|apron)") ||   // R267: "runway vacated, request taxi to holding point" (after aborted takeoff) = back to the start
                 (Has(n, "taxi") && !Has(n, "departure", "runway", "holding", "take off", "takeoff") &&
                  (Phase == Phase.ClearedLand || Phase == Phase.TaxiIn && !taxiInTold))) return "taxiin";   // after taxi clearance to parking: "request taxi" = start again
             if (Has(n, "taxi") && OnRwyWait && Has(n, "departure", "take off", "takeoff")) return "ready";   // LA04 (log Kutaisi): "request taxi, request takeoff" on the runway is the takeoff request
             if (Has(n, "taxi")) return "taxi";   // A6: before "start" ("engines started, request taxi"); "request startup and taxi" is answered by case "taxi" too
             if (StartReq(n) && Phase is Phase.Parked or Phase.StartupApproved) return "startup";   // otherwise e.g. the takeoff clearance would be lost
-            if (Phase == Phase.TaxiOut && lastTel is { } ct && CrossNext(ct) is { } cx && NearRwy(ct, cx) && Has(n, "cross", "ready", "departure", "take off", "takeoff", "holding short", "holding point")) return "cross";   // Forum 0.9.7: at the parallel runway holding point
-            if (Has(n, "ready", "departure", "take off", "takeoff", "holding short", "holding point", "unrestricted", "spiral") || F.Backtrack.Contains(Runway) && Has(n, "back ?track")) return "ready";   // "request backtrack" where the holding point leads onto the middle of the runway
+            if (Phase == Phase.TaxiOut && lastTel is { } ct && CrossNext(ct) is { } cx && NearRwy(ct, cx) && Has(n, "cross", "ready", "departure", "take off", "takeoff", "hold(?:ing)? short", "holding point")) return "cross";   // Forum 0.9.7: at the parallel runway holding point
+            if (Has(n, "ready", "departure", "take off", "takeoff", "hold(?:ing)? short", "holding point", "unrestricted", "spiral") || F.Backtrack.Contains(Runway) && Has(n, "back ?track")) return "ready";   // "request backtrack" where the holding point leads onto the middle of the runway
             if (Has(n, "inbound", "landing", "final", "initial")) return "ground_say";
         }
         else
