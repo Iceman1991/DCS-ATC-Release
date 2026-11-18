@@ -1,7 +1,7 @@
 ﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe und (ISCC /DSmall) dist\DCS-ATC-Update-Setup.exe
 ; Small: update setup without the big files (models, tools) for the update from the app; only over an existing installation.
 ; installer\manifest.ps1 reads the big files from the block "#ifndef Small" in [Files].
-#define AppVer "0.23.19-alpha"
+#define AppVer "0.23.20-alpha"
 #define Src ".."
 
 [Setup]
@@ -201,7 +201,18 @@ const ExportLine = 'pcall(function() local l=require(''lfs''); dofile(l.writedir
 var Saved, ServerSave, ServerDir: String;
     ServerOnly, TaskSet, CompSet: Boolean;   { ServerOnly: no Saved Games\DCS but a dedicated server -> install there only }
 
-{ Saved Games\DCS (bzw. DCS.openbeta, falls nur das existiert): früher gewählter Ordner (HKCU\Software\DCS-ATC, liest auch die App),
+{ Last write time of Logs\dcs.log as FILETIME (0 = no log) }
+function LogTime(Dir: String): Int64;
+var R: TFindRec;
+begin
+  Result := 0;
+  if FindFirst(Dir + '\Logs\dcs.log', R) then begin
+    Result := Int64(R.LastWriteTime.dwHighDateTime) * 4294967296 + R.LastWriteTime.dwLowDateTime;
+    FindClose(R);
+  end;
+end;
+
+{ Saved Games\DCS (bzw. DCS.openbeta, falls nur das existiert oder dessen Logs\dcs.log neuer ist, DCS schreibt es bei jedem Start neu): früher gewählter Ordner (HKCU\Software\DCS-ATC, liest auch die App),
   sonst der echte Ort von Saved Games (Konstante usersavedgames = Known Folder, in Windows verschiebbar) }
 function SavedGames(Param: String): String;
 var Base, Chosen: String;
@@ -209,7 +220,7 @@ begin
   { Windows Saved Games\DCS first (the folder DCS uses, also when moved), the folder chosen earlier only when that is missing }
   if Saved = '' then begin
     Base := ExpandConstant('{usersavedgames}');
-    if not DirExists(Base + '\DCS') and DirExists(Base + '\DCS.openbeta') then Saved := Base + '\DCS.openbeta'
+    if DirExists(Base + '\DCS.openbeta') and (not DirExists(Base + '\DCS') or (LogTime(Base + '\DCS.openbeta') > LogTime(Base + '\DCS'))) then Saved := Base + '\DCS.openbeta'
     else Saved := Base + '\DCS';
     if not DirExists(Saved) and RegQueryStringValue(HKCU, 'Software\DCS-ATC', 'SavedGames', Chosen) and DirExists(Chosen) then Saved := Chosen;
   end;

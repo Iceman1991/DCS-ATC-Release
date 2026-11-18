@@ -266,9 +266,16 @@ static partial class Program
             if (ClientSavedGames(sv, Path.Combine(sv, "Inst1")) != Path.Combine(sv, "DCS.openbeta")) throw new Exception("Saved Games: nur DCS.openbeta");
             Directory.CreateDirectory(Path.Combine(sv, "DCS"));
             if (ClientSavedGames(sv, Path.Combine(sv, "Inst1")) != Path.Combine(sv, "DCS")) throw new Exception("Saved Games: alte Setup-Wahl gewinnt");
+            foreach (var d in new[] { "DCS", "DCS.openbeta" }) Directory.CreateDirectory(Path.Combine(sv, d, "Logs"));
+            string Lg(string d) => Path.Combine(sv, d, "Logs", "dcs.log");
+            File.WriteAllText(Lg("DCS"), "x"); File.WriteAllText(Lg("DCS.openbeta"), "x");
+            File.SetLastWriteTimeUtc(Lg("DCS"), new DateTime(2026, 1, 1)); File.SetLastWriteTimeUtc(Lg("DCS.openbeta"), new DateTime(2026, 6, 1));
+            if (ClientSavedGames(sv, null) != Path.Combine(sv, "DCS.openbeta")) throw new Exception("Saved Games: beide, DCS.openbeta-Log neuer");
+            File.SetLastWriteTimeUtc(Lg("DCS.openbeta"), new DateTime(2025, 1, 1));
+            if (ClientSavedGames(sv, null) != Path.Combine(sv, "DCS")) throw new Exception("Saved Games: beide, DCS-Log neuer");
         }
         finally { try { Directory.Delete(sv, true); } catch (IOException) { } }
-        Console.WriteLine("OK   Dedicated Server: nur DCS_server läuft -> Hintergrundbetrieb (mit DCS nicht), bin\\DCS_server.exe zählt als DCS-Ordner, Saved Games: Hook (-w) vor Installer vor DCS.server/DCS.dcs_serverrelease; Client: Windows-Ordner DCS vor alter Setup-Wahl");
+        Console.WriteLine("OK   Dedicated Server: nur DCS_server läuft -> Hintergrundbetrieb (mit DCS nicht), bin\\DCS_server.exe zählt als DCS-Ordner, Saved Games: Hook (-w) vor Installer vor DCS.server/DCS.dcs_serverrelease; Client: Windows-Ordner DCS vor alter Setup-Wahl, bei DCS und DCS.openbeta der mit dem neueren Logs\\dcs.log");
         string Vr(string on) => $"options = {{\n\t[\"VR\"] = {{\n\t\t[\"custom_IPD_enable\"] = true,\n\t\t[\"enable\"] = {on},\n\t\t[\"pixel_density\"] = 1,\n\t}},\n\t[\"graphics\"] = {{\n\t\t[\"enable\"] = true,\n\t}},\n}}";
         const string Cl = "2026-10-08 11:44:51.233 INFO    APP (Main): Command line: \"D:\\DCS World\\bin/DCS.exe\" ";
         if (!VrOn(Vr("true"), "") || VrOn(Vr("false"), "") || VrOn("options = { [\"VR\"] = { [\"bloom\"] = true }, [\"x\"] = { [\"enable\"] = true } }", "")
@@ -312,14 +319,21 @@ static partial class Program
         }
         {   // Forum (Killg0re NL): 9-line in the game text one item per line, role JTAC/FACA only
             var nl = "Enfield one one, standby for 9-line. Line 1, IP Alpha. Line 4, elevation four niner zero zero feet. Line 5, one tank, stationary. Line 6, MGRS 38T LM 123 456. Remarks, final attack heading 270. Read back lines 4, 6 and restrictions";
-            string[] want = { "Enfield one one, standby for 9-line.", "Line 1, IP Alpha.", "Line 4, elevation four niner zero zero feet.", "Line 5, one tank, stationary.", "Line 6, MGRS 38T LM 123 456.", "Remarks, final attack heading 270.", "Read back lines 4, 6 and restrictions" };
+            string[] want = { "Enfield 1-1, standby for 9-line.", "Line 1, IP Alpha.", "Line 4, elevation 4900 feet.", "Line 5, one tank, stationary.", "Line 6, MGRS 38T LM 123 456.", "Remarks, final attack heading 270.", "Read back lines 4, 6 and restrictions" };
             var j = ShownText("JTAC", nl).Split('\n'); var fa = ShownText("FACA", nl).Split('\n');
             var tw = "Runway clear. Line up, wait. Line 3 is busy"; var jc = "Enfield one one, Darknight, loud and clear";
-            if (!j.SequenceEqual(want) || !fa.SequenceEqual(want) || ShownText("Tower", tw) != tw || ShownText("JTAC", jc) != jc) throw new Exception($"9-Line Spieltext: {string.Join("<NL>", j)}");
+            if (!j.SequenceEqual(want) || !fa.SequenceEqual(want) || ShownText("Tower", tw) != tw || ShownText("JTAC", jc) != "Enfield 1-1, Darknight, loud and clear") throw new Exception($"9-Line Spieltext: {string.Join("<NL>", j)}");
+            (string In, string Out)[] dg = {
+                ("Enfield one one, Marshal, case one recovery, expected BRC three five four, altimeter two niner niner two, hold angels 2, expected Charlie zero eight, report see me.", "Enfield 1-1, Marshal, case one recovery, expected BRC 354, altimeter 2992, hold angels 2, expected Charlie 08, report see me."),
+                ("Runway two five in use, contact Approach two five one decimal five.", "Runway 25 in use, contact Approach 251.5."),
+                ("Victory niner one, state five point niner.", "Victory 9-1, state 5.9."),
+                ("Two, go trail. Fox two.", "Two, go trail. Fox two."), ("Heading zero four five, one tank.", "Heading 045, one tank."),
+                ("Clouds 7000 feet. Temperature one niner. Visibility one zero kilometers.", "Clouds 7000 feet. Temperature 19. Visibility 10 kilometers.") };
+            foreach (var (i, o) in dg) if (ShownText("Tower", i) != o) throw new Exception($"Zahlen im Spieltext: {ShownText("Tower", i)}");
             if (RadioLabel("Kabul Ground", 284.25) != "Kabul Ground (284.25): " || RadioLabel("Kutaisi Tower", 265.0) != "Kutaisi Tower (265.0): ") throw new Exception($"Funkrad-Label rundet die Frequenz: {RadioLabel("Kabul Ground", 284.25)} | {RadioLabel("Kutaisi Tower", 265.0)}");
-            Console.WriteLine("OK   9-Line Spieltext: JTAC/FACA je Line/Remarks/Read back eine Zeile, andere Rollen und Texte ohne 9-Line unveraendert");
+            Console.WriteLine("OK   9-Line Spieltext: JTAC/FACA je Line/Remarks/Read back eine Zeile, andere Rollen und Texte ohne 9-Line unveraendert; Zahlen im Spieltext als Ziffern (Hoehenmesser, Frequenz, Rufzeichen 1-1, einzelnes Zahlwort bleibt)");
         }
-        {   // jojo (Discord, F/A-18): easy comms retunes COM2 while the first intent goes out, the DCS tanker never answers: intent once more (not at refusal, never Ready at join)
+        {   // jojo (Discord, F/A-18): DCS ignores the first intent right after un-muting its tanker (mission delays it 5 s, answer ~14 s later), if it never answers: intent once more (not at refusal, never Ready at join)
             var (ah0, ts0, tsl0) = (AiHook, TankerStage, TankerSleep);
             try
             {
@@ -334,9 +348,9 @@ static partial class Program
                     TankerMenu(tp, step, "g").Join();
                     return n;
                 }
-                var tr = new[] { Run("join", true, "-"), Run("join", true, "-", "Pre-contact"), Run("join", false, "-"), Run("intent", true, "-"), Run("join", true, "-", null) };
-                if (string.Join(",", tr) != "2,1,1,2,1") throw new Exception($"Tanker-Intent erneut: {string.Join(",", tr)}");
-                Console.WriteLine("OK   Tanker-Intent erneut: antwortet der DCS-Tanker nicht (Stufe bleibt -), einmal wiederholen (auch bei join); nicht bei Mission-Ablehnung, nicht wenn er antwortet oder die Stufe unbekannt ist");
+                var tr = new[] { Run("join", true, "-"), Run("join", true, "-", "Pre-contact"), Run("join", false, "-"), Run("intent", true, "-"), Run("join", true, "-", null), Run("join", true, Enumerable.Repeat("-", 12).Append("Pre-contact").ToArray()) };
+                if (string.Join(",", tr) != "2,1,1,2,1,1") throw new Exception($"Tanker-Intent erneut: {string.Join(",", tr)}");
+                Console.WriteLine("OK   Tanker-Intent erneut: DCS ignoriert den ersten Intent direkt nach dem Entstummen (die Mission verzoegert ihn 5 s, Antwort nach ~14 s abwarten); antwortet der DCS-Tanker nicht (Stufe bleibt -), einmal wiederholen (auch bei join); nicht bei Mission-Ablehnung, nicht wenn er antwortet oder die Stufe unbekannt ist");
             }
             finally { (AiHook, TankerStage, TankerSleep) = (ah0, ts0, tsl0); }
         }

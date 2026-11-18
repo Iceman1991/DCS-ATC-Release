@@ -1722,8 +1722,13 @@ local function start()
         elseif not fl:find("s") then   -- R304 tanker: a muted DCS tanker ignores "Intent to refuel" (forum jojojung, Hornet/KC-130 log), so it is audible while refuelling
           local g = o:getGroup()
           -- ponytail: fixed 15 min window after the last menu press; let the app report the end of the refuelling if that ever matters
+          local was = (loud[g:getName()] or 0) <= timer.getTime()
           loud[g:getName()] = timer.getTime() + 900
           pcall(function() g:getController():setOption(SILENCE, false) end)   -- the periodic silenceAll mutes it again after the window
+          if was then   -- DCS ignores "Intent to refuel" right after un-muting, a later press works (jojo, Discord, 0.23.19 log): the app presses 5 s later
+            local msg = string.format("M;%s;%s;%d;%d", clean(unit), kind, i, #list)
+            return timer.scheduleFunction(function() evt(msg) end, nil, timer.getTime() + 5)
+          end
         end
         return evt(string.format("M;%s;%s;%d;%d", clean(unit), kind, i, #list))
       end

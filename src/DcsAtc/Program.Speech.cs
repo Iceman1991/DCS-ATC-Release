@@ -12,8 +12,30 @@ namespace DcsAtc;
 static partial class Program
 {
     /// In-game text only (TTS unchanged), forum Killg0re NL: JTAC 9-line one item per line like DCS's own JTAC.
-    internal static string ShownText(string role, string text) =>
-        role is "JTAC" or "FACA" ? Regex.Replace(text, @"\. (?=Line [1-9]\b|Remarks\b|Read back\b)", ".\n") : text;
+    /// Forum: numbers as digits ("altimeter 2992", "251.5", "Enfield 1-1"); a single digit word stays a word ("case one", "fox two").
+    internal static string ShownText(string role, string text)
+    {
+        text = DigitChain.Replace(text, ShownDigits);
+        return role is "JTAC" or "FACA" ? Regex.Replace(text, @"\. (?=Line [1-9]\b|Remarks\b|Read back\b)", ".\n") : text;
+    }
+    const string Dg = "(?i:zero|one|two|three|four|five|six|seven|eight|nine|niner)";
+    static readonly Regex DigitChain = new($@"(?:\b(?<name>[A-Z][a-z]+) )?\b(?<n>{Dg}(?: (?:(?i:decimal|point) )?{Dg})*)\b");
+    static readonly HashSet<string> PlainNumber = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Alpha", "Alfa", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliett", "Kilo", "Lima", "Mike", "November", "Oscar", "Papa", "Quebec", "Romeo", "Sierra", "Tango", "Uniform", "Victor", "Whiskey", "Xray", "Yankee", "Zulu",
+        "Runway", "Angels", "Heading", "Channel", "Spot", "Stand", "Gate", "Line", "Case", "State", "Number", "Fox", "Track", "Radial", "Bearing", "Approach", "Tower", "Ground", "Departure", "Center",
+        "Temperature", "Dewpoint", "Visibility", "Wind", "Time", "Pattern", "Squawk", "Altimeter", "Information", "Frequency", "Contact"   // ATIS/weather: "Temperature one niner" is 19
+    };
+    static string ShownDigits(Match m)
+    {
+        string name = m.Groups["name"].Value, chain = m.Groups["n"].Value;
+        if (name != "" && Regex.IsMatch(name, $"^{Dg}$")) { chain = name + " " + chain; name = ""; }   // "Niner one" is a number, not a callsign
+        var w = chain.Split(' ').Select(x => x.ToLowerInvariant() is "decimal" or "point" ? "." : x.ToLowerInvariant() == "nine" ? "9" : Array.IndexOf(Tower.DigitWords, x.ToLowerInvariant()).ToString()).ToArray();
+        var pre = name != "" ? name + " " : "";
+        if (w.Contains(".")) return pre + string.Concat(w);   // "five point niner" -> 5.9
+        if (w.Length == 1) return m.Value;
+        return name != "" && w.Length == 2 && !PlainNumber.Contains(name) ? $"{name} {w[0]}-{w[1]}" : pre + string.Concat(w);
+    }
 
     // ------------------------------------------------------------ Speech recognition (whisper.cpp)
     /// Text and mean word confidence (0–1, Whisper token probabilities from -ojf).

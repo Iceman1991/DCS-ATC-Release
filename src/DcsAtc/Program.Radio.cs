@@ -871,7 +871,7 @@ static partial class Program
                 for (int t = 0; t < 2; t++)
                 {
                     AiCmd($"MENU;{unit};tanker;{group}");   // the mission keeps the DCS tanker audible for 15 min (a muted one ignores the menu), our controller speaks too; mission refuses without Easy Communication (issue #5)
-                    for (int i = 0; i < 10; i++)   // DCS wants Ready pre-contact once its tanker has answered (not at join: our tanker has not cleared the contact yet)
+                    for (int i = 0; i < 14; i++)   // DCS wants Ready pre-contact once its tanker has answered (not at join: our tanker has not cleared the contact yet)
                     {
                         TankerSleep(1500);
                         var s = TankerStage();
@@ -880,7 +880,7 @@ static partial class Program
                     }
                     bool sent; lock (TowerLock) sent = p.Ops.DcsIntent;
                     if (!sent) return;   // mission refused (no easy comms)
-                    if (t == 0) Log("[DCS] Funkmenü tanker: DCS-Tanker hat nicht geantwortet, Intent erneut");   // jojo (Discord, F/A-18): easy comms retunes COM2 to the tanker frequency while the first "Intent to refuel" goes out, the DCS tanker never hears it
+                    if (t == 0) Log("[DCS] Funkmenü tanker: DCS-Tanker hat nicht geantwortet, Intent erneut");   // DCS ignores the first "Intent to refuel" right after un-muting its tanker; the mission delays it 5 s (answer ~14 s after the command), the retry stays as fallback
                 }
             }
         }) { IsBackground = true };

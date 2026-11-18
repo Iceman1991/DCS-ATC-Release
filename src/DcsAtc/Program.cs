@@ -604,10 +604,13 @@ static partial class Program
     }
 
     /// Forum 0.16: Saved Games\DCS (DCS.openbeta if only that is there) of the Windows Saved Games folder, the one DCS uses (also when moved);
+    /// if both exist (old openbeta install still in use), the one whose Logs\dcs.log was written last (DCS rewrites it at every start), tie -> DCS;
     /// the folder chosen in setup only when that is missing (a stale choice after moving Saved Games used to win until uninstall).
     internal static string ClientSavedGames(string sg, string? chosen)
     {
-        var own = Path.Combine(sg, !Directory.Exists(Path.Combine(sg, "DCS")) && Directory.Exists(Path.Combine(sg, "DCS.openbeta")) ? "DCS.openbeta" : "DCS");
+        DateTime Log(string d) => File.GetLastWriteTimeUtc(Path.Combine(sg, d, "Logs", "dcs.log"));
+        var beta = Directory.Exists(Path.Combine(sg, "DCS.openbeta")) && (!Directory.Exists(Path.Combine(sg, "DCS")) || Log("DCS.openbeta") > Log("DCS"));
+        var own = Path.Combine(sg, beta ? "DCS.openbeta" : "DCS");
         return !Directory.Exists(own) && !string.IsNullOrWhiteSpace(chosen) && Directory.Exists(chosen) ? chosen : own;
     }
 

@@ -151,10 +151,10 @@ public sealed class Rollnetz
         {
             uint n = U(p - 4);
             if (n < 2 || n > 200 || p + 24 * (int)n > firstNode || !Near(p)) continue;
-            int a = (int)U(p - 16), bb = (int)U(p - 12);
-            if (a >= nodes.Count || bb >= nodes.Count || !Enumerable.Range(1, (int)n - 1).All(k => Near(p + 24 * k))) continue;
+            uint a = U(p - 16), bb = U(p - 12);   // unsigned: >= 0x80000000 as int is negative and would pass the range check
+            if (a >= (uint)nodes.Count || bb >= (uint)nodes.Count || !Enumerable.Range(1, (int)n - 1).All(k => Near(p + 24 * k))) continue;
             var poly = Enumerable.Range(0, (int)n).Select(k => (D(p + 24 * k), D(p + 24 * k + 16))).ToArray();
-            edges.Add((a, bb, poly, Enumerable.Range(1, poly.Length - 1).Sum(k => Tower.Dist(poly[k - 1].Item1, poly[k - 1].Item2, poly[k].Item1, poly[k].Item2))));
+            edges.Add(((int)a, (int)bb, poly, Enumerable.Range(1, poly.Length - 1).Sum(k => Tower.Dist(poly[k - 1].Item1, poly[k - 1].Item2, poly[k].Item1, poly[k].Item2))));
             p += 24 * (int)n - 1;
         }
         return edges.Count == 0 ? null : new Rollnetz { Nodes = nodes.ToArray(), Edges = edges.ToArray() };

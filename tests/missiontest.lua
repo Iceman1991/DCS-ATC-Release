@@ -348,9 +348,14 @@ files["9-5.cmd"] = "MENU;P1;tanker;" .. find("ATC Texaco")[1]:getName()   -- tan
 files["9-6.cmd"] = "MENU;P1;atc;26"
 files["9-7.cmd"] = "MENU;P1;atc;77"
 run(T + 1)
+assert(not has("M;P1;tanker;1;1"), "MENU tanker: M sofort trotz stummem Tanker (DCS ignoriert den ersten Intent)")
+assert(gSilent[find("ATC Texaco")[1]:getName()] == false, "Tanker nach MENU nicht hoerbar")
+run(T + 5)
 assert(has("M;P1;tanker;1;1"), "MENU tanker fehlt")
-do local tk, t0 = find("ATC Texaco")[1]:getName(), T   -- tanker menu: audible, stays so through the 60 s ticks of the 900 s window, muted again afterwards
+do local tk, t0 = find("ATC Texaco")[1]:getName(), T - 6   -- tanker menu: audible, stays so through the 60 s ticks of the 900 s window, muted again afterwards
   assert(gSilent[tk] == false, "Tanker nach MENU nicht hoerbar")
+  files["9-5b.cmd"] = "MENU;P1;tanker;" .. tk   -- already audible: M at once
+  run(T + 1); assert(select(2, ev():gsub("M;P1;tanker;1;1", "")) == 2, "zweites MENU tanker bei hoerbarem Tanker nicht sofort: " .. ev())
   run(t0 + 300); assert(gSilent[tk] == false, "Tanker im 900-s-Fenster wieder stumm")
   run(t0 + 1000); assert(gSilent[tk] == true, "Tanker nach dem Fenster nicht wieder stumm") end
 assert(gSilent["Hornet CV"] == true and gSilent.P1 == nil, "R308: KI-Flug der Mission nicht stumm bzw. Spielergruppe stumm")
@@ -386,7 +391,7 @@ run(T + 1)
 assert(select(2, ev():gsub("M;P1;dep;0;DCS%-ATC%-Dialog offen", "")) == 1, "Heißstart: DCS-Dialog offen fehlt: " .. ev())
 files["9-12.cmd"] = "MENU;P1;tanker;" .. find("ATC Texaco")[1]:getName()
 run(T + 1)
-assert(ev():find("M;P1;tanker;0;DCS-ATC-Dialog offen", 1, true) and select(2, ev():gsub("M;P1;tanker;1;1", "")) == 1, "Heißstart: Tanker trotz offenem DCS-Dialog: " .. ev())
+assert(ev():find("M;P1;tanker;0;DCS-ATC-Dialog offen", 1, true) and select(2, ev():gsub("M;P1;tanker;1;1", "")) == 2, "Heißstart: Tanker trotz offenem DCS-Dialog: " .. ev())
 menu("Bodenpersonal an/aus"); run(T + 310); assert(#find("ATC GC") == 0, "Bodenpersonal aus wirkt nicht")
 do local kinds = 0 for _, m in ipairs(MENU) do if type(m.arg) == "table" and m.arg.text and m.arg.text:find("^mayday mayday mayday, .+, request immediate landing$") then kinds = kinds + 1 end end
   assert(kinds > 0 and kinds % 5 == 0, "F10 MAYDAY mit Art (A30): " .. kinds) end

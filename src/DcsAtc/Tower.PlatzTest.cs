@@ -508,6 +508,32 @@ public partial class Tower
             }
         }
 
+        // Issue #51: edge node index >= 0x80000000 became a negative int, passed the range check and crashed Skipped/Spread; synthetic .rn4: nodes at 400/600, edges before
+        {
+            var rb = new byte[800];
+            void W(int o, double v) => BitConverter.GetBytes(v).CopyTo(rb, o);
+            void WU(int o, uint v) => BitConverter.GetBytes(v).CopyTo(rb, o);
+            void Edge(int p, uint a, uint b) { WU(p - 16, a); WU(p - 12, b); WU(p - 4, 2); W(p, 5000); W(p + 16, 5000); W(p + 24, 5100); W(p + 40, 5000); }
+            Edge(100, 0, 1);
+            Edge(166, 0xFFFFFFFE, 1);
+            for (int k = 0; k < 2; k++)
+            {
+                int p = 400 + 200 * k;
+                W(p - 96, 1); W(p - 56, 1); W(p - 16, 1); W(p, 5000 + 100 * k); W(p + 16, 5000); W(p + 24, 1);
+            }
+            var rf = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "dcsatc-rn51-" + Environment.ProcessId + ".rn4");
+            try
+            {
+                File.WriteAllBytes(rf, rb);
+                var net = Rollnetz.Read(rf);
+                Chk(net != null && net.Nodes.Length == 2 && net.Edges.Length == 1 && net.Edges.All(e => e.A >= 0 && e.B >= 0 && e.A < net.Nodes.Length && e.B < net.Nodes.Length), "Rollnetz: Kante mit Index >= 0x80000000 verworfen: " + net?.Edges.Length);
+                try { Chk(net?.RouteTo((5000, 5000), (5100, 5000), (x, z) => false) is { Lines.Count: 1 }, "Rollnetz: RouteTo über das Netz"); }
+                catch (Exception ex) { Chk(false, "Rollnetz: RouteTo wirft " + ex.GetType().Name); }
+                n += 2;
+            }
+            finally { File.Delete(rf); }
+        }
+
         if (err.Count > 0) throw new Exception("PlatzTest: " + string.Join(" | ", err));
         Console.WriteLine($"OK   PlatzTest: {all.Count(a => a.Charted)} Plätze mit Platzverfahren, {n} Prüfungen (Seite, Höhe, CRP, Initial, Ausflug, exit_only, Knickpunkt, Übergabe, Rollweg {nTaxi} Rampe x Bahn, Warteplatz, Backtrack, Standname)");
     }
