@@ -14,7 +14,7 @@ Manual: [English](docs/MANUAL.md) · [Deutsch](docs/ANLEITUNG.md) (installation,
 
 Special thanks to my supporters:
 
-![Heling](https://img.shields.io/badge/Heling-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white) ![buur](https://img.shields.io/badge/buur-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white) ![Pascali Alessandro](https://img.shields.io/badge/Pascali%20Alessandro-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white)
+![Heling](https://img.shields.io/badge/Heling-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white) ![buur](https://img.shields.io/badge/buur-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white) ![Pascali Alessandro](https://img.shields.io/badge/Pascali%20Alessandro-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white) ![Kampfkoloss](https://img.shields.io/badge/Kampfkoloss-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white)
 
 DCS-ATC is free and stays free. If you want to support it too:
 
@@ -125,6 +125,6 @@ If you want to support the project anyway, there is a small Ko-fi page:
 
 [![Buy me a coffee on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/christianwagner)
 
-**Heling**, **buur** and **Pascali Alessandro** have already done that. Special thanks to you.
+**Heling**, **buur**, **Pascali Alessandro** and **Kampfkoloss** have already done that. Special thanks to you.
 
 There is no obligation. That said, I appreciate every tip, big or small. Bug reports, logs and ideas help the project just as much. Either way, I will keep working on making our shared hobby a bit better.
