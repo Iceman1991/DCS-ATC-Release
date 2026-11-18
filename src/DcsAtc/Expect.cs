@@ -462,7 +462,7 @@ static partial class Program
         LoadModules("awacs");
         Want(Top() == "AWACS,Allgemein" || Top() == "AWACS,General", "nur awacs: Oberebene " + Top());
         Want(Sub("AWACS") is var a && a.Contains("AWACS: request picture") && !a.Contains("AWACS: vector to tanker"), "nur awacs: kein nearest tanker " + Sub("AWACS"));
-        Want(Sub(L("Allgemein", "General")) == "radio check,say again,debrief,settings", "nur awacs: Allgemein " + Sub(L("Allgemein", "General")));
+        Want(Sub(L("Allgemein", "General")) == "radio check,say again,Debriefing / Log,settings", "nur awacs: Allgemein " + Sub(L("Allgemein", "General")));
         Want(Said("Ground: request startup") == 0 && !RoleOn("Tower"), "atc aus: Ground antwortet");
         LoadModules(null);
         Pilots.Remove(p.Unit);

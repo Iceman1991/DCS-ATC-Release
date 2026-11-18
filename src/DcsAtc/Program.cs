@@ -150,7 +150,7 @@ sealed class AtisBulletin(string text)
 static partial class Program
 {
     const double NM = 1852;
-    internal static readonly string Root = FindRoot();
+    internal static string Root = FindRoot();   // not readonly: DiagnoseTest writes the real log into a temp directory
     static readonly string Ffmpeg = File.Exists(Path.Combine(Root, "tools", "ffmpeg", "ffmpeg.exe")) ? Path.Combine(Root, "tools", "ffmpeg", "ffmpeg.exe") : "ffmpeg";   // bundled, otherwise PATH
     internal static Config Cfg = new();
     static List<Airfield> Fields = new();
@@ -184,7 +184,7 @@ static partial class Program
         TestRun = args.Any(a => a is "--selftest" or "--anflugtest" or "--mptest" or "--asr-test" or "--srs-test" or "--platztest" or "--replay");
         if (args.Length >= 1 && args[0] == "--charttest") { if (args.Length > 1) Airfield.ChartFile = args[1]; ChartTest(); return 0; }   // chart data check, optionally a file instead of the embedded one
         if (args.Contains("--platztest")) { Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); return 0; }
-        if (args.Contains("--selftest")) { RadioTest(); ChartTest(); Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); Update.Test(); AtisTest(); CrewTest(); ExpectTest(); PromptTest(); GpuTest(); int rc = Tower.SelfTest(); ReplayTest(); return rc; }   // ReplayTest last: it runs the app loop (TickAll) and leaves static state behind
+        if (args.Contains("--selftest")) { RadioTest(); ChartTest(); Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); DiagnoseTest(); Update.Test(); AtisTest(); CrewTest(); ExpectTest(); PromptTest(); GpuTest(); int rc = Tower.SelfTest(); ReplayTest(); return rc; }   // ReplayTest last: it runs the app loop (TickAll) and leaves static state behind
         if (LoadConfig() is { } configError)
         {
             var message = configError + L("\nDatei korrigieren, speichern und DCS-ATC erneut starten.", "\nCorrect the file, save it and restart DCS-ATC.");
@@ -418,7 +418,9 @@ static partial class Program
 
     // follow along: console + atc-log.txt in the project folder
     static bool logDated;   // issue #7: date once per start, so a flight can be found
-    internal static void Log(string s) { if (SimLog != null) { SimLog.Add(s); return; } Console.WriteLine(s); Trace("LOG", s); try { File.AppendAllText(Path.Combine(Root, "atc-log.txt"), (logDated ? "" : $"===== {DateTime.Now:yyyy-MM-dd} =====\r\n") + $"{Clock:HH:mm:ss} {s}\r\n"); logDated = true; } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { } }
+    /// First line of a run in atc-log.txt: date and app version (a bug report shows which build wrote the log).
+    internal static string LogHeader() => $"===== {DateTime.Now:yyyy-MM-dd} DCS-ATC {Update.Own} =====";
+    internal static void Log(string s) { if (SimLog != null) { SimLog.Add(s); return; } Console.WriteLine(s); Trace("LOG", s); try { File.AppendAllText(Path.Combine(Root, "atc-log.txt"), (logDated ? "" : LogHeader() + "\r\n") + $"{Clock:HH:mm:ss} {s}\r\n"); logDated = true; } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { } }
 
     // Debug log for bug reports: atc-debug.txt "HH:mm:ss.fff [KAT] Text", rolls over to atc-debug.old.txt via TraceMax. Live only with Config.DebugLog (TraceOn), tests without file.
     internal static bool TraceOn;
@@ -1057,7 +1059,7 @@ static partial class Program
     internal static bool TextOn(string t) =>
         t.StartsWith("Range:") ? On("range") : t.StartsWith("AWACS:") ? On("awacs") && (t != "AWACS: vector to tanker" || On("tanker"))
         : t.StartsWith("Tanker:") ? On("tanker") : t.StartsWith("Carrier:") ? On("carrier") : t.StartsWith("JTAC:") ? On("jtac") : t.StartsWith("Center:") ? On("center")
-        : t is "radio check" or "say again" or "debrief" or "settings" || On("atc");
+        : t is "radio check" or "say again" or "debrief" or "mark log" or "settings" || On("atc");
     internal static void LoadModules(string? text) =>
         Mods = text?.ToLowerInvariant().Split(new[] { ',', ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).ToHashSet();
 

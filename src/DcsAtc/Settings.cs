@@ -50,6 +50,44 @@ static class Settings
         var info = zip.CreateEntry("info.txt").Open();
         using var iw = new StreamWriter(info);
         iw.Write($"DCS-ATC {Update.Own}\r\n{RuntimeInformation.OSDescription}\r\n{DateTime.Now:yyyy-MM-dd HH:mm:ss zzz}\r\n");
+        var marks = ReportFields(ReadLog(dir)).Marks;
+        if (marks.Count > 0) iw.Write("\r\nLog marks of this run:\r\n" + string.Join("\r\n", marks) + "\r\n");
+    }
+
+    /// atc-log.txt while the app writes it (empty if missing).
+    static string ReadLog(string dir)
+    {
+        try
+        {
+            using var fs = new FileStream(Path.Combine(dir, "atc-log.txt"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            return new StreamReader(fs).ReadToEnd();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return ""; }
+    }
+
+    /// Bug report data from the last run in atc-log.txt (the settings window is its own process): map from the Session line, aircraft from the last
+    /// "Spieler ... (type) als ..." line, the log marks of the run and the date and time of the last one ("2026-11-18 22:15:03", empty without a mark).
+    internal static (string Map, string Aircraft, string When, List<string> Marks) ReportFields(string log)
+    {
+        var run = log[Math.Max(0, log.LastIndexOf("===== ", StringComparison.Ordinal))..];
+        string Last(string pattern) => Regex.Matches(run, pattern, RegexOptions.Multiline).LastOrDefault()?.Groups[1].Value ?? "";
+        var marks = Regex.Matches(run, @"^\d\d:\d\d:\d\d \[MARK\] .*$", RegexOptions.Multiline).Select(m => m.Value.TrimEnd()).ToList();
+        var time = marks.Count > 0 ? marks[^1][..8] : "";
+        var day = Regex.Match(run, @"^===== (\d{4}-\d\d-\d\d)").Groups[1].Value;
+        return (Last(@"\[ATC\] Session: map ([^,\r\n]+)"), Last(@"\[ATC\] Spieler .* \(([^()\r\n]+)\) als "), time == "" ? "" : (day + " " + time).Trim(), marks);
+    }
+
+    /// New-issue form of the public repo with the fields of .github/ISSUE_TEMPLATE/bug_report.yml filled in (empty values left out). No names, callsigns or transcripts.
+    internal static string ReportUrl(string version, string map, string aircraft, string when) =>
+        "https://github.com/Iceman1991/DCS-ATC-Release/issues/new?template=bug_report.yml" + string.Concat(
+            new[] { ("version", version), ("map", map), ("aircraft", aircraft), ("when", when) }.Where(f => f.Item2 != "").Select(f => $"&{f.Item1}={Uri.EscapeDataString(f.Item2)}"));
+
+    /// Diagnostics zip on the desktop (the button "Create diagnostics zip" and "Report a problem"), the path of it.
+    static string DiagnosticsZip()
+    {
+        var zipPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), $"DCS-ATC-diagnostics-{DateTime.Now:yyyyMMdd-HHmm}.zip");
+        using (var fs = File.Create(zipPath)) CollectDiagnostics(Program.Root, fs);
+        return zipPath;
     }
 
     [DllImport("kernel32.dll")] static extern bool FreeConsole();
@@ -524,13 +562,23 @@ static class Settings
         {
             try
             {
-                var zipPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), $"DCS-ATC-diagnostics-{DateTime.Now:yyyyMMdd-HHmm}.zip");
-                using (var fs = File.Create(zipPath)) CollectDiagnostics(Program.Root, fs);
-                Process.Start("explorer.exe", $"/select,\"{zipPath}\"");
+                Process.Start("explorer.exe", $"/select,\"{DiagnosticsZip()}\"");
             }
             catch (Exception ex) { MessageBox.Show(ex.Message, "DCS-ATC"); }
         };
         Row(L("Logs, Einstellungen und Charts für Fehlerberichte (ohne API-Schlüssel)", "Logs, settings and charts for bug reports (without API key)"), diag);
+        var problem = Btn(L("Problem melden …", "Report a problem …"), false);
+        problem.Click += (_, _) =>
+        {
+            try
+            {
+                Process.Start("explorer.exe", $"/select,\"{DiagnosticsZip()}\"");   // the zip is attached to the issue by hand
+                var r = ReportFields(ReadLog(Program.Root));
+                Process.Start(new ProcessStartInfo(ReportUrl(Update.Own, r.Map, r.Aircraft, r.When)) { UseShellExecute = true });
+            }
+            catch (Exception ex) { MessageBox.Show(ex.Message, "DCS-ATC"); }
+        };
+        Row(L("Diagnose-Zip erstellen und das Formular für den Fehlerbericht auf GitHub öffnen (Zip dort anhängen)", "Create the diagnostics zip and open the bug report form on GitHub (attach the zip there)"), problem);
         Group(L("Spracherkennung *", "Speech recognition *"));
         var gpu = Check(L("Auf der Grafikkarte rechnen (Vulkan), sonst CPU", "Run on the graphics card (Vulkan), otherwise CPU"), cfg.AsrGpu);
         var apiUrl = Field(cfg.AsrApiUrl, hint: "https://…/v1/audio/transcriptions");

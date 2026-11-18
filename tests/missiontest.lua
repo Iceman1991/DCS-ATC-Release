@@ -404,6 +404,24 @@ do local g, tx = {}, {}   -- R390: F10 like the radio wheel – groups, wheel na
   assert(tx["Tower: base, gear down, touch and go"] == "Base, touch and go" and not tx["Tower: final, gear down, touch and go"]
     and tx["Approach: traffic in sight"] and tx["Approach: report airspeed"] and tx["Tanker: visual"] and tx["Tanker: refuel complete"]
     and tx["Range: in hot"] == "In hot" and tx["Carrier: ball"] and tx["AWACS: checking in"] and tx["AWACS: bingo, RTB"] and tx["Tower: request S F O"] and tx["Approach: cancel approach"], "F10 Antwort-Einträge (R390)") end
+assert(has("SESSION;Caucasus;;1"), "SESSION-Ereignis (Karte, Easy Communication an) fehlt")   -- bug reports: map, mission name, Easy Communication
+do   -- Log mark: F10 "Debriefing / Log" with Debriefing and "mark log" (like the radio wheel)
+  local log, tx = false, {}
+  for _, x in ipairs(GROUPS) do if x.name == "Debriefing / Log" then log = x.n end end
+  for _, m in ipairs(MENU) do if type(m.arg) == "table" and m.arg.text then tx[m.arg.text] = m.name end end
+  assert(log == 2 and tx["debrief"] == "Debriefing" and tx["mark log"], "F10 Debriefing / Log: " .. tostring(log))
+end
+do   -- Easy Communication off in the mission's forced options -> 0, mission name from env.mission.sortie
+  local fo, so = env.mission.forcedOptions, env.mission.sortie
+  env.mission.forcedOptions, env.mission.sortie = { easyCommunication = false }, "Op Test"
+  for i = #queue, 1, -1 do queue[i] = nil end
+  for i = #handlers, 1, -1 do handlers[i] = nil end
+  DCSATC, DCSATC_SPAWNTEST, DCSATC_OPTIONS, MENU, GROUPS = nil, nil, { crew = true }, {}, {}
+  dofile(arg[1])
+  run(T + 3)
+  assert(has("SESSION;Caucasus;Op Test;0"), "SESSION-Ereignis ohne Easy Communication fehlt")
+  env.mission.forcedOptions, env.mission.sortie = fo, so
+end
 do local fh = realOpen(tmp .. "\\DcsAtc-Terrain-Caucasus-map.txt.tmp", "r"); assert(fh and fh:read("*l"):find("^Map;"), "Kartenraster (V15) fehlt"); fh:close() end
 for _, id in ipairs({ "23", "26" }) do local fh = realOpen(tmp .. "\\DcsAtc-Terrain-Caucasus-" .. id .. ".txt.tmp", "r"); assert(fh, "Platzraster " .. id .. " fehlt"); local s = fh:read("*a") fh:close()
   assert(select(2, s:gsub("\n", "")) == 62 and select(2, s:match("\n([^\n]*)"):gsub(",", "")) == 60, "Platzraster " .. id .. " nicht 61x61") end   -- one after another (queue)

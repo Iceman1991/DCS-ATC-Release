@@ -108,7 +108,7 @@ sealed class Wheel : Form
             new(L("Platz wählen", "Select airfield"), Sub: Array.Empty<Item>()),   // content on opening: nearest airfields (Near)
             new("Radio check", "radio check"), new("Say again", "say again"), new("QNH / weather", "request weather"), new(L("ATIS hören", "Listen to ATIS"), "atis"),
             new("Request zone transit", "Approach: request zone transit"),   // N3: transit through the control zone
-            new(L("Prüfflug an/aus", "Checkride on/off"), "checkride"), new("Debriefing", "debrief"), new(L("Einstellungen", "Settings"), "settings"),
+            new(L("Prüfflug an/aus", "Checkride on/off"), "checkride"), new("Debriefing / Log", Sub: new Item[] { new("Debriefing", "debrief"), new(L("Log markieren", "Mark log"), "mark log") }), new(L("Einstellungen", "Settings"), "settings"),
         }),
     };
     /// A30: type of emergency; Program adds position, altitude and heading (PilotCall), Approach picks the nearest suitable airfield.

@@ -145,6 +145,7 @@ static partial class Program
         foreach (var l in jl.Where(l => l.Alive && JtacSeen.Add(l.Id)))   // forum Killg0re NL: one console line per controller (also one a script spawns later), so he sees it was recognised
             Log($"[JTAC] {l.Cs} ({Ops.KindTxt(l)}, {l.Id}) {Ops.FreqTxt(l)}");
         JtacSeen.IntersectWith(jl.Where(l => l.Alive).Select(l => l.Id));
+        LogStations();
         Carrier.Boats = boats;
         Carrier.RadarShips = radars;
         Flights.Units = fu;

@@ -414,6 +414,36 @@ static partial class Program
         where b.Item2 > 0 && Math.Abs(kv.Value - b.Item2) < 0.005
         select FormattableString.Invariant($"{kv.Key} {kv.Value:0.0##} = {f.Name} {b.Item1}");
 
+    /// Bug reports: the AI stations of the mission as one line per kind ("[ATC] Tanker: Texaco 251.0, Shell 252.5") and a warning for each one on an
+    /// airfield frequency of the map (FreqClashes: "Tanker Texaco 251.0 = Krasnodar-Center UHF").
+    internal static IEnumerable<string> StationLines(IEnumerable<Airfield> fields, IEnumerable<(string Kind, string Cs, double Freq)> stations)
+    {
+        var st = stations.Where(s => s.Freq > 0).ToList();
+        foreach (var g in st.GroupBy(s => s.Kind))
+            yield return $"[ATC] {g.Key}: " + string.Join(", ", g.Select(s => FormattableString.Invariant($"{s.Cs} {s.Freq:0.0##}")));
+        foreach (var s in st)
+            foreach (var c in FreqClashes(fields, new() { [$"{s.Kind} {s.Cs}"] = s.Freq }))
+                yield return "[ATC] Frequency clash: " + c;
+    }
+
+    static double stationsAt;   // Now() at which StationLines of the new mission is logged (state data of tankers/AWACS needs a few seconds), 0 = done
+    static void LogStations()
+    {
+        if (stationsAt <= 0 || Now() < stationsAt) return;
+        stationsAt = 0;
+        string Cs(string g) => Ops.Callsigns.GetValueOrDefault(g, g);
+        foreach (var l in StationLines(Fields, Ops.AwacsFreq.Select(a => ("AWACS", Cs(a.Key), a.Value))
+                     .Concat(Ops.TankerFreq.Select(t => ("Tanker", Cs(t.Key), Ops.TankerFreqOf(t.Key))))
+                     .Concat(Ops.Leaders.Where(l => l.Alive).Select(l => (l.Kind == "faca" ? "FAC(A)" : "JTAC", l.Cs, l.Freq > 0 ? l.Freq : Ops.DefFreq)))))
+            Log(l);
+    }
+
+    /// Bug reports: one line at mission start (event SESSION;map;mission;easy from DcsAtcMission.lua): map, mission, Easy Communication,
+    /// plus the settings that change what the player sees (only when off) and the mode.
+    internal static string SessionLine(string[] e, Config cfg, bool dedicated) =>
+        $"[ATC] Session: map {e[1]}{(e.Length > 2 && e[2] != "" ? $", mission \"{e[2]}\"" : "")}, Easy Communication {(e.Length > 3 && e[3] == "0" ? "off" : "on")}, mode {(dedicated ? "dedicated" : cfg.Mode)}"
+        + (cfg.RadioText ? "" : ", RadioText off") + (cfg.HintText ? "" : ", HintText off");
+
     static Tower TowerFor(Pilot p, Airfield f)
     {
         if (!p.Towers.TryGetValue(f.Name, out var t)) p.Towers[f.Name] = t = new Tower(f, p.Callsign);

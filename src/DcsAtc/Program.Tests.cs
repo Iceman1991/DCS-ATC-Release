@@ -11,6 +11,90 @@ using NAudio.Wave;
 namespace DcsAtc;
 static partial class Program
 {
+    /// Self-test bug report helpers: log header with version, session line, station list with frequency clash, log mark (radio wheel and F10), report URL, marks in info.txt.
+    static void DiagnoseTest()
+    {
+        void Check(bool ok, string what) { if (!ok) throw new Exception("Diagnose: " + what); }
+        // log header with the version (real file in a temp directory)
+        var (root0, sl0, dated0, fs0) = (Root, SimLog, logDated, Fields);
+        var tmp = Directory.CreateTempSubdirectory("DcsAtc-Diag-").FullName;
+        try
+        {
+            (Root, SimLog, logDated) = (tmp, null, false);
+            Log("probe");
+            var first = File.ReadLines(Path.Combine(tmp, "atc-log.txt")).First();
+            Check(first == $"===== {DateTime.Now:yyyy-MM-dd} DCS-ATC {Update.Own} =====", "Kopfzeile: " + first);
+        }
+        finally { (Root, SimLog, logDated) = (root0, sl0, dated0); try { Directory.Delete(tmp, true); } catch (IOException) { } }
+        Console.WriteLine("OK   Diagnose: Log-Kopfzeile mit Version");
+
+        // session line
+        var cfg = new Config { RadioText = false, HintText = false };
+        var s1 = SessionLine(new[] { "SESSION", "Caucasus", "Op Test", "0" }, cfg, false);
+        var s2 = SessionLine(new[] { "SESSION", "Nevada", "", "1" }, new Config(), true);
+        Check(s1 == "[ATC] Session: map Caucasus, mission \"Op Test\", Easy Communication off, mode host, RadioText off, HintText off", s1);
+        Check(s2 == "[ATC] Session: map Nevada, Easy Communication on, mode dedicated", s2);
+        Console.WriteLine("OK   Diagnose: Sitzungszeile (Karte, Mission, Easy Communication, Modus, RadioText/HintText)");
+
+        // station list: one line per kind, tanker on an airfield frequency gives a warning
+        var kut = Airfield.Kutaisi();
+        var kr = new Airfield { Name = "Krasnodar-Center", X = kut.X + 300 * NM, Z = kut.Z, Uhf = 251.0 };
+        var lines = StationLines(new[] { kut, kr }, new[] { ("AWACS", "Overlord", 251.5), ("Tanker", "Texaco", 251.0), ("Tanker", "Shell", 252.5), ("JTAC", "Axeman", 0.0) }).ToList();
+        Check(lines.Contains("[ATC] AWACS: Overlord 251.5") && lines.Contains("[ATC] Tanker: Texaco 251.0, Shell 252.5") && !lines.Any(l => l.Contains("Axeman"))
+              && lines.Contains("[ATC] Frequency clash: Tanker Texaco 251.0 = Krasnodar-Center UHF") && lines.Count(l => l.Contains("clash")) == 1, string.Join(" / ", lines));
+        Console.WriteLine("OK   Diagnose: Stationsliste je Art mit Frequenzwarnung");
+
+        // log mark: wheel/F10 text "mark log" -> [MARK] line and info text, only the last 3 radio calls
+        try
+        {
+            Fields = new() { kut };
+            SimLog = new();
+            lock (RadioLog) { RadioLog.Clear(); for (int i = 1; i <= 5; i++) RadioLog.Add((new DateTime(2026, 1, 1, 12, i, 0), "Kutaisi Tower", "call " + i, 0, false)); }
+            var pl = new Pilot { Unit = "U1", Callsign = "Enfield 1-1", Type = "F-16C", Tel = new Telemetry(1524, 0, 128.6, Math.PI * 1.5, kut.X + 3 * NM, kut.Z, 0, 0, 0) };
+            Request(pl, "mark log", "RAD", true);
+            var tx = SayQueue.TryTake(out var t) ? t : null;
+            var mark = SimLog.FirstOrDefault(l => l.StartsWith("[MARK]")) ?? "";
+            Check(mark.Contains("F-16C") && mark.Contains("near Kutaisi 3.0 NM") && mark.Contains("5000 ft, hdg 270 true, 250 kt") && mark.Contains("call 5") && mark.Contains("call 3") && !mark.Contains("call 2"), mark);
+            Check(tx != null && (tx.Text.Contains("Log markiert") || tx.Text.Contains("Log marked")) && tx.Text.Contains(":"), tx?.Text ?? "keine Meldung");
+            SimLog.Clear();
+            Request(pl, "mark log", "T", false);   // by voice it is no wheel text
+            Check(!SimLog.Any(l => l.StartsWith("[MARK]")), "Sprache");
+        }
+        finally { (SimLog, Fields) = (sl0, fs0); lock (RadioLog) RadioLog.Clear(); while (SayQueue.TryTake(out _)) { } }
+        Console.WriteLine("OK   Diagnose: Log markieren (Funkrad/F10) schreibt [MARK] mit Typ, Platz, Höhe, Kurs, Funk und meldet die Zeit");
+
+        // wheel: "Debriefing / Log" submenu in group General, group still at most 9 entries
+        var gen = Wheel.All.FirstOrDefault(g => g.Label is "Allgemein" or "General");
+        var sub = gen?.Sub?.FirstOrDefault(i => i.Label == "Debriefing / Log");
+        Check(sub?.Sub != null && sub.Sub.Any(i => i.Text == "debrief") && sub.Sub.Any(i => i.Text == "mark log") && gen!.Sub!.Length <= 9, "Funkrad-Untermenü");
+        Console.WriteLine("OK   Diagnose: Funkrad Allgemein -> Debriefing / Log (Debriefing, Log markieren), höchstens 9 Einträge");
+
+        // report data from the log of the last run and the URL
+        var log = "===== 2026-11-17 DCS-ATC 0.23.0 =====\r\n10:00:00 [ATC] Session: map Syria, Easy Communication on, mode host\r\n10:00:01 [MARK] old\r\n"
+                + "===== 2026-11-18 DCS-ATC 0.23.18-alpha =====\r\n22:00:00 [ATC] Session: map Caucasus, mission \"Op\", Easy Communication on, mode host\r\n22:00:05 [ATC] Spieler Max Mustermann (F-16C) als Enfield 1-1\r\n22:14:00 [MARK] a\r\n22:15:03 [MARK] b | x\r\n";
+        var r = Settings.ReportFields(log);
+        Check(r.Map == "Caucasus" && r.Aircraft == "F-16C" && r.When == "2026-11-18 22:15:03" && r.Marks.Count == 2 && Settings.ReportFields("").Map == "", $"{r.Map}/{r.Aircraft}/{r.When}/{r.Marks.Count}");
+        var url = Settings.ReportUrl("0.23.18-alpha", r.Map, r.Aircraft, r.When);
+        Check(url == "https://github.com/Iceman1991/DCS-ATC-Release/issues/new?template=bug_report.yml&version=0.23.18-alpha&map=Caucasus&aircraft=F-16C&when=2026-11-18%2022%3A15%3A03", url);
+        Check(!url.Contains("Enfield") && !url.Contains("Mustermann") && Settings.ReportUrl("1", "A B&c", "", "").EndsWith("&map=A%20B%26c"), "URL-Kodierung");
+        Console.WriteLine("OK   Diagnose: Fehlerbericht-URL aus dem Log des letzten Laufs, kodiert, ohne Rufzeichen und Namen");
+
+        // marks in info.txt of the diagnostics zip
+        var dir = Directory.CreateTempSubdirectory("DcsAtc-Diag2-").FullName;
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "atc-log.txt"), log);
+            using var ms = new MemoryStream();
+            Settings.CollectDiagnostics(dir, ms);
+            ms.Position = 0;
+            using var zip = new System.IO.Compression.ZipArchive(ms);
+            var info = new StreamReader(zip.GetEntry("info.txt")!.Open()).ReadToEnd();
+            Check(info.Contains("22:14:00 [MARK] a") && info.Contains("22:15:03 [MARK] b") && !info.Contains("old"), info);
+        }
+        finally { try { Directory.Delete(dir, true); } catch (IOException) { } }
+        Console.WriteLine("OK   Diagnose: Log-Marken des Laufs in info.txt der Diagnose-Zip");
+    }
+
     /// Self-test: settings window writes config.jsonc (comments stay, missing keys added), callsign normalized.
     static void ConfigTest()
     {

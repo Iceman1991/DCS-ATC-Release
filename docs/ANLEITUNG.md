@@ -256,7 +256,7 @@ Ground führt dich mit Richtung und Entfernung zurück zu deiner Startposition. 
 
 Rollst du ohne Rollfreigabe weiter (schneller als 5 kt und mehr als 150 m von der Bahn), bekommst du „hold position, you are not cleared to taxi. Request taxi.“ und einen Verstoß.
 
-**10. Debriefing.** Funkrad → Allgemein → Debriefing listet deinen Flug, auch Luftraumverstöße.
+**10. Debriefing.** Funkrad → Allgemein → Debriefing / Log → Debriefing listet deinen Flug, auch Luftraumverstöße.
 
 ## Wege zu funken
 
@@ -574,7 +574,7 @@ Die Pilotenstimme ergänzt Position, Höhe und Kurs, und DCS-ATC wählt den näc
 | ATIS hören | Liest die aktuelle ATIS deines Platzes. Ohne Wetterdaten in der Mission kommt stattdessen ein Texthinweis. |
 | Request zone transit | `request zone transit` (an Approach) |
 | Prüfflug an/aus | Startet oder beendet einen [Prüfflug](#prüfflug) |
-| Debriefing | Zeigt dein bisheriges Debriefing als Text im Spiel |
+| Debriefing / Log | **Debriefing** zeigt dein bisheriges Debriefing als Text im Spiel. **Log markieren** schreibt eine `[MARK]`-Zeile in `atc-log.txt` mit Uhrzeit, Position, Höhe, Phase beim Lotsen und den letzten drei Funksprüchen. Nutze es in dem Moment, in dem etwas schiefgeht, und nenne die Uhrzeit im Fehlerbericht. |
 | Einstellungen | Öffnet das Einstellungsfenster |
 
 #### Funkrad im Multiplayer (Mitspieler)
@@ -622,7 +622,7 @@ In jeder Mission mit DCS-ATC bekommt jede Spielergruppe **F10 Andere → DCS-ATC
 | AWACS / Tanker / Center | AWACS → Check in · Picture · Bogey dope · Sort · Nächster Tanker · Vektor nächster Platz · Check out · Gefecht → Committing / Fox three / Splash / Defending / Request support / Unable / Winchester / Bingo, RTB / Say again. Tanker → Request rejoin · Visual · Observation · Pre-contact · Refuel complete · Abort · Say position · Center → Check in · Request altitude · Request direct · Leaving frequency |
 | Carrier (nur wenn die Mission einen Träger hat) | Marshal check in · See you at · Initial · Commencing · Platform · Ball · Clara · Pigeons · Strike check in/out · Red Crown check in/out (nur mit eigenem Kreuzer) |
 | Notfall | MAYDAY → Art · PAN PAN → Art · Spritmangel · Hung ordnance · Flameout, high key · Notfall beenden · CSAR übernehmen · CSAR Rauch/Leuchtkugel (Arten: Triebwerksausfall, Treibstoff (nur MAYDAY), Hydraulik, Gefechtsschaden, Medizinisch, Vogelschlag) |
-| Allgemein | Radio check · Say again · QNH / weather · ATIS hören · Request zone transit · Prüfflug an/aus · Debriefing |
+| Allgemein | Radio check · Say again · QNH / weather · ATIS hören · Request zone transit · Prüfflug an/aus · Debriefing / Log |
 | Einstellungen | Bodenpersonal an/aus · Anzeigen |
 
 F10-Sprüche werden wie Rad-Sprüche behandelt, mit Pilotenstimme und Platzwahl. Das F10-Menü hat dieselben Gruppen, Namen und Texte wie das Rad, höchstens 9 Einträge je Ebene; nur *Platz wählen* fehlt (dafür das Rad nehmen oder den Platznamen sagen). Das Rad blendet Einträge aus, die zu deinem Flugzustand nicht passen, F10 zeigt immer alle; ein unpassender Ruf wird wie gewohnt beantwortet (z. B. *unable*).
@@ -1424,7 +1424,7 @@ Das Debriefing sammelt:
 - die Zahl der vom Lotsen abgelehnten Sprüche
 - Einträge von Range, Tanker, Träger und AWACS
 
-Parkst du nach einem Flug, wird es automatisch gezeigt und unter `%LOCALAPPDATA%\Programs\DCS-ATC\debrief\<Datum>_<Uhrzeit>_<Rufzeichen>.txt` gespeichert. Jederzeit abrufbar über Rad oder F10 **Allgemein → Debriefing**.
+Parkst du nach einem Flug, wird es automatisch gezeigt und unter `%LOCALAPPDATA%\Programs\DCS-ATC\debrief\<Datum>_<Uhrzeit>_<Rufzeichen>.txt` gespeichert. Jederzeit abrufbar über Rad oder F10 **Allgemein → Debriefing / Log → Debriefing**.
 
 Gibt es den Dateinamen schon, erhält der nächste Bericht die Endung `-2.txt`, dann `-3.txt`. Ist der Zielordner gesperrt, legt DCS-ATC den fertigen Bericht unter `%LOCALAPPDATA%\DCS-ATC\pending-debriefs` ab. Die laufende App versucht den Export alle 30 Sekunden erneut, auch nach einem Neustart. Der Flug zählt dabei einmal im Logbuch. Meldet die App „nur im Arbeitsspeicher“, stelle vor dem Beenden den Schreibzugriff wieder her.
 
@@ -2919,6 +2919,7 @@ Links wählst du die Seite: Allgemein, Stimmen, Funk & Verkehr, AWACS, Frequenze
 | **Debug-Log für Fehlerberichte (atc-debug.txt)** | an/aus | `DebugLog` |
 | **Diagnose-Zip erstellen …** | Knopf | legt `DCS-ATC-diagnostics-<Datum>-<Uhrzeit>.zip` auf den Desktop (siehe Fehlerbericht unten) |
 | **Installationsbericht erstellen …** | Knopf | Erstellt eine Textdatei mit DCS-ATC-Version, Windows-Version, Zeitpunkt und dem Installationsstatus der mitgelieferten Sprachkomponenten. |
+| **Problem melden …** | Knopf | Erstellt die Diagnose-Zip, zeigt sie im Explorer und öffnet das Formular für den Fehlerbericht auf GitHub, vorausgefüllt mit Version, Karte, Flugzeug und der Uhrzeit deiner letzten Log-Markierung. Die Zip hängst du dort selbst an. |
 | **Funk-Selbsttest starten** | Knopf | Prüft Mikrofonpegel, lokale Spracherkennung, Erzeugung der Sprachantwort und den lokalen SRS-Port. |
 | **Bahnbefeuerung (nachts)** | stumm / mit DCS-Lotse (hörbar) / aus. Gilt ab dem nächsten Start. | `RunwayLights` |
 | **Höhenmesser-Einstellung** | automatisch (nach Flugzeugtyp) / hPa (QNH) / inHg (altimeter) | `AltimeterUnit` |
@@ -3090,6 +3091,12 @@ Wenn sich die Einstellungen nicht öffnen lassen, starte PowerShell im DCS-ATC-P
 Bei einem Problem während des Flugs helfen Uhrzeit, Platz, eine kurze Beschreibung und passende Auszüge aus `atc-log.txt` und `atc-debug.txt`. Bei einem Problem mit Vektoren oder dem Weg zur Bahn dazu `airfields.txt` aus dem DCS-ATC-Ordner, die Dateien `DcsAtc-Terrain-*.txt` aus `%TEMP%` und deine `charts.jsonc`: damit lässt sich der Flug aus deinem Log durch die aktuelle Version noch einmal abspielen (`DcsAtc.exe --replay atc-debug.txt`, die Dateien neben dem Log; listet die Lotsensprüche des Logs neben denen der aktuellen Version).
 
 Einfacher: Unter Erweitert, Diagnose, packt **Diagnose-Zip erstellen …** alles in eine Zip-Datei auf dem Desktop und zeigt sie im Explorer: `atc-log.txt`, `atc-debug.txt`, `config.jsonc`, `frequencies.jsonc`, `modules.txt`, alle `charts*.jsonc` (auch aus `charts\`) und `info.txt` mit Version, Windows und Uhrzeit. Der API-Schlüssel (`AsrApiKey`) fehlt in der Kopie, die Datei auf der Platte bleibt unverändert. Die Logs enthalten Rufzeichen und das, was auf dem Funk gesagt wurde; prüfe die Zip, bevor du sie weitergibst. Ist ein Log größer als 20 MB, steht nur sein Ende darin. Auch das Debug-Log enthält den API-Schlüssel nicht mehr; ältere Logs werden beim nächsten Start bereinigt. Wer einen `atc-debug.txt` gepostet hat, während ein Schlüssel eingetragen war, sollte diesen Schlüssel ersetzen.
+
+Am schnellsten: **Problem melden …** (an derselben Stelle) erstellt diese Zip, zeigt sie im Explorer und öffnet das Formular für den Fehlerbericht auf GitHub, in dem Version, Karte, Flugzeug und die Uhrzeit deiner letzten Log-Markierung schon eingetragen sind. Du ziehst nur noch die Zip ins Formular und beschreibst, was passiert ist. Ohne GitHub-Konto schick dieselbe Zip im Forum oder über Discord.
+
+Den Moment markieren: Geht im Flug etwas schief, wähle im Funkrad oder in F10 **Allgemein → Debriefing / Log → Log markieren**. DCS-ATC schreibt eine `[MARK]`-Zeile mit Uhrzeit, Position, Höhe, Phase beim Lotsen und den letzten drei Funksprüchen in `atc-log.txt` und zeigt dir die Uhrzeit. Die Markierungen des Laufs stehen auch in `info.txt` in der Zip.
+
+`atc-log.txt` beginnt außerdem jeden Lauf mit Datum und Version und nennt beim Missionsstart Karte, Mission, ob Easy Communication an ist, sowie AWACS, Tanker und JTACs mit ihren Frequenzen. Liegt einer davon auf einer Platzfrequenz, steht das in einer eigenen Zeile, etwa *„Frequency clash: Tanker Texaco 251.0 = Krasnodar-Center UHF“*.
 
 ### Fehlersuche
 

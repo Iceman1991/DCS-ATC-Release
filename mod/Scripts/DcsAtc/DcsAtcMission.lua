@@ -103,7 +103,7 @@ local function start()
     local p = t:match("^(%a+):")
     if p == "Range" then return on("range") elseif p == "AWACS" then return on("awacs") and (not t:find("tanker") or on("tanker"))
     elseif p == "Tanker" then return on("tanker") elseif p == "Carrier" then return on("carrier") elseif p == "JTAC" then return on("jtac") elseif p == "Center" then return on("center") end
-    return t == "radio check" or t == "say again" or t == "debrief" or on("atc")
+    return t == "radio check" or t == "say again" or t == "debrief" or t == "mark log" or on("atc")
   end
   local onOpt = {}   -- [name] = function() – apply immediately
 
@@ -267,7 +267,8 @@ local function start()
     { L("Allgemein", "General"), nil, {
       { "Radio check", "radio check" }, { "Say again", "say again" }, { "QNH / weather", "request weather" },
       { L("ATIS hören", "Listen to ATIS"), "atis" }, { "Request zone transit", "Approach: request zone transit" },
-      { L("Prüfflug an/aus", "Checkride on/off"), "checkride" }, { "Debriefing", "debrief" } } },
+      { L("Prüfflug an/aus", "Checkride on/off"), "checkride" },
+      { "Debriefing / Log", nil, { { "Debriefing", "debrief" }, { L("Log markieren", "Mark log"), "mark log" } } } } },   -- "mark log": time stamp in atc-log.txt for bug reports
   }
   local function prune(items)   -- modules: drop entries of deselected modules, then empty groups
     for j = #items, 1, -1 do
@@ -1667,6 +1668,12 @@ local function start()
     if fo and fo.easyCommunication ~= nil then easy = fo.easyCommunication return end
     local h = io.open(lfs.writedir() .. "Config\\options.lua", "r")
     if h then easy = h:read("*a"):match('%["easyCommunication"%]%s*=%s*(%a+)') ~= "false" h:close() end
+  end)
+  -- Bug reports: the app logs map, mission and Easy Communication once per mission ("SESSION;map;mission;easy 1|0")
+  pcall(function()
+    local m, name = env.mission, ""
+    pcall(function() name = tostring(m.sortie or "") if env.getValueDictByKey and name:find("^DictKey_") then name = env.getValueDictByKey(name) end end)
+    evt(string.format("SESSION;%s;%s;%d", clean(tostring(m.theatre)), clean(name), easy and 1 or 0))
   end)
   -- Open DCS-ATC dialog (hot start/runway, answer to our request) shows its entries on opening instead of F5 ATC: the keys would hit "Abort ..."
   local dlg = {}

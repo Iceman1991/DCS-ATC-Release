@@ -254,7 +254,7 @@ Ground guides you back toward your start position with direction and distance. D
 
 If you taxi on without a taxi clearance (faster than 5 kt and more than 150 m from the runway), you get "hold position, you are not cleared to taxi. Request taxi." and a deviation.
 
-**10. Debriefing.** Radio wheel → General → Debriefing lists your flight, including any airspace deviations.
+**10. Debriefing.** Radio wheel → General → Debriefing / Log → Debriefing lists your flight, including any airspace deviations.
 
 ## Ways to talk
 
@@ -572,7 +572,7 @@ The pilot voice adds your position, altitude and heading, and DCS-ATC picks the 
 | Listen to ATIS | Reads the current ATIS of your airfield. If the mission has no weather data, you get a text hint instead. |
 | Request zone transit | `request zone transit` (to Approach) |
 | Checkride on/off | Starts or ends a [checkride](#checkride) |
-| Debriefing | Shows your debriefing so far as text in the game |
+| Debriefing / Log | **Debriefing** shows your debriefing so far as text in the game. **Mark log** writes a `[MARK]` line into `atc-log.txt` with the time, your position, altitude, the controller phase and the last three radio calls. Use it the moment something goes wrong and name the time in your bug report. |
 | Settings | Opens the settings window |
 
 #### Radio wheel in multiplayer (clients)
@@ -620,7 +620,7 @@ In every mission with DCS-ATC, each player group gets **F10 Other → DCS-ATC**.
 | AWACS / Tanker / Center | AWACS → Check in · Picture · Bogey dope · Sort · Nearest tanker · Vector nearest airfield · Check out · Combat → Committing / Fox three / Splash / Defending / Request support / Unable / Winchester / Bingo, RTB / Say again. Tanker → Request rejoin · Visual · Observation · Pre-contact · Refuel complete · Abort · Say position · Center → Check in · Request altitude · Request direct · Leaving frequency |
 | Carrier (only if the mission has a carrier) | Marshal check in · See you at · Initial · Commencing · Platform · Ball · Clara · Pigeons · Strike check in/out · Red Crown check in/out (only with an own cruiser) |
 | Emergency | MAYDAY → kind · PAN PAN → kind · Minimum fuel · Hung ordnance · Flameout, high key · Cancel emergency · CSAR pickup · CSAR smoke / flare (kinds: engine failure, fuel (MAYDAY only), hydraulic failure, battle damage, medical, bird strike) |
-| General | Radio check · Say again · QNH / weather · Listen to ATIS · Request zone transit · Checkride on/off · Debriefing |
+| General | Radio check · Say again · QNH / weather · Listen to ATIS · Request zone transit · Checkride on/off · Debriefing / Log |
 | Settings | Ground crew on/off · Show |
 
 F10 calls are handled like wheel calls, including the pilot voice and the choice of airfield. The F10 menu has the same groups, names and texts as the wheel, with at most 9 entries per level; only *Select airfield* is missing (use the wheel, or say the airfield's name). The wheel hides entries that don't fit your flight state, F10 always shows all of them; a call that doesn't fit is answered as usual (for example *unable*).
@@ -1422,7 +1422,7 @@ The debriefing collects:
 - the number of calls the controller rejected
 - range, tanker, carrier and AWACS entries
 
-When you park after a flight, it is shown automatically and saved to `%LOCALAPPDATA%\Programs\DCS-ATC\debrief\<date>_<time>_<callsign>.txt`. You can open it at any time with wheel or F10 **General → Debriefing**.
+When you park after a flight, it is shown automatically and saved to `%LOCALAPPDATA%\Programs\DCS-ATC\debrief\<date>_<time>_<callsign>.txt`. You can open it at any time with wheel or F10 **General → Debriefing / Log → Debriefing**.
 
 If the name is already taken, the next report ends in `-2.txt`, then `-3.txt`. If the destination is locked, DCS-ATC keeps the completed report in `%LOCALAPPDATA%\DCS-ATC\pending-debriefs`. The running app retries the export every 30 seconds, including after a restart. The flight counts once in the logbook. If the app reports that the debriefing is held in memory, restore write access before closing it.
 
@@ -2916,6 +2916,7 @@ Pick the page on the left: General, Voices, Radio & traffic, AWACS, Frequencies,
 | **Debug log for bug reports (atc-debug.txt)** | on/off | `DebugLog` |
 | **Create diagnostics zip …** | button | writes `DCS-ATC-diagnostics-<date>-<time>.zip` to the desktop (see bug reports below) |
 | **Create installation report …** | button | Writes a text file with the DCS-ATC version, Windows version, time and the installation status of the bundled speech components. |
+| **Report a problem …** | button | Creates the diagnostics zip, shows it in Explorer and opens the bug report form on GitHub with version, map, aircraft and the time of your last log mark filled in. Attach the zip there yourself. |
 | **Start radio self-test** | button | Checks microphone level, local speech recognition, speech synthesis and the local SRS port. |
 | **Runway lights (at night)** | silent / with DCS controller (audible) / off. Takes effect the next time DCS-ATC starts. | `RunwayLights` |
 | **Altimeter setting** | automatic (by aircraft type) / hPa (QNH) / inHg (altimeter) | `AltimeterUnit` |
@@ -3087,6 +3088,12 @@ If the settings window cannot open, start PowerShell in the DCS-ATC application 
 For a problem during a flight, include the time, the airfield, a short description and relevant excerpts from `atc-log.txt` and `atc-debug.txt`. For a problem with vectors or the way to the runway also add `airfields.txt` from the DCS-ATC folder, the files `DcsAtc-Terrain-*.txt` from `%TEMP%` and your `charts.jsonc`: with them the flight from your log can be played again through the current version (`DcsAtc.exe --replay atc-debug.txt`, the files next to the log; it lists the controller calls of the log next to the ones the current version makes).
 
 Easier: under Advanced, Diagnostics, **Create diagnostics zip …** puts everything into one zip file on the desktop and shows it in Explorer: `atc-log.txt`, `atc-debug.txt`, `config.jsonc`, `frequencies.jsonc`, `modules.txt`, every `charts*.jsonc` (also from `charts\`) and `info.txt` with the version, Windows and the time. The API key (`AsrApiKey`) is removed from the copy; the file on disk stays unchanged. The logs contain callsigns and what was said on the radio, so check the zip before you pass it on. If a log is larger than 20 MB, only its end is included. The debug log no longer contains the API key either; older logs are cleaned at the next start. If you posted an `atc-debug.txt` while a key was set, replace that key.
+
+Quickest: **Report a problem …** (same place) creates that zip, shows it in Explorer and opens the bug report form on GitHub with version, map, aircraft and the time of your last log mark already filled in. You only drag the zip into the form and describe what happened. Without a GitHub account, send the same zip in the forum or on Discord.
+
+Mark the moment: when something goes wrong in flight, choose radio wheel or F10 **General → Debriefing / Log → Mark log**. DCS-ATC writes a `[MARK]` line with the time, your position, altitude, the controller phase and the last three radio calls into `atc-log.txt` and shows you the time. The marks of the run are also listed in `info.txt` inside the zip.
+
+`atc-log.txt` also starts each run with the date and version, and at mission start it names the map, the mission, whether Easy Communication is on, and the AWACS, tankers and JTACs with their frequencies. If one of them sits on an airfield frequency, a line says so, for example *"Frequency clash: Tanker Texaco 251.0 = Krasnodar-Center UHF"*.
 
 ### Troubleshooting
 

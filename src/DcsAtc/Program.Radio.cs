@@ -292,6 +292,31 @@ static partial class Program
         return new Tx(text, "Info", "", p.Gid);
     }
 
+    /// Radio wheel / F10 "mark log": one "[MARK]" line for bug reports (the time is the log line's own): aircraft, nearest airfield, altitude, heading (true), speed,
+    /// phase of the active airfield controller and the last three radio calls.
+    internal static string MarkLine(Pilot p, IEnumerable<(DateTime At, string Who, string Text)> radio)
+    {
+        var t = p.Tel;
+        var parts = new List<string> { p.Type == "" ? "?" : p.Type };
+        if (t != null)
+        {
+            if (Fields.OrderBy(f => Dist(t.X, t.Z, f.X, f.Z)).FirstOrDefault() is { } near) parts.Add(FormattableString.Invariant($"near {near.Name} {Dist(t.X, t.Z, near.X, near.Z) / NM:0.0} NM"));
+            parts.Add(FormattableString.Invariant($"{t.AltMsl / 0.3048:0} ft, hdg {(t.Hdg * 180 / Math.PI + 360) % 360:000} true, {t.Ias / 0.514444:0} kt"));
+        }
+        if ((p.Lead ?? p).Active is { } tw) parts.Add($"{tw.F.Name} {tw.Phase}");
+        parts.Add("radio: " + (radio.Select(r => $"{r.At:HH:mm:ss} {r.Who}: {(r.Text.Length > 80 ? r.Text[..80] : r.Text)}").DefaultIfEmpty("-").Aggregate((a, b) => a + " / " + b)));
+        return "[MARK] " + string.Join(" | ", parts);
+    }
+
+    /// Mark log request: log line plus a short in-game note with the time to name in the report.
+    static Tx MarkReq(Pilot p)
+    {
+        List<(DateTime At, string Who, string Text, int Gid, bool Pilot)> last;
+        lock (RadioLog) last = RadioLog.TakeLast(3).ToList();
+        Log(MarkLine(p, last.Select(r => (r.At, r.Who, r.Text))));
+        return new Tx(L($"Log markiert {Clock:HH:mm:ss}, diese Zeit im Fehlerbericht nennen.", $"Log marked {Clock:HH:mm:ss}, mention this time in your report."), "Info", "", p.Gid);
+    }
+
     /// Fellow player without own mission: radio wheel only. Requests go via the DCS hook (DcsAtcHook.lua) as chat to the host.
     static int ClientMode()
     {
@@ -330,6 +355,7 @@ static partial class Program
             lock (TowerLock) SayQueue.Add(new Tx(L($"Wingman: Befehl nicht gesendet ({e[1]}). Nimm das DCS-Funkmenü.", $"Wingman: command not sent ({e[1]}). Use the DCS radio menu."), "Info", "", Host()?.Gid ?? 0));
             return;
         }
+        if (e[0] == "SESSION") { Log(SessionLine(e, Cfg, Dedicated)); stationsAt = Now() + 10; return; }   // once per mission start (DcsAtcMission.lua)
         if (e[0] == "X") { lock (TowerLock) try { Ops.OnEvent(e, Now()); foreach (var q in Pilots.Values) q.Ops.OnCasEvent(e, q.Unit, Now()); Flights.OnEvent(e, Now(), FlightWorld()); } catch (FormatException x) { Trace("FEHLER", $"Ereignis {line}: {x.Message}"); } return; }   // AI radio
         List<Ops.Call> calls = new();
         Pilot? p;
@@ -427,6 +453,7 @@ static partial class Program
             var spoken = colon > 0 ? text[(colon + 1)..].Trim() : text;
             if (fromMenu && spoken == "report airspeed" && p.Tel is { } it) (spoken, text) = (Tower.IasSay(it), $"{to ?? "Approach"}: {Tower.IasSay(it)}");   // R129: radio wheel "Fahrt melden" -> "340 knots"
             if (fromMenu && to == "JTAC" && p.Ops.CasWheel(spoken) is { } cw) (spoken, text) = (cw, "JTAC: " + cw);   // J11: readback with lines 4/6, IN / OFF with direction
+            if (fromMenu && spoken == "mark log") { SayQueue.Add(MarkReq(p)); return; }
             if (Regex.IsMatch(spoken, @"^\s*debrief", RegexOptions.IgnoreCase)) { SayQueue.Add(DebriefTx(p, false)); return; }
             if (Regex.IsMatch(spoken, @"\bcheck ?ride\b|\bcheck flight\b", RegexOptions.IgnoreCase)) { SayQueue.Add(CheckrideReq(p, spoken)); return; }
             if (CsarReq(p, to, spoken) is { } cr) { foreach (var x in cr) SayQueue.Add(x); return; }
