@@ -95,6 +95,26 @@ static partial class Program
         Console.WriteLine("OK   Diagnose: Log-Marken des Laufs in info.txt der Diagnose-Zip");
     }
 
+    /// Self-test: client version report from the hook ("~version"): log line, never a radio request.
+    static void ClientVersionTest()
+    {
+        void Check(bool ok, string what) { if (!ok) throw new Exception("Mitspieler-Version: " + what); }
+        var (sl, en) = (SimLog, En);
+        SimLog = new();
+        try
+        {
+            En = false;
+            Check(ClientVersion("@Hawk|~version 0.23.18-alpha", "0.23.20-alpha"), "~version erkannt");
+            Check(SimLog[^1] == "[ATC] Mitspieler Hawk: DCS-ATC 0.23.18-alpha (Server 0.23.20-alpha, älter)", SimLog[^1]);
+            Check(ClientVersionLine("A", "0.24.0-alpha", "0.23.20-alpha").EndsWith("neuer)") && ClientVersionLine("A", "0.23.20-alpha", "0.23.20-alpha").EndsWith("gleich)"), "neuer/gleich");
+            En = true;
+            Check(ClientVersionLine("A", "0.23.1-alpha", "0.23.20-alpha") == "[ATC] Player A: DCS-ATC 0.23.1-alpha (server 0.23.20-alpha, older)", "englisch");
+            Check(!ClientVersion("@Hawk|request taxi", "0.23.20-alpha") && !ClientVersion("request taxi", "0.23.20-alpha"), "normale Anfrage bleibt Anfrage");
+        }
+        finally { (SimLog, En) = (sl, en); }
+        Console.WriteLine("OK   Mitspieler-Version: Log-Zeile älter/neuer/gleich, keine Funkanfrage");
+    }
+
     /// Self-test: settings window writes config.jsonc (comments stay, missing keys added), callsign normalized.
     static void ConfigTest()
     {

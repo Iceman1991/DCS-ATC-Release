@@ -148,8 +148,8 @@ public partial class Tower
     }
     /// R46: separated behind the preceding aircraft (remaining distance ahead): at the threshold at least 3 NM, behind Heavy 5 NM (ICAO Doc 4444 8.7.3, FAA JO 7110.65 5-5-4), plus marginS seconds.
     public static bool Behind(double mine, double ahead, bool heavy, double marginS = 0) => Secs(mine) - Secs(ahead) >= (heavy ? 5 : 3) * NM / (150 * Kt) + marginS;
-    /// Too close behind the preceding aircraft (less than separation + 30 s): slower, longer base.
-    bool Tight(Telemetry t) => vecFinal && AheadR >= 0 && !Behind(Path(t).R, AheadR, AheadHeavy, 30);
+    /// Too close behind the preceding aircraft (less than separation + 60 s): slower, longer base. 30 s let a follower closer to the field turn in 1.5 NM behind (mptest Nalchik IFR, real terrain).
+    bool Tight(Telemetry t) => vecFinal && AheadR >= 0 && !Behind(Path(t).R, AheadR, AheadHeavy, 60);
     double holdFt;                      // assigned altitude in the holding
     double holdFree = -1;               // since when it has been pending (clearance waits for a suitable heading in the circle)
     /// Holding stack: position 3 of the sequence is the lowest level, each position 1000 ft higher.
@@ -171,14 +171,14 @@ public partial class Tower
         if (planMva.X == p.X && planMva.Z == p.Z && planMva.Rw == key) return planMva.Ft;
         double ft = Math.Max(StackFt(F, 2), Math.Ceiling(F.MvaLeg(p.X, p.Z, CX, CZ) / 1000) * 1000), m = 0;   // plan altitude as when leaving: climbing because of terrain costs (Cost)
         // exit is possible anywhere in the circle (up to ~3.5 NM from the holding fix, which still moves up to 1.5 NM on arrival; Gudauta/Senaki: from there already over the mountains): plan from the center and eight points 4 NM around
-        foreach (var k in Enumerable.Range(-1, 9))
+        foreach (var k in Enumerable.Range(-1, 17))   // center, ring 4 NM, ring 6 NM (mptest: the circle drifts to ~5 NM from the fix)
         {
-            var q = k < 0 ? p : (X: p.X + 4 * NM * Math.Cos(k * Math.PI / 4), Z: p.Z + 4 * NM * Math.Sin(k * Math.PI / 4));
+            double rr = k < 8 ? 4 * NM : 6 * NM;
+            var q = k < 0 ? p : (X: p.X + rr * Math.Cos(k * Math.PI / 4), Z: p.Z + rr * Math.Sin(k * Math.PI / 4));
             var (rw, g, _, v) = Plan(new Telemetry(ft * Ft, 0, HoldKt * Kt, Bearing(q.X, q.Z, CX, CZ) * Math.PI / 180, q.X, q.Z, 0, 0, 0), Ifr || wantStraight);
             m = Math.Max(m, LegsMva(q, v, rw, g));
         }
-        planMva = (p.X, p.Z, key, m);
-        return planMva.Ft;
+        planMva = (p.X, p.Z, key, m);        return planMva.Ft;
     }
     public string Key = "";              // Program: "p:<Unit>" (holding occupancy)
     public static Func<string, double, double, double, double> FreeLevel = (k, x, z, ft) => ft;

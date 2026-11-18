@@ -1054,7 +1054,7 @@ Approach führt dich zum **Initial**: etwa 2 NM (4000 m) vor der Schwelle auf de
 > **Du:** Kutaisi Tower, Enfield 1-1, four miles final, gear down.  
 > **Tower:** Enfield one one, runway two five, wind …, cleared to land.
 
-- **Führung:** innerhalb 8 NM und bei freiem Gelände direkt auf einen 6-NM-Endanflug. Sonst Radarführung zum Endanflug.
+- **Führung:** innerhalb 8 NM, bei freiem Gelände und von der Anflugseite direkt auf einen 6-NM-Endanflug. Sonst Radarführung zum Endanflug, auch wenn du hinter oder neben der Bahn bist (etwa direkt nach dem Start): Approach behält dich dann, bis du im Endanflug bist, und übergibt dort an Tower.
 - **Höhe:** auf oder unter dem Gleitweg, aber nie unter der Geländefreiheit.
 - **ILS-Bahnen:** „maintain 2500 feet until established, cleared ILS approach runway two five, localizer …“
 - **„initial“ im Geradeaus-Anflug** bekommt „make straight in runway two five, report four miles final.“
@@ -1156,6 +1156,8 @@ Approach führt dich zum **Initial**: etwa 2 NM (4000 m) vor der Schwelle auf de
 **ILS** (die Bahn hat in den Kartendaten einen Localizer):
 
 > **Approach:** Enfield one one, 12 miles from touchdown, maintain 3000 feet until established, cleared ILS approach runway two five, QNH one zero one three, contact Kutaisi Tower.
+
+- **Die Freigabe kommt mit der letzten Kurve zur Mittellinie** (ILS und PAR). Die Kurve ist höchstens 30° und trifft die Mittellinie mindestens 2 NM vor dem Gate. Näher am Gate gilt höchstens 20°, und nur bei einer Wolkenuntergrenze mindestens 500 ft über der Mindestführungshöhe und 3 Meilen Sicht. Bist du schon nahe der Mittellinie, bekommst du eine Kurve von 10 bis 30° darauf, nie einen Parallelkurs.
 
 Ein ILS-Anflug wird nur überwacht: keine Gleitweg-Ansagen, nur die eine Tiefflugwarnung.
 
@@ -2507,6 +2509,7 @@ Im Client-Modus:
 - **Sprechen geht wie gewohnt.** SRS-Sprechtaste auf der Lotsenfrequenz drücken und sprechen.
 - **Was Mitspieler nicht bekommen.** Dein lokales DCS-ATC startet kein SRS, macht keine Spracherkennung und betreibt keine Lotsen. Der ENTER-Vorschlag in der Radmitte geht nur beim Host, weil der Mitspieler keinen Flugzustand hat. Das Mitspieler-Rad zeigt keine Frequenzen, weil nur der Host sie kennt (Karte und `frequencies.jsonc`). Auch den Rad-Text im Spiel (VR) bekommt der Mitspieler nicht; den schreibt das DCS-ATC des Hosts nur für sein eigenes Flugzeug.
 - **Der Host muss DCS-ATC laufen haben.** Sonst fängt niemand deine `ATC>`-Anfragen ab und nichts antwortet.
+- **Versionen.** Nimmst du einen Slot, schreibt dir der Server eine Chatzeile: „This server runs DCS-ATC 0.23.21-alpha. ...“. Hat dein DCS-ATC eine andere Version, bekommst du eine zweite Zeile, ob deine älter ist (updaten) oder neuer (manche Funkrad-Einträge kommen beim Server nicht an). Deine Version landet auch in der `atc-log.txt` des Servers („[ATC] Mitspieler Hawk: DCS-ATC 0.23.18-alpha (Server 0.23.21-alpha, älter)“). Die Prüfung braucht auf beiden Seiten 0.23.21 oder neuer. Unterschiedliche Versionen gehen trotzdem: Lotsen, Stimmen und Logik sind die des Servers.
 
 ### Spieler ohne DCS-ATC
 

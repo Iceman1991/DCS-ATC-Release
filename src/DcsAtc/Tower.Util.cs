@@ -16,6 +16,10 @@ public partial class Tower
         return (e.ThrX - along * e.Dx, e.ThrZ - along * e.Dz);
     }
 
+    /// Aircraft behind or beside the runway (less than 2 NM out on the approach side): straight to the 6-NM point would mean flying away from the runway.
+    /// Not on an intercept inside the 6-NM point (bearing to it points back there too, but the aircraft is out in front).
+    bool BehindSixMile(Telemetry t, string rw) { var p = OnCenterline(rw, 6 * NM); return Approach(t.X, t.Z, rw).along < 2 * NM && HdgDiff(Bearing(t.X, t.Z, p.X, p.Z), LandHdg(rw)) > 90; }
+
     /// > 0 = on the pattern side of the runway (left for left-hand pattern)
     double PatternOffset(double x, double z, string rw)
     {

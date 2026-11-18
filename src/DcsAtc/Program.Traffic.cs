@@ -33,9 +33,11 @@ static partial class Program
         terrainCheck = Clock;
         foreach (var fld in Fields.Where(f => !f.HasTerrain && f.Id > 0).Append(Airfield.Map).Where(f => f != Airfield.Map ? !f.HasTerrain : f.Name != Airfield.Theatre)) TerrainOf(fld);
     }
+    /// Where TerrainOf reads from: the temp folder of the running app; --anflugtest points it at the committed snapshot tests\terrain.
+    static string TerrainDir = Path.GetTempPath();
     static bool TerrainOf(Airfield fld)
     {
-        var file = Path.Combine(Path.GetTempPath(), $"DcsAtc-Terrain-{Airfield.Theatre}-{(fld == Airfield.Map ? "map" : fld.Id)}.txt");   // map: coarse grid of the whole map (V15)
+        var file = Path.Combine(TerrainDir, $"DcsAtc-Terrain-{Airfield.Theatre}-{(fld == Airfield.Map ? "map" : fld.Id)}.txt");   // map: coarse grid of the whole map (V15)
         try { if (File.Exists(file)) { fld.LoadTerrain(file); if (fld == Airfield.Map) fld.Name = Airfield.Theatre; } } catch (Exception e) when (e is IOException or FormatException or IndexOutOfRangeException) { }
         return fld.HasTerrain;
     }

@@ -1427,7 +1427,8 @@ public partial class Tower
         if (v < 8 && slowAt < landedAt) slowAt = now;
         double rest = slowAt >= landedAt ? 25 - (now - slowAt) : (v - 8) / 2 + 25;
         bool now3 = rest <= 0 || v < 3;
-        return traffic.Where(a => a.Speed > 30 && a.AltMsl - FieldElev < 1100 * Ft && OnFinal(a.X, a.Z, a.Hdg, a.AltMsl - FieldElev, rw, 3 * NM) &&
+        // Speed < 100 m/s (~195 kt): a 300 kt pass on initial for the overhead break lines up with the runway too but is no landing traffic (it breaks over the field)
+        return traffic.Where(a => a.Speed is > 30 and < 100 && a.AltMsl - FieldElev < 1100 * Ft && OnFinal(a.X, a.Z, a.Hdg, a.AltMsl - FieldElev, rw, 3 * NM) &&
                                   (now3 || Approach(a.X, a.Z, rw).along / a.Speed < rest + 15)).OrderBy(a => Approach(a.X, a.Z, rw).along).FirstOrDefault();
     }
     bool rwSwitched;      // R334: Aligned changed the runway with landing clearance

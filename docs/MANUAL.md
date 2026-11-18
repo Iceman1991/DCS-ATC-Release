@@ -1052,7 +1052,7 @@ Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the t
 > **You:** Kutaisi Tower, Enfield 1-1, four miles final, gear down.  
 > **Tower:** Enfield one one, runway two five, wind …, cleared to land.
 
-- **How you are routed:** within 8 NM, if the terrain is clear, you go direct to a 6-mile final. Otherwise Approach gives you radar vectors to final.
+- **How you are routed:** within 8 NM, if the terrain is clear and you come from the approach side, you go direct to a 6-mile final. Otherwise Approach gives you radar vectors to final, also when you are behind or beside the runway (for example right after takeoff): Approach then keeps you until you are on final and hands you to Tower there.
 - **Altitude:** on or below the glide path, but never below terrain clearance.
 - **ILS runways:** "maintain 2500 feet until established, cleared ILS approach runway two five, localizer …"
 - **Calling "initial" on a straight-in** gets "make straight in runway two five, report four miles final."
@@ -1154,6 +1154,8 @@ Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the t
 **ILS** (the runway has a localizer in the map data):
 
 > **Approach:** Enfield one one, 12 miles from touchdown, maintain 3000 feet until established, cleared ILS approach runway two five, QNH one zero one three, contact Kutaisi Tower.
+
+- **The clearance comes with the last turn toward the centreline** (ILS and PAR). The turn is at most 30° and meets the centreline at least 2 NM before the gate. Closer to the gate, the limit is 20°, and only with a ceiling at least 500 ft above the minimum vectoring altitude and 3 miles visibility. If you are already close to the centreline, you get a turn of 10 to 30° onto it, never a parallel heading.
 
 The controller only monitors an ILS approach: no glide-path calls, just the one low-altitude alert.
 
@@ -2505,6 +2507,7 @@ In client mode:
 - **Voice works as usual.** Press your SRS push-to-talk on the controller frequency and speak.
 - **What clients don't get.** Your local DCS-ATC does not start SRS, does no speech recognition and runs no controllers. The ENTER suggestion in the wheel centre works only on the host, because the client has no flight state to base it on. The client wheel shows no frequencies, because only the host knows them (map and `frequencies.jsonc`). The client also gets no wheel text in the game (VR); that text comes from the host's DCS-ATC for its own aircraft only.
 - **The host must run DCS-ATC.** If the host doesn't run it, nobody intercepts your `ATC>` requests and nothing answers.
+- **Versions.** When you take a slot, the server writes one chat line to you: "This server runs DCS-ATC 0.23.21-alpha. ...". If your DCS-ATC has another version, you get a second line saying whether yours is older (update it) or newer (some radio wheel entries may not reach the server). Your version also goes to the server's `atc-log.txt` ("[ATC] Player Hawk: DCS-ATC 0.23.18-alpha (server 0.23.21-alpha, older)"). Both sides need 0.23.21 or newer for the check. Different versions still work: the controllers, voices and logic are those of the server.
 
 ### Players without DCS-ATC installed
 

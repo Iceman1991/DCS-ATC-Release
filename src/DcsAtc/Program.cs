@@ -184,7 +184,7 @@ static partial class Program
         TestRun = args.Any(a => a is "--selftest" or "--anflugtest" or "--mptest" or "--asr-test" or "--srs-test" or "--platztest" or "--replay");
         if (args.Length >= 1 && args[0] == "--charttest") { if (args.Length > 1) Airfield.ChartFile = args[1]; ChartTest(); return 0; }   // chart data check, optionally a file instead of the embedded one
         if (args.Contains("--platztest")) { Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); return 0; }
-        if (args.Contains("--selftest")) { RadioTest(); ChartTest(); Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); DiagnoseTest(); Update.Test(); AtisTest(); CrewTest(); ExpectTest(); PromptTest(); GpuTest(); int rc = Tower.SelfTest(); ReplayTest(); return rc; }   // ReplayTest last: it runs the app loop (TickAll) and leaves static state behind
+        if (args.Contains("--selftest")) { RadioTest(); ChartTest(); Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); DiagnoseTest(); ClientVersionTest(); Update.Test(); AtisTest(); CrewTest(); ExpectTest(); PromptTest(); GpuTest(); int rc = Tower.SelfTest(); ReplayTest(); return rc; }   // ReplayTest last: it runs the app loop (TickAll) and leaves static state behind
         if (LoadConfig() is { } configError)
         {
             var message = configError + L("\nDatei korrigieren, speichern und DCS-ATC erneut starten.", "\nCorrect the file, save it and restart DCS-ATC.");
@@ -221,9 +221,9 @@ static partial class Program
             Console.WriteLine(L($"Verfahrens-Editor im Browser: http://localhost:{port}/chart – dieses Fenster schließen beendet ihn.", $"Chart editor in the browser: http://localhost:{port}/chart – closing this window ends it."));
             Thread.Sleep(Timeout.Infinite);
         }
-        if (args.Length >= 1 && args[0] == "--anflugtest") { LoadFields(); LoadTerrain(); return Tower.AnflugTest(Fields, args[1..]); }   // airfields from the repo airfields.txt, terrain of the last mission (%TEMP%)
+        if (args.Length >= 1 && args[0] == "--anflugtest") { TerrainDir = TestTerrainDir(); LoadFields(); LoadTerrain(); return Tower.AnflugTest(Fields, args[1..]); }   // airfields from the repo airfields.txt, terrain from the fixed snapshot tests\terrain (not the last mission in %TEMP%)
         if (args.Length == 2 && args[0] == "--replay") return ReplayCli(args[1]);   // a reporter's atc-debug.txt through this build
-        if (args.Length >= 1 && args[0] == "--mptest") { LoadFields(); LoadTerrain(); return MpTest(args[1..]); }   // multiple players + AI via the app logic
+        if (args.Length >= 1 && args[0] == "--mptest") { TerrainDir = TestTerrainDir(); LoadFields(); LoadTerrain(); return MpTest(args[1..]); }   // multiple players + AI via the app logic
 
         ScrubKey(TracePath, Cfg.AsrApiKey); ScrubKey(Path.ChangeExtension(TracePath, ".old.txt"), Cfg.AsrApiKey);   // older logs: key from before it was masked
         TraceOn = Cfg.DebugLog;   // live from here: debug log (tests above without file)
@@ -751,6 +751,21 @@ static partial class Program
     // ------------------------------------------------------------ F10 menu of the mission (KutaisiATC.lua): "unit|text"
     static readonly string MenuDir = Path.Combine(Path.GetTempPath(), "DcsAtc-Menu");
 
+    /// "@Hawk|~version 0.23.18-alpha" (client hook, sent after joining): not a radio request, only a log line; true = handled.
+    internal static bool ClientVersion(string text, string own)
+    {
+        int bar = text.IndexOf('|');
+        if (bar < 0 || !text[(bar + 1)..].StartsWith("~version ")) return false;
+        Log(ClientVersionLine(text[..bar].TrimStart('@'), text[(bar + 10)..].Trim(), own));
+        return true;
+    }
+
+    internal static string ClientVersionLine(string name, string client, string own)
+    {
+        var rel = Update.Newer(own, client) ? L("älter", "older") : Update.Newer(client, own) ? L("neuer", "newer") : L("gleich", "same");
+        return L($"[ATC] Mitspieler {name}: DCS-ATC {client} (Server {own}, {rel})", $"[ATC] Player {name}: DCS-ATC {client} (server {own}, {rel})");
+    }
+
     static void PollMenu()
     {
         if (!Directory.Exists(MenuDir)) return;
@@ -759,6 +774,7 @@ static partial class Program
             string text;
             try { text = File.ReadAllText(f).Trim(); File.Delete(f); } catch (IOException) { continue; }
             int bar = text.IndexOf('|');
+            if (ClientVersion(text, Update.Own)) continue;
             Trace("MISSION", "Menü " + text);
             Pilot? p;
             var key = bar > 0 ? text[..bar] : "";
@@ -1017,6 +1033,13 @@ static partial class Program
     }
 
     // ------------------------------------------------------------ Start
+    /// tests\terrain of the repo: walk up from the exe (Root only finds the repo when models\ exists, e.g. not in a fresh worktree).
+    static string TestTerrainDir()
+    {
+        for (var d = new DirectoryInfo(AppContext.BaseDirectory); d != null; d = d.Parent)
+            if (Directory.Exists(Path.Combine(d.FullName, "tests", "terrain"))) return Path.Combine(d.FullName, "tests", "terrain");
+        throw new DirectoryNotFoundException("tests\\terrain not found");
+    }
     static string FindRoot()
     {
         for (var d = new DirectoryInfo(AppContext.BaseDirectory); d != null; d = d.Parent)

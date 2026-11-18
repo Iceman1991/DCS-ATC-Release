@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace DcsAtc;
@@ -2632,6 +2632,36 @@ public partial class Tower
         var s2 = At(s2x, s2z, 2.5 * NM * Math.Tan(3 * Math.PI / 180) + 15, LandHdg("25"), 120);
         r = new Tower(flat, "Enfield 1-1").OnTranscript("Kutaisi Approach, Enfield 11, request straight in", s2, none, 1);
         Check(r[0].Contains("500 feet") && !r[0].Contains("limb") && !r[0].Contains("1000 feet"), "R42 Straight-in 2,5 NM mit Gelände nicht über den Gleitweg: " + r[0]);
+        // Own log (Kutaisi 25, VFR): after departure 4.4 NM behind the field flying away, "request straight in": the 6-NM point lies across the field, flown away from the runway, Tower took over and nobody turned him onto final -> vectors like beyond 8 NM
+        var (bhx, bhz) = P("25", -4.4 * NM);
+        var bh = At(bhx, bhz, 956 * Ft, 253, 200);
+        var twBh = new Tower("Enfield 1-1");
+        twBh.Tick(bh, none, 0);
+        r = twBh.OnTranscript("Kutaisi Approach, Enfield 11, request straight in", bh, none, 1);
+        Check(!r[0].Contains("Contact Kutaisi Tower") && !r[0].Contains("for six mile final") && twBh.Phase == Phase.Inbound && r[0].Contains("eading"), "Straight-in hinter der Bahn: Radarführung statt 6-Meilen-Punkt: " + string.Join(" | ", r.Select(m => m.Text)));
+        {
+            double bh_hx = bhx, bh_hz = bhz, bh_hh = 253, bh_hAlt = bh.AltMsl, bh_hTarget = twBh.vecHdg, bh_minAgl = 99999;
+            var bh_said = new List<string> { r[0].Text };
+            int bh_hs = 2;
+            for (; bh_hs < 1500 && twBh.Phase == Phase.Inbound; bh_hs++)
+            {
+                if (twBh.vec is { Count: 0 } && twBh.AL(bh_hx, bh_hz, "25") is var (bpa, bpl) && Math.Abs(bpl) < NM) { var bq = twBh.Pt("25", bpa - 1.5 * NM, 0); bh_hTarget = Bearing(bh_hx, bh_hz, bq.X, bq.Z); }
+                bh_hh = (bh_hh + Math.Clamp(((bh_hTarget - bh_hh) % 360 + 540) % 360 - 180, -3, 3) + 360) % 360;
+                bh_hx += 140 * Math.Cos(bh_hh * Math.PI / 180); bh_hz += 140 * Math.Sin(bh_hh * Math.PI / 180);
+                double bh_a0 = bh_hAlt, bh_want = twBh.vecFt * Ft;
+                bh_hAlt = bh_want > bh_hAlt ? Math.Min(bh_hAlt + 15, bh_want) : Math.Max(bh_hAlt - 15, bh_want);
+                bh_minAgl = Math.Min(bh_minAgl, (bh_hAlt - FieldElev) / Ft);
+                var bm = twBh.Tick(At(bh_hx, bh_hz, bh_hAlt - FieldElev, bh_hh, 140) with { Vs = bh_hAlt - bh_a0 }, none, bh_hs);
+                if (bm.Count > 0) { bh_hTarget = twBh.vecHdg; bh_said.Add(bm[0].Text); }
+            }
+            var (bha, bhl) = twBh.AL(bh_hx, bh_hz, "25");
+            Check(twBh.Phase == Phase.Entering && Math.Abs(bhl) < 1.5 * NM && bha > 2 * NM && HdgDiff(bh_hh, LandHdg("25")) < 45, $"Straight-in hinter der Bahn: nach {bh_hs} s auf Final übergeben ({bha / NM:0.0} NM, seitlich {bhl:0} m, Kurs {bh_hh:0}, min {bh_minAgl:0} ft AGL): " + string.Join(" | ", bh_said));
+        }
+        // ahead of the final (7 NM east, 2 NM off the centerline, flying in): unchanged, straight to the 6-NM point and Tower
+        var (ahx, ahz) = P("25", 7 * NM);
+        var ah = At(ahx + 2 * NM * Uz, ahz - 2 * NM * Ux, 3000 * Ft, 250, 200);
+        r = new Tower("Enfield 1-1").OnTranscript("Kutaisi Approach, Enfield 11, request straight in", ah, none, 1);
+        Check(r[0].Contains("for six mile final") && r[0].Contains("Contact Kutaisi Tower"), "Straight-in vor dem Final unverändert direkt: " + r[0]);
 
         // --- Pattern: extend downwind due to traffic, then base
         var tw10 = new Tower("Enfield 1-1");

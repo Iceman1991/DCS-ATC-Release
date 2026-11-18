@@ -615,7 +615,7 @@ public partial class Tower
                 wantStraight = true;
                 if (intent != "fieldinsight") { wantVisual = Has(n, "visual approach", "vfr"); visSeen = wantVisual && Has(n, FieldSight) && !Has(n, "negative", "not in sight", "no joy"); visAsk = false; }   // P3-AP7: also after radar vectoring/holding "cleared visual approach" instead of ILS; R115: airfield already reported in the request
                 if (QueueAhead >= 0 && !Spaced || OtherEmergency) goto case "inbound";   // Sequence also applies to instrument approaches: holding first
-                if (t != null && !OnFinalLoose(t, rw) && (Dist(t.X, t.Z, CX, CZ) > 8 * NM || !FinalOk(rw) || Proc(rw) != "" && !wantVisual))   // R317: instrument approach from the side: vectors (≤ 30°, position before heading), not across the 6-NM point   // terrain on final: plan instead of straight-in
+                if (t != null && !OnFinalLoose(t, rw) && (Dist(t.X, t.Z, CX, CZ) > 8 * NM || !FinalOk(rw) || Proc(rw) != "" && !wantVisual || BehindSixMile(t, rw)))   // R317; behind/beside the runway the 6-NM point lies across the field, flown away from it: vectors: instrument approach from the side: vectors (≤ 30°, position before heading), not across the 6-NM point   // terrain on final: plan instead of straight-in
                 {
                     var head = Phase is Phase.Inbound or Phase.Entering ? $"{c}, roger, {(wantVisual ? "expect visual approach" : "straight in approach approved")}. " : $"{hdr}, radar contact, {Where(t)}, {Qnh(t)}. ";   // already announced (inbound): no new first contact
                     Phase = Phase.Inbound;

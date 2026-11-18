@@ -22,7 +22,62 @@ local function session(text)
   if h then h:write(text) h:close() end
 end
 
+-- Version check in multiplayer: the server names its DCS-ATC version in chat to each joining player (once per mission); a client with DCS-ATC compares it,
+-- shows a hint locally if it differs and reports its own version back as hidden "ATC>~version x" (the server app logs it). Old servers never send the line.
+local told, checked = {}, false
+local function readFile(name)   -- first line of Scripts\DcsAtc\<name>, nil if missing
+  local h = io.open(lfs.writedir() .. 'Scripts\\DcsAtc\\' .. name, 'r')
+  local s = h and h:read('*l')
+  if h then h:close() end
+  s = s and s:match('^%s*(.-)%s*$')
+  return s ~= '' and s or nil
+end
+local function nums(v) local a, b, c = tostring(v):match('(%d+)%.(%d+)%.(%d+)') return { tonumber(a) or 0, tonumber(b) or 0, tonumber(c) or 0 } end
+local function older(a, b)   -- version a < b by its three numbers ("-alpha" ignored)
+  local x, y = nums(a), nums(b)
+  for i = 1, 3 do if x[i] ~= y[i] then return x[i] < y[i] end end
+  return false
+end
+
+function cb.onPlayerChangeSlot(id)
+  pcall(function()
+    if not (Sim.isServer() and Sim.isMultiplayer()) or told[id] or id == net.get_my_player_id() then return end
+    local ver = readFile('DcsAtcVersion.txt')
+    if not ver then return end
+    told[id] = true
+    net.send_chat_to('This server runs DCS-ATC ' .. ver .. '. Talk to its controllers over SRS. If you have DCS-ATC installed, use the same version.', id)
+  end)
+end
+
+function cb.onChatMessage(message, from)
+  if checked or type(message) ~= 'string' then return end
+  local ok, err = pcall(function()
+    local sok, sid = pcall(net.get_server_id)
+    if from ~= (sok and sid or 1) then return end
+    local srv = message:match('This server runs DCS%-ATC (%S+)%.')
+    if not srv or Sim.isServer() then return end
+    local own = readFile('DcsAtcVersion.txt')
+    if not own then return end
+    checked = true
+    net.send_chat('ATC>~version ' .. own, false)
+    if own == srv then return end
+    local de = readFile('DcsAtcLang.txt') == 'de'
+    local txt
+    if older(own, srv) or not older(srv, own) then   -- equal numbers, different text: "older" wording
+      txt = de and ('DCS-ATC: Du hast ' .. own .. ', der Server hat ' .. srv .. '. Bitte updaten (Einstellungen, Update).')
+                or ('DCS-ATC: you have ' .. own .. ', the server runs ' .. srv .. '. Please update (settings window, Update).')
+    else
+      txt = de and ('DCS-ATC: Du hast ' .. own .. ', der Server hat ' .. srv .. '. Manche Funkrad-Eintr\195\164ge kommen dort nicht an.')
+                or ('DCS-ATC: you have ' .. own .. ', the server runs ' .. srv .. '. Some radio wheel entries may not reach the server.')
+    end
+    local shown, e = pcall(net.recv_chat, txt)
+    if not shown then net.log('DcsAtcHook: Versionshinweis nicht angezeigt: ' .. tostring(e)) end
+  end)
+  if not ok then net.log('DcsAtcHook: Versionspruefung: ' .. tostring(err)) end
+end
+
 function cb.onSimulationStart()
+  told, checked = {}, false
   local off = io.open(lfs.writedir() .. 'Scripts\\DcsAtc\\DcsAtcOff.txt', 'r')   -- forum 0.13: switched off in the settings window, no app start
   if off then off:close() return end
   local host = not Sim.isMultiplayer() or Sim.isServer()
@@ -47,7 +102,7 @@ function cb.onSimulationStart()
   end
 end
 
-function cb.onSimulationStop() session('stop\n') end
+function cb.onSimulationStop() told, checked = {}, false session('stop\n') end
 
 function cb.onPlayerTrySendChat(id, msg, all)
   if type(msg) ~= 'string' or msg:sub(1, 4) ~= 'ATC>' then return end

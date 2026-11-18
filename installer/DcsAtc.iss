@@ -1,7 +1,7 @@
 ﻿; DCS-ATC Installer (Inno Setup 6). Bauen: installer\build.cmd -> dist\DCS-ATC-Setup.exe und (ISCC /DSmall) dist\DCS-ATC-Update-Setup.exe
 ; Small: update setup without the big files (models, tools) for the update from the app; only over an existing installation.
 ; installer\manifest.ps1 reads the big files from the block "#ifndef Small" in [Files].
-#define AppVer "0.23.20-alpha"
+#define AppVer "0.23.21-alpha"
 #define Src ".."
 
 [Setup]
@@ -187,6 +187,8 @@ Type: filesandordirs; Name: "{app}\tmp"
 Type: files; Name: "{code:SavedGames}\Scripts\DcsAtc\DcsAtcPath.txt"
 Type: files; Name: "{code:SavedGames}\Scripts\DcsAtc\DcsAtcLang.txt"
 Type: files; Name: "{code:ServerSaved}\Scripts\DcsAtc\DcsAtcPath.txt"
+Type: files; Name: "{code:SavedGames}\Scripts\DcsAtc\DcsAtcVersion.txt"
+Type: files; Name: "{code:ServerSaved}\Scripts\DcsAtc\DcsAtcVersion.txt"
 Type: files; Name: "{code:ServerSaved}\Scripts\DcsAtc\DcsAtcLang.txt"
 Type: files; Name: "{app}\lang.txt"
 Type: files; Name: "{app}\modules.txt"
@@ -367,6 +369,7 @@ begin
     if HasClient() then begin
       ForceDirectories(SavedGames('') + '\Scripts\DcsAtc');
       SaveStringToFile(SavedGames('') + '\Scripts\DcsAtc\DcsAtcPath.txt', ExpandConstant('{app}\DcsAtc.exe'), False);
+      SaveStringToFile(SavedGames('') + '\Scripts\DcsAtc\DcsAtcVersion.txt', '{#AppVer}', False);
       SaveStringToFile(SavedGames('') + '\Scripts\DcsAtc\DcsAtcLang.txt', ActiveLanguage, False);
       SaveStringToFile(SavedGames('') + '\Scripts\DcsAtc\DcsAtcModules.txt', Mods, False);
       ExportLua(True);
@@ -374,6 +377,7 @@ begin
     if WantServer() then begin   { Dedicated server: the hook starts the app with every server mission }
       ForceDirectories(ServerSaved('') + '\Scripts\DcsAtc');
       SaveStringToFile(ServerSaved('') + '\Scripts\DcsAtc\DcsAtcPath.txt', ExpandConstant('{app}\DcsAtc.exe'), False);
+      SaveStringToFile(ServerSaved('') + '\Scripts\DcsAtc\DcsAtcVersion.txt', '{#AppVer}', False);
       SaveStringToFile(ServerSaved('') + '\Scripts\DcsAtc\DcsAtcLang.txt', ActiveLanguage, False);
       SaveStringToFile(ServerSaved('') + '\Scripts\DcsAtc\DcsAtcModules.txt', Mods, False);
     end;
