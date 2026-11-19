@@ -447,6 +447,7 @@ static partial class Program
         {
             Log($"[{src}] {p.Callsign}: {text}" + (conf < 1 ? $"   ({conf:0.00})" : "") + (p.Tel == null ? "   (keine Telemetrie von DCS)" : ""));
             Trace("ANFRAGE", $"{src} {p.Callsign} (unit {p.Id}) via {via?.Name ?? "-"} menu {fromMenu} conf {conf:0.00} aktiv {(p.Lead ?? p).Active?.F.Name ?? "-"} {(p.Lead ?? p).Active?.Phase} Pin {(p.Lead ?? p).Pinned?.F.Name ?? "-"}: {text}");
+            if (Ops.Disregard(Tower.Normalize(text.Contains(':') ? text[(text.IndexOf(':') + 1)..] : text), p.Callsign)) return;   // #49: "disregard" / "correction" withdraws the last call: no reply, no "say again", for every controller
             tracedReq[p.Unit] = (text, Now());
             int colon = text.IndexOf(':');
             string? to = colon > 0 ? text[..colon].Trim() : null;
@@ -527,7 +528,7 @@ static partial class Program
             if (opsRole != null && Off(opsRole.ToLowerInvariant(), text)) return;
             if (opsRole != null)
             {
-                var calls = p.Ops.OnTranscript(opsRole, text, MeOf(p) with { Freq = src == "SRS" ? p.CalledOn : 0 }, TrafficFor(p), Fields, Now(), conf < MinConf, Cfg.Frequencies.GetValueOrDefault("AWACS", 251.5), FieldWxOf);
+                var calls = p.Ops.OnTranscript(opsRole, text, MeOf(p) with { Freq = src == "SRS" ? p.CalledOn : 0 }, TrafficFor(p), Fields, Now(), conf < MinConf && !(opsRole == "AWACS" && conf >= ExpConf && Ops.AwacsReport(Tower.Normalize(spoken))), Cfg.Frequencies.GetValueOrDefault("AWACS", 251.5), FieldWxOf);
                 if (p.Ops.Menu is { } mn && Cfg.CommsKey != 0 && MissionData && p == Host())   // basket/boom only via the DCS menu: "Intent to refuel" (mission looks it up in the list) or "Ready pre-contact"
                     TankerMenu(p, mn.Step, mn.Group);
                 p.Ops.Menu = null;

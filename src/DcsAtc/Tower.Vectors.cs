@@ -264,6 +264,16 @@ public partial class Tower
         return Bearing(t.X, t.Z, tp.X, tp.Z);
     }
 
+    /// #45: distance by which the ground track (heading + wind) passes the next waypoint. The bearing to it drifts by the 5° heading rounding and the wind (the closer, the more),
+    /// but that stays one heading: a new one only when he would clearly miss the point (FAA JO 7110.65 5-9-2, one vector per leg).
+    const double MissMax = 1.5 * NM, MissFar = 10 * NM;   // closer than MissFar the bearing rule stays (its drift per degree is small there)
+    double Miss(Telemetry t)
+    {
+        double tas = t.Ias * (1 + 0.02 * IndFt(t) / 1000), vx = tas * Math.Cos(t.Hdg) + t.WindX, vz = tas * Math.Sin(t.Hdg) + t.WindZ;
+        double d = Dist(t.X, t.Z, vec![0].X, vec[0].Z), a = HdgDiff(Math.Atan2(vz, vx) * 180 / Math.PI, Bearing(t.X, t.Z, vec[0].X, vec[0].Z));
+        return a >= 90 ? d : d * Math.Sin(a * Math.PI / 180);   // flying away from it: the closest approach is now
+    }
+
     /// Turn-in point on the centreline: 30° intercept angle, flatter when close, not behind the gate (visual: up to 1 NM before initial),
     /// the gate at most at 45° and at least 2 NM ahead: otherwise the target near the gate would lie across/behind him, headings left/right alternating (zigzag at 6-9 NM).
     (double X, double Z) Icpt(double x, double z)
@@ -685,7 +695,7 @@ public partial class Tower
         }
         // new heading needed (wind/offset, through the centreline), not mid-turn and not shortly before (the turn corrects too); before the descent, the call includes it
         // R306: when turning in only if he misses the centreline – the turn-in point (VecBrg) slides along close to it and gets flatter (300 -> 285 -> 270), the given heading stays
-        if (now - lastVecSaid >= 30 && !turning && HdgDiff(VecBrg(t), vecHdg) > 7 && (vec.Count == 0 ? !Intercepts(t, vecHdg) && !(joining && Intercepts(t, hdg)) : Dist(t.X, t.Z, vec[0].X, vec[0].Z) > Math.Max(2.5 * NM, vecLim + NM))) return Say($"{c}, {VecCall(t, now)}{SeqNote(t, traffic, now)}", "Approach");
+        if (now - lastVecSaid >= 30 && !turning && HdgDiff(VecBrg(t), vecHdg) > 7 && (vec.Count == 0 ? !Intercepts(t, vecHdg) && !(joining && Intercepts(t, hdg)) : Dist(t.X, t.Z, vec[0].X, vec[0].Z) > Math.Max(2.5 * NM, vecLim + NM) && (Dist(t.X, t.Z, vec[0].X, vec[0].Z) < MissFar || Miss(t) > MissMax))) return Say($"{c}, {VecCall(t, now)}{SeqNote(t, traffic, now)}", "Approach");
         if (now - lastVecSaid >= 30 && Tight(t) && VecKt(t) is > 0 and var sk && sk < vecMemKt && t.Ias / Kt > sk + 10)   // R46: separation by speed (FAA JO 7110.65 5-7-1, ICAO Doc 4444 4.6)
         {
             lastVecSaid = now; vecMemKt = sk;

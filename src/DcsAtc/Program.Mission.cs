@@ -123,7 +123,7 @@ static partial class Program
                         bool air = p[16] == "1";
                         pl!.Tel = new Telemetry(D(8), air ? Math.Max(D(9), 3.5) : 0, D(10), D(11), D(6), D(7), D(12), D(13), D(14), D(15), p.Length > 20 ? D(20) : -1);
                         pl.Seen = Clock;
-                        if ((Cfg.MyCallsign != "" && Host() == pl ? Cfg.MyCallsign : Cfg.CallsignFromUnit && UnitCallsign(pl.Unit) is { } uc ? uc : pl.SlotCallsign) is var want && want != pl.Callsign) { if (fresh) pl.Callsign = want; else Rename(pl, want); }   // own callsign (settings)
+                        if (WantCallsign(pl) is var want && want != pl.Callsign) { if (fresh) pl.Callsign = want; else Rename(pl, want); }   // own callsign (settings)
                         if (fresh) Log($"[ATC] Spieler {p[4]} ({p[5]}) als {pl.Callsign}");
                         if (fresh) RestoreSession(pl);
                         break;

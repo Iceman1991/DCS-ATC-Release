@@ -98,6 +98,11 @@ partial class Ops
     /// and not in a call to an airfield station or with an emergency word ("Kutaisi Tower, declare an emergency").
     static string Blank(string n, string? own) => own == null ? n : Regex.Replace(n, $@"\b{Regex.Replace(Normalize(own), @"(?<=\d) (?=\d)", " ?")}\b", " ");
     /// R393: "say again" without a station (own call sign blanked): repeats the last call of the controller that spoke last (Program.Request)
+    /// #49: a call that only withdraws the previous one ("Disregard", "Correction, Victory 9-1", "Showtime, Victory 9-1, disregard") gets no reply and no "say again" (Program.Request, all controllers)
+    public static bool Disregard(string n, string? own = null) => Regex.IsMatch(Regex.Replace(Blank(n, own), @"\s+", " ").Trim(), @"^(?:\w+ ){0,3}?(?:disregard|correction)(?: that| last transmission| my last transmission)?$");
+    /// #49 (log Nellis: "Victory 9-1, Judy." 0.62 and "Victory 9-1. Defending." 0.57 were asked back, the same words at 0.70/0.85 were accepted): a tactical report to the AWACS
+    /// is a closed phrase that triggers nothing dangerous, so a weak recognition (Program: from ExpConf) is not asked back
+    public static bool AwacsReport(string n) => Has(n, "judy", "defending", "defensive", "commit", "targeting", "targeted", "engaged", "engaging");
     public static bool BareSayAgain(string n, string? own = null) => Regex.IsMatch(Blank(n, own).Trim(), @"^(?:say again|say again please)$");
     /// Forum (Abr): the name of a mission AWACS/tanker is a station too, also an own one from the unit name ("Sentry 1-1", CallsignFromUnit)
     static bool Named(Dictionary<string, double> groups, string n) =>

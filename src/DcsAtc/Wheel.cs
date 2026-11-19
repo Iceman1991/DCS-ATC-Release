@@ -107,8 +107,8 @@ sealed class Wheel : Form
         {
             new(L("Platz wählen", "Select airfield"), Sub: Array.Empty<Item>()),   // content on opening: nearest airfields (Near)
             new("Radio check", "radio check"), new("Say again", "say again"), new("QNH / weather", "request weather"), new(L("ATIS hören", "Listen to ATIS"), "atis"),
-            new("Request zone transit", "Approach: request zone transit"),   // N3: transit through the control zone
             new(L("Prüfflug an/aus", "Checkride on/off"), "checkride"), new("Debriefing / Log", Sub: new Item[] { new("Debriefing", "debrief"), new(L("Log markieren", "Mark log"), "mark log") }), new(L("Einstellungen", "Settings"), "settings"),
+            new("Request zone transit", "Approach: request zone transit"),   // N3: transit through the control zone; last and the only phase-filtered entry here, so the other keys stay fixed (VoiceAttack)
         }),
     };
     /// A30: type of emergency; Program adds position, altitude and heading (PilotCall), Approach picks the nearest suitable airfield.
@@ -127,7 +127,8 @@ sealed class Wheel : Form
         get
         {
             var (aw, tk) = Up();
-            var t = Vis(Mod(All.Where(i => i.Label switch { "Range" => Ops.Range != null, "Carrier" => Cv(), "AWACS" => aw, "Tanker" => tk, "JTAC" => Jtac(), "Center" => Cen(), _ => true })), Fits(), 2);
+            var fix = Program.Cfg.WheelFixed;   // #52: fixed numbers, only the module selection removes entries (no presence or phase filter)
+            var t = Vis(Mod(All.Where(i => fix || i.Label switch { "Range" => Ops.Range != null, "Carrier" => Cv(), "AWACS" => aw, "Tanker" => tk, "JTAC" => Jtac(), "Center" => Cen(), _ => true })), fix ? _ => true : Fits(), 2);
             if (top == null || !t.SequenceEqual(top)) top = t;
             return top;
         }
@@ -179,6 +180,20 @@ sealed class Wheel : Form
         var cl = string.Join(",", Top.Select(i => i.Label));
         Jtac = jt;
         check(!tl.Contains("AWACS") && tl.Contains("Tanker") && cl.Contains("AWACS") && cl.Contains("Carrier"), "Funkrad ohne AWACS / Mitspieler mit AWACS und Carrier: " + tl + " / " + cl);
+        {   // #52: WheelFixed: nothing present, any phase -> same entries in the same order, only the module selection removes; the cut keeps Emergency/General last
+            var (wf, up0, jt0, cv0, cen0, fits0) = (Program.Cfg.WheelFixed, Up, Jtac, Cv, Cen, Fits);
+            (Up, Jtac, Cv, Cen, Fits) = (() => (false, false), () => false, () => false, () => false, () => _ => false);
+            Program.Cfg.WheelFixed = false; var free = string.Join(",", Top.Select(i => i.Label));
+            Program.Cfg.WheelFixed = true; var fx = string.Join(",", Top.Select(i => i.Label));
+            var want = Vis(Mod(All), _ => true, 2);
+            (Program.Cfg.WheelFixed, Up, Jtac, Cv, Cen, Fits) = (wf, up0, jt0, cv0, cen0, fits0);
+            check(fx == string.Join(",", want.Select(i => i.Label)) && fx.Contains("AWACS") && fx.Contains("Range") && fx.Contains("JTAC") && fx.StartsWith("Ground,Tower") && fx.EndsWith($"{L("Notfall", "Emergency")},{L("Allgemein", "General")}") && fx.Split(',').Length == Math.Min(9, All.Length) && !free.Contains("AWACS"),
+                  $"#52 Funkrad fest: {fx} (ohne: {free})");
+            // Allgemein: "Debriefing / Log" keeps its key on the ground and airborne (zone transit is last)
+            var gn = All.First(i => i.Label == L("Allgemein", "General"));
+            int KeyOf(bool air) => Array.FindIndex(Vis(Mod(gn.Sub!), x => air || x != "Approach: request zone transit"), i => i.Label == "Debriefing / Log") + 1;
+            check(KeyOf(false) == KeyOf(true) && KeyOf(true) == 7, $"#52 Allgemein: Debriefing / Log Taste am Boden {KeyOf(false)}, in der Luft {KeyOf(true)}");
+        }
         // R13: AWACS "Nächster Tanker" names the tanker (with frequency), not the nearest airfield
         var tkText = All.First(i => i.Label == "AWACS").Sub!.First(i => i.Label == L("Nächster Tanker", "Nearest tanker")).Text!;
         var me = new Ops.Me("Enfield 1-1", new Telemetry(6000, 6000, 200, 0, 0, 0, 0, 0, 0), "FA-18C_hornet", 2);

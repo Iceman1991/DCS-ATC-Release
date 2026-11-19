@@ -148,16 +148,42 @@ public partial class Tower
             w.Tick(At(c.X + 10 * NM, c.Z), none, 0);
             (w.Phase, w.Runway, w.entry, w.nav, w.navName) = (Phase.Inbound, "25", "north", c, "C R P north");
             var msgs = new List<Msg>();
-            double x = c.X + 8 * NM, s = 1;
+            double x = c.X + 4 * NM, s = 1;
             for (; s < 400 && w.Phase == Phase.Inbound; s += 5, x -= 77) msgs.AddRange(w.Tick(At(x, c.Z), none, s));
             double dH = (x - c.X) / NM;
             var ho = msgs.FirstOrDefault(m => m.Role == "Approach");
             var r1 = w.OnTranscript("Kutaisi Tower, Enfield 11, inbound", At(x, c.Z), none, s);
             for (s += 5, x -= 77; x > c.X + 0.2 * NM; s += 5, x -= 77) msgs.AddRange(w.Tick(At(x, c.Z), none, s));   // on to the point
             var r2 = w.OnTranscript("Kutaisi Tower, Enfield 11, C R P north", At(x, c.Z), none, s);
-            Chk(ho != null && ho.Text.StartsWith("Enfield one one, contact Kutaisi Tower ") && ho.Text.EndsWith("report C R P north.") && dH is > 3 and < 6.5 &&
+            Chk(ho != null && ho.Text.StartsWith("Enfield one one, contact Kutaisi Tower ") && ho.Text.EndsWith("report C R P north.") && dH is > 1.5 and < 3.5 &&
                 r1.Count == 1 && r1[0].Role == "Tower" && r1[0].Text.EndsWith("report C R P north.") && r2.Count == 1 && r2[0].Role == "Tower" && r2[0].Text.StartsWith("Enfield one one, proceed overhead") && !r2[0].Text.Contains("contact"),
                 $"Übergabe vor dem CRP ({dH:0.0} NM, {w.Phase}): " + ho?.Text + " / " + J(r1) + " / " + J(r2));
+            n += 3;
+        }
+
+        // #49 (Log Nellis): the handover comes about one minute before the point (K22 was 2 minutes); "pushing Tower" acknowledges it, no "contact Tower now" afterwards,
+        // also not while the point is still ahead; without any acknowledgement the reminder only comes at the point
+        {
+            var k = Airfield.Kutaisi();
+            var c = k.Crp["north"];
+            Telemetry At(double x) => new(k.Elev + k.PatternFt * Ft, k.PatternFt * Ft, 150 * Kt, 180 * Math.PI / 180, x, c.Z, 0, 0, 760);
+            Tower Handed(out double x, out double s)
+            {
+                var w = new Tower(k, "Enfield 1-1");
+                w.Tick(At(c.X + 10 * NM), none, 0);
+                (w.Phase, w.Runway, w.entry, w.nav, w.navName) = (Phase.Inbound, "25", "north", c, "C R P north");
+                (x, s) = (c.X + 4 * NM, 1);
+                for (; s < 400 && w.Phase == Phase.Inbound; s += 5, x -= 77) w.Tick(At(x), none, s);
+                return w;
+            }
+            bool Nag(IEnumerable<Msg> m) => m.Any(g => g.Text.Contains("contact Kutaisi Tower now"));
+            var wa = Handed(out var xa, out var sa);
+            var ack = wa.OnTranscript("Enfield 11, pushing Tower", At(xa), none, sa + 2);
+            var nagAck = Nag(wa.Tick(At(xa), none, sa + 70));
+            var wb = Handed(out var xb, out var sb);
+            var nagFar = Nag(wb.Tick(At(xb), none, sb + 70));
+            var nagAt = Nag(wb.Tick(At(c.X + 0.5 * NM), none, sb + 75));
+            Chk(ack.Count == 0 && !nagAck && !nagFar && nagAt, $"#49 Übergabe: pushing Tower still, keine Erinnerung vor dem Punkt ({nagAck}/{nagFar}), am Punkt ohne Meldung ({nagAt}): " + J(ack));
             n += 3;
         }
 

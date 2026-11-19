@@ -132,6 +132,19 @@ static partial class Program
             var on = (AiCs("SENTRY 1-1", "Overlord11"), AiCs("AWACS Blue", "Overlord11"));
             Cfg.CallsignFromUnit = false;
             var off = AiCs("SENTRY 1-1", "Overlord11");
+            {   // #45: callsign from the DCS player name (dedicated server, dynamic slots): own name > player name > unit name > slot; "HOWLING PUPPIES 1-1" has two words
+                var (cp, mc) = (Cfg.CallsignFromPlayer, Cfg.MyCallsign);
+                var pl = new Pilot { Name = "HOWLING PUPPIES 1-1 | RedButton", Unit = "Viper 2-1", SlotCallsign = "Pontiac 1-1" };
+                var w = new List<string?>();
+                (Cfg.CallsignFromPlayer, Cfg.CallsignFromUnit, Cfg.MyCallsign) = (false, true, "");
+                w.Add(WantCallsign(pl));   // option off: unit name
+                Cfg.CallsignFromPlayer = true;
+                foreach (var n in new[] { "HOWLING PUPPIES 1-1 | RedButton", "GUARDIAN 1-1 | Christian", "Guardian 9-1", "GUARDIAN [TaktLwG66]" }) { pl.Name = n; w.Add(WantCallsign(pl)); }
+                Cfg.CallsignFromUnit = false; w.Add(WantCallsign(pl));   // no callsign in the name, unit name off: slot
+                (Cfg.CallsignFromPlayer, Cfg.MyCallsign) = (cp, mc);
+                if (!w.SequenceEqual(new[] { "Viper 2-1", "Howling Puppies 1-1", "Guardian 1-1", "Guardian 9-1", "Viper 2-1", "Pontiac 1-1" }) || UnitCallsign("Aerial Target 1-1") != null)
+                    throw new Exception("Rufzeichen aus dem Spielernamen: " + string.Join(" / ", w));
+            }
             var before = Ops.RoleOf("sentry enfield 1 1 radio check");
             Ops.Callsigns = new Dictionary<string, string> { ["A"] = "Sentry 1-1", ["T"] = "Petrol 2-1" };
             (Ops.AwacsFreq, Ops.TankerFreq) = (new() { ["A"] = 251 }, new() { ["T"] = 252 });
@@ -339,10 +352,12 @@ static partial class Program
         }
         {   // Forum (Killg0re NL): 9-line in the game text one item per line, role JTAC/FACA only
             var nl = "Enfield one one, standby for 9-line. Line 1, IP Alpha. Line 4, elevation four niner zero zero feet. Line 5, one tank, stationary. Line 6, MGRS 38T LM 123 456. Remarks, final attack heading 270. Read back lines 4, 6 and restrictions";
-            string[] want = { "Enfield 1-1, standby for 9-line.", "Line 1, IP Alpha.", "Line 4, elevation 4900 feet.", "Line 5, one tank, stationary.", "Line 6, MGRS 38T LM 123 456.", "Remarks, final attack heading 270.", "Read back lines 4, 6 and restrictions" };
+            string[] want = { "Enfield 1-1, standby for 9-line.", "1. IP Alpha.", "4. Elevation 4900 feet.", "5. One tank, stationary.", "6. MGRS 38T LM 123 456.", "Remarks, final attack heading 270.", "Read back lines 4, 6 and restrictions" };
             var j = ShownText("JTAC", nl).Split('\n'); var fa = ShownText("FACA", nl).Split('\n');
             var tw = "Runway clear. Line up, wait. Line 3 is busy"; var jc = "Enfield one one, Darknight, loud and clear";
             if (!j.SequenceEqual(want) || !fa.SequenceEqual(want) || ShownText("Tower", tw) != tw || ShownText("JTAC", jc) != "Enfield 1-1, Darknight, loud and clear") throw new Exception($"9-Line Spieltext: {string.Join("<NL>", j)}");
+            var gr = ShownText("JTAC", "Line 6, grid three seven tango, golf hotel, two six, two one, keypad seven. Line 7, MGRS three eight tango, lima mike, one two three, four five six.");   // #34: grid as pilots write it
+            if (gr != "6. Grid 37T GH 2621 keypad 7.\n7. MGRS 38T LM 123 456.") throw new Exception($"Koordinaten im Spieltext: {gr}");
             (string In, string Out)[] dg = {
                 ("Enfield one one, Marshal, case one recovery, expected BRC three five four, altimeter two niner niner two, hold angels 2, expected Charlie zero eight, report see me.", "Enfield 1-1, Marshal, case one recovery, expected BRC 354, altimeter 2992, hold angels 2, expected Charlie 08, report see me."),
                 ("Runway two five in use, contact Approach two five one decimal five.", "Runway 25 in use, contact Approach 251.5."),
@@ -1765,6 +1780,19 @@ static partial class Program
         var a15 = new List<Tx>(); while (SayQueue.TryTake(out var t15)) a15.Add(t15);
         fw.Add(pa.Pinned?.F.Name + (pa.Active?.Emergency == true ? "!" : "") + string.Join("/", a15.Select(t => t.Role)) + pa.OnBoat);
         while (SayQueue.TryTake(out _)) { }
+        // #49 (Log Nellis): "Disregard" / "Correction" withdraw the last call (no reply, no "say again", every controller); "Judy" / "Defending" at 0.57-0.62 are not asked back, other weak calls still are
+        var pd = new Pilot { Unit = "U7", Callsign = "Victory 9-1", Id = 12, Coalition = 2, Tel = pr.Tel };
+        Ops.Gci.Add(2);
+        List<string> Said49(string text, double conf = 1) { while (SayQueue.TryTake(out _)) { } Request(pd, text, "SRS", false, null, conf); var l = new List<string>(); while (SayQueue.TryTake(out var t49)) if (t49.Role != "Info") l.Add(t49.Text); return l; }
+        var d49 = new[] { Said49("AWACS: Disregard.", 0.87), Said49("AWACS: Correction, Victory 9-1.", 0.93), Said49("AWACS: Showtime, Victory 9-1, disregard.", 0.9), Said49("Tower: Nellis Tower, Victory 9-1, disregard", 0.9) };
+        var j49 = new[] { Said49("AWACS: Victory 9-1, Judy.", 0.62), Said49("AWACS: Victory 9-1. Defending.", 0.57) };
+        var j49b = Said49("AWACS: Victory 9-1. Defending.", 0.9);   // reference: same call, sure recognition
+        var u49 = Said49("AWACS: Victory 9-1, request picture.", 0.62);
+        Ops.Gci.Remove(2);
+        while (SayQueue.TryTake(out _)) { }
+        if (d49.Any(l => l.Count > 0) || j49[0].Any(s => s.Contains("say again")) || string.Join("|", j49[1]) != string.Join("|", j49b) || !u49.Any(s => s.Contains("say again")))
+            throw new Exception("#49 disregard/judy: " + string.Join(" || ", d49.Concat(j49).Append(u49).Select(l => string.Join(" | ", l))));
+        Console.WriteLine("OK   #49: disregard/correction ohne Antwort bei jedem Lotsen, Judy/Defending bei schwacher Erkennung nicht nachgefragt, sonstige schwache AWACS-Rufe weiter");
         (SimLog, Fields) = (null, new());
         if (!fw.SequenceEqual(new[] { "Kobuleti", "Batumi", "Kobuleti", "Kobuleti", "SenakiInbound", "Batumi", "Batumi", "Batumi", "Batumi", "Kobuleti", "KobuletiInbound", "Batumi", "Kobuleti", "Batumi", "Kobuleti!AWACS" }))
             throw new Exception("Frequenz wählt den Platz: " + string.Join(",", fw));

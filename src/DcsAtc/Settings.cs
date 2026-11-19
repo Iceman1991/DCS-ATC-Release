@@ -268,6 +268,7 @@ static class Settings
         var cs = Field(cfg.MyCallsign, hint: L("leer = Rufzeichen aus dem DCS-Slot", "empty = callsign from the DCS slot"));
         Row(L("Eigenes Rufzeichen", "Your callsign"), cs);
         var unitCs = Check(L("Rufzeichen aus dem Unitnamen der Mission (z. B. VICTORY 9-1)", "Callsign from the mission unit name (e.g. VICTORY 9-1)"), cfg.CallsignFromUnit);
+        var playerCs = Check(L("Rufzeichen aus dem DCS-Spielernamen (z. B. GUARDIAN 1-1 | Christian)", "Callsign from the DCS player name (e.g. GUARDIAN 1-1 | Christian)"), cfg.CallsignFromPlayer);
         var lang = Combo(new[] { "Deutsch", "English" }, En ? 1 : 0);
         Row(L("Sprache der Oberfläche *", "Interface language *"), lang);
         Group("Cockpit");
@@ -485,6 +486,7 @@ static class Settings
         Row(L("Funkrad im Spiel (VR)", "Radio wheel in game (VR)"), ingame);
         var wsize = new Slider(25, 95, 5, Math.Round(cfg.WheelSize * 100), "0' %'");
         Row(L("Größe (Anteil der Fensterhöhe, im Rad mit + / -) *", "Size (share of the window height, + / - in the wheel) *"), wsize);
+        var wfix = Check(L("Feste Nummern im Funkrad (unbenutzte Module abwählen, damit alles in 1-9 passt)", "Fixed radio wheel numbers (switch off unused modules so everything fits 1-9)"), cfg.WheelFixed);
 
         Page("SRS");
         Group(L("Verbindung", "Connection"));
@@ -657,7 +659,7 @@ static class Settings
             if (voices.FirstOrDefault(v => voice[v.Key] == "").C is { } empty && Bad(empty, L("Stimme fehlt.", "Voice is missing."))) return;
             var set = new (string Key, string Value, string After)[]
             {
-                ("MyCallsign", J(call!), "Callsign"), ("CallsignFromUnit", J(unitCs.Checked), "MyCallsign"), ("Volume", D(vol.Value / 100), "RadioFx"), ("SpeechRate", D(rate.Value), "Volume"),
+                ("MyCallsign", J(call!), "Callsign"), ("CallsignFromUnit", J(unitCs.Checked), "MyCallsign"), ("CallsignFromPlayer", J(playerCs.Checked), "CallsignFromUnit"), ("WheelFixed", J(wfix.Checked), "WheelSize"),("Volume", D(vol.Value / 100), "RadioFx"), ("SpeechRate", D(rate.Value), "Volume"),
                 ("ReplyPause", D(pause.Value), "SpeechRate"), ("RadioFx", J(fx.Checked), "PilotVoice"), ("RadioText", J(rtx.Checked), "RadioFx"), ("HintText", J(htx.Checked), "RadioText"),
                 ("PilotVoice", J(pv.SelectedIndex == 0 ? "" : known[pv.SelectedIndex - 1] == pilot ? cfg.PilotVoice : known[pv.SelectedIndex - 1]), "Voices"),   // same model: its "@pitch" stays
                 ("AiChatter", J(chat.Checked), "ReplyPause"), ("AwacsBullseye", J(bull.Checked), "Coalition"), ("AwacsNewGroupNm", D(awNm.Value), "AwacsBullseye"), ("Atis", J(atis.Checked), "AiChatter"), ("RunwayLights", J(lights[light.SelectedIndex]), "Atis"), ("AltimeterUnit", J(units[unit.SelectedIndex]), "RunwayLights"), ("AiFlightComms", J(modes[combat.SelectedIndex]), "Volume"), ("IffCheck", J(iffc.Checked), "AirspaceWatch"), ("StationPositions", J(spos.Checked), "IffCheck"), ("RandomNotams", J(notam.Checked), "StationPositions"),("AirspaceWatch", J(watch.Checked), "RunwayLights"), ("DebugLog", J(dbg.Checked), "AirspaceWatch"),

@@ -15,10 +15,22 @@ static partial class Program
     /// Forum: numbers as digits ("altimeter 2992", "251.5", "Enfield 1-1"); a single digit word stays a word ("case one", "fox two").
     internal static string ShownText(string role, string text)
     {
+        bool jtac = role is "JTAC" or "FACA";
+        if (jtac) text = GridWords.Replace(text, GridShown);   // before the digit chains: "grid 37T GH 2621 keypad 7" as pilots write it
         text = DigitChain.Replace(text, ShownDigits);
-        return role is "JTAC" or "FACA" ? Regex.Replace(text, @"\. (?=Line [1-9]\b|Remarks\b|Read back\b)", ".\n") : text;
+        // #34: 9-line one numbered line per item like the DCS JTAC ("4. Elevation 660 feet"), the voice keeps "Line 4, ..." with its pause
+        return jtac ? Regex.Replace(Regex.Replace(text, @"\. (?=Line [1-9]\b|Remarks\b|Read back\b)", ".\n"), @"(?m)^Line ([1-9]), (.)", m => m.Groups[1].Value + ". " + m.Groups[2].Value.ToUpperInvariant()) : text;
     }
     const string Dg = "(?i:zero|one|two|three|four|five|six|seven|eight|nine|niner)";
+    static readonly Regex GridWords = new($@"\b(?<k>grid|MGRS) (?<z>{Dg}(?: {Dg})*) (?<b>[a-z]+), (?<c>[a-z]+) (?<d>[a-z]+), (?<e>{Dg}(?: {Dg})*), (?<n>{Dg}(?: {Dg})*)(?:, keypad (?<p>{Dg}))?");
+    static string GridShown(Match m)
+    {
+        string Num(string w) => string.Concat(w.Split(' ').Select(x => x.Equals("nine", StringComparison.OrdinalIgnoreCase) ? "9" : Array.IndexOf(Tower.DigitWords, x.ToLowerInvariant()).ToString()));
+        string Ch(string w) => char.ToUpperInvariant(w[0]).ToString();
+        string e = Num(m.Groups["e"].Value), n = Num(m.Groups["n"].Value);
+        var head = $"{m.Groups["k"].Value} {Num(m.Groups["z"].Value)}{Ch(m.Groups["b"].Value)} {Ch(m.Groups["c"].Value)}{Ch(m.Groups["d"].Value)}";
+        return m.Groups["p"].Success ? $"{head} {e}{n} keypad {Num(m.Groups["p"].Value)}" : $"{head} {e} {n}";
+    }
     static readonly Regex DigitChain = new($@"(?:\b(?<name>[A-Z][a-z]+) )?\b(?<n>{Dg}(?: (?:(?i:decimal|point) )?{Dg})*)\b");
     static readonly HashSet<string> PlainNumber = new(StringComparer.OrdinalIgnoreCase)
     {

@@ -15,6 +15,8 @@
   "WheelButton": 1,
   // Funkradgröße: Anteil der DCS-Fensterhöhe; im offenen Rad mit + / - verstellen (wird hier gespeichert)
   "WheelSize": 0.45,
+  // Feste Nummern im Funkrad (z. B. für VoiceAttack): oberste Ebene immer mit allen Einträgen der gewählten Module, ohne Filter nach Flugphase oder Anwesenheit (AWACS, Tanker, JTAC ...). Mehr als 9 Einträge: Notfall und Allgemein bleiben hinten, unbenutzte Module abwählen
+  "WheelFixed": false,
   // Funkrad zusätzlich als Text im Spiel (VR-Headset zeigt das Desktop-Rad nicht): "auto" = wenn DCS im VR-Modus (Option VR oder Startparameter --force_enable_VR), "on", "off"
   "WheelInGame": "auto",
 
@@ -30,6 +32,8 @@
   "MyCallsign": "",
   // Rufzeichen aus dem Unitnamen der Mission ("VICTORY 9-1", "WOLF-2-1") statt aus dem DCS-Slot; andere Unitnamen bleiben beim DCS-Rufzeichen
   "CallsignFromUnit": false,
+  // Rufzeichen aus dem DCS-Spielernamen, Teil vor "|" ("GUARDIAN 1-1 | Christian", "Guardian 9-1"), z. B. Dedicated Server mit dynamischen Slots; Vorrang vor CallsignFromUnit, ohne passenden Namen gilt Unitname/Slot
+  "CallsignFromPlayer": false,
 
   // Lotsen-Frequenzen (MHz) – alle gleich setzen = alles auf einer Frequenz
   "Frequencies": { "ATIS": 263.5, "Ground": 264.5, "Tower": 265.0, "Approach": 266.5,

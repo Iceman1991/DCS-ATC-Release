@@ -177,6 +177,20 @@ public partial class Tower
               && twBk.Phase == Phase.Inbound && oIn[0].Role == "Approach" && oIn[0].Contains("Kutaisi Approach") && !oIn[0].Contains("Departure")
               && oCl[0].Contains("departure frequency two seven three decimal five five, squawk") && !oCl[0].Contains("Approach"),
               $"AirfieldFrequencies Übergaben: {oTx[0]} | {oTk[0]} | {string.Join(" / ", oHo)} | {oRc[0].Role}: {oRc[0]} | {string.Join(" / ", oBye.Select(m => m.Role + ": " + m.Text))} | {twBk.Phase} {oIn[0].Role}: {oIn[0]} | {oCl[0]}");
+        {   // #45 (log Nordholz): "airborne" to the Tower below the tick's handover height named Approach, 2 s later the tick named Departure: one handover, Departure
+            var tw45 = new Tower(kO, "Enfield 1-1") { HeardOn = 275.8 };
+            tw45.Tick(parked, none, 0);
+            tw45.OnTranscript("Kutaisi Ground, Enfield 11 request startup", parked, none, 1);
+            tw45.OnTranscript("Kutaisi Ground, Enfield 11 request taxi", parked, none, 2);
+            tw45.OnTranscript("Kutaisi Ground, Enfield 11 ready for departure", hold, none, 3);
+            tw45.HeardOn = 327.0;
+            tw45.OnTranscript("Kutaisi Tower, Enfield 11 ready for departure", hold, none, 4);
+            tw45.Tick(At(dx, dz, 120, LandHdg("25"), 180), none, 10);
+            var a45 = tw45.OnTranscript("Kutaisi Tower, Enfield 11, airborne", At(dx, dz, 120, LandHdg("25"), 180), none, 11);
+            var b45 = tw45.Tick(At(dx, dz, 250, LandHdg("25"), 200), none, 13);
+            Check(a45.Count == 1 && a45[0].Contains("contact Kutaisi Departure two seven three decimal five five") && !a45[0].Contains("Approach") && b45.Count == 0,
+                  "#45 airborne an Tower mit eigener Departure-Frequenz: " + string.Join(" | ", a45.Concat(b45).Select(m => m.Role + ": " + m.Text)));
+        }
         // R128: flight without code in the air: first "squawk", after 6 s "radar contact" (not in one transmission); on the ground/phase left: expires
         var airId = At(dx, dz, 600, LandHdg("25"), 250);
         var twId = new Tower("Enfield 1-1");
@@ -392,6 +406,10 @@ public partial class Tower
             tw222.vec = new(); tw222.lastVecSaid = -100;
             var r318 = tw222.Tick(At(ix22, iz22, 400, tw222.LandHdg(tw222.vrw), 130 * Kt), none, 3);
             Check(r318.Count == 1 && r318[0].Contains("miles from the airport, one half mile") && r318[0].Contains("of course, say intentions") && !r318[0].Contains("cleared"), $"R318 innerhalb des Gates ({tw222.Phase} {tw222.vecFinal}): " + string.Join(" | ", r318.Select(m => m.Text)));
+            // #45: 15 NM from the waypoint on a heading pointing away from it (track > 90° off): the "miss" gate must not swallow the new heading
+            tw222.vec = new() { (lx22 - 15 * NM, lz22) }; tw222.lastVecSaid = -100; tw222.vecHdg = 0;
+            var r45 = tw222.Tick(At(lx22, lz22, 900, 0, 130 * Kt), none, 200);
+            Check(r45.Count == 1 && r45[0].Contains("heading"), $"#45 Kurs weg vom Punkt, 15 NM: neuer Kurs ({tw222.Phase}): " + string.Join(" | ", r45.Select(m => m.ToString())));
         }
         {   // R8: clearance limit without destination = nearest airfield in departure direction (25: west, not the nearer one in the east); readback with the code -> "readback correct", then silent
             var allR8 = All;
@@ -1463,6 +1481,13 @@ public partial class Tower
         r = tw91.Tick(offSlow, none, 61);
         Check(r.Count == 1 && r[0].Role == "Tower" && r[0].Text.Contains("contact Kutaisi Ground"), "A91 Erinnerung: " + r.FirstOrDefault()?.Text);
         Check(tw91.Tick(offSlow, none, 100).Count == 0, "A91 nur einmal");
+        // #49 (Log Nellis): "Runway vacated at Alpha. Pushing ground." an den Tower ist die Rückmeldung zum "contact Ground when vacated": keine Antwort, keine Erinnerung danach
+        var tw49g = new Tower("Enfield 1-1");
+        tw49g.Tick(At(CX, CZ, 300, 254, 80), none, 0); tw49g.Tick(At(CX, CZ, 0, 254, 20), none, 5); tw49g.Tick(At(CX, CZ, 0, 254, 5), none, 8);
+        tw49g.Tick(offSlow, none, 12);
+        var r49g = tw49g.OnTranscript("Kutaisi Tower, Enfield 11, runway vacated at Alpha, pushing ground", offSlow, none, 14);
+        var r49h = tw49g.OnTranscript("Kutaisi Tower, Enfield 11, runway vacated, switching to ground", offSlow, none, 20).Concat(tw49g.Tick(offSlow, none, 61)).Concat(tw49g.Tick(offSlow, none, 100)).ToList();
+        Check(r49g.Count == 0 && r49h.Count == 0, "#49 Rollbahn frei, pushing ground: still, keine Erinnerung: " + string.Join(" | ", r49g.Concat(r49h).Select(m => m.Text)));
         // Reporting obligation #13: without taxi clearance above 5 kt, 400 m off the runway: "hold position, you are not cleared to taxi" + violation, once, afterwards no A91 reminder;
         // R247: the notice "possible pilot deviation" comes separately, only when stopped
         var tw13g = new Tower("Enfield 1-1");
@@ -1537,6 +1562,14 @@ public partial class Tower
             var pk2 = tpk.OnTranscript("Kutaisi Ground, Enfield 11, at parking.", offRwy with { Ias = 0 }, none, 110);
             Check(pk1 is [{ } p1] && p1.Text == "Enfield one one, roger." && pkPh == Phase.Parked && pk2 is [{ } p2] && p2.Text == "Enfield one one, roger.",
                   $"#49 at parking nach der Rollfreigabe: kurze Bestätigung, geparkt ({pkPh}): " + string.Join(" | ", pk1.Concat(pk2).Select(m => m.Text)));
+        }
+        {   // #49 (log Nellis 15:27): stopped 77 m beyond the runway end, 87 m to the side, a DCS spot 40 m away, no taxi clearance: not parked (was closed after 30 s)
+            var tnE = Landed();
+            var re = tnE.F.Ends.First();
+            var (e49x, e49z) = (re.CX + (re.Len / 2 + 77) * re.Dx - 87 * re.Dz, re.CZ + (re.Len / 2 + 77) * re.Dz + 87 * re.Dx);
+            tnE.F.Spots.Add((e49x + 40, e49z, 5, 72));
+            for (int s = 10; s <= 70; s += 5) tnE.Tick(At(e49x, e49z), none, s);
+            Check(tnE.Phase == Phase.TaxiIn, $"#49 Stehen hinter dem Bahnende ohne Rollfreigabe (Stellplatz 40 m) ist nicht geparkt: {tnE.Phase}");
         }
         // #13: standing off the runway with headwind (export IAS shows the wind) is not taxiing
         var tw13w = new Tower("Enfield 1-1");
@@ -1961,6 +1994,28 @@ public partial class Tower
                       (clr6 ? x6 is [{ } t6x] && t6x.Text.Contains("cross runway zero three left, continue to parking") && c6.Count == 0
                             : c6.Any(m => m.Text.Contains("You are not cleared onto runway"))),
                       $"LA06 Einrollen über 03L (Freigabe {clr6}): " + $"{sg6} / {sg6b} / " + string.Join(" | ", r6.Concat(x6).Concat(c6).Select(m => m.Text)));
+            }
+            // #45 (log Nordholz): single runway, landed on it, vacated to the side away from the parking position: the landing runway itself is crossed on the way to parking
+            // (taxi clearance with hold short, radio wheel offers the crossing request, "request crossing runway" without number is the request); still rolling out on it: no crossing
+            {
+                var nSr = Airfield.FromDcs("Nordholz", x0, z0, 570, new[] { ("03", -h, x0, z0, 3000.0) });
+                Telemetry T1((double X, double Z) p, double ias = 0) => new(nSr.Elev, 0, ias, h, p.X, p.Z, 0, 0, 760);
+                var tw1 = new Tower(nSr,"Enfield 1-1");
+                tw1.Tick(np, none, 0);
+                (tw1.Phase, tw1.landedAt, tw1.landRw) = (Phase.TaxiIn, 1, "03");
+                var roll1 = T1(Pt(-500, 0), 20 * Kt);
+                var v1 = T1(Pt(-500, -100));
+                tw1.Tick(roll1, none, 2);
+                var sr1 = tw1.Suggest(roll1);
+                tw1.Tick(v1, none, 3);
+                var r1 = tw1.OnTranscript("Nordholz Ground, Enfield 1-1, request taxi to parking", v1, none, 4);
+                var hs1 = T1(Pt(-600, -60));
+                tw1.Tick(hs1, none, 8);
+                var sg1 = tw1.Suggest(hs1);
+                var x1 = tw1.OnTranscript("Nordholz Ground, Enfield 1-1, request crossing runway", hs1, none, 9);
+                Check(sr1?.Text.Contains("crossing") != true, "#45 Ausrollen auf der Landebahn: kein Kreuzen angeboten: " + sr1);
+                Check(r1 is [{ } t1r] && t1r.Text.Contains("hold short runway zero three") && sg1 is ("Ground", "holding short runway zero three, request crossing") && x1 is [{ } t1x] && t1x.Text.Contains("cross runway zero three, continue to parking"),
+                      "#45 Landebahn nach dem Verlassen kreuzen (einzige Bahn): " + $"{sg1} / " + string.Join(" | ", r1.Concat(x1).Select(m => m.Text)));
             }
         }
         // --- A2: Unintelligible -> ask again without overwriting the last call, "say again" repeats the taxi clearance

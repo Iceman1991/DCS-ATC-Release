@@ -20,6 +20,8 @@ public class Config
     public string Callsign { get; set; } = "Enfield 1-1";   // only without mission data (otherwise call sign from DCS)
     public string MyCallsign { get; set; } = "";       // own call sign instead of the one from the DCS slot, "" = from DCS (Settings window)
     public bool CallsignFromUnit { get; set; }         // forum 0.13: call sign from the mission unit name ("VICTORY 9-1", "WOLF-2-1") instead of the DCS slot (Pontiac); other names stay DCS
+    public bool CallsignFromPlayer { get; set; }       // #45: call sign from the DCS player name before "|" ("GUARDIAN 1-1 | Christian"), dedicated server with dynamic slots; before CallsignFromUnit
+    public bool WheelFixed { get; set; }               // #52: radio wheel top level with fixed numbers: all entries of the enabled modules, no filter by flight phase or presence
     public Dictionary<string, double> Frequencies { get; set; } = new(Tower.Freqs) { ["Range"] = 267.5, ["AWACS"] = 251.5, ["Tanker"] = 255.5, ["Carrier"] = 127.5, ["RedCrown"] = Carrier.RedCrownDefault, ["JTAC"] = 133.5 };   // AWACS/tanker on .5: not on an airfield frequency (Radio.lua whole MHz, K3)
     public Dictionary<string, string> Pronunciation { get; set; } = new();   // word -> respelling for the voice only ("Ramstein": "Rahm-shtine"), Program.ForPiper; radio text stays as written
     public Dictionary<string, string> CenterNames { get; set; } = new();   // Center name per map ("Caucasus": "Tbilisi Control", "Caucasus:red": red side), without entry the table in Tower.CenterName
@@ -933,8 +935,14 @@ static partial class Program
         ? $"{char.ToUpperInvariant(m.Groups[1].Value[0])}{m.Groups[1].Value[1..]} {m.Groups[2].Value}-{m.Groups[3].Value}" : null;
 
     /// Forum 0.13: mission unit name as call sign, "VICTORY 9-1", "WOLF-2-1" -> "Victory 9-1", "Wolf 2-1"; ME default (Aerial-1-1, Rotary-1-1) and other names -> null
-    internal static string? UnitCallsign(string unit) => Regex.Match(unit.Trim(), @"^(?!(?i:aerial|rotary)\b)([A-Za-z]+)[\s-]*(\d)\s*-\s*(\d)$") is { Success: true } m
-        ? $"{char.ToUpperInvariant(m.Groups[1].Value[0])}{m.Groups[1].Value[1..].ToLowerInvariant()} {m.Groups[2].Value}-{m.Groups[3].Value}" : null;
+    internal static string? UnitCallsign(string unit) => Regex.Match(unit.Trim(), @"^(?!(?i:aerial|rotary)\b)([A-Za-z]+(?: [A-Za-z]+)?)[\s-]*(\d)\s*-\s*(\d)$") is { Success: true } m   // one or two words ("HOWLING PUPPIES 1-1")
+        ? $"{Regex.Replace(m.Groups[1].Value.ToLowerInvariant(), @"\b[a-z]", c => c.Value.ToUpperInvariant())} {m.Groups[2].Value}-{m.Groups[3].Value}" : null;
+
+    /// #45: callsign wanted for a player: own one (host) > DCS player name before "|" ("GUARDIAN 1-1 | Christian") > mission unit name > DCS slot callsign.
+    static string WantCallsign(Pilot pl) =>
+        Cfg.MyCallsign != "" && Host() == pl ? Cfg.MyCallsign
+        : Cfg.CallsignFromPlayer && UnitCallsign(pl.Name.Split('|')[0]) is { } pc ? pc
+        : Cfg.CallsignFromUnit && UnitCallsign(pl.Unit) is { } uc ? uc : pl.SlotCallsign;
 
     /// Forum (Abr): CallsignFromUnit for AI too: a flight, AWACS or tanker whose mission unit is named like a call sign ("SENTRY 1-1") is called that, otherwise the DCS call sign
     internal static string AiCs(string unit, string dcs) => Cfg.CallsignFromUnit && UnitCallsign(unit) is { } uc ? uc : dcs;
@@ -959,8 +967,8 @@ static partial class Program
         lastConfigError = null;
         var n = Cfg;
         Cfg = old;
-        (Cfg.MyCallsign, Cfg.Volume, Cfg.SpeechRate, Cfg.ReplyPause, Cfg.RadioFx, Cfg.RadioText, Cfg.PilotVoice, Cfg.AiChatter, Cfg.AiFlightComms, Cfg.Atis, Cfg.AltimeterUnit, Cfg.WheelInGame, Cfg.AirspaceWatch, Cfg.RunwayLights, Cfg.CallsignFromUnit) =   // R392: RunwayLights is read per call (line ~995), applies immediately
-            (n.MyCallsign, n.Volume, n.SpeechRate, n.ReplyPause, n.RadioFx, n.RadioText, n.PilotVoice, n.AiChatter, n.AiFlightComms, n.Atis, n.AltimeterUnit, n.WheelInGame, n.AirspaceWatch, n.RunwayLights, n.CallsignFromUnit);
+        (Cfg.MyCallsign, Cfg.Volume, Cfg.SpeechRate, Cfg.ReplyPause, Cfg.RadioFx, Cfg.RadioText, Cfg.PilotVoice, Cfg.AiChatter, Cfg.AiFlightComms, Cfg.Atis, Cfg.AltimeterUnit, Cfg.WheelInGame, Cfg.AirspaceWatch, Cfg.RunwayLights, Cfg.CallsignFromUnit, Cfg.CallsignFromPlayer, Cfg.WheelFixed) =   // R392: RunwayLights is read per call (line ~995), applies immediately
+            (n.MyCallsign, n.Volume, n.SpeechRate, n.ReplyPause, n.RadioFx, n.RadioText, n.PilotVoice, n.AiChatter, n.AiFlightComms, n.Atis, n.AltimeterUnit, n.WheelInGame, n.AirspaceWatch, n.RunwayLights, n.CallsignFromUnit, n.CallsignFromPlayer, n.WheelFixed);
         Cfg.HintText = n.HintText;
         (Cfg.IffCheck, Cfg.StationPositions) = (n.IffCheck, n.StationPositions);   // Tower.IffCheck is set by LoadConfig, StationPositions is read per transmission
         (Cfg.RandomNotams, Cfg.Notams) = (n.RandomNotams, n.Notams);

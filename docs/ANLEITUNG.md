@@ -188,6 +188,7 @@ Tower: Enfield one one, after departure exit via C R P west, not above … until
 - **Bahn nicht frei.** Mit Verkehr im Endanflug oder auf der Bahn kommt „hold short runway two five, traffic …“ oder „line up and wait“. Tower gibt dich von selbst frei, sobald die Bahn frei ist.
 - **Zu früh.** Meldest du „ready“ vor dem Rollhalt, kommt „negative, you are not at the holding point“.
 - **Parallelbahn kreuzen.** Liegt zwischen Vorfeld und Startbahn eine Parallelbahn (etwa 03L vor 03R), endet die Rollfreigabe mit „hold short runway zero three left“. Am Haltepunkt dort meldest du „holding short runway 03L, request crossing“ (das Funkrad schlägt es vor; „ready for departure“ dort bekommt dieselbe Antwort): „cross runway zero three left, hold short runway zero three right“. An der Parallelbahn gibt es keine Startfreigabe. Ist sie belegt, kommt „hold short runway zero three left, traffic …“ und die Freigabe zum Kreuzen folgt von selbst, sobald sie frei ist. Wer ohne Freigabe kreuzt, bekommt „You are not cleared onto runway …“.
+- **Landebahn auf dem Weg zur Parkposition kreuzen.** Liegt deine Parkposition auf der anderen Seite der Bahn, auf der du gelandet bist (Plätze mit nur einer Bahn wie Nordholz), zählt diese Bahn als Querung, sobald du sie verlassen hast: Die Rollfreigabe endet mit „hold short runway …“, dort meldest du „holding short, request crossing“ (das Funkrad schlägt es vor).
 
 **6. Abflug (Approach).** Beim Steigen durch etwa 500 ft über Grund:
 
@@ -316,6 +317,7 @@ Du hörst (und siehst) nur, worauf du gerastet bist. Lotsensprüche erscheinen a
 - **Slots ohne westliches Rufzeichen:** der erste solche Spieler bekommt `"Callsign"` aus config.jsonc (Standard `"Enfield 1-1"`). Weitere werden mit ihrem Spielernamen angesprochen.
 - **Eigenes Rufzeichen:** `"MyCallsign"` setzen (Standard `""` = aus DCS) oder Einstellungsfenster → *Eigenes Rufzeichen*. Format: Name und zwei Ziffern, etwa `Viper 1-1`. Es ersetzt das Slot-Rufzeichen des Spielers an diesem PC (Host); andere Spieler behalten ihres.
 - **Rufzeichen aus dem Unitnamen:** `"CallsignFromUnit": true` oder Einstellungsfenster → *Rufzeichen aus dem Unitnamen der Mission*. Heißt die Unit in der Mission wie ein Rufzeichen (`VICTORY 9-1`, `WOLF-2-1`), wirst du so gerufen („Victory 9-1“) statt mit dem DCS-Rufzeichen (etwa Pontiac). Andere Unitnamen (`Aerial-1-1`, `F-4E ADVERSARIES NELLIS 1-1`) behalten das DCS-Rufzeichen. Gilt für alle Spieler, „MyCallsign“ geht für den Host vor. Gilt auch für KI-Flugzeuge: Ein KI-Flug, AWACS oder Tanker, dessen Unit `SENTRY 1-1` heißt, wird Sentry gerufen, und du kannst ihn so anrufen („Sentry, Enfield 1-1, picture“).
+- **Rufzeichen aus dem Spielernamen:** `"CallsignFromPlayer": true` oder Einstellungsfenster → *Rufzeichen aus dem DCS-Spielernamen*. Steht in deinem DCS-Spielernamen vor einem „|“ ein Rufzeichen (`GUARDIAN 1-1 | Christian`, `HOWLING PUPPIES 1-1 | RedButton`) oder ist er eins (`Guardian 9-1`), wirst du so gerufen („Guardian 1-1“), egal welchen Slot du nimmst. Praktisch auf Servern mit dynamischen Slots. Ein Name, der kein Rufzeichen ist (`GUARDIAN [TaktLwG66]`), fällt auf den Unitnamen oder das DCS-Rufzeichen zurück. Geht vor „CallsignFromUnit“; „MyCallsign“ gilt für den Host weiterhin zuerst.
 - **Verhörer werden toleriert.** Dein Rufzeichen wird erkannt, wenn die Ziffern stimmen und das Wort nur leicht abweicht („Enfeld 1-1“ zählt als „Enfield 1-1“).
 - **Was du sagst, ändert dein Rufzeichen nicht.** Liefert die Mission dein Rufzeichen (oder hast du eins gesetzt), benennt dich ein anderes Rufzeichen im Gesprochenen nicht um. Ein Spruch, der mit einem anderen Rufzeichen oder einer Rottennummer beginnt und deins nicht enthält („Enfield 1-2, check fuel“, „Two, go trail“), gilt als Rottenfunk, der Lotse ignoriert ihn. Ein Befehl wie „Two, go trail“ geht an deine KI-Rottenflieger (siehe [Deine KI-Rottenflieger befehlen](#deine-ki-rottenflieger-befehlen)).
 - **Wer gesendet hat:** dein Spruch wird dir über deine SRS-/DCS-Einheit zugeordnet. Klappt das nicht, über das gesprochene Rufzeichen.
@@ -345,6 +347,7 @@ Diese Sprüche gehen bei jedem Platzlotsen:
 
 Worauf der Lotse nicht antwortet:
 
+- **„Disregard“ oder „correction“ allein nimmt deinen letzten Ruf zurück.** Der Lotse bleibt still und wartet auf deinen nächsten Ruf, kein „say again“.
 - **Readbacks bleiben unbeantwortet.** Wie im echten Funk heißt Stille: Readback in Ordnung. Als Readback gilt ein Spruch mit „wilco“, „roger“, „copy“, „cleared“, „approved“ oder „report …“, einer, der die Werte des Lotsen wiederholt (hold short, contact, squawk, QNH bzw. altimeter, heading oder nur die Zahlen: „Tower 134.0, Enfield 1-1“), oder nur dein Rufzeichen, auch mit „starting up“, „taxiing“, „lining up“, „rolling“ oder „switching“ („Start up approved, Enfield 1-1“, „Enfield 1-1“). Ein Readback einer IFR-Freigabe mit richtigem Squawk bekommt *„readback correct.“*
 - **Dieselbe Anfrage innerhalb von 30 Sekunden nach dem Ende der Lotsenantwort noch einmal gilt als Readback.**
 
@@ -2484,6 +2487,7 @@ Als Host behandelt DCS-ATC jeden menschlichen Spieler der Mission getrennt:
 - **Rotten bilden sich automatisch.** Spieler derselben DCS-Gruppe innerhalb 1 NM zueinander fliegen als eine Rotte mit der Folge des Leads. Lead ist der Spieler mit dem niedrigsten Rufzeichen. Ground, Tower und Approach behandeln die Rotte dann als Einheit. Ein Rottenflieger, der sich mehr als 3 NM entfernt, bekommt wieder seine eigene Folge.
 - **Rufzeichen kommen aus dem DCS-Slot jedes Spielers** (aus `Enfield11` wird „Enfield 1-1“). „MyCallsign“ in den Einstellungen ändert nur das Rufzeichen des Hosts. Sitzen mehrere Spieler in Slots ohne westliches Rufzeichen, bekommt der erste „Callsign“ aus config.jsonc und die anderen werden mit ihrem Spielernamen gerufen.
 - Mit „CallsignFromUnit“ wird jeder Spieler mit dem Unitnamen seines Slots gerufen, wenn der wie ein Rufzeichen aussieht (`VICTORY 9-1` wird „Victory 9-1“).
+- Mit „CallsignFromPlayer“ wird jeder Spieler, dessen DCS-Spielername vor einem „|“ ein Rufzeichen trägt (`GUARDIAN 1-1 | Christian`), so gerufen, unabhängig vom Slot. Das geht auch auf einem Dedicated Server.
 - **Textmeldungen gehen an die eigene Gruppe jedes Spielers**, du siehst also nur Lotsentext für deine Gruppe (und nur, wenn du auf die Frequenz gerastet bist). Die Stimme geht über SRS auf der Lotsenfrequenz, du hörst also genau, was du auf dieser Frequenz in echt hören würdest, auch die Sprüche an andere Spieler.
 - **Lotsen arbeiten nur für ihre Seite.** Ein Platz der Gegenseite hat für dich keinen Lotsen.
 
@@ -2838,8 +2842,9 @@ Bei jedem Missionsstart legt DCS-ATC seine Kneeboard-Seiten in `Saved Games\DCS\
 
 - Auf jeder Karte, in der Sprache der Oberfläche (Deutsch oder Englisch). Auf Karten mit vielen Plätzen laufen die Tabellen über mehrere Seiten.
 - Platzrunden, CRPs und Routen stehen für die Plätze mit Verfahren drin: Kaukasus eingebaut, sonst aus deiner `charts.jsonc` (siehe [Eigene Platzverfahren](#eigene-platzverfahren-chartsjsonc)). Die Routen-Seite nennt je Route die Bahnen, die Fixes in Reihenfolge und ihre Höhen („9000+“ = oder höher, „5000-“ = oder tiefer, „5000-7000“ = zwischen).
-- Nur im Kaukasus: die Seite Kutaisi und die Hinweise zur Karte.
-- DCS liest die Seitenliste beim Laden der Mission. Eine Seite, die es bisher nicht gab (andere Karte, mehr Tabellenseiten), erscheint deshalb erst ab der nächsten Mission. Eine Seite, die diese Mission nicht braucht, zeigt einen Hinweis und ist ab der nächsten Mission weg.
+- Platzseiten: Jeder Platz aus deinen `charts*.jsonc`-Dateien bekommt eine eigene Seite `ATC-2-<Platz>` (etwa `ATC-2-NellisAFB`) mit Bahnen und Längen, Elevation, Navhilfen, Frequenzen, Platzrundenhöhe und -seite je Bahn, An- und Abflughöhe, Kontrollzone, Meldepunkten mit den Bahnen und dem Einflug, den sie bedienen, Initial-Abstand, Rollwegen je Vorfeld, Abrollhinweisen und deinen Hinweisen. Bei vielen Vorfeldern geht sie auf `…_2` und `…_3` weiter. Höchstens 10 Plätze je Karte. Im Kaukasus hat Kutaisi immer seine Seite; die übrigen eingebauten Plätze stehen auf den Platz- und Platzrunden-Seiten.
+- Nur im Kaukasus: die Hinweise zur Karte.
+- DCS liest die Seitenliste beim Laden der Mission. Eine Seite, die es bisher nicht gab (andere Karte, mehr Tabellenseiten), erscheint deshalb erst ab der nächsten Mission, und die erste Mission nach einem Kartenwechsel zeigt noch die Seiten der vorherigen Karte. Eine Seite, die diese Mission nicht braucht, zeigt einen Hinweis und ist ab der nächsten Mission weg.
 - Ausschalten: `"KneeboardPages": false` in `config.jsonc`.
 - Die Dateien heißen `ATC-*.png`. Beim Deinstallieren werden sie gelöscht.
 
@@ -2902,6 +2907,7 @@ Links wählst du die Seite: Allgemein, Stimmen, Funk & Verkehr, AWACS, Frequenze
 |---|---|---|
 | **Eigenes Rufzeichen** | Leer = Rufzeichen aus dem DCS-Slot. Sonst Name und zwei Ziffern, etwa `Viper 1-1` (`viper11` wird angenommen und vereinheitlicht). | `MyCallsign` |
 | **Rufzeichen aus dem Unitnamen der Mission** | Aus = DCS-Rufzeichen. An = Unitname, wenn er wie ein Rufzeichen aussieht (`VICTORY 9-1` wird „Victory 9-1“), sonst DCS-Rufzeichen. | `CallsignFromUnit` |
+| **Rufzeichen aus dem DCS-Spielernamen** | An = Teil des Spielernamens vor dem Strich (oder ganzer Name), wenn er wie ein Rufzeichen aussieht (`GUARDIAN 1-1 \| Christian` wird „Guardian 1-1“), vor dem Unitnamen. | `CallsignFromPlayer` |
 | **Sprache der Oberfläche** `*` | Deutsch / English. Schaltet auch die Sprache des F10-Menüs um. | (Sprachdatei) |
 | **Lautstärke Lotsen** | 0–100 %, in 5er-Schritten | `Volume` |
 | **Sprechtempo** (1 = normal, größer = langsamer) | 0,70–1,50 | `SpeechRate` |
@@ -2927,6 +2933,7 @@ Links wählst du die Seite: Allgemein, Stimmen, Funk & Verkehr, AWACS, Frequenze
 | **Bahnbefeuerung (nachts)** | stumm / mit DCS-Lotse (hörbar) / aus. Gilt ab dem nächsten Start. | `RunwayLights` |
 | **Höhenmesser-Einstellung** | automatisch (nach Flugzeugtyp) / hPa (QNH) / inHg (altimeter) | `AltimeterUnit` |
 | **Funkrad im Spiel (VR)** | Text automatisch (wenn DCS im VR-Modus) / Text immer / aus / Rad als Bild (Test) | `WheelInGame` |
+| **Feste Nummern im Funkrad** | An: Die oberste Ebene zeigt immer alle Einträge der gewählten Module in derselben Reihenfolge (etwa für VoiceAttack). Nicht benutzte Module abwählen, damit alles auf die Tasten 1-9 passt. | `WheelFixed` |
 | **Mikrofon (nur ohne SRS)** `*` | Windows-Standard oder ein bestimmtes Gerät | `MicName` |
 | **SRS-Ordner** `*` | Der Pfad, mit „…“ zum Durchsuchen. Geprüft wird auf `ExternalAudio\DCS-SR-ExternalAudio.exe`. | `SrsPath` |
 | **Tasten festlegen …** | Öffnet die Tastenabfrage (Funkrad, HOTAS, Sprechtaste). | `WheelKey`, `PttKey`, … |
@@ -2973,6 +2980,7 @@ Die Datei liegt im Installationsordner: `%LOCALAPPDATA%\Programs\DCS-ATC\config.
 | `WheelButton` | `1` | Knopfnummer, die das Rad öffnet. |
 | `WheelSize` | `0.45` | Radgröße als Anteil der DCS-Fensterhöhe (0,25–0,95). `+`/`-` im offenen Rad ändern und speichern sie. |
 | `WheelInGame` | `"auto"` | Rad zusätzlich als Text im Spiel: `"auto"`, wenn DCS in VR läuft (VR-Option oder `--force_enable_VR`), `"on"`, `"off"`. `"window"` = stattdessen das Rad als Bild in einem DCS-Fenster (Test). |
+| `WheelFixed` | `false` | `true` = die oberste Ebene des Funkrads zeigt immer alle Einträge der gewählten Module in fester Reihenfolge, ohne Filter nach Flugphase oder Anwesenheit von AWACS, Tanker, JTAC, Träger, Schießplatz oder Center; Ground ist also immer Taste 1. Bleiben mehr als 9, bleiben Notfall und Allgemein hinten und Einträge aus der Mitte entfallen, deshalb nicht benutzte Module abwählen. Untermenüs bleiben; in Allgemein ist Debriefing / Log immer Taste 7. |
 | `CommsKey` | `43` (`\` US / `#` deutsch) | Deine DCS-Taste für das **Kommunikationsmenü** als Scancode. DCS-ATC drückt sie, um das DCS-Tankermenü (Korb/Boom) zu öffnen und in Dämmerung, Nacht oder schlechter Sicht die Bahnbefeuerung anzufordern. `0` = aus. |
 | `MicName` | `""` | Teil des Mikrofonnamens, etwa `"FDUCE"`. Leer = Windows-Standard. Nur ohne SRS. |
 
@@ -2983,6 +2991,7 @@ Die Datei liegt im Installationsordner: `%LOCALAPPDATA%\Programs\DCS-ATC\config.
 | `Callsign` | `"Enfield 1-1"` | Nur ohne Missionsdaten oder für einen Slot ohne westliches Rufzeichen. Normalerweise kommt das Rufzeichen aus deinem DCS-Slot. |
 | `MyCallsign` | `""` | Eigenes Rufzeichen statt des Slot-Rufzeichens. `""` = aus DCS. |
 | `CallsignFromUnit` | `false` | Rufzeichen aus dem Unitnamen der Mission (`VICTORY 9-1`, `WOLF-2-1`) statt aus dem DCS-Slot. Andere Unitnamen behalten das DCS-Rufzeichen. |
+| `CallsignFromPlayer` | `false` | Rufzeichen aus dem DCS-Spielernamen: Teil vor dem Strich (`GUARDIAN 1-1 \| Christian`) oder ganzer Name (`Guardian 9-1`). Vor `CallsignFromUnit`; `MyCallsign` gilt für den Host zuerst. Andere Namen behalten Unitnamen oder DCS-Rufzeichen. |
 | `Mode` | `"host"` | `"client"` = nur Funkrad, Anfragen gehen über DCS an den Host. DCS-ATC schaltet von selbst in den Client-Modus, wenn du einem fremden Server beitrittst. |
 | `Dedicated` | `false` | Dedicated Server ohne jemanden am PC: kein Rad, keine Tasten, kein Mikrofon, kein SRS-Client. Schaltet sich automatisch ein, wenn `DCS_server.exe` ohne `DCS.exe` läuft. |
 

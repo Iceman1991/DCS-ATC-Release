@@ -226,6 +226,8 @@ public partial class Tower
         int calls = 0;
         double maxTurn = 0, clrVec = 1e9, clrTwr = 1e9, clrFin = 1e9, hoLat = double.NaN, hoFt = double.NaN, hoA = double.NaN, brkFt = double.NaN, clearedAt = double.NaN, sec = 0;
         double lastApp = -1e9, pilotAt = -1e9;   // R351: last Approach call, last pilot call
+        double lastAsg = double.NaN;   // #45: heading of the last Approach vector and the waypoint it led to
+        (double, double)? lastLeg = null;
         int sinceIcpt = -1;   // R353: Approach calls since the intercept vector, -1 = none pending
         string[]? annRw = null;   // R352: runways of the last runway announcement
         var alts = new List<(double S, string A)>();   // R355: altitudes assigned by Approach
@@ -258,6 +260,13 @@ public partial class Tower
                 {
                     calls++;
                     if (!first && p.HdgOf(m.Text) is { } h) maxTurn = Math.Max(maxTurn, HdgDiff(h, p.Hdg));
+                    // #45: a leg to a waypoint gets one heading: a new one less than 15° from the last, to the same waypoint, only when he would miss it by more than 2 NM
+                    if (p.HdgOf(m.Text) is { } nh)
+                    {
+                        (double, double)? lp = tw.vec is { Count: > 0 } ? tw.vec[0] : null;
+                        if (lp != null && lp == lastLeg && HdgDiff(nh, lastAsg) < 15 && Dist(p.Tel().X, p.Tel().Z, lp.Value.Item1, lp.Value.Item2) >= MissFar && tw.Miss(p.Tel()) is var miss && miss <= MissMax) errs.Add($"Kurskorrektur {HdgDiff(nh, lastAsg):0}° auf demselben Abschnitt, Verfehlen nur {miss / NM:0.0} NM @{sec}s");
+                        (lastAsg, lastLeg) = (nh, lp);
+                    }
                 }
                 if (double.IsNaN(brkFt) && Regex.IsMatch(m.Text, @"report base|hand downwind|cleared (ILS|P A R|straight in) approach|proceed straight in"))   // Altitude at initial/overhead or above the 3° glide path at approach clearance
                     brkFt = m.Text.Contains(" approach") ? (p.Alt - f.Elev - Math.Max(p.AL(f.End(tw.vrw != "" ? tw.vrw : tw.Runway)).A, 0) * Math.Tan(3 * Math.PI / 180)) / Ft : p.Alt / Ft - tw.PatternFt;

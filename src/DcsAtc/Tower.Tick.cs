@@ -409,7 +409,7 @@ public partial class Tower
 
         // Reporting obligation: handed over, but not reported to the Tower: after 60 s or 5 NM before the airfield once Approach "contact Tower now" (landing clearance only on report, otherwise go around)
         // shared map frequency (K2): no frequency change, so no "contact Tower now" (there "report initial/overhead" and the landing report apply)
-        if (!ground && towerDue && !towerNag && Phase == Phase.Entering && Math.Abs(FreqOf(F, "Tower") - FreqOf(F, "Approach")) >= 0.005 && (now - handoffAt > 60 || now - handoffAt > 20 && Dist(t.X, t.Z, CX, CZ) < 5 * NM))
+        if (!ground && towerDue && !towerNag && Phase == Phase.Entering && Math.Abs(FreqOf(F, "Tower") - FreqOf(F, "Approach")) >= 0.005 && !(entry != null && navName == CrpSay(entry) && nav is { } rp && Dist(t.X, t.Z, rp.X, rp.Z) > 2 * NM) && (now - handoffAt > 60 || now - handoffAt > 20 && Dist(t.X, t.Z, CX, CZ) < 5 * NM))
         {
             towerNag = true;
             return Say($"{c}, contact {F.StationOf("Tower")} now, {FreqSay(FreqOf(F, "Tower"))}.", "Approach");
@@ -461,7 +461,7 @@ public partial class Tower
             }
             bool crpLeg = !holding && entry != null && Rt == null && (Phase == Phase.Inbound || Phase == Phase.Entering && navName == CrpSay(entry!));
             // K22: Approach hands over so that the Tower is called about 2 minutes before the C R P (not yet at the point: that is the fallback below)
-            if (crpLeg && Phase == Phase.Inbound && vec == null && navName == CrpSay(entry!) && !crpAsked && d > NM && d <= Math.Max(Gs(t), 40) * 120)
+            if (crpLeg && Phase == Phase.Inbound && vec == null && navName == CrpSay(entry!) && !crpAsked && d > NM && d <= Math.Max(Gs(t), 40) * 60)   // #49: one minute before the point (log Nellis: 2 min at 440 kt was too early)
             {
                 Phase = Phase.Entering; handoffAt = now; towerDue = true; towerNag = false;
                 return Say($"{c}, contact {Contact("Tower")}, report {CrpSay(entry!)}.", "Approach");
@@ -882,7 +882,7 @@ public partial class Tower
             if (stoppedSince < 0 || holdFor != null) stoppedSince = now;
             // #23 (log 12.11.): with a parking spot assigned by Ground only near that one; 30 s standing beside the runway near another spot (reading back the taxi clearance)
             // counted as parked, the flight was closed and the next readback taken as a taxi request for departure. Engine off at any stand still parks (EngineOff).
-            else if (now - stoppedSince > 30 && (taxiInTold && spot is { } own ? !OnRunwayPos(t.X, t.Z) && Dist(t.X, t.Z, own.X, own.Z) < 100 : AtSpot(t, 100) && !OnRunwayPos(t.X, t.Z, 150))) Park();   // #49: without taxi-in clearance not on a taxiway beside the runway (a spot within 100 m is no stand yet)
+            else if (now - stoppedSince > 30 && (taxiInTold && spot is { } own ? !OnRunwayPos(t.X, t.Z) && Dist(t.X, t.Z, own.X, own.Z) < 100 : AtSpot(t, 100) && !OnRunwayPos(t.X, t.Z, 150, 600))) Park();   // #49: without taxi-in clearance not on a taxiway beside the runway or beyond its end (spots near the runway are no stand yet)
         }
         else stoppedSince = -1;
 

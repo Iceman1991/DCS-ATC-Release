@@ -82,7 +82,7 @@ static partial class Program
         try
         {
             var done = Cfg.KneeboardPages ? Kneeboard.Write(dir, Fields, Cfg) : new();
-            boardDrop = Kneeboard.Names.Select(p => Path.Combine(dir, p + ".png")).Except(done).Where(File.Exists).ToList();
+            boardDrop = Kneeboard.Owned(dir).Except(done, StringComparer.OrdinalIgnoreCase).Where(File.Exists).ToList();
             Kneeboard.Note(boardDrop);
         }
         catch (Exception e) { Log(L($"[Kneeboard] Seiten nicht geschrieben: {e.Message}", $"[Kneeboard] pages not written: {e.Message}")); }

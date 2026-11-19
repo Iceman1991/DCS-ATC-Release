@@ -1,4 +1,5 @@
 using System.Drawing.Imaging;
+using System.Text.Json;
 
 namespace DcsAtc;
 
@@ -6,16 +7,21 @@ namespace DcsAtc;
 static class Kneeboard
 {
     const double Ft = 0.3048;
+    const int FieldMax = 10, FieldSheets = 3, SheetLines = 40, Cols = 56;   // airfield pages: at most 10 airfields per map, 3 pages each (rest is cut), 40 lines/56 characters per page
     const int FieldPages = 5, NavPages = 3, TableRows = 40;   // ponytail: a table longer than its pages is cut (5 × 40 airfield rows); more pages = raise the count
 
     /// All file names DCS-ATC may write (Program.WriteKneeboard: the ones not written get a note and go when the mission ends). DCS shows the pages in
     /// name order: a table continues on "ATC-3a2-…", "ATC-3a3-…", which sort between "ATC-3-" and "ATC-3b-".
-    public static readonly string[] Names = new[] { "ATC-1-Funk", "ATC-2-Kutaisi" }.Concat(PageNames("ATC-3-Plaetze", FieldPages)).Append("ATC-3b-Platzrunden").Append("ATC-3c-Routen")
+    public static readonly string[] Names = new[] { "ATC-1-Funk" }.Concat(PageNames("ATC-3-Plaetze", FieldPages)).Append("ATC-3b-Platzrunden").Append("ATC-3c-Routen")
         .Concat(PageNames("ATC-4-Navigation", NavPages)).Append("ATC-5-AWACS").Append("ATC-5b-Funksprueche").Append("ATC-5c-Funksprueche").Append("ATC-6-Hinweise").ToArray();
+    /// Airfield pages "ATC-2-<airfield>[_2|_3]" depend on the map and are not in Names: everything of ours in dir that this mission does not write again
+    /// (Program.WriteKneeboard) gets the note and goes when the mission ends.
+    public static List<string> Owned(string dir) => Names.Select(p => Path.Combine(dir, p + ".png"))
+        .Concat(Directory.Exists(dir) ? Directory.GetFiles(dir, "ATC-2-*.png") : Array.Empty<string>()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     static IEnumerable<string> PageNames(string name, int n) => Enumerable.Range(1, n).Select(i => i == 1 ? name : name.Insert(name.IndexOf('-', 4), "a" + i));
 
-    /// Writes the pages of this map and returns their files: radio, airfields (frequencies of the mission), patterns/CRPs and named routes of the charted
-    /// airfields (built in or charts.jsonc), navaids, AWACS/tanker. Kutaisi and the chart notes only on the Caucasus (elsewhere Kutaisi is the placeholder of Airfield.Load).
+    /// Writes the pages of this map and returns their files: radio, airfields (frequencies of the mission), one page per charted airfield (ATC-2-*, built in or charts*.jsonc),
+    /// patterns/CRPs and named routes of the charted airfields, navaids, AWACS/tanker. The VAD chart notes only on the Caucasus (elsewhere Kutaisi is the placeholder of Airfield.Load).
     public static List<string> Write(string dir, List<Airfield> fields, Config cfg)
     {
         Directory.CreateDirectory(dir);
@@ -72,34 +78,18 @@ static class Kneeboard
             L("Falscher Lotse -> \"contact ... on ...\"", "Wrong controller -> \"contact ... on ...\""),
             L("Landebewertung nach jedem Aufsetzen (Text)", "Landing grade after every touchdown (text)"),
         }).ToArray());
-        if (cauc && fields.FirstOrDefault(x => x.Name == "Kutaisi") is { } k)
-            One("ATC-2-Kutaisi", "KUTAISI (UGKO)", new[]
-            {
-                L($"Bahn 07/25, 2500 m, Elevation {k.Elev / Ft:0} ft", $"Runway 07/25, 2500 m, elevation {k.Elev / Ft:0} ft"),
-            }.Concat(k.NavText().Replace(", NDB", "\nNDB").Split('\n')).Concat(new[]   // NDB on its own line (otherwise wider than the page)
-            {
-                L($"Platzrunde {k.PatternFt:0} ft, IMMER SÜDLICH:", $"Pattern {k.PatternFt:0} ft, ALWAYS SOUTH:"),
-                L("  Bahn 07 rechts, Bahn 25 links", "  runway 07 right, runway 25 left"),
-                L($"An-/Abflug max. {k.MaxFt:0} ft", $"Arrival/departure max. {k.MaxFt:0} ft"),
-                L($"Kontrollzone {k.CtrNm:0.0} NM bis {k.CtrTopFt:0} ft", $"Control zone {k.CtrNm:0.0} NM up to {k.CtrTopFt:0} ft"),   // A100/N2
-                L("  ohne Anruf nicht einfliegen,", "  do not enter without a call,"),
-                L("  Durchflug: request zone transit", "  transit: request zone transit"),
-                "",
-                L("PFLICHTMELDEPUNKTE (Einflug)", "COMPULSORY REPORTING POINTS (entry)"),
-                L("  CRP North  immer   -> overhead", "  CRP North  always  -> overhead"),
-                L("  CRP South  immer   -> initial", "  CRP South  always  -> initial"),
-                L("  CRP West   nur Bahn 07", "  CRP West   runway 07 only"),
-                L("  CRP East   nur Bahn 25", "  CRP East   runway 25 only"),
-                L($"  Initial: ca. {Tower.Initial(k, "07") / 1852:0.0} NM vor der Schwelle", $"  Initial: about {Tower.Initial(k, "07") / 1852:0.0} NM before the threshold"),
-                "",
-                L("ROLLWEGE", "TAXIWAYS"),
-            }).Concat(RampLines(k)).Concat(new[]
-            {
-                L("  Abrollen 25: Alpha/Bravo (N), Whiskey (S)", "  Vacate 25: Alpha/Bravo (N), Whiskey (S)"),
-                L("  Abrollen 07: Charlie/Delta (N), Echo (S)", "  Vacate 07: Charlie/Delta (N), Echo (S)"),
-                "",
-                L("Warteschleife am CRP, wenn die Runde voll ist", "Holding at the CRP when the pattern is full"),
-            }).ToArray());
+        // One page (up to FieldSheets) per charted airfield from the user's own charts files (generated from the chart data), plus Kutaisi on the Caucasus (fields is already
+        // filtered by OnMap); the other built-in Caucasus airfields get no page (they would push the later pages back).
+        bool OwnChart(Airfield x) => Airfield.OwnChart?.TryGetProperty(Airfield.OwnAlias.GetValueOrDefault(x.Name, x.Name), out _) == true;
+        var ids = new HashSet<string>();
+        foreach (var x in fields.Where(x => x.Charted && (OwnChart(x) || x.Name == "Kutaisi")).OrderBy(x => OwnChart(x) ? 0 : 1).ThenBy(x => x.Name == "Kutaisi" ? 0 : 1).ThenBy(x => x.Name, StringComparer.Ordinal).Take(FieldMax))
+        {
+            var id = FileSafe(x.Name);
+            if (!ids.Add(id)) ids.Add(id += ids.Count);
+            var sheets = FieldLines(x, f);
+            for (int i = 0; i < sheets.Count; i++)   // "_2" sorts after "ATC-2-<name>.png" ("-" would sort before the "."); DCS lists the files by name
+                One(i == 0 ? "ATC-2-" + id : $"ATC-2-{id}_{i + 1}", Trim(x.Name.ToUpperInvariant(), 22) + (x.Icao != "" ? $" ({x.Icao})" : "") + (sheets.Count > 1 ? $" {i + 1}/{sheets.Count}" : ""), sheets[i], true);
+        }
         string Fq(double v) => v > 0 ? $"{v,7:0.000}" : "      -";   // K1: TWR = VHF as on the map, UHF only DCS
         double Band(Airfield x, bool uhf) => x.FreqsOf("Tower")?.FirstOrDefault(v => v >= 200 == uhf) ?? 0;   // own tower frequency (AirfieldFrequencies) instead of the map's
         var rows = fields.OrderBy(x => x.Name).Select(x =>
@@ -158,6 +148,98 @@ static class Kneeboard
     {
         int w = k.Ramps.Select(r => r.Name.Length).DefaultIfEmpty(0).Max();
         return k.Ramps.DistinctBy(r => r.Name).SelectMany(r => r.To.Select((p, i) => $"  {(i == 0 ? r.Name : "").PadRight(w)} -> {p.Key}: {p.Value}"));
+    }
+
+    /// File-safe airfield name: ASCII letters and digits only ("Nellis AFB" -> "NellisAFB", "Büchel" -> "Buchel"), so "_" stays free for the continuation pages.
+    internal static string FileSafe(string name)
+    {
+        var s = string.Concat(name.Normalize(System.Text.NormalizationForm.FormD).Where(char.IsAsciiLetterOrDigit));
+        return s == "" ? "Airfield" : s;
+    }
+
+    /// Lines longer than the page are broken at a space, the rest is indented.
+    static IEnumerable<string> Wrap(string s)
+    {
+        int ind = Math.Min(8, s.Length - s.TrimStart().Length + (s.TrimStart().StartsWith("- ") ? 2 : 4));
+        while (s.Length > Cols)
+        {
+            int cut = s.LastIndexOf(' ', Cols);
+            if (cut <= ind) cut = Cols;
+            yield return s[..cut].TrimEnd();
+            s = new string(' ', ind) + s[cut..].TrimStart();
+        }
+        yield return s;
+    }
+
+    /// Forum (Heling): the page of one charted airfield, the same for every airfield (Kutaisi included) from its data: runways, elevation, navaids, frequencies,
+    /// pattern per runway, arrival/departure ceiling, control zone, reporting points with the runways and entry they serve, initial, taxi routes, vacate, chart notes.
+    /// Split into pages of SheetLines lines (at most FieldSheets, ponytail: what is longer, the chart notes at the end, is cut).
+    internal static List<string[]> FieldLines(Airfield k, Dictionary<string, double> cfgFreq)
+    {
+        var r = new List<string>();
+        var done = new HashSet<string>();
+        foreach (var e in k.Ends.Where(e => done.Add(e.Name)))
+        {
+            var o = k.Ends.FirstOrDefault(y => y.Name != e.Name && y.Name == Airfield.Opposite(e.Name));
+            if (o != null) done.Add(o.Name);
+            var rw = o == null ? e.Name : e.Name + "/" + o.Name;
+            r.Add(L($"Bahn {rw}, {e.Len:0} m", $"Runway {rw}, {e.Len:0} m"));
+        }
+        r.Add($"Elevation {k.Elev / Ft:0} ft");
+        r.AddRange(k.NavText().Replace(", NDB", "\nNDB").Split('\n').Where(l => l != ""));
+        r.Add("");
+        r.Add(L("FREQUENZEN (AM)", "FREQUENCIES (AM)"));
+        string Mhz(double v) => (v >= 200 ? "UHF " : "VHF ") + v.ToString("0.0##", System.Globalization.CultureInfo.InvariantCulture);
+        var fr = new[] { "ATIS" }.Concat(Airfield.Roles).Where(x => x != "Departure" || k.Own.ContainsKey(x)).Select(x => (x, v: k.FreqsOf(x))).Where(t => t.v != null)
+            .GroupBy(t => string.Join(" / ", t.v!.Select(Mhz))).Select(g => $"  {string.Join("/", g.Select(t => t.x))}: {g.Key}").ToList();
+        if (fr.Count == 0)   // no map frequencies: config values, the same for every airfield
+            fr.AddRange(new[] { "ATIS", "Ground", "Tower", "Approach" }.Where(cfgFreq.ContainsKey).Select(x => $"  {x}: {cfgFreq[x]:0.0}"));
+        r.AddRange(fr);
+        r.Add("");
+        r.Add(L($"Platzrunde {k.PatternFt:0} ft:", $"Pattern {k.PatternFt:0} ft:"));
+        string Cardinal(string s) => Ui.En ? s : s.Replace("north", "Nord").Replace("south", "Süd").Replace("east", "Ost").Replace("west", "West");
+        foreach (var (rw, hand) in k.HandOf)
+            r.Add("  " + L($"Bahn {rw}: {(hand == "right hand" ? "rechts" : "links")}", $"Runway {rw}: {(hand == "right hand" ? "right" : "left")}") + (k.SideOf.TryGetValue(rw, out var sd) ? ", " + Cardinal(sd) : ""));
+        if (k.LandRwy != "" || k.DepRwy != "")
+            r.Add("  " + L($"Bevorzugt: Landung {k.LandRwy}, Abflug {k.DepRwy}", $"Preferred: landing {k.LandRwy}, departure {k.DepRwy}"));
+        if (k.MaxFt > 0) r.Add(L($"An-/Abflug max. {k.MaxFt:0} ft", $"Arrival/departure max. {k.MaxFt:0} ft"));
+        r.Add(L($"Kontrollzone {k.CtrNm:0.0} NM bis {k.CtrTopFt:0} ft", $"Control zone {k.CtrNm:0.0} NM up to {k.CtrTopFt:0} ft"));   // A100/N2
+        r.Add(L("  ohne Anruf nicht einfliegen,", "  do not enter without a call,"));
+        r.Add(L("  Durchflug: request zone transit", "  transit: request zone transit"));
+        r.Add("");
+        r.Add(L("PFLICHTMELDEPUNKTE (Einflug)", "COMPULSORY REPORTING POINTS (entry)"));
+        int lw = Math.Min(14, k.Crp.Keys.Select(c => Airfield.Label(c).Length).DefaultIfEmpty(0).Max());
+        foreach (var c in k.Crp.Keys)
+        {
+            var via = k.Entry.Where(e => e.Value.Any(x => x.Crp == c)).Select(e => (Rw: e.Key, e.Value.First(x => x.Crp == c).Via)).ToList();
+            var when = via.Count == 0 ? (k.Exit.Values.Any(x => x.Contains(c)) || k.ExitOnly.Contains(c) ? L("nur Ausflug", "departures only") : "")
+                : via.Count == k.Entry.Count ? L("immer", "always") : L($"nur Bahn {string.Join(" ", via.Select(v => v.Rw))}", $"runway {string.Join(" ", via.Select(v => v.Rw))} only");
+            var to = via.Select(v => v.Via).Distinct().Count() == 1 ? "-> " + via[0].Via : string.Join(", ", via.Select(v => $"{v.Rw} -> {v.Via}"));
+            r.Add($"  {Airfield.Label(c).PadRight(lw)}  {when}" + (to.Length > 3 && via.Count > 0 ? "  " + to : ""));
+        }
+        var ini = k.Ends.Where(e => k.InitialNm.ContainsKey(e.Name)).Select(e => (e.Name, Nm: k.InitialNm[e.Name])).ToList();
+        if (ini.Count > 0)
+            r.Add(ini.Select(i => i.Nm).Distinct().Count() == 1 ? L($"  Initial: ca. {ini[0].Nm:0.0} NM vor der Schwelle", $"  Initial: about {ini[0].Nm:0.0} NM before the threshold")
+                : "  Initial (NM): " + string.Join(", ", ini.Select(i => $"{i.Name} {i.Nm:0.0}")));
+        if (k.Routes.Count + k.Departures.Count > 0) r.Add(L("  Namen der An-/Abflugrouten: Seite ATC-3c", "  Arrival/departure route names: page ATC-3c"));
+        if (k.Ramps.Length > 0)
+        {
+            r.Add("");
+            r.Add(L("ROLLWEGE", "TAXIWAYS"));
+            r.AddRange(RampLines(k));
+            foreach (var g in k.Ramps.DistinctBy(x => x.Name).SelectMany(x => x.Vacate).GroupBy(p => p.Key))
+                r.Add("  " + L("Abrollen ", "Vacate ") + $"{g.Key}: {string.Join("; ", g.Select(p => p.Value).Distinct())}");
+        }
+        r.Add("");
+        r.Add(L("Warteschleife am CRP, wenn die Runde voll ist", "Holding at the CRP when the pattern is full"));
+        if (k.Notes.Count > 0)
+        {
+            r.Add("");
+            r.Add(L("HINWEISE (Karte, englisch)", "NOTES (chart)"));
+            r.AddRange(k.Notes.Select(n => "- " + n));
+        }
+        var lines = r.SelectMany(l => Wrap(l)).ToList();
+        return Enumerable.Range(0, FieldSheets).Select(i => lines.Skip(i * SheetLines).Take(SheetLines).SkipWhile(l => l == "").ToArray()).Where(x => x.Length > 0).ToList();
     }
 
     /// N35: AWACS/tanker page only from the config (Write knows no mission data); the sentences are those Ops.AwacsCall understands.
@@ -355,8 +437,9 @@ static class Kneeboard
             Console.SetOut(TextWriter.Null);   // Write reports the folder
             bool Has(List<string> w, string n) => w.Contains(Path.Combine(tmp, n + ".png")) && new FileInfo(Path.Combine(tmp, n + ".png")).Length > 1000;
             Airfield.Theatre = "Caucasus";
-            var w = Write(tmp, new() { kut, ndb }, cfg);
-            if (!Has(w, "ATC-2-Kutaisi") || !Has(w, "ATC-3b-Platzrunden") || !Has(w, "ATC-6-Hinweise") || !Has(w, "ATC-5-AWACS") || Has(w, "ATC-3c-Routen") || Has(w, "ATC-3a2-Plaetze"))
+            var bat = new Airfield { Name = "Batumi", Crp = { ["north"] = (0, 0) }, Ends = { new("13", 0, 0, 130, 2000, 0, 0) } };   // charted built-in airfield: no page without an own chart
+            var w = Write(tmp, new() { kut, bat, ndb }, cfg);
+            if (w.Any(p => Path.GetFileName(p).StartsWith("ATC-2-") && !Path.GetFileName(p).StartsWith("ATC-2-Kutaisi")) ||!Has(w, "ATC-2-Kutaisi") ||!Has(w, "ATC-3b-Platzrunden") || !Has(w, "ATC-6-Hinweise") || !Has(w, "ATC-5-AWACS") || Has(w, "ATC-3c-Routen") || Has(w, "ATC-3a2-Plaetze"))
                 throw new Exception("Kneeboard: Seiten Kaukasus: " + string.Join(" ", w.Select(Path.GetFileName)));
             var old = new FileInfo(Path.Combine(tmp, "ATC-3-Plaetze.png")).Length;
             Note(new[] { Path.Combine(tmp, "ATC-3-Plaetze.png") });
@@ -366,6 +449,51 @@ static class Kneeboard
             w = Write(tmp, many, cfg);
             if (Has(w, "ATC-2-Kutaisi") || Has(w, "ATC-6-Hinweise") || !Has(w, "ATC-3c-Routen") || !Has(w, "ATC-3a2-Plaetze") || !Has(w, "ATC-3a3-Plaetze") || Has(w, "ATC-3a4-Plaetze") || !Has(w, "ATC-1-Funk"))
                 throw new Exception("Kneeboard: Seiten andere Karte: " + string.Join(" ", w.Select(Path.GetFileName)));
+            // Forum (Heling): airfield page from the chart data of any map. Kutaisi first: the generic page has what the old fixed one had
+            var kl = string.Join("\n", FieldLines(kut, cfg.Frequencies).SelectMany(s => s));
+            if (!kl.Contains("Runway 07/25, 24") || !kl.Contains("CRP west") || !kl.Contains("runway 07 only") || !kl.Contains("CRP east") || !kl.Contains("runway 25 only") || !kl.Contains("-> overhead") || !kl.Contains("Pattern 2000 ft") ||
+                !kl.Contains("Runway 07: right, south") || !kl.Contains("Runway 25: left, south") || !kl.Contains("Vacate 25: right via Alpha or Bravo") || !kl.Contains("Ramp West") || !kl.Contains("Control zone"))
+                throw new Exception("Kneeboard: Kutaisi-Seite aus den Kartendaten: " + kl);
+            var (oc, oa) = (Airfield.OwnChart, Airfield.OwnAlias);
+            try
+            {
+                var ramps = string.Join(",", Enumerable.Range(1, 13).Select(i => $"\"Ramp {i}\": {{ \"pts\": [[{i * 10}, {i * 10}]], \"to\": {{ \"03L\": \"Alpha, Bravo\", \"03R\": \"Alpha\", \"21L\": \"Charlie, Delta, Echo, Foxtrot\", \"21R\": \"Charlie\" }}, \"vacate\": {{ \"03L\": \"left via Hotel\", \"21R\": \"right via Juliet\" }} }}"));
+                Airfield.OwnChart = JsonDocument.Parse("{ \"Nellis AFB\": { \"icao\": \"KLSV\", \"pattern_ft\": 3500, \"arrdep_max_ft\": 5000, \"ctr_top_ft\": 6500, \"land_rwy\": \"21R\", \"dep_rwy\": \"21L\", " +
+                    "\"crp\": { \"CRAIG\": [1000, 2000], \"ONDAE\": [3000, 4000], \"FLEX\": [5000, 6000], \"L_S_V_Radial_3_4_9\": [7000, 8000] }, " +
+                    "\"rwy\": { \"03L\": { \"hand\": \"left\", \"side\": \"west\", \"initial_nm\": 3, \"entry\": { \"CRAIG\": { \"crs\": 120, \"via\": \"overhead\" }, \"ONDAE\": { \"crs\": 180, \"via\": \"initial\" } }, \"exit\": { \"FLEX\": { \"crs\": 28 } } }, " +
+                    "\"03R\": { \"hand\": \"right\", \"side\": \"east\", \"initial_nm\": 3.3, \"entry\": { \"CRAIG\": { \"crs\": 120, \"via\": \"overhead\" }, \"ONDAE\": { \"crs\": 180, \"via\": \"initial\" } }, \"exit\": { \"FLEX\": { \"crs\": 28 } } }, " +
+                    "\"21L\": { \"hand\": \"left\", \"side\": \"east\", \"initial_nm\": 5, \"entry\": { \"CRAIG\": { \"crs\": 300, \"via\": \"overhead\" } }, \"exit\": { \"FLEX\": { \"crs\": 28 } } } }, " +
+                    "\"ground\": { \"ramps\": { " + ramps + " } }, \"notes\": [\"Test note: hold short of runway 21L when the tower tells you to and read back every instruction\"] } }", Airfield.ChartOpts).RootElement;
+                Airfield.OwnAlias = new();
+                var nel = new Airfield { Name = "Nellis AFB", Id = 7, X = 0, Z = 0, Elev = 570 * Ft, Uhf = 327, Vhf = 132.35, Tacan = 12, TacanId = "LSV", Ils = { ["21R"] = (111.1, "ILSV") },
+                    Ends = { new("03L", 0, 0, 30, 3000, 0, 0), new("21R", 0, 0, 210, 3000, 0, 0), new("03R", 0, 0, 30, 3000, 0, 0), new("21L", 0, 0, 210, 3000, 0, 0) } }.ApplyChart();
+                var sheets = FieldLines(nel, cfg.Frequencies);
+                var nl = string.Join("\n", sheets.SelectMany(s => s));
+                var xr = new Airfield { Name = "Xray Field", Ends = { new("09", 0, 0, 90, 1000, 0, 0) } };   // no chart: no page
+                var stale = Path.Combine(tmp, "ATC-2-OldField.png"); File.WriteAllBytes(stale, new byte[] { 1 });   // page of another map
+                w = Write(tmp, new() { kut, xr, nel }, cfg);
+                if (sheets.Count != 3 || !Has(w, "ATC-2-NellisAFB") || !Has(w, "ATC-2-NellisAFB_2") || !Has(w, "ATC-2-NellisAFB_3") || Has(w, "ATC-2-NellisAFB_4") || Has(w, "ATC-2-XrayField") || Has(w, "ATC-2-Kutaisi") ||
+                    string.CompareOrdinal("ATC-2-NellisAFB.png", "ATC-2-NellisAFB_2.png") >= 0 || string.CompareOrdinal("ATC-2-NellisAFB_2.png", "ATC-3-Plaetze.png") >= 0 || string.CompareOrdinal("ATC-1-Funk.png", "ATC-2-NellisAFB.png") >= 0)
+                    throw new Exception("Kneeboard: Platzseiten aus eigener Karte: " + string.Join(" ", w.Select(Path.GetFileName)) + " Blätter " + sheets.Count);
+                foreach (var need in new[] { "Runway 03L/21R, 3000 m", "Runway 03R/21L", "Elevation 570 ft", "TACAN 12X LSV", "ILS 21R 111.10", "Ground/Tower/Approach: UHF 327.0 / VHF 132.35", "Pattern 3500 ft", "Runway 03R: right, east",
+                    "Preferred: landing 21R, departure 21L", "max. 5000 ft", "Control zone", "6500 ft", "CRP", "CRAIG", "always  -> overhead", "runway 03L 03R only  -> initial", "departures only", "Radial 3 4 9", "Initial (NM): 03L 3.0, 03R 3.3, 21L 5.0",
+                    "TAXIWAYS", "Ramp 1 ", "Ramp 13", "-> 21L: Charlie, Delta, Echo, Foxtrot", "Vacate 03L: left via Hotel", "Vacate 21R: right via Juliet", "NOTES (chart)", "- Test note" })
+                    if (!nl.Contains(need)) throw new Exception($"Kneeboard: Platzseite aus eigener Karte ohne \"{need}\": " + nl);
+                if (sheets.SelectMany(s => s).Any(l => l.Length > Cols) || sheets.Any(s => s.Length > SheetLines)) throw new Exception("Kneeboard: Platzseite zu breit oder zu lang: " + nl);
+                var gone = Owned(tmp).Except(w, StringComparer.OrdinalIgnoreCase).ToList();   // what Program.WriteKneeboard notes and deletes at the end
+                if (!gone.Contains(stale) || gone.Any(g => g.Contains("NellisAFB")) || !gone.Any(g => g.EndsWith("ATC-6-Hinweise.png"))) throw new Exception("Kneeboard: alte Platzseite anderer Karte nicht zum Ersetzen/Entfernen: " + string.Join(" ", gone.Select(Path.GetFileName)));
+                Note(gone);
+                if (new FileInfo(stale).Length < 1000) throw new Exception("Kneeboard: alte Platzseite nicht durch den Hinweis ersetzt");
+                if (Environment.GetEnvironmentVariable("DCSATC_KNEEBOARD_PREVIEW") is { Length: > 0 } pv) Write(pv, new() { nel }, cfg);   // pages to look at
+                // Caucasus with an own chart for Batumi: Batumi and Kutaisi, nothing else
+                Airfield.Theatre = "Caucasus";
+                Airfield.OwnChart = JsonDocument.Parse("{ \"Batumi\": { } }").RootElement;
+                w = Write(tmp, new() { kut, bat, ndb }, cfg);
+                if (w.Any(p => Path.GetFileName(p).StartsWith("ATC-2-") && !Path.GetFileName(p).StartsWith("ATC-2-Kutaisi") && !Path.GetFileName(p).StartsWith("ATC-2-Batumi")) || !Has(w, "ATC-2-Batumi") || !Has(w, "ATC-2-Kutaisi"))
+                    throw new Exception("Kneeboard: Kaukasus mit eigener Karte für Batumi: " + string.Join(" ", w.Select(Path.GetFileName)));
+                Airfield.Theatre = "Nevada";
+            }
+            finally { (Airfield.OwnChart, Airfield.OwnAlias) = (oc, oa); }
                 foreach (var en2 in new[] { false, true })   // phrases pages: written, block headings, nothing wider than the page (Consolas 21 px, 56 chars)
             {
                 Ui.En = en2;
@@ -385,7 +513,7 @@ static class Kneeboard
             (Airfield.Theatre, Ui.En) = (th, en);
             try { Directory.Delete(tmp, true); } catch (IOException) { }
         }
-        Console.WriteLine("OK   Kneeboard: Rollwege aus Airfield.Ramps, NDB in NavText, AWACS-Seite mit Config-Frequenz, Hinweisseite, Hinweis statt alter Seite; andere Karte ohne Kutaisi, Routen-Seite, Plätze auf 3 Seiten, englisch");
+        Console.WriteLine("OK   Kneeboard: Rollwege aus Airfield.Ramps, NDB in NavText, AWACS-Seite mit Config-Frequenz, Hinweisseite, Hinweis statt alter Seite; andere Karte ohne Kutaisi, Routen-Seite, Plätze auf 3 Seiten, englisch; Platzseite je Platz mit Karte (Kutaisi und eigene Karte, 2. und 3. Seite, Breite, alte Seite wird ersetzt)");
     }
 
     /// Pages DCS already listed that this mission does not use (another map, pages switched off): a note in place of the old content.

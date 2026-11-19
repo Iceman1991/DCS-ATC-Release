@@ -125,7 +125,11 @@ public partial class Tower
             lastIntent = "readback";
             return new() { new Msg(Dep(role), $"{c}, readback correct.") };   // last stays the clearance ("say again" repeats it, further readbacks silent)
         }
-        if (!fromMenu && !request && intent is not ("emergency" or "unable") && (readback || repeat)) return new();   // "Unable heading 045" with the controller's heading is not a readback (A28)
+        if (!fromMenu && !request && intent is not ("emergency" or "unable") && (readback || repeat))   // "Unable heading 045" with the controller's heading is not a readback (A28)
+        {
+            if (towerDue && !ground && Phase == Phase.Entering) towerNag = true;   // #49: "Victory 9-1, pushing Tower" acknowledges the handoff, no "contact Tower now" afterwards
+            return new();
+        }
         lastIntent = intent;
         if (intent != "cancelapproach") optedOut = false;
         if (leaveAt >= 0) (minDist, leaveAt) = (-1, -1);   // A13: reply to "say intentions": no sign-off, measure again (heading again)
@@ -172,7 +176,13 @@ public partial class Tower
         var resp = (intent is "transit" or "transitoff" || intent == "crp" && Phase == Phase.Entering) && addressed is "Approach" or "Tower" ? addressed : Responsible(intent, t);   // N3: transit is answered by the station called; K22: C R P report after the early handover to either
         if (addressed == "Center" && intent is "ff" or "ffoff") resp = "Center";   // flight following asked from the Center
         if (addressed != null && resp != null && addressed != resp && !SameFreq(resp))
+        {
+            // #45: "airborne" on the Tower frequency is the handover (below the tick's 500 ft): mark it done, so Contact names Departure (own frequency) and the tick does not hand over a second time
+            if (intent == "airborne" && Phase is Phase.ClearedTakeoff or Phase.Departing && !stayPattern) { Phase = Phase.Departing; wantRw = null; handedOff = true; handedAt = now; dueAt = -1; }
+            // #49 (log Nellis: "Runway vacated at Alpha. Pushing ground." to the Tower was answered "contact Ground" three times): changing to the right controller is the readback
+            if (!fromMenu && Has(n, $"(?:push|pushing|switch|switching|changing|contacting|going) (?:to )?{resp.ToLowerInvariant()}")) { vacRemFor = landedAt; return new(); }   // no A91 "contact Ground" reminder afterwards either
             return Neg($"{c}, {Station}, contact {Contact(resp)}.");
+        }
         role = resp ?? role;
         bool firstTower = role == "Tower" && towerDue;   // R314: first call to Tower after handover (reply with station name)
         if (role == "Tower" && !ground) towerDue = false;   // Reporting obligation: reported to Tower after "contact Tower"
@@ -1282,7 +1292,7 @@ public partial class Tower
 
     /// LA06: taxi in: runway between the aircraft and its parking position (nearest first, not the landing runway), name in the direction of the active runway. Without taxiways:
     /// only if the straight line to the parking position crosses the centerline within the runway (otherwise it goes around its end).
-    string? CrossIn(Telemetry t) => (spot ?? ((!ParkSpot || F.RampOnly) && Phase == Phase.TaxiIn && home != null ? (home.X, home.Z) : null)) is not { } sp ? null : F.Ends.Where(o => HdgDiff(o.Hdg, F.End(Runway).Hdg) < 90 && !Landed(o.Name)).Select(o =>
+    string? CrossIn(Telemetry t) => (spot ?? ((!ParkSpot || F.RampOnly) && Phase == Phase.TaxiIn && home != null ? (home.X, home.Z) : null)) is not { } sp ? null : F.Ends.Where(o => HdgDiff(o.Hdg, F.End(Runway).Hdg) < 90 && (!Landed(o.Name) || vacatedAt > landedAt)).Select(o =>   // #45: the landing runway counts once vacated (single runway field: parking is on the other side)
     {
         double la = (t.X - o.CX) * o.Dz - (t.Z - o.CZ) * o.Dx, lb = (sp.X - o.CX) * o.Dz - (sp.Z - o.CZ) * o.Dx;   // lateral: aircraft, parking position
         double aa = (t.X - o.CX) * o.Dx + (t.Z - o.CZ) * o.Dz, ab = (sp.X - o.CX) * o.Dx + (sp.Z - o.CZ) * o.Dz;   // along

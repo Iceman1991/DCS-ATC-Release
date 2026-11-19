@@ -477,6 +477,9 @@ partial class Ops
         var nl = Say(o, m1, "JTAC: ready to copy", 1);
         check(nl.Contains("Line 4, elevation six six zero feet") && nl.Contains("north four two degrees zero seven decimal four zero minutes") && nl.Contains("laser one six eight eight")
               && nl.Contains("friendlies three zero zero zero meters") && nl.Contains("final attack heading") && nl.Contains("four tanks, stationary") && o.Cas == 2, "J7: 9-Liner mit Hoehe, Lat/Long (Hornet), Laser-Code, Friendlies -> " + nl);
+        var nlShown = Program.ShownText("JTAC", nl);   // #34: on-screen 9-line: one numbered line per item, digits, no number words
+        check(nlShown.Contains("\n1. IP ") && nlShown.Contains("\n2. Heading ") && nlShown.Contains("\n4. Elevation 660 feet.") && nlShown.Contains("\n7. Laser 1688.") && nlShown.Contains("\n8. Friendlies 3000 meters ") && nlShown.Contains("\nRemarks, final attack heading ")
+              && nlShown.Contains("North 42 degrees 07.40 minutes") && !Regex.IsMatch(nlShown, @"(?i)\bniner\b|\b(?:zero|one|two|three|four|five|six|seven|eight|nine) (?:zero|one|two|three|four|five|six|seven|eight|nine|niner)\b"), "#34: 9-Liner im Spieltext nummeriert, mit Ziffern -> " + nlShown);
         var rp = Say(o, m1, "JTAC: say again the nine-line", 1.5);
         check(rp.Contains("I say again 9-line. Line ") && rp.Contains("Line 4, elevation six six zero feet") && rp.Contains("Read back") && o.Cas == 2 && Say(o, m1, "JTAC: say again line 4", 1.6).Contains("line 4, elevation"), "9-Liner komplett wiederholen (nicht Zeile 9) -> " + rp);
         var wrong = Say(o, m1, "JTAC: readback line 4 one one zero zero line 6 " + o.casLines[6], 2);

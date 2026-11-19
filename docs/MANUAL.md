@@ -186,6 +186,7 @@ Tower: Enfield one one, after departure exit via C R P west, not above … until
 - **If the runway isn't free.** With traffic on final or on the runway you get "hold short runway two five, traffic …" or "line up and wait". Tower clears you by itself as soon as the runway is free.
 - **Too early.** If you call "ready" before you reach the holding point, you get "negative, you are not at the holding point".
 - **Crossing a parallel runway.** If a parallel runway lies between the ramp and your departure runway (e.g. 03L before 03R), the taxi clearance ends with "hold short runway zero three left". At that holding point report "holding short runway 03L, request crossing" (the radio wheel suggests it; "ready for departure" there gets the same answer): "cross runway zero three left, hold short runway zero three right". There is no takeoff clearance at the parallel runway. If it is busy you get "hold short runway zero three left, traffic …" and the crossing clearance follows by itself once it is clear. Cross without clearance and you get "You are not cleared onto runway …".
+- **Crossing the landing runway on the way to parking.** If your parking position lies on the other side of the runway you landed on (single-runway fields like Nordholz), that runway counts as a crossing once you have vacated it: the taxi clearance ends with "hold short runway …", and at that point you report "holding short, request crossing" (the radio wheel suggests it).
 
 **6. Departure (Approach).** When you climb through about 500 ft above the ground:
 
@@ -314,6 +315,7 @@ You only hear (and see) what you are tuned to. Controller calls appear as text o
 - **Slots without a western callsign:** the first such player gets `"Callsign"` from config.jsonc (default `"Enfield 1-1"`). Other players are addressed by their player name.
 - **Your own callsign:** set `"MyCallsign"` (default `""` = take it from DCS), or use the settings window → *Your callsign*. The format is a name and two digits, for example `Viper 1-1`. It replaces the slot callsign of the player at this PC (the host); other players keep theirs.
 - **Callsign from the unit name:** set `"CallsignFromUnit": true` or use the settings window → *Callsign from the mission unit name*. If the unit in the mission is named like a callsign (`VICTORY 9-1`, `WOLF-2-1`), you are called that ("Victory 9-1") instead of the DCS callsign (for example Pontiac). Other unit names (`Aerial-1-1`, `F-4E ADVERSARIES NELLIS 1-1`) keep the DCS callsign. It applies to all players; "MyCallsign" takes precedence for the host. It applies to AI aircraft too: an AI flight, AWACS or tanker whose unit is named `SENTRY 1-1` is called Sentry, and you can call it by that name ("Sentry, Enfield 1-1, picture").
+- **Callsign from the player name:** set `"CallsignFromPlayer": true` or use the settings window → *Callsign from the DCS player name*. If your DCS player name has a callsign before a "|" (`GUARDIAN 1-1 | Christian`, `HOWLING PUPPIES 1-1 | RedButton`) or is one (`Guardian 9-1`), you are called that ("Guardian 1-1") whatever slot you take. Useful on servers with dynamic slots. A name that doesn't read as a callsign (`GUARDIAN [TaktLwG66]`) falls back to the unit name or the DCS callsign. It takes precedence over "CallsignFromUnit"; "MyCallsign" still wins for the host.
 - **Mishearings are tolerated.** Your callsign is still recognised when the digits match and the word is only slightly off ("Enfeld 1-1" counts as "Enfield 1-1").
 - **What you say doesn't change your callsign.** When the mission provides your callsign (or you set one), a different callsign in your speech doesn't rename you. A call that starts with another callsign or a wingman number and doesn't contain yours ("Enfield 1-2, check fuel", "Two, go trail") counts as flight chatter, and the controller ignores it. An order like "Two, go trail" goes to your AI wingmen (see [Commanding your AI wingmen](#commanding-your-ai-wingmen)).
 - **Who sent a call:** your call is matched to you by your SRS/DCS unit. If that fails, DCS-ATC matches the callsign you speak.
@@ -343,6 +345,7 @@ These phrases work with every airfield controller:
 
 Calls the controller doesn't answer:
 
+- **"Disregard" or "correction" on its own withdraws your last call.** The controller stays silent and waits for your next call, no "say again".
 - **Readbacks get no reply.** As in real radio, silence means your readback was fine. A call counts as a readback when it contains "wilco", "roger", "copy", "cleared", "approved" or "report …", when it repeats the controller's values (hold short, contact, squawk, QNH or altimeter, heading, or just the numbers: "Tower 134.0, Enfield 1-1"), or when it is only your callsign, optionally with "starting up", "taxiing", "lining up", "rolling" or "switching" ("Start up approved, Enfield 1-1", "Enfield 1-1"). A readback of an IFR clearance with the correct squawk gets *"readback correct."*
 - **Repeating the same request within 30 seconds after the controller's reply has been spoken counts as a readback.**
 
@@ -2482,6 +2485,7 @@ When you host, DCS-ATC handles every human player in the mission separately:
 - **Flights form automatically.** Players in the same DCS group who are within 1 NM of each other fly as one flight, with the lead's sequence. The lead is the player with the lowest callsign. Ground, Tower and Approach then handle the flight as a unit. A wingman who moves more than 3 NM away gets their own sequence again.
 - **Callsigns come from each player's DCS slot** (e.g. `Enfield11` becomes "Enfield 1-1"). "MyCallsign" in the settings only changes the host's own callsign. If several players sit in slots without a western callsign, the first one gets "Callsign" from config.jsonc and the others are called by their player name.
 - With "CallsignFromUnit", every player is called by the unit name of their slot when it looks like a callsign (`VICTORY 9-1` becomes "Victory 9-1").
+- With "CallsignFromPlayer", every player whose DCS player name carries a callsign before a "|" (`GUARDIAN 1-1 | Christian`) is called by it, whatever the slot. This works on a dedicated server too.
 - **Text messages go to each player's own group**, so you only see controller text meant for your group (and only if you are tuned to that frequency). Voice goes out over SRS on the controller frequency, so you hear exactly what you would hear on that frequency in real life. That includes the calls to other players.
 - **Controllers work only for their own side.** An airfield held by the enemy coalition has no controller for you.
 
@@ -2835,8 +2839,9 @@ At every mission start DCS-ATC puts its kneeboard pages into `Saved Games\DCS\Kn
 
 - On every map, in the language of the interface (German or English). On maps with many airfields the tables run over several pages.
 - Patterns, CRPs and routes are listed for the airfields with procedures: built in for the Caucasus, otherwise from your `charts.jsonc` (see [Own airfield procedures](#own-airfield-procedures-chartsjsonc)). The routes page gives the runways of each route, its fixes in order and their altitudes ("9000+" = at or above, "5000-" = at or below, "5000-7000" = between).
-- Caucasus only: the Kutaisi page and the notes on the map.
-- DCS reads the page list when the mission loads. A page that did not exist before (another map, more table pages) therefore shows from the next mission on. A page this mission does not need shows a note and is gone from the next mission on.
+- Airfield pages: every airfield from your own `charts*.jsonc` files gets its own page `ATC-2-<airfield>` (for example `ATC-2-NellisAFB`) with runways and lengths, elevation, navaids, frequencies, pattern altitude and side per runway, arrival and departure ceiling, control zone, reporting points with the runways and entry they serve, initial distance, taxi routes per apron, vacate instructions and your notes. With many aprons it continues as `…_2` and `…_3`. At most 10 airfields per map. On the Caucasus Kutaisi always has its page; the other built-in airfields are on the airfields and patterns pages.
+- Caucasus only: the notes on the map.
+- DCS reads the page list when the mission loads. A page that did not exist before (another map, more table pages) therefore shows from the next mission on, and the first mission after a map change still shows the pages of the previous map. A page this mission does not need shows a note and is gone from the next mission on.
 - Switch off: `"KneeboardPages": false` in `config.jsonc`.
 - The files are named `ATC-*.png`. Uninstalling deletes them.
 
@@ -2899,6 +2904,7 @@ Pick the page on the left: General, Voices, Radio & traffic, AWACS, Frequencies,
 |---|---|---|
 | **Your callsign** | Empty uses the callsign from your DCS slot. Otherwise a name and two digits, e.g. `Viper 1-1` (`viper11` is accepted and normalised). | `MyCallsign` |
 | **Callsign from the mission unit name** | Off uses the DCS callsign. On uses the unit name when it looks like a callsign (`VICTORY 9-1` becomes "Victory 9-1"), otherwise the DCS callsign. | `CallsignFromUnit` |
+| **Callsign from the DCS player name** | On uses the part of the player name before the bar (or the whole name) when it looks like a callsign (`GUARDIAN 1-1 \| Christian` becomes "Guardian 1-1"), before the unit name. | `CallsignFromPlayer` |
 | **Interface language** `*` | Deutsch / English. Also switches the F10 menu language. | (language file) |
 | **Controller volume** | 0–100 %, steps of 5 | `Volume` |
 | **Speech pace** (1 = normal, higher = slower) | 0.70–1.50 | `SpeechRate` |
@@ -2924,6 +2930,7 @@ Pick the page on the left: General, Voices, Radio & traffic, AWACS, Frequencies,
 | **Runway lights (at night)** | silent / with DCS controller (audible) / off. Takes effect the next time DCS-ATC starts. | `RunwayLights` |
 | **Altimeter setting** | automatic (by aircraft type) / hPa (QNH) / inHg (altimeter) | `AltimeterUnit` |
 | **Radio wheel in game (VR)** | text automatic (when DCS is in VR mode) / text always / off / wheel as a picture (test) | `WheelInGame` |
+| **Fixed radio wheel numbers** | On: the top level always shows all entries of the enabled modules in the same order (for example for VoiceAttack). Switch off unused modules so they fit into keys 1-9. | `WheelFixed` |
 | **Microphone (only without SRS)** `*` | Windows default or a specific device | `MicName` |
 | **SRS folder** `*` | The path, with "…" to browse. It is checked for `ExternalAudio\DCS-SR-ExternalAudio.exe`. | `SrsPath` |
 | **Set keys …** | Opens the key prompt (radio wheel, HOTAS, push-to-talk). | `WheelKey`, `PttKey`, … |
@@ -2970,6 +2977,7 @@ The file is in the installation folder: `%LOCALAPPDATA%\Programs\DCS-ATC\config.
 | `WheelButton` | `1` | Button number that opens the wheel. |
 | `WheelSize` | `0.45` | Wheel size as a fraction of the DCS window height (0.25–0.95). `+`/`-` in the open wheel change it and save it. |
 | `WheelInGame` | `"auto"` | Also show the wheel as text in the game: `"auto"` when DCS runs in VR (VR option or `--force_enable_VR`), `"on"`, `"off"`. `"window"` = the wheel as a picture in a DCS window instead (test). |
+| `WheelFixed` | `false` | `true` = the top level of the radio wheel always shows all entries of the enabled modules in a fixed order, without filtering by flight phase or by whether AWACS, tanker, JTAC, carrier, range or Center are present, so Ground is always key 1. If more than 9 remain, Emergency and General stay last and entries in the middle drop out, so switch off modules you don't use. Submenus don't change; in General, Debriefing / Log is always key 7. |
 | `CommsKey` | `43` (`\` US / `#` German) | Your DCS **communication menu** key as a keyboard scancode. DCS-ATC presses it to open DCS's own tanker menu (basket/boom) and, at dusk, at night or in poor visibility, to request runway lighting. `0` = off. |
 | `MicName` | `""` | Part of the microphone name, e.g. `"FDUCE"`. Empty = Windows default. Used only without SRS. |
 
@@ -2980,6 +2988,7 @@ The file is in the installation folder: `%LOCALAPPDATA%\Programs\DCS-ATC\config.
 | `Callsign` | `"Enfield 1-1"` | Used only without mission data, or for a slot without a western callsign. Normally the callsign comes from your DCS slot. |
 | `MyCallsign` | `""` | Your own callsign instead of the slot callsign. `""` = from DCS. |
 | `CallsignFromUnit` | `false` | Callsign from the mission unit name (`VICTORY 9-1`, `WOLF-2-1`) instead of the DCS slot. Other unit names keep the DCS callsign. |
+| `CallsignFromPlayer` | `false` | Callsign from the DCS player name: the part before the bar (`GUARDIAN 1-1 \| Christian`) or the whole name (`Guardian 9-1`). Before `CallsignFromUnit`; `MyCallsign` still wins for the host. Other names keep the unit name or the DCS callsign. |
 | `Mode` | `"host"` | `"client"` = radio wheel only, with requests sent to the host through DCS. DCS-ATC switches to client mode by itself when you join someone else's server. |
 | `Dedicated` | `false` | Dedicated server with nobody at the PC: no wheel, keys, microphone or SRS client. Switches on automatically when `DCS_server.exe` runs without `DCS.exe`. |
 
