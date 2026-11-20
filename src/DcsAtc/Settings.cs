@@ -496,6 +496,7 @@ static class Settings
         string ElError(Exception e) => e switch
         {
             HttpRequestException { StatusCode: System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden } => L("Schlüssel abgelehnt oder Recht fehlt (Voices/User lesen)", "Key rejected or permission missing (Voices/User read)"),
+            HttpRequestException { StatusCode: System.Net.HttpStatusCode.BadRequest } => L("Schlüssel ungültig – den ganzen Schlüssel einfügen (beginnt mit sk_, ElevenLabs zeigt ihn nur beim Erstellen): ", "Invalid key – paste the whole key (starts with sk_, ElevenLabs shows it only once when you create it): ") + e.Message,
             TaskCanceledException => L("Zeitüberschreitung", "Timed out"),
             JsonException => L("Unerwartete Antwort", "Unexpected answer"),
             _ => e.Message,   // never contains the key
@@ -514,6 +515,13 @@ static class Settings
                 if (key == elKey.Text.Trim()) elQ = q;
                 msg = ElevenLabs.QuotaText(q, false);
                 if (live && key == Program.Cfg.ElevenLabsKey)ElevenLabs.Apply(q);
+            }
+            catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {   // same key, same error: no voice list request
+                if (f.IsDisposed) return;
+                elQuota.Text = ElError(e);
+                elConnect.Enabled = true;
+                return;
             }
             catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException)
             {

@@ -102,8 +102,17 @@ static class ElevenLabs
         using var req = Req(HttpMethod.Get, path, key);
         using var res = await Http.SendAsync(req);
         var body = await res.Content.ReadAsStringAsync();
-        if (!res.IsSuccessStatusCode) throw new HttpRequestException($"HTTP {(int)res.StatusCode}", null, res.StatusCode);
-        return body;
+        if (res.IsSuccessStatusCode) return body;
+        string msg = "";   // reason from ElevenLabs: detail.message, or detail as plain text (never contains the key)
+        try
+        {
+            using var d = JsonDocument.Parse(body);
+            var det = d.RootElement.GetProperty("detail");
+            msg = (det.ValueKind == JsonValueKind.String ? det.GetString() : det.GetProperty("message").GetString()) ?? "";
+        }
+        catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException) { }
+        if (msg.Length > 150) msg = msg[..150];
+        throw new HttpRequestException(msg == "" ? $"HTTP {(int)res.StatusCode}" : $"HTTP {(int)res.StatusCode}: {msg}", null, res.StatusCode);
     }
 
     internal static Quota ParseQuota(string json)
@@ -141,6 +150,8 @@ static class ElevenLabs
         try { var q = await GetQuota(Program.Cfg.ElevenLabsKey); Program.Log(QuotaText(q, true)); Apply(q); }
         catch (HttpRequestException e) when (e.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         { Remaining = -1; Program.Log("ElevenLabs: key rejected or without the permission User (read), Piper voices only"); }
+        catch (HttpRequestException e) when (e.StatusCode == HttpStatusCode.BadRequest)
+        { Remaining = -1; Program.Log($"ElevenLabs: invalid key ({e.Message}), Piper voices only"); }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException) { Remaining = -1; Program.Trace("FEHLER", $"ElevenLabs Kontingent: {e.GetType().Name}: {e.Message}"); }
     }
 
@@ -157,7 +168,7 @@ static class ElevenLabs
         var reqs = new List<string>();
         var srv = new Thread(() =>
         {
-            for (int n = 0; n < 8; n++)
+            for (int n = 0; n < 9; n++)
             {
                 using var c = l.AcceptTcpClient();
                 var s = c.GetStream();
@@ -183,9 +194,10 @@ static class ElevenLabs
                     4 => """{"detail":{"status":"missing_permissions"}}"""u8.ToArray(),   // subscription not readable
                     5 => """{"character_count":1944,"character_limit":10000,"next_character_count_reset_unix":1796428800}"""u8.ToArray(),
                     6 => new byte[22050 * 2],
-                    _ => """{"character_count":9990,"character_limit":10000,"next_character_count_reset_unix":1796428800}"""u8.ToArray(),   // 10 left
+                    7 => """{"character_count":9990,"character_limit":10000,"next_character_count_reset_unix":1796428800}"""u8.ToArray(),   // 10 left
+                    _ => """{"detail":{"type":"authentication_error","code":"invalid_api_key","message":"API key must start with 'sk_'.","status":"invalid_api_key_prefix","param":"api_key"}}"""u8.ToArray(),
                 };
-                s.Write(Encoding.ASCII.GetBytes($"HTTP/1.1 {(n is 1 or 4 ? "401 Unauthorized" : "200 OK")}\r\nContent-Type: application/json\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n"));
+                s.Write(Encoding.ASCII.GetBytes($"HTTP/1.1 {(n is 1 or 4 ? "401 Unauthorized" : n == 8 ? "400 Bad Request" : "200 OK")}\r\nContent-Type: application/json\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n"));
                 s.Write(body);
             }
         }) { IsBackground = true };
@@ -256,6 +268,11 @@ static class ElevenLabs
             LogQuota().GetAwaiter().GetResult();   // request 7: 10 of 10000 left -> below 1 % (at least 500): off with one hint
             bool low = Disabled && hints.Count == hintsBefore + 1;
             bool lowPiper = !Program.VoiceFor("Tower", "Kutaisi Tower").StartsWith("el:") && !Wav("v1", "x", 1, wav) && reqs.Count == 8;
+            string? badKey = null;   // request 8: malformed key -> 400 with the reason from ElevenLabs
+            try { GetQuota("xi-test").GetAwaiter().GetResult(); }
+            catch (HttpRequestException e) when (e.StatusCode == HttpStatusCode.BadRequest) { badKey = e.Message; }
+            if (badKey == null || !badKey.Contains("API key must start with 'sk_'"))
+                throw new Exception($"ElevenLabs 400: Grund fehlt: {badKey}");
             if (!srv.Join(3000) || !unk || !known || !tooLong || !pv || !paid || !low || !lowPiper)
                 throw new Exception($"ElevenLabs Kontingent-Stopp: unbekannt {unk}, bekannt {known}, zu lang {tooLong}, Probe {pv}, Abzug {paid}, knapp {low}, Piper {lowPiper}, Anfragen {reqs.Count}");
         }
