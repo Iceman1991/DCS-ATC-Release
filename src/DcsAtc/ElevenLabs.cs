@@ -129,9 +129,10 @@ static class ElevenLabs
     {
         var date = DateTimeOffset.FromUnixTimeSeconds(q.Reset).LocalDateTime;
         if (log) return string.Create(CultureInfo.InvariantCulture, $"ElevenLabs: {q.Remaining:N0} of {q.Limit:N0} characters left, reset {date:yyyy-MM-dd}");
-        var c = CultureInfo.GetCultureInfo(Ui.En ? "en-US" : "de-DE");
-        return Ui.En ? string.Create(c, $"Left: {q.Remaining:N0} of {q.Limit:N0} characters, resets on {date:MMM d}")
-                          : string.Create(c, $"Verbleibend: {q.Remaining:N0} von {q.Limit:N0} Zeichen, zurückgesetzt am {date:dd.MM.}");
+        var c = CultureInfo.InvariantCulture;   // InvariantGlobalization: no other culture exists
+        string N(long v) { var s = v.ToString("N0", c); return Ui.En ? s : s.Replace(',', '.'); }
+        return Ui.En ? string.Create(c, $"Left: {N(q.Remaining)} of {N(q.Limit)} characters, resets on {date:MMM d}")
+                          : string.Create(c, $"Verbleibend: {N(q.Remaining)} von {N(q.Limit)} Zeichen, zurückgesetzt am {date:dd.MM.}");
     }
 
     /// Start: one log line with the remaining characters (asynchronous), key problems are noted too.
@@ -210,6 +211,16 @@ static class ElevenLabs
                 || q != new Quota(1944, 10000, 1796428800) || q.Remaining != 8056 || vl.Count != 2 || vl[0] != ("v1", "Rachel")
                 || !QuotaText(q, true).StartsWith("ElevenLabs: 8,056 of 10,000 characters left, reset 20"))
                 throw new Exception($"ElevenLabs: ok {ok} {sec:0.00} s, 401 {bad}, aus {off}, {reqs.Count} Anfragen, {QuotaText(q, true)}");
+            // settings-window text must not need a non-invariant culture (InvariantGlobalization)
+            bool en0 = Ui.En;
+            try
+            {
+                Ui.En = false; var de = QuotaText(q, false);
+                Ui.En = true; var en = QuotaText(q, false);
+                if (!de.StartsWith("Verbleibend: 8.056 von 10.000 Zeichen, zurückgesetzt am ") || !en.StartsWith("Left: 8,056 of 10,000 characters, resets on "))
+                    throw new Exception($"ElevenLabs Kontingenttext: {de} / {en}");
+            }
+            finally { Ui.En = en0; }
             // VoiceFor: without key Piper, with key + mapping the token, "a|b" fixed per station
             Program.Cfg.ElevenLabsKey = "";
             Disabled = false;
