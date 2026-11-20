@@ -163,15 +163,16 @@ static partial class Program
             var dd = Path.Combine(Path.GetTempPath(), $"DcsAtc-DiagTest-{Environment.ProcessId}");
             Directory.CreateDirectory(Path.Combine(dd, "charts"));
             File.WriteAllText(Path.Combine(dd, "atc-log.txt"), "12:00:00 [ATC] test");
-            File.WriteAllText(Path.Combine(dd, "atc-debug.txt"), "12:00:00.000 [START] x | {\"Volume\":0.6,\"AsrApiKey\":\"sk-secret\",\"AsrApiModel\":\"whisper-1\"}\r\n");
-            var startLine = MaskKey(JsonSerializer.Serialize(new Config { AsrApiKey = "sk-secret" }), "***");   // what the START trace logs
+            File.WriteAllText(Path.Combine(dd, "atc-debug.txt"), "12:00:00.000 [START] x | {\"Volume\":0.6,\"AsrApiKey\":\"sk-secret\",\"ElevenLabsKey\":\"xi-secret\",\"AsrApiModel\":\"whisper-1\"}\r\n");
+            var startLine = MaskKey(JsonSerializer.Serialize(new Config { AsrApiKey = "sk-secret", ElevenLabsKey = "xi-secret" }), "***");   // what the START trace logs
             var scrubF = Path.Combine(dd, "scrub.txt");
             File.WriteAllText(scrubF, "a sk-secret b");
             ScrubKey(scrubF, "sk-secret");
+            if (startLine.Contains("xi-secret") || !startLine.Contains("\"ElevenLabsKey\":\"***\"") || MaskKey("{\"ElevenLabsKey\":\"\"}", "***") != "{\"ElevenLabsKey\":\"\"}") throw new Exception("ElevenLabs-Schlüssel im Log: " + startLine);
             if (startLine.Contains("sk-secret") || !startLine.Contains("\"AsrApiKey\":\"***\"") || MaskKey("{\"AsrApiKey\":\"\"}", "***") != "{\"AsrApiKey\":\"\"}" || File.ReadAllText(scrubF) != "a *** b")
                 throw new Exception("Schlüssel im Log: " + startLine);
             File.Delete(scrubF);
-            File.WriteAllText(Path.Combine(dd, "config.jsonc"), "{ \"Volume\": 0.6, \"AsrApiKey\": \"sk-geheim-123\", \"AsrApiModel\": \"whisper-1\" }");
+            File.WriteAllText(Path.Combine(dd, "config.jsonc"), "{ \"Volume\": 0.6, \"AsrApiKey\": \"sk-geheim-123\", \"ElevenLabsKey\": \"xi-geheim-456\", \"AsrApiModel\": \"whisper-1\" }");
             File.WriteAllText(Path.Combine(dd, "charts", "charts-x.jsonc"), "{}");
             Directory.CreateDirectory(Path.Combine(dd, "models"));
             File.WriteAllText(Path.Combine(dd, "models", "ggml-small.en.bin"), "private model contents");
@@ -209,7 +210,8 @@ static partial class Program
                 throw new Exception("Diagnose-Zip: " + string.Join(",", names));
             using var za = new System.IO.Compression.ZipArchive(new MemoryStream(ms.ToArray()));
             var cfgText = new StreamReader(za.GetEntry("config.jsonc")!.Open()).ReadToEnd();
-            if (new[] { "atc-debug.txt", "atc-log.txt", "charts/charts-x.jsonc" }.Any(n => new StreamReader(za.GetEntry(n)!.Open()).ReadToEnd().Contains("sk-secret"))) throw new Exception("Diagnose-Zip: Schlüssel im Log");
+            if (new[] { "atc-debug.txt", "atc-log.txt", "charts/charts-x.jsonc" }.Any(n => new StreamReader(za.GetEntry(n)!.Open()).ReadToEnd() is var rt && (rt.Contains("sk-secret") || rt.Contains("xi-secret")))) throw new Exception("Diagnose-Zip: Schlüssel im Log");
+            if (cfgText.Contains("xi-geheim") || !cfgText.Contains("\"ElevenLabsKey\": \"\"")) throw new Exception("Diagnose-Zip ElevenLabs-Schlüssel: " + cfgText);
             if (cfgText.Contains("sk-geheim") || !cfgText.Contains("\"AsrApiKey\": \"\"") || !cfgText.Contains("whisper-1")) throw new Exception("Diagnose-Zip Schlüssel: " + cfgText);
             Console.WriteLine("OK   Diagnose-Zip: Log, config.jsonc, charts\\charts-x.jsonc, info.txt, API-Schlüssel geleert");
         }
@@ -523,6 +525,7 @@ static partial class Program
         Csar.SelfTest();
         Lagebild.SelfTest();
         AsrApi.SelfTest();
+        ElevenLabs.SelfTest();
         if (!JsonSerializer.Serialize(MapState()).Contains("\"fields\":")) throw new Exception("FI7: MapState");
         if (Tag("Träger LSO: (OK) 3-wire", "Case III", null, "Nacht") != "Träger LSO (Case III, Nacht): (OK) 3-wire" || Tag("Verstoß: x", null) != "Verstoß: x") throw new Exception("FI3: Debrief-Kennzeichen");
         // Etappe 1 (PLATZVERFAHREN-PLAN.md): Kutaisi from charts/caucasus.jsonc, CRPs as printed within 5 m of the old hand values, entries/exits/hand as before

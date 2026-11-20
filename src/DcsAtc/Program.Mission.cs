@@ -155,7 +155,7 @@ static partial class Program
         if (boats.Count > 0 && !lsoWarm)   // Pre-render LSO phrases: groove calls without Piper pause (SynthCache)
         {
             lsoWarm = true;
-            var lv = PickVoice(Cfg.Voices.GetValueOrDefault("Carrier", "en_US-ryan-medium"), "Paddles");
+            var lv = VoiceFor("Carrier", "Paddles");
             Task.Run(() => { int i = 0; foreach (var s in Carrier.LsoLines) try { Synth(s, lv, Path.Combine(Root, "tmp", $"warm{i++}.mp3")); } catch (Exception e) { Trace("FEHLER", $"LSO vorab: {e.GetType().Name}: {e.Message}"); } });
         }
         var host = Host();

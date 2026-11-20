@@ -246,7 +246,7 @@ static partial class Program
                 bulletin = Atis[name].Bulletin;
             }
             var seconds = radio.Prepare(name, bulletin, (text, path) =>
-                Synth(text, PickVoice(Cfg.Voices.GetValueOrDefault("ATIS", "en_US-ryan-medium@0.94"), name), path));
+                Synth(text, VoiceFor("ATIS", name, "en_US-ryan-medium@0.94"), path));
             if (seconds == null || !Cfg.Atis || !On("atc")) continue;
             var sw = Stopwatch.StartNew();
             Transmit(radio.Mp3, freq, name + "ATIS", side: side);

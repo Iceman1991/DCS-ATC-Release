@@ -701,6 +701,19 @@ So funktionieren die Werte:
 
 Lautstärke, Tempo, Pause, Funkklang und Pilotenstimme gelten sofort nach dem Speichern im Einstellungsfenster (Startmenü → **DCS-ATC → Einstellungen**).
 
+### ElevenLabs-Stimmen (optional)
+
+Statt Piper kann eine Lotsenrolle mit einer Stimme aus deinem eigenen ElevenLabs-Konto sprechen. Standardmäßig ist das aus; ohne Schlüssel ändert sich nichts.
+
+- **Eigenes Konto und Schlüssel:** Einen API-Schlüssel auf elevenlabs.io erstellen und im Einstellungsfenster eintragen (Seite Stimmen, Gruppe *ElevenLabs*) oder als `ElevenLabsKey` in der `config.jsonc`. DCS-ATC nutzt den Schlüssel des PCs, auf dem es läuft, also des Mission-Hosts. Jede Installation hat ihren eigenen. Der Schlüssel braucht die Rechte *Text to Speech*, *Voices* (lesen) und *User* (lesen).
+- **Stimmen wählen:** **Verbinden** lädt die Stimmen deines Kontos (auch Bibliotheksstimmen, die du hinzugefügt hast) und das Restkontingent. Je Rolle (Tower, Ground, Approach, …) eine Stimme oder *Piper (wie oben)* wählen. ▶ spricht eine Probe. In der `config.jsonc` stehen die Stimmen-IDs in `ElevenVoices`, etwa `"Tower": "idA|idB"`; mit `|` behält jede Station eine davon, wie bei `Voices`. Pilotenstimmen bleiben immer Piper.
+- **Modell:** das Flash-Modell `eleven_flash_v2_5` (das schnellste ElevenLabs-Modell, in vielen Tarifen pro Zeichen günstiger als die anderen). Das Sprechtempo folgt `SpeechRate`; Gefechts- und AWACS-Sprüche kommen schneller.
+- **Kontingent:** Das Einstellungsfenster zeigt die verbleibenden Zeichen und das Rücksetzdatum. Bei jedem Start mit Schlüssel steht dasselbe als eine Zeile im Log.
+- **Kosten:** ElevenLabs rechnet nach Zeichen ab. Der kostenlose Tarif mit 10.000 Zeichen im Monat reicht für etwa ein bis zwei Stunden Funk. Kurze feste Sätze werden während einer Sitzung zwischengespeichert.
+- **Keine Mehrkosten:** DCS-ATC hört bei den im Tarif enthaltenen Zeichen auf und nutzt nie kostenpflichtige Zusatzzeichen. ElevenLabs wird nur genutzt, solange das Restkontingent bekannt ist (beim Start und alle 5 Minuten gelesen, mit jedem gesprochenen Text verringert). Ist das Kontingent nicht lesbar, etwa weil dem Key die Berechtigung *User (read)* fehlt, spricht Piper. Ein Text, der länger ist als der Rest, wird von Piper gesprochen; bleibt weniger als 1 % des Tarifs (mindestens 500 Zeichen), zeigt DCS-ATC einen Hinweis im Spiel und nutzt für den Rest der Sitzung Piper. Zusätzlich bei ElevenLabs ein Kreditlimit am API-Key setzen und die nutzungsbasierte Abrechnung im Konto aus lassen.
+- **Ausweichen:** Ohne Internet spricht bei einem fehlgeschlagenen Aufruf die Piper-Stimme der Rolle. Wird der Schlüssel abgelehnt oder ist das Kontingent aufgebraucht, zeigt DCS-ATC einen Hinweis im Spiel und nutzt für den Rest der Sitzung Piper. Speichern im Einstellungsfenster versucht es erneut.
+- **Datenschutz:** Der Text des Funkspruchs geht an ElevenLabs. Der Schlüssel wird aus dem Diagnose-Zip und aus den Logs entfernt.
+
 ### Höhenmesser-Einstellung: hPa oder inHg
 
 Lotsen nennen die Höhenmessereinstellung in der Einheit deines Flugzeugs:
@@ -2916,6 +2929,7 @@ Links wählst du die Seite: Allgemein, Stimmen, Funk & Verkehr, AWACS, Frequenze
 | **Funksprüche auch als Text im Spiel** | an/aus | `RadioText` |
 | **Hinweise von DCS-ATC als Text im Spiel** | an/aus. Aus: Hinweise, Fehlermeldungen, Landebewertung und Verstöße erscheinen nicht mehr im Bild (für VR ohne Text im Sichtfeld). Sie stehen weiter in `atc-log.txt` und im Debriefing. | `HintText` |
 | **Pilotenstimme (spricht eigene Anfragen vor)** | Stimme wählen oder *aus*. Aus setzt die Pilotenstimme auf leer. | `PilotVoice` |
+| **ElevenLabs (optional)** | API-Schlüssel, **Verbinden** (lädt Stimmen und Kontingent), Kontingentanzeige, je Rolle eine Stimme oder *Piper (wie oben)* mit ▶ Probe. | `ElevenLabsKey`, `ElevenVoices` |
 | **AWACS-Picture als Bullseye (statt BRAA)** | an/aus | `AwacsBullseye` |
 | **AWACS meldet neue Gruppen bis** | 40–200 NM | `AwacsNewGroupNm` |
 | **KI-Verkehr funkt hörbar mit** | an/aus | `AiChatter` |
@@ -3020,6 +3034,8 @@ Eigene Frequenzen je Platz und Lotse stehen nicht in `config.jsonc`, sondern in 
 |---|---|---|
 | `Voices` | Wie installiert: Tower `"en_US-ryan-medium\|en_US-ljspeech-medium"`, Ground `"en_US-bryce-medium"`, Approach `"en_US-ryan-medium@1.05"`, ATIS `"en_US-ryan-medium@0.94"`, Range `"en_US-ryan-medium@1.06"`, AWACS `"en_GB-alan-medium\|en_US-ljspeech-medium"`, Tanker `"en_US-bryce-medium"`, Crew `"en_US-ryan-medium"`. Carrier (automatisch ergänzt) `"en_US-ryan-medium@0.97\|en_GB-alan-medium@1.02"` | Piper-Stimme je Lotse aus dem Ordner `models`. `@0.9` = tiefer. Mehrere Stimmen mit `\|` getrennt: jeder Platz bzw. jede Station bekommt eine davon. Mehr Stimmen: huggingface.co/rhasspy/piper-voices. |
 | `PilotVoice` | `"en_US-joe-medium"` | Spricht deine Rad- und F10-Anfragen vor der Antwort. `""` = aus. |
+| `ElevenLabsKey` | `""` | Dein eigener ElevenLabs-API-Schlüssel (Rechte Text to Speech, Voices lesen, User lesen). Leer = nur Piper. Wird aus Diagnose-Zip und Logs entfernt. |
+| `ElevenVoices` | `{}` | Rolle → ElevenLabs-Stimmen-ID, etwa `{"Tower": "idA\|idB"}`. Mit `\|` behält jede Station eine. Fehlt die Rolle, gilt die Piper-Stimme aus `Voices`. |
 | `RadioFx` | `true` | Funkklang: Bandpass, leichtes Rauschen, Squelch-Ende. |
 | `RadioText` | `true` | Funksprüche auch als DCS-Text im Bild. `false` = nur Stimme. |
 | `HintText` | `true` | Hinweise von DCS-ATC (Hinweise, Fehler, Landebewertung, Verstöße) als DCS-Text im Bild. `false` = nur in `atc-log.txt` und im Debriefing. |
@@ -3102,7 +3118,7 @@ Wenn sich die Einstellungen nicht öffnen lassen, starte PowerShell im DCS-ATC-P
 
 Bei einem Problem während des Flugs helfen Uhrzeit, Platz, eine kurze Beschreibung und passende Auszüge aus `atc-log.txt` und `atc-debug.txt`. Bei einem Problem mit Vektoren oder dem Weg zur Bahn dazu `airfields.txt` aus dem DCS-ATC-Ordner, die Dateien `DcsAtc-Terrain-*.txt` aus `%TEMP%` und deine `charts.jsonc`: damit lässt sich der Flug aus deinem Log durch die aktuelle Version noch einmal abspielen (`DcsAtc.exe --replay atc-debug.txt`, die Dateien neben dem Log; listet die Lotsensprüche des Logs neben denen der aktuellen Version).
 
-Einfacher: Unter Erweitert, Diagnose, packt **Diagnose-Zip erstellen …** alles in eine Zip-Datei auf dem Desktop und zeigt sie im Explorer: `atc-log.txt`, `atc-debug.txt`, `config.jsonc`, `frequencies.jsonc`, `modules.txt`, alle `charts*.jsonc` (auch aus `charts\`) und `info.txt` mit Version, Windows und Uhrzeit. Der API-Schlüssel (`AsrApiKey`) fehlt in der Kopie, die Datei auf der Platte bleibt unverändert. Die Logs enthalten Rufzeichen und das, was auf dem Funk gesagt wurde; prüfe die Zip, bevor du sie weitergibst. Ist ein Log größer als 20 MB, steht nur sein Ende darin. Auch das Debug-Log enthält den API-Schlüssel nicht mehr; ältere Logs werden beim nächsten Start bereinigt. Wer einen `atc-debug.txt` gepostet hat, während ein Schlüssel eingetragen war, sollte diesen Schlüssel ersetzen.
+Einfacher: Unter Erweitert, Diagnose, packt **Diagnose-Zip erstellen …** alles in eine Zip-Datei auf dem Desktop und zeigt sie im Explorer: `atc-log.txt`, `atc-debug.txt`, `config.jsonc`, `frequencies.jsonc`, `modules.txt`, alle `charts*.jsonc` (auch aus `charts\`) und `info.txt` mit Version, Windows und Uhrzeit. Die API-Schlüssel (`AsrApiKey`, `ElevenLabsKey`) fehlen in der Kopie, die Datei auf der Platte bleibt unverändert. Die Logs enthalten Rufzeichen und das, was auf dem Funk gesagt wurde; prüfe die Zip, bevor du sie weitergibst. Ist ein Log größer als 20 MB, steht nur sein Ende darin. Auch das Debug-Log enthält den API-Schlüssel nicht mehr; ältere Logs werden beim nächsten Start bereinigt. Wer einen `atc-debug.txt` gepostet hat, während ein Schlüssel eingetragen war, sollte diesen Schlüssel ersetzen.
 
 Am schnellsten: **Problem melden …** (an derselben Stelle) erstellt diese Zip, zeigt sie im Explorer und öffnet das Formular für den Fehlerbericht auf GitHub, in dem Version, Karte, Flugzeug und die Uhrzeit deiner letzten Log-Markierung schon eingetragen sind. Du ziehst nur noch die Zip ins Formular und beschreibst, was passiert ist. Ohne GitHub-Konto schick dieselbe Zip im Forum oder über Discord.
 

@@ -183,11 +183,14 @@ static partial class Program
               .Where(x => installed.Contains(x.Split('@')[0], StringComparer.OrdinalIgnoreCase)).DefaultIfEmpty("en_US-ryan-medium").ToArray();
 
     /// Settings window: speak a sample with this voice ("a|b@0.9", "random") on the PC speakers, without SRS.
-    internal static void Preview(string voices)
+    internal const string PreviewText = "Kutaisi Tower, radio check, read you five by five.";
+    internal static void Preview(string voices, string? elevenKey = null, long allowed = 0)
     {
+        (ElevenLabs.PreviewKey, ElevenLabs.PreviewAllowed) = (elevenKey, allowed);
         Directory.CreateDirectory(Path.Combine(Root, "tmp"));
         var mp3 = Path.Combine(Root, "tmp", "probe.mp3");
-        Synth("Kutaisi Tower, radio check, read you five by five.", PickVoice(voices, Random.Shared.Next(99).ToString()), mp3);
+        try { Synth(PreviewText, voices.StartsWith("el:") ? voices : PickVoice(voices, Random.Shared.Next(99).ToString()), mp3); }   // "el:id#piper" as VoiceFor returns it
+        finally { (ElevenLabs.PreviewKey, ElevenLabs.PreviewAllowed) = (null, 0); }
         lock (Pipers) { foreach (var p in Pipers.Values) try { p.P.Kill(); } catch (Exception) { } Pipers.Clear(); }   // the settings window leaves no warm Piper behind
         using var r = new Mp3FileReaderBase(mp3, wf => new AcmMp3FrameDecompressor(wf));
         using var o = new WaveOutEvent();

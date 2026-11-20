@@ -699,6 +699,19 @@ How the voice values work:
 
 Volume, pace, pause, radio effect and pilot voice take effect immediately when you save in the settings window (Start menu → **DCS-ATC → Settings**).
 
+### ElevenLabs voices (optional)
+
+Instead of Piper, a controller role can speak with a voice from your own ElevenLabs account. It is off by default; without a key nothing changes.
+
+- **Own account and key:** create an API key at elevenlabs.io and enter it in the settings window (Voices page, group *ElevenLabs*) or as `ElevenLabsKey` in `config.jsonc`. DCS-ATC uses the key of the PC it runs on, which is the mission host. Each installation sets its own key. The key needs the permissions *Text to Speech*, *Voices* (read) and *User* (read).
+- **Choose voices:** **Connect** loads the voices of your account (including library voices you added) and the remaining quota. For each role (Tower, Ground, Approach, …) pick a voice or *Piper (as above)*. ▶ plays a sample. In `config.jsonc` the voice IDs go into `ElevenVoices`, for example `"Tower": "idA|idB"`; with `|` each station keeps one of them, like with `Voices`. Pilot voices always stay Piper.
+- **Model:** the Flash model `eleven_flash_v2_5` (the fastest ElevenLabs model, on many plans cheaper per character than the others). Speech pace follows `SpeechRate`; combat and AWACS calls come out faster.
+- **Quota:** the settings window shows the remaining characters and the reset date. At every start with a key set, one line in the log shows the same.
+- **Costs:** ElevenLabs bills per character. The free plan with 10,000 characters a month is roughly one to two hours of radio. Short fixed phrases are cached during a session.
+- **No extra charges:** DCS-ATC stops at the characters included in your plan and never uses paid extra characters. ElevenLabs is only used while the remaining quota is known (it is read at start and every 5 minutes, and reduced by every spoken text). If the quota cannot be read, for example because the key lacks the *User (read)* permission, Piper speaks. A text longer than what is left is spoken by Piper, and when less than 1 % of the plan (at least 500 characters) is left, DCS-ATC shows one note in the game and uses Piper for the rest of the session. In addition, set a credit limit on the API key in ElevenLabs and keep usage-based billing off in the account.
+- **Fallback:** without internet, a failed call is spoken by the Piper voice of that role. If the key is rejected or the quota is used up, DCS-ATC shows one note in the game and uses Piper for the rest of the session. Saving the settings tries again.
+- **Privacy:** the text of the call is sent to ElevenLabs. The key is removed from the diagnostics zip and from the logs.
+
 ### Altimeter setting: hPa or inHg
 
 Controllers give the altimeter setting in the unit your aircraft uses:
@@ -2913,6 +2926,7 @@ Pick the page on the left: General, Voices, Radio & traffic, AWACS, Frequencies,
 | **Radio calls also as text in the game** | on/off | `RadioText` |
 | **Notes from DCS-ATC as text in the game** | on/off. Off: hints, error notes, landing grade and deviations no longer appear on screen (for VR without text in view). They stay in `atc-log.txt` and in the debriefing. | `HintText` |
 | **Pilot voice (speaks your wheel requests)** | Pick a voice or *off*. Off sets the pilot voice to empty. | `PilotVoice` |
+| **ElevenLabs (optional)** | API key, **Connect** (loads voices and quota), quota display, a voice or *Piper (as above)* per role with ▶ sample. | `ElevenLabsKey`, `ElevenVoices` |
 | **AWACS picture as bullseye (instead of BRAA)** | on/off | `AwacsBullseye` |
 | **AWACS calls new groups within** | 40–200 NM | `AwacsNewGroupNm` |
 | **Hear AI traffic on frequency** | on/off | `AiChatter` |
@@ -3017,6 +3031,8 @@ Own frequencies per airfield and controller are not in `config.jsonc` but in the
 |---|---|---|
 | `Voices` | As installed: Tower `"en_US-ryan-medium\|en_US-ljspeech-medium"`, Ground `"en_US-bryce-medium"`, Approach `"en_US-ryan-medium@1.05"`, ATIS `"en_US-ryan-medium@0.94"`, Range `"en_US-ryan-medium@1.06"`, AWACS `"en_GB-alan-medium\|en_US-ljspeech-medium"`, Tanker `"en_US-bryce-medium"`, Crew `"en_US-ryan-medium"`. Carrier (added automatically) `"en_US-ryan-medium@0.97\|en_GB-alan-medium@1.02"` | Piper voice per controller, from the `models` folder. `@0.9` = lower pitch. If you give several voices separated by `\|`, each airfield or station is assigned one of them. More voices: huggingface.co/rhasspy/piper-voices. |
 | `PilotVoice` | `"en_US-joe-medium"` | Speaks your wheel and F10 requests before the answer. `""` = off. |
+| `ElevenLabsKey` | `""` | Your own ElevenLabs API key (permissions Text to Speech, Voices read, User read). Empty = Piper only. Removed from the diagnostics zip and the logs. |
+| `ElevenVoices` | `{}` | Role → ElevenLabs voice ID, for example `{"Tower": "idA\|idB"}`. With `\|` each station keeps one. A missing role uses the Piper voice from `Voices`. |
 | `RadioFx` | `true` | Radio sound: band-pass, light noise, squelch tail. |
 | `RadioText` | `true` | Radio calls also as DCS text on screen. `false` = speech only. |
 | `HintText` | `true` | Notes from DCS-ATC (hints, errors, landing grade, deviations) as DCS text on screen. `false` = only in `atc-log.txt` and the debriefing. |
@@ -3099,7 +3115,7 @@ If the settings window cannot open, start PowerShell in the DCS-ATC application 
 
 For a problem during a flight, include the time, the airfield, a short description and relevant excerpts from `atc-log.txt` and `atc-debug.txt`. For a problem with vectors or the way to the runway also add `airfields.txt` from the DCS-ATC folder, the files `DcsAtc-Terrain-*.txt` from `%TEMP%` and your `charts.jsonc`: with them the flight from your log can be played again through the current version (`DcsAtc.exe --replay atc-debug.txt`, the files next to the log; it lists the controller calls of the log next to the ones the current version makes).
 
-Easier: under Advanced, Diagnostics, **Create diagnostics zip …** puts everything into one zip file on the desktop and shows it in Explorer: `atc-log.txt`, `atc-debug.txt`, `config.jsonc`, `frequencies.jsonc`, `modules.txt`, every `charts*.jsonc` (also from `charts\`) and `info.txt` with the version, Windows and the time. The API key (`AsrApiKey`) is removed from the copy; the file on disk stays unchanged. The logs contain callsigns and what was said on the radio, so check the zip before you pass it on. If a log is larger than 20 MB, only its end is included. The debug log no longer contains the API key either; older logs are cleaned at the next start. If you posted an `atc-debug.txt` while a key was set, replace that key.
+Easier: under Advanced, Diagnostics, **Create diagnostics zip …** puts everything into one zip file on the desktop and shows it in Explorer: `atc-log.txt`, `atc-debug.txt`, `config.jsonc`, `frequencies.jsonc`, `modules.txt`, every `charts*.jsonc` (also from `charts\`) and `info.txt` with the version, Windows and the time. The API keys (`AsrApiKey`, `ElevenLabsKey`) are removed from the copy; the file on disk stays unchanged. The logs contain callsigns and what was said on the radio, so check the zip before you pass it on. If a log is larger than 20 MB, only its end is included. The debug log no longer contains the API key either; older logs are cleaned at the next start. If you posted an `atc-debug.txt` while a key was set, replace that key.
 
 Quickest: **Report a problem …** (same place) creates that zip, shows it in Explorer and opens the bug report form on GitHub with version, map, aircraft and the time of your last log mark already filled in. You only drag the zip into the form and describe what happened. Without a GitHub account, send the same zip in the forum or on Discord.
 

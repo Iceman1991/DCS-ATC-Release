@@ -429,6 +429,107 @@ static class Settings
                "Random: at each start every station gets one of the installed voices (not the pilot voice) and keeps it while DCS-ATC runs. " +
                "Second voice: airfields alternate, e.g. Senaki Tower and Kutaisi Tower. Pitch 1.00 = unchanged, lower = deeper. ▶ plays a sample on the PC speakers."));
 
+        Group(L("ElevenLabs (optional)", "ElevenLabs (optional)"));
+        Note(L("Eigenes ElevenLabs-Konto und eigener API-Schlüssel (elevenlabs.io): Stimmen aus deinem Konto statt Piper, je Rolle wählbar. Der Schlüssel braucht die Rechte Text to Speech, Voices (lesen) und User (lesen). ElevenLabs rechnet nach Zeichen ab. DCS-ATC hört bei den im Tarif enthaltenen Zeichen auf und nutzt nie kostenpflichtige Zusatzzeichen; zusätzlich ein Kreditlimit am Key setzen und nutzungsbasierte Abrechnung im Konto aus lassen. Ohne Schlüssel, Netz, lesbares Kontingent oder Rest spricht Piper.",
+               "Your own ElevenLabs account and API key (elevenlabs.io): voices from your account instead of Piper, chosen per role. The key needs the permissions Text to Speech, Voices (read) and User (read). ElevenLabs bills per character. DCS-ATC stops at the characters included in the plan and never uses paid extra characters; also set a credit limit on the key and keep usage-based billing off in the account. Without a key, network, readable quota or remaining characters Piper speaks."));
+        var elKey = Field(cfg.ElevenLabsKey);
+        elKey.UseSystemPasswordChar = true;
+        Row(L("API-Schlüssel", "API key"), elKey);
+        ElevenLabs.Quota? elQ = null;   // quota read by Connect for the typed key; null = unknown, no ElevenLabs sample
+        elKey.TextChanged += (_, _) => elQ = null;
+        var elConnect = Btn(L("Verbinden", "Connect"), false);
+        Row(L("Stimmen und Kontingent laden", "Load voices and quota"), elConnect);
+        var elQuota = new Label { Text = "–", AutoSize = true, MaximumSize = new Size(285, 0), UseMnemonic = false };
+        Row(L("Kontingent", "Quota"), elQuota);
+        var elVt = new TableLayoutPanel { ColumnCount = 3, AutoSize = true, Margin = Padding.Empty };
+        foreach (var w in new[] { 84, 300, 28 }) elVt.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, w));
+        var elList = new List<(string Id, string Name)>();
+        var elRows = new List<(string Key, ComboBox Cb, List<string> Ids, string Was)>();
+        foreach (var role in cfg.Voices.Keys.Where(k => k != "Departure"))   // Departure speaks with the Approach voice
+        {
+            int row = elRows.Count;
+            var lab = new Label { Text = role, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 6, 6), UseMnemonic = false };
+            elVt.Controls.Add(lab, 0, row);
+            find.Add((lab, pages.Count - 1));
+            var cb = Combo(new[] { L("Piper (wie oben)", "Piper (as above)") }, 0);
+            (cb.Anchor, cb.Margin) = (AnchorStyles.Left, new Padding(0, 5, 0, 5));
+            elVt.Controls.Add(cb, 1, row);
+            var play = Btn("▶", false);
+            (play.AutoSize, play.Size, play.Padding, play.Margin, play.Anchor) = (false, new Size(26, 25), Padding.Empty, new Padding(0, 5, 0, 5), AnchorStyles.Left);
+            elVt.Controls.Add(play, 2, row);
+            var ids = new List<string>();
+            elRows.Add((role, cb, ids, cfg.ElevenVoices.GetValueOrDefault(role, "")));
+            play.Click += async (_, _) =>   // sample on the PC speakers: the voice chosen here, otherwise the Piper voice of the row above
+            {
+                var id = ids[cb.SelectedIndex].Split('|')[0];
+                var say = id == "" ? voices.First(v => v.Key == role).Get() : $"el:{id}#en_US-ryan-medium";
+                long allowed = 0;
+                if (id != "")   // ElevenLabs sample only with a known quota and enough left above the floor (never paid extra characters)
+                {
+                    if (elQ == null || (allowed = elQ.Remaining - Math.Max(500, elQ.Limit / 100)) < Program.PreviewText.Length)
+                    { elQuota.Text = L("Erst Verbinden – Kontingent unbekannt oder zu knapp", "Connect first – quota unknown or too low"); return; }
+                }
+                play.Enabled = false;
+                try
+                {
+                    await Task.Run(() => Program.Preview(say, id == "" ? null : elKey.Text.Trim(), allowed));
+                    if (id != "") { elQ = elQ! with { Count = elQ.Count + Program.PreviewText.Length }; elQuota.Text = ElevenLabs.QuotaText(elQ, false); }
+                }
+                catch (Exception e) { MessageBox.Show(f, e.Message, "DCS-ATC"); }
+                play.Enabled = true;
+            };
+        }
+        void ElFill()   // voice names of the account; a stored id the account does not list stays selectable as its id
+        {
+            foreach (var (_, cb, ids, was) in elRows)
+            {
+                var cur = ids.Count > 0 && cb.SelectedIndex >= 0 ? ids[cb.SelectedIndex] : was;
+                ids.Clear(); cb.Items.Clear();
+                cb.Items.Add(L("Piper (wie oben)", "Piper (as above)")); ids.Add("");
+                foreach (var (id, name) in elList) { cb.Items.Add(name); ids.Add(id); }
+                if (cur != "" && !ids.Contains(cur)) { cb.Items.Add(cur); ids.Add(cur); }
+                cb.SelectedIndex = ids.IndexOf(cur);
+            }
+        }
+        ElFill();
+        Wide(elVt);
+        string ElError(Exception e) => e switch
+        {
+            HttpRequestException { StatusCode: System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden } => L("Schlüssel abgelehnt oder Recht fehlt (Voices/User lesen)", "Key rejected or permission missing (Voices/User read)"),
+            TaskCanceledException => L("Zeitüberschreitung", "Timed out"),
+            JsonException => L("Unerwartete Antwort", "Unexpected answer"),
+            _ => e.Message,   // never contains the key
+        };
+        async Task ElLoad()
+        {
+            var key = elKey.Text.Trim();
+            if (key == "") { elQuota.Text = L("Kein Schlüssel eingegeben.", "No key entered."); return; }
+            elConnect.Enabled = false;
+            elQuota.Text = "…";
+            string msg;
+            elQ = null;
+            try
+            {
+                var q = await ElevenLabs.GetQuota(key);
+                if (key == elKey.Text.Trim()) elQ = q;
+                msg = ElevenLabs.QuotaText(q, false);
+                if (live && key == Program.Cfg.ElevenLabsKey)ElevenLabs.Apply(q);
+            }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException)
+            {
+                msg = e is HttpRequestException { StatusCode: System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden }
+                    ? L("Kontingent nicht lesbar – der Key braucht die Berechtigung User (read)", "Quota not readable – the key needs the User (read) permission")
+                    : L("Kontingent nicht lesbar: ", "Quota not readable: ") + ElError(e);
+            }
+            try { elList = await ElevenLabs.GetVoices(key); if (!f.IsDisposed) ElFill(); }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException or KeyNotFoundException) { msg += " | " + L("Stimmenliste: ", "Voice list: ") + ElError(e); }
+            if (f.IsDisposed) return;
+            elQuota.Text = msg;
+            elConnect.Enabled = true;
+        }
+        elConnect.Click += async (_, _) => await ElLoad();
+        if (live && cfg.ElevenLabsKey != "") f.Shown += async (_, _) => await ElLoad();
+
         Page(L("Funk & Verkehr", "Radio & traffic"));
         Group(L("KI-Verkehr", "AI traffic"));
         var chat = Check(L("KI-Verkehr funkt hörbar mit", "Hear AI traffic on frequency"), cfg.AiChatter);
@@ -668,6 +769,7 @@ static class Settings
                 ("AiFollowAwacs", J(follow.Checked), "AiFlightComms"), ("Modulation", J(modu.Text), "AwacsNewGroupNm"), ("Coalition", side.SelectedIndex == 1 ? "1" : "2", "Modulation"),
                 ("WheelSize", D(wsize.Value / 100), "WheelButton"), ("SrsListen", J(listen.Checked), "AiChatter"), ("SrsAutoConnect", J(auto.Checked), "SrsListen"), ("SrsStart", J(srsStart.Checked), "SrsPath"),
                 ("AsrGpu", J(gpu.Checked), "DebugLog"), ("AsrApiUrl", J(apiUrl.Text.Trim()), "AsrGpu"), ("AsrApiKey", J(apiKey.Text.Trim()), "AsrApiUrl"), ("AsrApiModel", J(apiModel.Text.Trim()), "AsrApiKey"),
+                ("ElevenLabsKey", J(elKey.Text.Trim()), "PilotVoice"),
                 ("MapPort", mapPort.ToString(), "DebugLog"), ("MapLan", J(lan.Checked), "MapPort"), ("UpdateCheck", J(updAuto.Checked), "DebugLog"),
             };
             var was = JsonSerializer.SerializeToElement(cfg);   // write only what changed: the file keeps its shape, and a value another window wrote meanwhile (wheel size) stays
@@ -683,6 +785,8 @@ static class Settings
                 foreach (var s in set.Where(s => !was.TryGetProperty(s.Key, out var o) || o.GetRawText() != s.Value)) text = Program.WithConfigValue(text, s.Key, s.Value, s.After);
                 text = WithNested(text, "Frequencies", mhz.Where(x => x.Value != cfg.Frequencies[x.Key]).Select(x => (x.Key, D(x.Value))), J(mhz));
                 text = WithNested(text, "Voices", voice.Where(x => x.Value != cfg.Voices[x.Key]).Select(x => (x.Key, J(x.Value))), J(voice));
+                var elv = elRows.ToDictionary(r => r.Key, r => r.Ids[r.Cb.SelectedIndex]);
+                text = WithNested(text, "ElevenVoices", elv.Where(x => x.Value != cfg.ElevenVoices.GetValueOrDefault(x.Key, "")).Select(x => (x.Key, J(x.Value))), J(elv.Where(x => x.Value != "").ToDictionary(x => x.Key, x => x.Value)));
                 if (text != before) File.WriteAllText(Program.ConfigPath, text);
                 if ((lang.SelectedIndex == 1) != En)   // like the installer: app and mission (F10 menu)
                 {

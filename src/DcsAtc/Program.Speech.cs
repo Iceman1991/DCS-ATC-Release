@@ -428,7 +428,7 @@ static partial class Program
             if ((tx.Prio == 2 || tx.Role == "Flight") && freq != Flights.Guard && !ShowTo(tx.Gid, freq, freq2).Any()) { Trace("TTS", $"{tx.Station} {freq:0.0##}: niemand gerastet, nicht gesprochen: {tx.Text}"); return; }   // nobody tuned: no Piper (KF14)
             var mp3 = Path.Combine(Root, "tmp", $"say{++n}.mp3");   // unambiguous: do not overwrite waiting calls
             double sec;
-            var voice = tx.Voice ?? (tx.Pilot ? Cfg.PilotVoice : PickVoice(Cfg.Voices.GetValueOrDefault(tx.Role, "en_US-ryan-medium"), tx.Station));
+            var voice = tx.Voice ?? (tx.Pilot ? Cfg.PilotVoice : VoiceFor(tx.Role, tx.Station));
             var sw = Stopwatch.StartNew();
             sec = Synth(tx.Text, voice, mp3, tx.Pilot, tx.Stress, PaceOf(tx));
             Trace("TTS", FormattableString.Invariant($"{Path.GetFileName(mp3)} {tx.Role} {tx.Station} {freq:0.0##}{(freq2 > 0 ? $"/{freq2:0.0##}" : "")} gid {tx.Gid} prio {PrioOf(tx)} Seite {tx.Side} Stimme {voice} Tempo {(tx.Pilot ? 1.0 : Cfg.SpeechRate) * (tx.Stress ? 0.85 : 1) * PaceOf(tx):0.00} {sec:0.0} s, Synth {sw.ElapsedMilliseconds} ms, Rückstau {Backlog(freq):0} s: {tx.Text}"));
@@ -495,12 +495,18 @@ static partial class Program
             if (SynthCache.TryGetValue(key, out var hit) && File.Exists(hit.Mp3))
                 try { File.Copy(hit.Mp3, mp3, true); return hit.Sec; } catch (IOException) { }
         var wav = Path.ChangeExtension(mp3, ".wav");
-        var parts = voice.Split('@');
+        bool el = false, fell = false;   // ElevenLabs: "el:id#piper", on failure this call uses the Piper voice after the #
+        if (voice.StartsWith("el:") && voice.IndexOf('#') is var h and > 0)
+        {
+            el = ElevenLabs.Wav(voice[3..h], text, Math.Clamp(0.85 / (Cfg.SpeechRate * (stress ? 0.85 : 1) * pace), 0.7, 1.2), wav);
+            if (!el) { voice = voice[(h + 1)..]; fell = true; }
+        }
+        var parts = el ? new[] { "el" } : voice.Split('@');
         double pitch = parts.Length > 1 ? double.Parse(parts[1], CultureInfo.InvariantCulture) : 1;
         bool nine = Regex.IsMatch(text, @"\b[Ll]ine \d,");   // 9-line: natural pace, digits single, longer pause after each line (the pilot writes it down)
         string sil = nine ? "0.7" : "0.2", say = ForPiper(text, nine), model = Path.Combine(Root, "models", parts[0] + ".onnx"),   // Pronunciation; digits bound: brisk as on the radio
                scale = ((pilot ? 0.95 : Cfg.SpeechRate) * VoicePace.GetValueOrDefault(parts[0], 1) * (stress ? 0.85 : 1) * pace).ToString("0.###", CultureInfo.InvariantCulture);   // Combat: faster
-        if (!PiperWarm(model, scale, sil, say, wav) &&
+        if (!el && !PiperWarm(model, scale, sil, say, wav) &&
             Run(Path.Combine(Root, "tools", "piper", "piper.exe"), say, "--model", model, "--length_scale", scale, "--sentence_silence", sil, "--output_file", wav).exit != 0)
             return 0;
         double sec = 0;
@@ -522,7 +528,7 @@ static partial class Program
             : $"[0:a]{pre}aresample=48000,alimiter=limit=0.5:level=disabled[out]";
         if (Run(Ffmpeg, null, "-y", "-loglevel", "error", "-i", wav, "-filter_complex", graph, "-map", "[out]", "-ac", "1",
             "-codec:a", "libmp3lame", "-q:a", "3", mp3).exit != 0) return 0;
-        if (text.Length <= 30)   // remember short fixed phrases (LSO, "Roger ball."): no Piper/ffmpeg the next time
+        if (text.Length <= 30 && !fell)   // remember short fixed phrases (LSO, "Roger ball."): no Piper/ffmpeg the next time
             try
             {
                 lock (SynthCache)

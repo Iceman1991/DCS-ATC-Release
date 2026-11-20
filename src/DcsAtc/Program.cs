@@ -39,6 +39,8 @@ public class Config
         ["Range"] = "en_US-ryan-medium@1.06", ["AWACS"] = "en_GB-alan-medium", ["Tanker"] = "en_US-bryce-medium", ["Crew"] = "en_US-ryan-medium", ["JTAC"] = "en_US-bryce-medium@0.94", ["FACA"] = "en_GB-alan-medium@1.04",
         ["Carrier"] = "en_US-ryan-medium@0.97|en_GB-alan-medium@1.02",   // one per station (Marshal, Tower, Paddles); AWACS/carrier without the pilot model (joe)
     };
+    public string ElevenLabsKey { get; set; } = "";    // optional ElevenLabs text-to-speech (own account, API key with Text to Speech, Voices read, User read); "" = off, Piper only
+    public Dictionary<string, string> ElevenVoices { get; set; } = new();   // role -> ElevenLabs voice_id ("id1|id2": one per station), "" or missing = Piper voice from Voices; fallback on errors/quota
     public string PilotVoice { get; set; } = "en_US-joe-medium";   // speaks your menu/wheel requests, "" = off
     public bool RadioFx { get; set; } = true;          // Radio sound: bandpass, noise, squelch
     public bool HintText { get; set; } = true;         // #27: notes of DCS-ATC (hints, errors, landing grade, deviations, "ATC: now ...") as text in the game; false = only in atc-log.txt and the debriefing
@@ -228,6 +230,7 @@ static partial class Program
         if (args.Length >= 1 && args[0] == "--mptest") { TerrainDir = TestTerrainDir(); LoadFields(); LoadTerrain(); return MpTest(args[1..]); }   // multiple players + AI via the app logic
 
         ScrubKey(TracePath, Cfg.AsrApiKey); ScrubKey(Path.ChangeExtension(TracePath, ".old.txt"), Cfg.AsrApiKey);   // older logs: key from before it was masked
+        ScrubKey(TracePath, Cfg.ElevenLabsKey); ScrubKey(Path.ChangeExtension(TracePath, ".old.txt"), Cfg.ElevenLabsKey);
         TraceOn = Cfg.DebugLog;   // live from here: debug log (tests above without file)
         Dedicated = DedicatedNow();
         Trace("START", $"{DateTime.Now:yyyy-MM-dd} DCS-ATC {System.Windows.Forms.Application.ProductVersion} {string.Join(" ", args)} | {MaskKey(JsonSerializer.Serialize(Cfg), "***")}");
@@ -240,6 +243,7 @@ static partial class Program
             Console.ReadKey(true);
             return 1;
         }
+        if (Cfg.ElevenLabsKey != "") _ = Task.Run(ElevenLabs.LogQuota);   // remaining characters, asynchronous
         new Thread(() =>   // in the background: GitHub may be slow or unreachable
             {
                 Update.Clean();
@@ -442,7 +446,7 @@ static partial class Program
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
     }
     /// Non-empty "AsrApiKey" value in serialized config text -> to ("" in the zip's config.jsonc, "***" in logs); empty stays empty (shows whether a key is set)
-    internal static string MaskKey(string text, string to) => Regex.Replace(text, "(\"AsrApiKey\"\\s*:\\s*)\"(?:[^\"\\\\]|\\\\.)+\"", m => m.Groups[1].Value + "\"" + to + "\"");
+    internal static string MaskKey(string text, string to) => Regex.Replace(text, "(\"(?:AsrApiKey|ElevenLabsKey)\"\\s*:\\s*)\"(?:[^\"\\\\]|\\\\.)+\"", m => m.Groups[1].Value + "\"" + to + "\"");
     /// Remove the key from a log file in place (only written if it occurs); never throws
     internal static void ScrubKey(string file, string key)
     {
@@ -970,6 +974,8 @@ static partial class Program
         (Cfg.MyCallsign, Cfg.Volume, Cfg.SpeechRate, Cfg.ReplyPause, Cfg.RadioFx, Cfg.RadioText, Cfg.PilotVoice, Cfg.AiChatter, Cfg.AiFlightComms, Cfg.Atis, Cfg.AltimeterUnit, Cfg.WheelInGame, Cfg.AirspaceWatch, Cfg.RunwayLights, Cfg.CallsignFromUnit, Cfg.CallsignFromPlayer, Cfg.WheelFixed) =   // R392: RunwayLights is read per call (line ~995), applies immediately
             (n.MyCallsign, n.Volume, n.SpeechRate, n.ReplyPause, n.RadioFx, n.RadioText, n.PilotVoice, n.AiChatter, n.AiFlightComms, n.Atis, n.AltimeterUnit, n.WheelInGame, n.AirspaceWatch, n.RunwayLights, n.CallsignFromUnit, n.CallsignFromPlayer, n.WheelFixed);
         Cfg.HintText = n.HintText;
+        if (Cfg.ElevenLabsKey != n.ElevenLabsKey || !Cfg.ElevenVoices.OrderBy(x => x.Key).SequenceEqual(n.ElevenVoices.OrderBy(x => x.Key))) { ElevenLabs.Disabled = false; ElevenLabs.Remaining = -1; if (n.ElevenLabsKey != "") { Cfg.ElevenLabsKey = n.ElevenLabsKey; _ = Task.Run(ElevenLabs.LogQuota); } }   // new key or voices: try again, quota read first
+        (Cfg.ElevenLabsKey, Cfg.ElevenVoices) = (n.ElevenLabsKey, n.ElevenVoices);
         (Cfg.IffCheck, Cfg.StationPositions) = (n.IffCheck, n.StationPositions);   // Tower.IffCheck is set by LoadConfig, StationPositions is read per transmission
         (Cfg.RandomNotams, Cfg.Notams) = (n.RandomNotams, n.Notams);
         SetNotams();

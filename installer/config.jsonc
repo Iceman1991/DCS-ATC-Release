@@ -60,6 +60,8 @@
     "Crew": "en_US-ryan-medium"   // Crew Chief am Parkplatz, spricht auf deinem Intercom
   },
   "PilotVoice": "en_US-joe-medium",   // spricht deine Menü-/Rad-Anfragen vor der Antwort, "" = aus
+  "ElevenLabsKey": "",   // optional: eigener ElevenLabs-API-Schlüssel (Rechte Text to Speech, Voices lesen, User lesen), "" = nur Piper; ElevenLabs rechnet nach Zeichen ab
+  "ElevenVoices": {},    // Rolle -> ElevenLabs voice_id, z. B. {"Tower": "id1|id2"} (mit | je Station fest eine); fehlt die Rolle: Piper-Stimme von oben. Ohne Netz/Kontingent spricht Piper
 
   "RadioFx": true,   // Funkklang: Bandpass, leises Rauschen, Squelch am Ende
   "RadioText": true,   // Funksprüche auch als Text im Spiel; false = nur Stimme (Hinweise bleiben Text)
