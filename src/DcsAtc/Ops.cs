@@ -13,7 +13,29 @@ partial class Ops
     public record Me(string Callsign, Telemetry? Tel, string Type, int Coalition, int Flight = 1, double Fuel = -1, double Freq = 0, Iff? Iff = null, string Modex = "");   // Flight: aircraft in the flight (player + AI wingmen); Fuel: tank 0–1, -1 unknown; Freq: SRS frequency of the call (MHz), 0 = menu/unknown
 
     // ------------------------------------------------------------ World (Program sets it from DcsAtc-State.txt)
-    public static (double X, double Z, double R)? Range;              // Range Alpha (TrainingRange_build.lua)
+    /// #56: every trigger zone "Range ..." is one range; name and frequency come from the zone name (ParseRange). Freq 0 = the Range frequency of the config.
+    public record Zone(string Name, double X, double Z, double R, double Freq);
+    public static List<Zone> Ranges = new();
+    static readonly Zone NoZone = new("Range Alpha", 0, 0, 0, 0);
+    internal static readonly string[] NatoNames = { "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliett", "Kilo", "Lima" };
+    /// Compatibility: the first zone (older code and tests knew one range); set = one zone "Range Alpha" without own frequency.
+    public static (double X, double Z, double R)? Range
+    {
+        get => Ranges.Count > 0 ? (Ranges[0].X, Ranges[0].Z, Ranges[0].R) : null;
+        set => Ranges = value is { } v ? new() { new Zone("Range Alpha", v.X, v.Z, v.R, 0) } : new();
+    }
+    /// Zone name as written in the mission ("Range", "Range-2", "Range 62 268.5", "Range_Kutaisi"): a frequency (108-399 MHz, three digits) is cut out;
+    /// a bare "Range" / one character / "zone" is generic and gets the next NATO name by index ("Range Alpha", "Range Bravo", ...), otherwise the name as written.
+    public static Zone ParseRange(string raw, int index, double x, double z, double r)
+    {
+        var fm = Regex.Match(raw, @"\b(1[0-7]\d|2\d\d|3\d\d)(\.\d{1,3})?\b");
+        var freq = fm.Success ? double.Parse(fm.Value, System.Globalization.CultureInfo.InvariantCulture) : 0;
+        if (freq < 108 || freq > 399) freq = 0;
+        var name = Regex.Replace((freq > 0 ? raw.Remove(fm.Index, fm.Length) : raw).Replace('_', ' '), @"\s+", " ").Trim(' ', '-');
+        var rest = Regex.Replace(name, @"^range", "", RegexOptions.IgnoreCase).Trim(' ', '-');
+        if (rest.Length <= 1 || rest.Equals("zone", StringComparison.OrdinalIgnoreCase)) name = "Range " + NatoNames[index % NatoNames.Length];
+        return new Zone(name, x, z, r, freq);
+    }
     public static Dictionary<int, (double X, double Z)> Bulls = new(); // Bullseye per side (1 red, 2 blue; 0 = old mission)
     public static Dictionary<string, string> Beacons = new();          // tanker group -> TACAN "51X"
     public static Dictionary<string, string> Tracks = new();           // tanker group -> track "Alpha" (mission)
@@ -28,6 +50,10 @@ partial class Ops
 
     public readonly List<string> Debrief = new();
     int tkContacts; double tkLb;   // N39: counters for the debriefing (contacts, fuel taken); not in State: after a restart counting begins anew
+    int rg;   // #56: range this pilot is checked in to (index in Ranges; also the last one after checking out)
+    Zone Z => Ranges.Count == 0 ? NoZone : Ranges[Math.Clamp(rg, 0, Ranges.Count - 1)];
+    readonly HashSet<string> rgSeen = new();
+    string RgLabel => rgSeen.Count == 1 ? rgSeen.First() : "Range";   // summary over all visits: the name of the only range, otherwise "Range"
     int rgPasses; double rgBestD = double.MaxValue; int rgBestClock;   // N39: range over all visits of the flight (passes/bestD begin anew per visit, A126)
 
     /// N39: summary of the individual scores (tanker, range); empty if there was nothing.
@@ -35,12 +61,12 @@ partial class Ops
     {
         var l = new List<string>();
         if (tkContacts > 0) l.Add(L($"Luftbetankung gesamt: {tkContacts} Kontakt{(tkContacts > 1 ? "e" : "")}", $"Air refueling total: {tkContacts} contact{(tkContacts > 1 ? "s" : "")}") + (tkLb > 0 ? L($", {tkLb:0} lb erhalten", $", {tkLb:0} lb received") : ""));   // without fuel capacity of the type (MaxLb 0) no amount, like the single line
-        if (rgPasses > 0) l.Add(L($"Range Alpha gesamt: {rgPasses} {(rgPasses > 1 ? "Anflüge" : "Anflug")}", $"Range Alpha total: {rgPasses} pass{(rgPasses > 1 ? "es" : "")}") + (rgBestD < 5000 ? L($", bester Einschlag {(rgBestD < 1.5 ? "shack" : $"{Feet(rgBestD)} bei {rgBestClock} Uhr")}", $", best impact {Score(rgBestD, rgBestClock)}") : ""));
+        if (rgPasses > 0) l.Add(L($"{RgLabel} gesamt: {rgPasses} {(rgPasses > 1 ? "Anflüge" : "Anflug")}", $"{RgLabel} total: {rgPasses} pass{(rgPasses > 1 ? "es" : "")}") + (rgBestD < 5000 ? L($", bester Einschlag {(rgBestD < 1.5 ? "shack" : $"{Feet(rgBestD)} bei {rgBestClock} Uhr")}", $", best impact {Score(rgBestD, rgBestClock)}") : ""));
         return l;
     }
     public int TankerContacts => tkContacts;   // FI3: logbook
     public int RangePasses => rgPasses;
-    public void ResetDebrief() { Debrief.Clear(); (tkContacts, tkLb, rgPasses, rgBestD, rgBestClock) = (0, 0, 0, double.MaxValue, 0); }
+    public void ResetDebrief() { Debrief.Clear(); (tkContacts, tkLb, rgPasses, rgBestD, rgBestClock) = (0, 0, 0, double.MaxValue, 0); rgSeen.Clear(); }
 
     // Range
     bool checkedIn, isHot, isDry;   // isDry: R285 "cleared dry", occupies the range until "off"
@@ -137,8 +163,8 @@ partial class Ops
         if (now - byeAt < 60 && Farewell(n)) return new();   // LA08 (log): "Good day, Trident 5-1" after "copy checking out, good day", "… Have a good one. Goodbye." after "cleared to depart", also when unsure
         if (unsure || Has(n, "radio check", "how do you read"))
         {
-            var st = role == "Range" ? "Range Alpha" : role == "AWACS" ? AwacsName(MyAwacs(air, me), me) : Tankers(air, me).FirstOrDefault()?.Name ?? "Tanker";
-            return new() { new(role, st, unsure ? $"{Cs(me)}, {st}, say again." : $"{Cs(me)}, {st}, read you five.", role == "AWACS" ? AwacsFreqOf(MyAwacs(air, me), me) : 0) };
+            var st = role == "Range" ? PickZone(n, me).Name : role == "AWACS" ? AwacsName(MyAwacs(air, me), me) : Tankers(air, me).FirstOrDefault()?.Name ?? "Tanker";
+            return new() { new(role, st, unsure ? $"{Cs(me)}, {st}, say again." : $"{Cs(me)}, {st}, read you five.", role == "AWACS" ? AwacsFreqOf(MyAwacs(air, me), me) : role == "Range" ? PickZone(n, me).Freq : 0) };
         }
         if (role != "AWACS" && Has(n, "say again") && lastRole.TryGetValue(role, out var lc)) return lc;   // R393: repeat the last call of the Range/tanker (AWACS: `last`)
         var res = role == "Range" ? RangeCall(n, me, air, fields, cfgAwacs, now, qnhOf) : role == "AWACS" ? AwacsCall(n, me, air, fields, now) : TankerCall(n, me, air, now);
@@ -155,28 +181,59 @@ partial class Ops
     {
         var r = Regex.Replace(Blank(n, own), @"\b(?:roger|copy|copied|wilco|affirm(?:ative)?|understood|okay|ok|thanks|thank you|will do|\d+)\b", " ");
         var bare = Regex.Replace(r, @"\b(?:texaco|shell|arco|tanker|range alpha|range)\b", " ");
+        foreach (var z in Ranges) bare = NameRx(z.Name).Replace(bare, " ");   // #56: zone names are station words
         return bare.Trim() == "" && n.Trim() != "" && (bare == r || role == "Tanker" && tank >= 1 || role == "Range" && checkedIn);
     }
 
     // ======================================================================= Range
-    static Call R(string s) => new("Range", "Range Alpha", s);
+    Call R(string s) => new("Range", Z.Name, s, Z.Freq);
+
+    /// Regex of a zone name in the normalised transcript; numbers also as spoken ("Range 62": "range 62", "range 6 2", "range sixty two").
+    static Regex NameRx(string name)
+    {
+        var tens = new[] { "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety" };
+        var parts = Normalize(name).Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w =>
+        {
+            if (!Regex.IsMatch(w, @"^\d+$")) return Regex.Escape(w);
+            var alt = new List<string> { w, string.Join(" ?", w.ToCharArray()) };
+            if (w.Length == 2 && w[0] >= '2') alt.Add(tens[w[0] - '0'] + (w[1] == '0' ? "" : " " + w[1]));   // Normalize turns "two" into "2": "sixty 2"
+            return "(?:" + string.Join("|", alt) + ")";
+        });
+        return new Regex($@"\b{string.Join(" ", parts)}\b");
+    }
+    /// #56: which range a call addresses: zone name in the call (longest), checked in, the zone of the frequency transmitted on, the nearest, the first.
+    int PickRange(string n, Me me)
+    {
+        if (Ranges.Count < 2) return 0;
+        var byName = Ranges.Select((z, i) => (z, i)).Where(x => NameRx(x.z.Name).IsMatch(n)).OrderByDescending(x => x.z.Name.Length).ToList();
+        if (byName.Count > 0) return byName[0].i;
+        if (checkedIn) return Math.Min(rg, Ranges.Count - 1);
+        var fi = me.Freq > 0 ? Ranges.FindIndex(z => z.Freq > 0 && Math.Abs(z.Freq - me.Freq) < 0.01) : -1;
+        if (fi >= 0) return fi;
+        return me.Tel is { } t ? Ranges.Select((z, i) => (i, d: Dist(t.X, t.Z, z.X, z.Z))).MinBy(x => x.d).i : 0;
+    }
+    public Zone? RangeFor(Me me) => Ranges.Count == 0 ? null : PickZone("", me);   // radio wheel: frequency of the checked-in or nearest range
+    Zone PickZone(string n, Me me) => Ranges.Count == 0 ? NoZone : Ranges[PickRange(n, me)];
 
     List<Call> RangeCall(string n, Me me, IReadOnlyList<Traffic> air, IReadOnlyList<Airfield> fields, double cfgAwacs, double now, Func<Airfield, (double Qnh, double Wx, double Wz)>? qnhOf)
     {
         var c = Cs(me);
-        if (Range is not { } z) return new() { R($"{c}, Range Alpha, range is closed.") };
+        if (Ranges.Count == 0) return new() { R($"{c}, Range Alpha, range is closed.") };
+        var pk = PickRange(n, me);
+        if (!checkedIn) rg = pk;
+        var z = Z;
         if (Has(n, "hung", "hot gun")) hung = Has(n, "hot gun") ? "hot gun" : "hung ordnance";   // R290: remembered in every range call (until the next check-in)
         if (Has(n, "check out", "checking out", "leaving", "departing", "good day"))
         {
-            if (!checkedIn) return new() { R($"{c}, Range Alpha, you are not checked in.") };
+            if (!checkedIn) return new() { R($"{c}, {Z.Name}, you are not checked in.") };
             checkedIn = false; if (isHot) EndPass(); else Cold();   // R58: pass without "off" counts (debriefing, total)
             var sum = passes == 0 ? "no passes" : $"{passes} pass{(passes > 1 ? "es" : "")}" + (bestD < 5000 ? $", best impact {Score(bestD, bestClock)}" : "");
             var own = fields.Where(f => f.Side == 0 || f.Side == me.Coalition).MinBy(f => Dist(z.X, z.Z, f.X, f.Z));   // A123: exit toward the nearest own airfield
             var exit = own != null ? $" to the {Card(Bearing(z.X, z.Z, own.X, own.Z))}" : "";
             var next = AwacsContact(air, me, cfgAwacs) is { } aw ? $", contact {aw}" : "";
             if (hung != null)   // R251 (AFI 13-212): exit via the hung-ordnance route, inform Approach
-                return new() { R($"{c}, Range Alpha, copy {hung}, check switches safe. {sum}. Cleared off the range{exit} via the hung ordnance route, advise Approach, good day.") };
-            return new() { R($"{c}, Range Alpha, check switches safe. {sum}. Cleared off the range{exit}{next}, good day.") };
+                return new() { R($"{c}, {Z.Name}, copy {hung}, check switches safe. {sum}. Cleared off the range{exit} via the hung ordnance route, advise Approach, good day.") };
+            return new() { R($"{c}, {Z.Name}, check switches safe. {sum}. Cleared off the range{exit}{next}, good day.") };
         }
         if (Has(n, "winchester"))   // N36: ammunition empty -> end pass, switch safe
             return new() { R($"{c}, {Ended(post: ", ")}check switches safe, report checking out.") };
@@ -192,10 +249,10 @@ partial class Ops
             { dryReq = false; return new() { R(InHot(me, z, now)) }; }
         // R234: "IP inbound" after the check-in is not a new check-in (no reset, no briefing), only "continue"; before it, it is not one
         if (Has(n, "inbound") && !Has(n, "check") && (checkedIn || Has(n, "ip", "i p")))
-            return new() { R(checkedIn ? $"{c}, continue." : $"{c}, Range Alpha, negative, you are not checked in. Report check in.") };
+            return new() { R(checkedIn ? $"{c}, continue." : $"{c}, {Z.Name}, negative, you are not checked in. Report check in.") };
         if (Has(n, "check in", "checking in", "inbound", "request entry", "entering", "with you", "request range"))
         {
-            RangeReset(); checkedIn = true;   // A126: every visit starts at pass 1
+            RangeReset(); checkedIn = true; rg = pk; z = Z;   // A126: every visit starts at pass 1; #56: RangeReset ends a running pass in the old range first
             var t = me.Tel;
             var far = t != null && Dist(t.X, t.Z, z.X, z.Z) > 3 * NM;
             // QNH of the nearest airfield from the mission weather like Tower; reduced from the aircraft only as a fallback (standard atmosphere, wrong at altitude in a warm/cold mission)
@@ -212,10 +269,10 @@ partial class Ops
             var rh = far ? Math.Round((Bearing(t!.X, t.Z, z.X, z.Z) - MagVar) / 10) * 10 + MagVar : 0;
             var runIn = far ? $"Enter from the {Card(rh + 180)}, run-in headings {Brg(rh - 20)} to {Brg(rh + 20)}" : "Run-in headings any";
             // R235: wording per JFIRE/AFI 13-212 ("range is cold" or "one aircraft in"), no targets (the range knows none), continue with "IP inbound"
-            var busy = hot.Count > 0 ? ", one aircraft in" : ", range is cold";
-            return new() { R($"{c}, Range Alpha{qnh}{wind}{busy}.{where} {runIn}, minimum altitude 1500 feet AGL. Report IP.") };
+            var busy = hot.Any(o => o.rg == rg) ? ", one aircraft in" : ", range is cold";
+            return new() { R($"{c}, {Z.Name}{qnh}{wind}{busy}.{where} {runIn}, minimum altitude 1500 feet AGL. Report IP.") };
         }
-        return new() { R($"{c}, Range Alpha, say again. Report check in, in hot, off, or checking out.") };
+        return new() { R($"{c}, {Z.Name}, say again. Report check in, in hot, off, or checking out.") };
     }
 
     void Cold() { isHot = isDry = false; hot.Remove(this); waitHot = false; offAsk = -1; }
@@ -226,16 +283,16 @@ partial class Ops
     double offAsk = -1;  // #21: when "report off" was asked (-1 = not)
 
     /// "in hot"/"in" (also from Tick after R236): clearance or reason against.
-    string InHot(Me me, (double X, double Z, double R) z, double now)
+    string InHot(Me me, Zone z, double now)
     {
         var c = Cs(me);
         waitHot = false;
-        if (!checkedIn) return $"{c}, Range Alpha, negative, you are not checked in. Report check in.";   // R57: cleared hot only after the check-in
+        if (!checkedIn) return $"{c}, {Z.Name}, negative, you are not checked in. Report check in.";   // R57: cleared hot only after the check-in
         if (hung != null) return $"{c}, negative, {hung}, report checking out.";   // R290: no further passes
         // R14: cleared hot only airborne, within 10 NM and (outside the zone) heading toward the area (JFIRE)
         if (me.Tel is { } ht && (OnGround(ht) || Dist(ht.X, ht.Z, z.X, z.Z) > 10 * NM)) return $"{c}, continue, report in inside 10 miles.";
         if (me.Tel is { } ha && Dist(ha.X, ha.Z, z.X, z.Z) > z.R && HdgDiff(ha.Hdg * 180 / Math.PI, Bearing(ha.X, ha.Z, z.X, z.Z)) > 60) return $"{c}, continue dry.";
-        if (hot.Any(o => o != this)) { waitHot = true; return $"{c}, continue, one aircraft in."; }   // A119: no "fouled"; R236: clearance comes after it becomes free
+        if (hot.Any(o => o != this && o.rg == rg)) { waitHot = true; return $"{c}, continue, one aircraft in."; }   // A119: no "fouled"; R236: clearance comes after it becomes free
         if (dryReq) { if (isHot) EndPass(); isDry = true; hot.Add(this); rgActAt = now; rgAway = double.NaN; offAsk = -1; return $"{c}, cleared dry."; }   // R285: occupied until "off", without scoring/pass counter
         isHot = true; isDry = false; hot.Add(this); rgActAt = now; rgAway = double.NaN; offAsk = -1;
         pass.Clear(); gunHits = 0; passRow = null;
@@ -248,7 +305,7 @@ partial class Ops
     string EndPass()
     {
         Cold();
-        passes++; rgPasses++;
+        passes++; rgPasses++; rgSeen.Add(Z.Name);
         var res = PassText();
         Debrief.Add(passRow = PassRow());
         vol.Clear();   // A72: what has impacted so far is in the pass report, Tick does not say it again (pass remains until "in hot" for late impacts)
@@ -262,7 +319,7 @@ partial class Ops
     public State Save() => new(awacsIn, radarContact, Debrief.ToList(), cas > 0 ? CasSave() : null);
     public void Load(State s) { (awacsIn, radarContact) = (s.AwacsIn, s.RadarContact); Debrief.AddRange(s.Debrief); if (s.Jtac != null) CasLoad(s.Jtac); }
 
-    string PassRow() => L($"Range Alpha Anflug {passes}: {PassText()}", $"Range Alpha pass {passes}: {PassText()}");
+    string PassRow() => L($"{Z.Name} Anflug {passes}: {PassText()}", $"{Z.Name} pass {passes}: {PassText()}");
     string PassText()
     {
         var parts = new List<string>();
@@ -298,15 +355,17 @@ partial class Ops
     /// Impact of a bomb/missile in the range (KutaisiATC.lua): distance to the nearest target, clock position (12 = approach direction).
     /// A72: impacts of the same drop (same weapon, gap < 3 s) are collected and scored from Tick as one call.
     /// R58: without clearance "check fire" (at most every 30 s) and one violation line per drop in the debriefing, no scoring.
-    public List<Call> OnImpact(Me me, double dist, int clock, double now, string weapon = "", double flight = -1)   // flight: weapon time of flight in s (-1 unknown)
+    public List<Call> OnImpact(Me me, double dist, int clock, double now, string weapon = "", double flight = -1, int zone = -1)   // flight: weapon time of flight in s (-1 unknown); zone: range of the impact (#56, -1 unknown)
     {
+        if (OtherZone(zone)) return new();
+        if (!checkedIn && zone >= 0 && zone < Ranges.Count) rg = zone;   // release without clearance: named after the range it fell on
         var res = vol.Count > 0 && (weapon != volW || now - volAt >= 3) ? Flush(me, now, true) : new();   // other drop: the old one first
         if (vol.Count == 0)
         {
             volW = weapon; volCold = !Cleared(now, flight);
             if (volCold)
             {
-                Debrief.Add(L($"Verstoß: Abwurf ohne Freigabe auf Range Alpha ({WeaponName(weapon)})", $"Deviation: release without clearance on Range Alpha ({WeaponName(weapon)})"));
+                Debrief.Add(L($"Verstoß: Abwurf ohne Freigabe auf {Z.Name} ({WeaponName(weapon)})", $"Deviation: release without clearance on {Z.Name} ({WeaponName(weapon)})"));
                 if (now - lastCold >= 30)
                 {
                     lastCold = now;
@@ -342,12 +401,14 @@ partial class Ops
         return new() { R($"{Cs(me)}, {(k == "" ? "" : k + (n > 1 ? "s, " : ", "))}{(n > 1 && b.D >= 1.5 ? "best " : "")}{Score(b.D, b.Clock)}.") };
     }
 
-    public void OnGunHit() { if (isHot) gunHits++; }
+    /// #56: an event in another zone than the one the pilot is checked in to is not his (not checked in or zone unknown: as before)
+    bool OtherZone(int zone) => zone >= 0 && checkedIn && zone != rg;
+    public void OnGunHit(int zone = -1) { if (isHot && !OtherZone(zone)) gunHits++; }
 
     /// Kill in the range: only an object of the opposing side, only with clearance (cold = no scoring), "target destroyed" once per pass (A72/R58).
-    public List<Call> OnKill(Me me, double now, int target = -1)
+    public List<Call> OnKill(Me me, double now, int target = -1, int zone = -1)
     {
-        if (!Cleared(now) || killTold || target >= 0 && target != 3 - me.Coalition) return new();   // R369: only the opposing side counts (target: coalition of the destroyed object, -1 = older mission)
+        if (OtherZone(zone) || !Cleared(now) || killTold || target >= 0 && target != 3 - me.Coalition) return new();   // R369: only the opposing side counts (target: coalition of the destroyed object, -1 = older mission)
         killTold = true;
         return new() { R($"{Cs(me)}, {OneOf("good hits", "good effects")}, target destroyed.") };
     }
@@ -1347,27 +1408,28 @@ partial class Ops
             }
             return new();
         }
-        if ((isHot || isDry) && Range is { } z)   // R285: a dry pass without "off" also frees the range
+        if ((isHot || isDry) && Ranges.Count > 0)   // R285: a dry pass without "off" also frees the range
         {
+            var z = Z;
             var d = Dist(t.X, t.Z, z.X, z.Z);
             // A119: no "off" -> 60 s after the last impact (without impact 180 s after "in hot") or 60 s beyond 3 NM heading away the range frees itself
             // (the 60 s cover the turn-in after "in hot" and weapons still flying after turning away: loft, Maverick, GBU; "in hot" and every impact restart it)
             if (d > 3 * NM && HdgDiff(t.Hdg * 180 / Math.PI, Bearing(t.X, t.Z, z.X, z.Z)) > 90) { if (double.IsNaN(rgAway)) rgAway = now; } else rgAway = double.NaN;
             if (d > z.R + 10 * NM)   // R14: out of the range, withdrawal announced
-                { var lv = R($"{Cs(me)}, Range Alpha, leaving the range, range is cold{Ended(", ")}. Report in hot or checking out."); HotEdge(now); return new() { lv }; }
+                { var lv = R($"{Cs(me)}, {Z.Name}, leaving the range, range is cold{Ended(", ")}. Report in hot or checking out."); HotEdge(now); return new() { lv }; }
             else if (now - rgActAt > (pass.Count > 0 ? 60 : 180) || now - Math.Max(rgAway, rgActAt) >= 60)
             {
                 // #21 reporting duty: first "report off", 30 s later without "off" freed as before plus violation
-                if (offAsk < 0) { offAsk = now; return new() { R($"{Cs(me)}, Range Alpha, report off.") }; }
+                if (offAsk < 0) { offAsk = now; return new() { R($"{Cs(me)}, {Z.Name}, report off.") }; }
                 if (now - offAsk >= 30)
                 {
-                    Debrief.Add(L("Verstoß: kein „off“ auf Range Alpha gemeldet", "Deviation: no \"off\" call on Range Alpha"));
-                    var ao = R($"{Cs(me)}, Range Alpha, assuming you are off, range is cold{Ended(", ")}. Report in hot or checking out."); HotEdge(now); return new() { ao };   // HotEdge: pass end for the grace period (R58)
+                    Debrief.Add(L($"Verstoß: kein „off“ auf {Z.Name} gemeldet", $"Deviation: no \"off\" call on {Z.Name}"));
+                    var ao = R($"{Cs(me)}, {Z.Name}, assuming you are off, range is cold{Ended(", ")}. Report in hot or checking out."); HotEdge(now); return new() { ao };   // HotEdge: pass end for the grace period (R58)
                 }
             }
         }
         // R236: waiting for the range ("continue, one aircraft in") -> free: "cleared hot" if position and heading still fit, otherwise silent (new "in")
-        if (waitHot && Range is { } zw && !hot.Any(o => o != this) && InHot(me, zw, now) is var ih && (isHot || isDry)) { HotEdge(now); return new() { R(ih) }; }
+        if (waitHot && Ranges.Count > 0 && !hot.Any(o => o != this && o.rg == rg) && InHot(me, Z, now) is var ih && (isHot || isDry)) { HotEdge(now); return new() { R(ih) }; }
         var tk = tank >= 2 ? Tankers(air, me).FirstOrDefault(k => k.A.Group == tanker) : null;
         if (tk != null && Dist(t.X, t.Z, tk.A.X, tk.A.Z) > 25 * NM) { tank = 0; afterFull = false; OffLine(); tk = null; }   // away from the tanker (LA16: join from up to 20 NM)
         if (tk != null && TankerCoach(me, t, tk, now) is { } tc) return new() { tc };
@@ -2359,6 +2421,36 @@ partial class Ops
         var role17 = RoleOf("range alpha enfield 1 1 checking in");
         Range = keepR;
         check(role17 == null && RoleOf("range alpha enfield 1 1 checking in") == "Range", "A17: Range nur mit Zone -> " + role17);
+        // #56: several ranges, name and frequency from the zone name
+        var pr56 = new[] { ParseRange("Range", 0, 1, 2, 3), ParseRange("Range-2", 1, 0, 0, 0), ParseRange("Range 62 268.5", 2, 0, 0, 0), ParseRange("range zone", 0, 0, 0, 0), ParseRange("Range 1", 0, 0, 0, 0), ParseRange("Range 105", 0, 0, 0, 0), ParseRange("Range_Kutaisi 250", 0, 0, 0, 0), ParseRange("Range Alpha", 0, 0, 0, 0), ParseRange("Range 62", 0, 0, 0, 0) };
+        check(pr56[0] == new Zone("Range Alpha", 1, 2, 3, 0) && pr56[1].Name == "Range Bravo" && pr56[2].Name == "Range 62" && pr56[2].Freq == 268.5 && pr56[3].Name == "Range Alpha" && pr56[4].Name == "Range Alpha"
+              && pr56[5].Name == "Range 105" && pr56[5].Freq == 0 && pr56[6] is { Name: "Range Kutaisi", Freq: 250 } && pr56[7].Name == "Range Alpha" && pr56[8] is { Name: "Range 62", Freq: 0 }, "#56: ParseRange -> " + string.Join(" | ", pr56.Select(z => $"{z.Name}/{z.Freq}")));
+        var keepRs = Ranges;
+        Ranges = new() { new("Range Alpha", 5 * NM, 0, 2500, 0), new("Range 62", -20 * NM, 0, 2500, 268.5) };
+        var m56a = new Me("Viper 2-1", me.Tel! with { X = 5 * NM }, "FA-18C_hornet", 2);
+        var m56b = new Me("Enfield 1-1", me.Tel! with { X = -20 * NM }, "FA-18C_hornet", 2);
+        var o56a = new Ops(); var o56b = new Ops(); var o56c = new Ops(); var o56d = new Ops(); var o56e = new Ops();
+        List<Call> T56(Ops o, Me m, string s) => o.OnTranscript("Range", s, m, air, f, 0);
+        var ca56 = T56(o56a, m56a, "Range Alpha, Viper 2-1, checking in"); T56(o56a, m56a, "in hot");
+        var cb56 = T56(o56b, m56b, "Range 62, Enfield 1-1, checking in");
+        var hb56 = T56(o56b, m56b, "in hot");
+        check(ca56[0].Text.StartsWith("Viper two one, Range Alpha") && ca56[0].Freq == 0 && cb56[0].Text.StartsWith("Enfield one one, Range 62") && cb56[0].Freq == 268.5 && cb56[0].Text.Contains("range is cold") && hb56[0].Text.Contains("cleared hot") && hb56[0].Freq == 268.5,
+              "#56: Check-in mit Zonenname: " + cb56[0].Text + " | " + hb56[0].Text);
+        var cc56 = T56(o56c, m56a with { Callsign = "Colt 3-3" }, "Range Alpha, Colt 3-3, checking in");
+        check(cc56[0].Text.Contains("one aircraft in") && T56(o56c, m56a with { Callsign = "Colt 3-3" }, "in hot")[0].Text.Contains("continue, one aircraft in"), "#56: Hot nur in der eigenen Range -> " + cc56[0].Text);
+        var cd56 = T56(o56d, m56b with { Tel = m56b.Tel! with { X = -19 * NM } }, "Enfield 1-1, checking in");
+        var ce56 = T56(o56e, m56a with { Freq = 268.5 }, "Viper 2-1, checking in");
+        check(cd56[0].Text.StartsWith("Enfield one one, Range 62") && ce56[0].Text.StartsWith("Viper two one, Range 62") && ce56[0].Freq == 268.5, "#56: ohne Namen: naechste Range / Frequenz -> " + cd56[0].Text + " | " + ce56[0].Text);
+        var ci56 = T56(new Ops(), m56a, "Range sixty two, Viper 2-1, checking in");
+        check(ci56[0].Text.StartsWith("Viper two one, Range 62"), "#56: Zonenname gesprochen -> " + ci56[0].Text);
+        var oth56 = o56b.OnImpact(m56b, 12, 6, 40, "", -1, 0);
+        var own56 = o56b.OnImpact(m56b, 12, 6, 41, "", -1, 1); var sc56 = o56b.Flush(m56b, 45);
+        o56b.OnGunHit(0); o56b.OnGunHit(1);
+        T56(o56b, m56b, "off safe");
+        check(oth56.Count == 0 && own56.Count == 0 && sc56 is [{ Station: "Range 62", Text: "Enfield one one, 40 feet at 6 o'clock." }] && o56b.Debrief is [var d56] && d56.Contains("Range 62") && d56.Contains("40 feet") && d56.Contains("1 gun hit") && !d56.Contains("2 gun"),
+              "#56: Einschlag je Zone -> " + string.Join(" | ", o56b.Debrief));
+        foreach (var ox in new[] { o56a, o56b, o56c, o56d, o56e }) ox.Leave();
+        Ranges = keepRs;
         // R388: "declare" without position or to an airfield station is the emergency, not the AWACS; the own call sign is no station name
         var r388 = new[] { RoleOf(Normalize("Kutaisi Tower, Enfield 1-1, declare emergency")), RoleOf(Normalize("Kutaisi Tower, Enfield 1-1, declare an emergency, squawk 7700")),
                            RoleOf(Normalize("Spike 1-1, Kutaisi Tower, declare an emergency"), "Spike 1-1"), RoleOf(Normalize("Spike 1-1, Kutaisi Tower, request taxi"), "Spike 1-1"),

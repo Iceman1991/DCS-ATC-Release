@@ -324,6 +324,7 @@ static class Kneeboard
         "",
         L("RANGE (Zone \"Range…\" in der Mission)", "RANGE (trigger zone \"Range…\" in the mission)"),
         "  Range Alpha, Enfield 1-1, checking in",
+        "  " + L("Zonenname = Name, evtl. Frequenz: \"Range 62 268.5\"", "zone name = name, may add freq: \"Range 62 268.5\""),
         "  IP inbound",
         "  in hot | in dry      " + L("(erst nach cleared hot werfen)", "(release only after cleared hot)"),
         "  off safe | winchester",
@@ -390,7 +391,7 @@ static class Kneeboard
             {
                 rows.Add(Trim($"  {r.Name.Replace('_', ' ')} {(dep ? "departure" : "recovery")}  RWY {string.Join(" ", r.Rwy)}{(dep ? "" : " -> " + Airfield.Label(r.To))}", 56));
                 var line = "   ";
-                foreach (var p in r.Pts.Select(p => $" {p.Fix.Replace('_', ' ')}{(p.Ft > 0 ? $" {p.Ft:0}{(p.Cross == "between" ? $"-{p.Ft2:0}" : p.Cross == "at or above" ? "+" : p.Cross == "at or below" ? "-" : "")}" : "")},"))
+                foreach (var p in r.Pts.Select(p => $" {p.Fix.Replace('_', ' ').Trim()}{(p.Ft > 0 ? $" {p.Ft:0}{(p.Cross == "between" ? $"-{p.Ft2:0}" : p.Cross == "at or above" ? "+" : p.Cross == "at or below" ? "-" : "")}" : "")},"))
                 {
                     if (line.Length > 3 && line.Length + p.Length > 56) { rows.Add(line); line = "   "; }
                     line += p;

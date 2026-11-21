@@ -115,6 +115,56 @@ static partial class Program
         Console.WriteLine("OK   Mitspieler-Version: Log-Zeile älter/neuer/gleich, keine Funkanfrage");
     }
 
+    /// Self-test: ElevenLabs speed is its own setting (not SpeechRate), above the API range the rest goes to ffmpeg atempo.
+    static void ElevenSpeedTest()
+    {
+        var (rate, speed) = (Cfg.SpeechRate, Cfg.ElevenLabsSpeed);
+        try
+        {
+            (Cfg.SpeechRate, Cfg.ElevenLabsSpeed) = (1.1, 1.1);
+            var (a, r) = ElevenSpeed(false, 1);
+            var (sa, _) = ElevenSpeed(true, 1);
+            Cfg.ElevenLabsSpeed = 1.4;
+            var (a2, r2) = ElevenSpeed(false, 1);
+            Cfg.ElevenLabsSpeed = 0.8;
+            var (a3, r3) = ElevenSpeed(false, 1);
+            var (a4, r4) = ElevenSpeed(false, 1.2);   // pace 1.2 (slower): 0.667 -> API 0.7, rest < 1
+            if (Math.Abs(a - 1.1) > 1e-9 || Math.Abs(r - 1) > 1e-9 || sa <= a || Math.Abs(a2 - 1.2) > 1e-9 || Math.Abs(r2 - 1.4 / 1.2) > 1e-9
+                || Math.Abs(a3 - 0.8) > 1e-9 || Math.Abs(r3 - 1) > 1e-9 || Math.Abs(a4 - 0.7) > 1e-9 || Math.Abs(r4 - 0.8 / 1.2 / 0.7) > 1e-9)
+                throw new Exception($"ElevenLabs-Tempo: {a} {r} | Stress {sa} | 1,4: {a2} {r2} | 0,8: {a3} {r3} | 0,8 Pace 1,2: {a4} {r4}");
+        }
+        finally { (Cfg.SpeechRate, Cfg.ElevenLabsSpeed) = (rate, speed); }
+        Console.WriteLine("OK   ElevenLabs-Tempo: eigene Einstellung ElevenLabsSpeed (nicht SpeechRate), Stress schneller, über 1,2 / unter 0,7 der Rest per atempo");
+    }
+
+    /// Self-test: radio effect graph: narrow two-stage band, presence boost, compressor ratio from the config, bad band -> default, ffmpeg accepts it.
+    static void RadioGraphTest()
+    {
+        var (band, ratio) = (Cfg.RadioFxBand, Cfg.RadioFxRatio);
+        try
+        {
+            string Chain(int lo, int hi) => $"highpass=f={lo}:p=2,highpass=f={lo}:p=2,lowpass=f={hi}:p=2,lowpass=f={hi}:p=2,equalizer=f=1500:t=q:w=1:g=3";
+            (Cfg.RadioFxBand, Cfg.RadioFxRatio) = (new double[] { 300, 2700 }, 6);
+            var def = RadioGraph("", false);
+            Cfg.RadioFxBand = new double[] { 400, 3000 };
+            var own = RadioGraph("", false);
+            var bad = new[] { new double[] { 2700, 300 }, new double[] { 50, 2700 }, new double[] { 300, 9000 }, new double[] { 300 }, null! };
+            var badOk = bad.All(b => { Cfg.RadioFxBand = b; return RadioGraph("", false).Contains(Chain(300, 2700)); });
+            var stress = RadioGraph("", true);
+            if (!def.Contains(Chain(300, 2700)) || !def.Contains("ratio=6") || !own.Contains(Chain(400, 3000)) || !badOk
+                || !stress.Contains("highpass=f=400,lowpass=f=2800,") || stress.Contains("equalizer"))
+                throw new Exception($"Funkklang-Graph: {def} | {own} | ungültig ok {badOk} | {stress}");
+            Cfg.RadioFxBand = new double[] { 300, 2700 };
+            var o = Path.Combine(Path.GetTempPath(), "dcsatc-fx.mp3");   // the string must be valid for ffmpeg: 1 s test tone through both graphs
+            foreach (var s in new[] { false, true })
+                if (Run(Ffmpeg, null, "-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=f=440:d=1", "-filter_complex", RadioGraph("", s), "-map", "[out]", "-ac", "1", o).exit != 0)
+                    throw new Exception("ffmpeg lehnt den Funkklang-Graph ab (Stress " + s + "): " + RadioGraph("", s));
+            File.Delete(o);
+        }
+        finally { (Cfg.RadioFxBand, Cfg.RadioFxRatio) = (band, ratio); }
+        Console.WriteLine("OK   Funkklang: Band 300-2700 Hz zweistufig, Präsenz +3 dB bei 1,5 kHz, Kompressor 1:6, RadioFxBand/RadioFxRatio einstellbar, ungültiges Band -> Standard, Gefecht unverändert, ffmpeg nimmt den Graph an");
+    }
+
     /// Self-test: settings window writes config.jsonc (comments stay, missing keys added), callsign normalized.
     static void ConfigTest()
     {
@@ -526,6 +576,7 @@ static partial class Program
         Lagebild.SelfTest();
         AsrApi.SelfTest();
         ElevenLabs.SelfTest();
+        AsrServer.SelfTest();
         if (!JsonSerializer.Serialize(MapState()).Contains("\"fields\":")) throw new Exception("FI7: MapState");
         if (Tag("Träger LSO: (OK) 3-wire", "Case III", null, "Nacht") != "Träger LSO (Case III, Nacht): (OK) 3-wire" || Tag("Verstoß: x", null) != "Verstoß: x") throw new Exception("FI3: Debrief-Kennzeichen");
         // Etappe 1 (PLATZVERFAHREN-PLAN.md): Kutaisi from charts/caucasus.jsonc, CRPs as printed within 5 m of the old hand values, entries/exits/hand as before
@@ -745,7 +796,8 @@ static partial class Program
             File.WriteAllText(ownF, """
                 { "Banias": { "crp": { "TEST": [1, 2] }, "rwy": { "09": { "entry": { "TEST": { "via": "initial" } }, "exit": { "TEST": {} } } },
                   "routes": { "MINTT": { "rwy": ["09"], "to": "TEST", "pts": [ { "fix": "ALPHA", "pos": [5, 6], "above": 15000 }, { "fix": "BRAVO", "pos": [7, 8] } ] } },
-                  "departures": { "FLEX": { "rwy": ["09"], "pts": [ { "fix": "DELTA", "pos": [9, 10], "below": 5000 }, { "fix": "ECHO", "pos": [11, 12], "above": 5000, "below": 7000 } ] } } } }
+                  "departures": { "FLEX": { "rwy": ["09"], "pts": [ { "fix": "DELTA", "pos": [9, 10], "below": 5000 }, { "fix": "ECHO", "pos": [11, 12], "above": 5000, "below": 7000 } ] },
+                                  "MUTE": { "rwy": ["09"], "pts": [ { "fix": "DELTA", "pos": [9, 10], "at": 3000 }, { "fix": "FOXTROT", "pos": [13, 14], "at": 6000, "silent": true } ] } } } }
                 """);
             Airfield.OwnChart = OwnChart(ownF);
             var ed = Airfield.FromDcs("Banias", 22735.7, 5935.4, 8, rw).ApplyChart();
@@ -755,6 +807,10 @@ static partial class Program
             var bt = ed.Departures["FLEX"];
             if (bt.Pts[1] != ("ECHO", 11.0, 12.0, 5000.0, "between", 7000.0) || !Tower.CrossTxt(bt).EndsWith("Echo between 5000 and 7000 feet") || !Kneeboard.RouteLines(new[] { ed }).Any(l => l.Contains("ECHO 5000-7000")))
                 throw new Exception("Hoehe between: " + Tower.CrossTxt(bt));
+            // #57 (LtJaeger): "silent": true = flown, not spoken; the name gets a "_" prefix, the kneeboard lists it without
+            var mu = ed.Departures["MUTE"];
+            if (mu.Pts[1].Fix != "_FOXTROT" || Tower.CrossTxt(mu) != "Delta at 3000 feet" || !Kneeboard.RouteLines(new[] { ed }).Any(l => l.Contains("FOXTROT 6000")) || Kneeboard.RouteLines(new[] { ed }).Any(l => l.Contains("_FOXTROT")))
+                throw new Exception($"silent: {mu.Pts[1].Fix} / {Tower.CrossTxt(mu)}");
             File.WriteAllText(ownF, """{ "Banias": { "crp": { "TEST": [1, 2] }, "rwy": { "09": { "entry": { "TEST": { "via": "initial" } }, "exit": { "TEST": {} } } }, "departures": { "FLEX": { "rwy": ["09"], "pts": [ { "fix": "ECHO", "pos": [11, 12], "above": 7000, "below": 5000 } ] } } } }""");
             if (OwnChart(ownF) != null) throw new Exception("Hoehe between: above > below nicht erkannt");   // OwnChart reports format errors and drops the file
             Console.WriteLine("OK   Verfahrens-Editor: Platzdaten als JSON mit dem Eintrag wie geschrieben, Eintrag der Seite (Punkt, An- und Abflugroute) wird gelesen");
@@ -1732,6 +1788,17 @@ static partial class Program
         Request(pr, "Tanker: Texaco, Enfield 1-1, complete", "RAD", true);
         if (r387 != "Tanker -" || !r387l || pr.TankFq != 0 || ListenFreqs(new() { pr }).Contains(263.0)) throw new Exception($"R387 Tanker-Missionsfrequenz: {r387} / hört {r387l} / nach complete {pr.TankFq}");
         Console.WriteLine("OK   R387: vom DCS eingestellte Tankerfrequenz wird abgehört und dem Tanker des Senders zugeordnet, nach 'complete' zurückgesetzt");
+        // #56: own frequency of a range zone: Range role, monitored; Z line with and without a name
+        var keepRz = Ops.Ranges;
+        var rz0 = $"{SrsRole(null, 271.7) ?? "-"} {ListenFreqs(new()).Contains(271.7)}";
+        var zl = new List<Ops.Zone>();
+        zl.Add(ZoneLine("Z;20000;0;3000".Split(';'), zl)); zl.Add(ZoneLine("Z;1;2;3000;Range 62 271.7".Split(';'), zl)); zl.Add(ZoneLine("Z;3;4;1000;Range-3".Split(';'), zl));
+        Ops.Ranges = zl;
+        var rz1 = $"{SrsRole(null, 271.7) ?? "-"} {ListenFreqs(new()).Contains(271.7)}";
+        Ops.Ranges = keepRz;
+        if (rz0 != "- False" || rz1 != "Range True" || zl[0] != new Ops.Zone("Range Alpha", 20000, 0, 3000, 0) || zl[1] != new Ops.Zone("Range 62", 1, 2, 3000, 271.7) || zl[2].Name != "Range Bravo")
+            throw new Exception($"#56 Range-Zonen: {rz0} / {rz1} / {string.Join(" | ", zl)}");
+        Console.WriteLine("OK   #56: Range-Zone mit eigener Frequenz ist Range-Rolle und wird abgehört, Z-Zeile mit/ohne Namen");
         // TP7: tanker frequency from the mission (F line with "t") is monitored, belongs to the Tanker role, the tanker answers there too (also "Name#002" spawned from the template)
         Ops.TankerFreq["Aerial-1"] = 225.0; pr.Ops.TankerGroup = "Aerial-1#002";
         var tp7 = $"{SrsRole(null, 225.0)} {ListenFreqs(new() { pr }).Contains(225.0)} {Program.Fq(OpsTx(pr, new("Tanker", "Bloodhound", "x")).Freqs)}";

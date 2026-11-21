@@ -691,9 +691,10 @@ How the voice values work:
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `"RadioFx"` | `true` | Radio sound: band-pass, quiet static, squelch tail. In combat, calls are faster and sound like an overdriven mask microphone. |
+| `"RadioFx"` | `true` | Radio sound: narrow band-pass (300–2700 Hz, two filter stages each) with a slight presence boost, hard compressor, quiet static, squelch tail. In combat, calls are faster and sound like an overdriven mask microphone. |
 | `"RadioText"` | `true` | Radio calls also as DCS text on screen. Numbers show as digits there (heading 045, 251.5, Enfield 1-1), the voice still says them digit by digit. `false` = speech only; notes from DCS-ATC still appear as text. |
 | `"Volume"` | `0.6` | Controller volume in SRS (0–1). Lower it if the voices are too loud. |
+| `"ElevenLabsSpeed"` | `1.1` | Speech pace of the ElevenLabs voices, independent of `SpeechRate`: 1 = ElevenLabs normal, higher = faster. The slider in the settings window ranges from 0.80 to 1.50. |
 | `"SpeechRate"` | `0.85` | Speech pace: 1 = Piper standard, lower = faster, higher = slower. The slider in the settings window ranges from 0.70 to 1.50. All voices are balanced to the same pace. |
 | `"ReplyPause"` | `1.5` | Seconds of pause between two calls on one frequency (pilot → controller → readback). Slider in the settings window: 0–5 s. |
 
@@ -705,7 +706,7 @@ Instead of Piper, a controller role can speak with a voice from your own ElevenL
 
 - **Own account and key:** create an API key at elevenlabs.io and enter it in the settings window (Voices page, group *ElevenLabs*) or as `ElevenLabsKey` in `config.jsonc`. Copy the whole key (it starts with sk_) right away, ElevenLabs shows it only once. DCS-ATC uses the key of the PC it runs on, which is the mission host. Each installation sets its own key. The key needs the permissions *Text to Speech*, *Voices* (read) and *User* (read).
 - **Choose voices:** **Connect** loads the voices of your account (including library voices you added) and the remaining quota. For each role (Tower, Ground, Approach, …) pick a voice or *Piper (as above)*. ▶ plays a sample. In `config.jsonc` the voice IDs go into `ElevenVoices`, for example `"Tower": "idA|idB"`; with `|` each station keeps one of them, like with `Voices`. Pilot voices always stay Piper.
-- **Model:** the Flash model `eleven_flash_v2_5` (the fastest ElevenLabs model, on many plans cheaper per character than the others). Speech pace follows `SpeechRate`; combat and AWACS calls come out faster.
+- **Model:** the Flash model `eleven_flash_v2_5` (the fastest ElevenLabs model, on many plans cheaper per character than the others). Speech pace follows `ElevenLabsSpeed` (slider *ElevenLabs speed* in the settings window, 1 = normal, higher = faster; above the 1.2 the API allows, DCS-ATC adds the rest with ffmpeg), independent of `SpeechRate`; combat and AWACS calls come out faster.
 - **Quota:** the settings window shows the remaining characters and the reset date. At every start with a key set, one line in the log shows the same.
 - **Costs:** ElevenLabs bills per character. The free plan with 10,000 characters a month is roughly one to two hours of radio. Short fixed phrases are cached during a session.
 - **No extra charges:** DCS-ATC stops at the characters included in your plan and never uses paid extra characters. ElevenLabs is only used while the remaining quota is known (it is read at start and every 5 minutes, and reduced by every spoken text). If the quota cannot be read, for example because the key lacks the *User (read)* permission, Piper speaks. A text longer than what is left is spoken by Piper, and when less than 1 % of the plan (at least 500 characters) is left, DCS-ATC shows one note in the game and uses Piper for the rest of the session. In addition, set a credit limit on the API key in ElevenLabs and keep usage-based billing off in the account.
@@ -2185,7 +2186,12 @@ Texaco:  Enfield one one, Texaco, total offload 6.2, cleared to depart, contact 
 
 ### Range
 
-A range controller exists only when the mission has a trigger zone whose name starts with **Range**. It is called **Range Alpha**.
+A range controller exists only when the mission has a trigger zone whose name starts with **Range**. Every such zone is a range of its own, so a mission can have several.
+
+- **Name:** the zone name is the spoken name. A zone called just *Range* (or a very short name) becomes *Range Alpha*, *Range Bravo* and so on by order. With a name like *Range 62* or *Range North* (`_` becomes a space) the controller uses that name.
+- **Frequency:** if the zone name contains a frequency between 108 and 399 MHz (*Range 62 268.5*), that range has its own frequency. Otherwise the Range frequency from config.jsonc applies.
+- **Which range answers:** the name you say, else the range you are checked in with, else the one matching the frequency you transmit on, else the nearest to your position.
+- **Hot and impacts** are per range: an aircraft in one range does not block another, and impacts count only for the range they land in.
 
 - **Targets:** enemy ground units inside the zone. DCS-ATC measures your hits but spawns nothing.
 - **Scored weapons:** your bombs, rockets and air-to-ground missiles are measured against the nearest enemy ground unit in the zone. An impact within 500 m counts.
@@ -2829,7 +2835,7 @@ A departure route is a chain of fixes you fly after takeoff, then own navigation
 }
 ```
 
-`"departures"` sits next to `"routes"` in the airfield's entry. `"rwy"` and `"pts"` work as for arrival routes, and so does a list of variants under one name; there is no `"to"`.
+`"departures"` sits next to `"routes"` in the airfield's entry. `"rwy"` and `"pts"` work as for arrival routes, and so does a list of variants under one name; there is no `"to"`. A point whose name starts with `_` (for example `"_ARC_SOUTH"`) or that has `"silent": true` is part of the route but never spoken; the controller names only the other points. The controller corrects you on a departure only when you are more than 4 NM off the route. The route runs straight between points, so for an arc add a few silent points along it.
 
 #### Chart editor
 
@@ -2927,6 +2933,7 @@ Pick the page on the left: General, Voices, Radio & traffic, AWACS, Frequencies,
 | **Notes from DCS-ATC as text in the game** | on/off. Off: hints, error notes, landing grade and deviations no longer appear on screen (for VR without text in view). They stay in `atc-log.txt` and in the debriefing. | `HintText` |
 | **Pilot voice (speaks your wheel requests)** | Pick a voice or *off*. Off sets the pilot voice to empty. | `PilotVoice` |
 | **ElevenLabs (optional)** | API key, **Connect** (loads voices and quota), quota display, a voice or *Piper (as above)* per role with ▶ sample. | `ElevenLabsKey`, `ElevenVoices` |
+| **ElevenLabs speed** (1 = normal, higher = faster) | 0.80–1.50 | `ElevenLabsSpeed` |
 | **AWACS picture as bullseye (instead of BRAA)** | on/off | `AwacsBullseye` |
 | **AWACS calls new groups within** | 40–200 NM | `AwacsNewGroupNm` |
 | **Hear AI traffic on frequency** | on/off | `AiChatter` |
@@ -3033,10 +3040,13 @@ Own frequencies per airfield and controller are not in `config.jsonc` but in the
 | `PilotVoice` | `"en_US-joe-medium"` | Speaks your wheel and F10 requests before the answer. `""` = off. |
 | `ElevenLabsKey` | `""` | Your own ElevenLabs API key (permissions Text to Speech, Voices read, User read). Empty = Piper only. Removed from the diagnostics zip and the logs. |
 | `ElevenVoices` | `{}` | Role → ElevenLabs voice ID, for example `{"Tower": "idA\|idB"}`. With `\|` each station keeps one. A missing role uses the Piper voice from `Voices`. |
-| `RadioFx` | `true` | Radio sound: band-pass, light noise, squelch tail. |
+| `RadioFx` | `true` | Radio sound: narrow band-pass, compressor, light noise, squelch tail. |
+| `RadioFxBand` | `[300, 2700]` | Band of the radio sound in Hz `[low cut, high cut]`, two filter stages each. Low cut 100–1000, high cut 1500–5000, otherwise the default applies. Wider = clearer, narrower = more radio. |
+| `RadioFxRatio` | `6` | Compressor ratio of the radio sound (1 = off, higher = harder). Combat calls stay at 1:3. |
 | `RadioText` | `true` | Radio calls also as DCS text on screen. `false` = speech only. |
 | `HintText` | `true` | Notes from DCS-ATC (hints, errors, landing grade, deviations) as DCS text on screen. `false` = only in `atc-log.txt` and the debriefing. |
 | `Volume` | `0.6` | Controller volume in SRS (0–1). |
+| `ElevenLabsSpeed` | `1.1` | ElevenLabs speech pace: 1 = normal, larger = faster (independent of `SpeechRate`). |
 | `SpeechRate` | `0.85` | Speech pace: 1 = Piper standard, smaller = faster. |
 | `ReplyPause` | `1.5` | Seconds between two calls on the same frequency. |
 
@@ -3072,6 +3082,7 @@ Own frequencies per airfield and controller are not in `config.jsonc` but in the
 | `RunwayLights` | `"silent"` | Runway lighting at dusk, at night or in poor visibility, through DCS's own ATC menu: `"silent"` (DCS controller stays muted), `"dcs"` (DCS controller audible for 15 s), `"off"`. |
 | `AltimeterUnit` | `"auto"` | Altimeter setting in calls. `"auto"`: western types get "altimeter two niner niner two" (inHg), others "QNH one zero one three" (hPa); ATIS gives both. Or `"hpa"`, `"inhg"`. |
 | `DebugLog` | `true` | Write `atc-debug.txt`. |
+| `AsrServer` | `true` | Speech recognition stays loaded in a background process while DCS-ATC runs (on the graphics card about 1 GB of video memory) and answers in well under a second, with no stutter from reloading the model for every call. Until it is ready, and if it fails, the call is recognised by the old per-call start. `false` = always the old per-call start. |
 | `AsrApiUrl` | `""` | Speech recognition over an OpenAI-compatible service instead of the local whisper, e.g. `"https://api.openai.com/v1/audio/transcriptions"` or a whisper server on another PC with a graphics card. `""` = local. If the service fails, that call is recognised locally; after three failures in a row the rest of the session runs locally. Everything said on the monitored frequencies goes to that service. |
 | `AsrApiKey` | `""` | Key for `AsrApiUrl` (sent as `Bearer`). Empty for a server without a key. |
 | `AsrApiModel` | `"whisper-1"` | Model name at `AsrApiUrl`, e.g. `"whisper-1"` or `"gpt-4o-mini-transcribe"`. |

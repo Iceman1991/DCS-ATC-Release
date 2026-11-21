@@ -616,24 +616,33 @@ local function start()
   -- Range (A17, from KutaisiATC.lua): first trigger zone "Range…" of the mission (circle or quad: farthest corner point) -> Z line; without a zone no range controller.
   -- Impacts of players' bombs/missiles/air-to-ground guided weapons in it: distance and clock position (12 = approach direction) to the nearest ground, ship or static target of the opposing side in the zone,
   -- flight time (the app checks the clearance for the drop, R58); gun hits and kills in the zone -> R/H/K events. Only measure, spawn nothing.
-  local RZ
+  -- #56: every zone "Range…" is one range (RZS, 0-based index in the events); the zone name gives name and frequency in the app ("Range 62 268.5").
+  local RZS = {}
   for _, z in ipairs(env.mission.triggers and env.mission.triggers.zones or {}) do
-    if not RZ and tostring(z.name or ""):lower():find("^range") then
+    if tostring(z.name or ""):lower():find("^range") then
       local r = z.radius or 0
       for _, v in ipairs(z.verticies or {}) do r = math.max(r, math.sqrt((v.x - z.x) ^ 2 + (v.y - z.y) ^ 2)) end
-      RZ = { x = z.x, z = z.y, r = r }
+      RZS[#RZS + 1] = { x = z.x, z = z.y, r = r, name = clean(z.name) }
     end
   end
-  HAS.range = RZ ~= nil   -- R390: F10 shows Range only then
-  if RZ then
-    local function inRange(p) return (p.x - RZ.x) ^ 2 + (p.z - RZ.z) ^ 2 < (RZ.r + 1500) ^ 2 end
-    local function nearestTarget(p, side)   -- R369: ground groups, ships and static objects of the opposing side
+  HAS.range = #RZS > 0   -- R390: F10 shows Range only then
+  if #RZS > 0 then
+    local function zoneOf(p)   -- index (0-based) of the zone whose centre is nearest among those the point is in (r + 1500 m), else nil
+      local best, bd
+      for i, z in ipairs(RZS) do
+        local d = (p.x - z.x) ^ 2 + (p.z - z.z) ^ 2
+        if d < (z.r + 1500) ^ 2 and (not bd or d < bd) then best, bd = i - 1, d end
+      end
+      return best
+    end
+    local function inRange(p) return zoneOf(p) ~= nil end
+    local function nearestTarget(p, side, zi)   -- R369: ground groups, ships and static objects of the opposing side; #56: only targets in the same zone
       local best, bd = nil, 1e9
       local function scan(units)
         for _, u in ipairs(units) do
           local q = u:getPoint()
           local d = math.sqrt((p.x - q.x) ^ 2 + (p.z - q.z) ^ 2)
-          if d < bd and inRange(q) then best, bd = u, d end
+          if d < bd and zoneOf(q) == zi then best, bd = u, d end
         end
       end
       for _, cat in ipairs({ Group.Category.GROUND, Group.Category.SHIP }) do
@@ -650,12 +659,13 @@ local function start()
         local ip = last
         local sp = math.sqrt(vel.x ^ 2 + vel.y ^ 2 + vel.z ^ 2)
         if sp > 1 then ip = land.getIP(last, { x = vel.x / sp, y = vel.y / sp, z = vel.z / sp }, sp * 0.1 + 30) or last end
-        if not inRange(ip) then return end
-        local tgt, d = nearestTarget(ip, side)
-        if not tgt or d > 500 then evt(string.format("R;%s;%s;-1;0;;%.1f", unit, wname, t - t0)) return end
+        local zi = zoneOf(ip)
+        if not zi then return end
+        local tgt, d = nearestTarget(ip, side, zi)
+        if not tgt or d > 500 then evt(string.format("R;%s;%s;-1;0;;%.1f;%d", unit, wname, t - t0, zi)) return end
         local q = tgt:getPoint()
         local clock = math.floor(((math.deg(math.atan2(ip.z - q.z, ip.x - q.x)) - hdg) % 360) / 30 + 0.5) % 12
-        evt(string.format("R;%s;%s;%.0f;%d;%s;%.1f", unit, wname, d, clock == 0 and 12 or clock, clean(tgt:getTypeName()), t - t0))
+        evt(string.format("R;%s;%s;%.0f;%d;%s;%.1f;%d", unit, wname, d, clock == 0 and 12 or clock, clean(tgt:getTypeName()), t - t0, zi))
       end, nil, timer.getTime() + 0.05)
     end
     world.addEventHandler({ onEvent = function(_, e) pcall(function()
@@ -669,11 +679,11 @@ local function start()
           track(e.weapon, clean(u:getName()), math.deg(math.atan2(pos.x.z, pos.x.x)), u:getCoalition())
         end
       elseif e.id == E.S_EVENT_HIT and e.target and e.target.getPoint and inRange(e.target:getPoint()) and e.weapon and (e.weapon:getDesc() or {}).category == Weapon.Category.SHELL then
-        evt(string.format("H;%s;%s", clean(u:getName()), clean(e.target:getTypeName())))
+        evt(string.format("H;%s;%s;%d", clean(u:getName()), clean(e.target:getTypeName()), zoneOf(e.target:getPoint())))
       elseif e.id == E.S_EVENT_KILL and e.target and e.target.getPoint and inRange(e.target:getPoint()) then
         local tc = 0   -- R369: coalition of the destroyed object (the app scores only the opposing side)
         pcall(function() tc = e.target:getCoalition() end)
-        evt(string.format("K;%s;%s;%d", clean(u:getName()), clean(e.target:getTypeName()), tc))
+        evt(string.format("K;%s;%s;%d;%d", clean(u:getName()), clean(e.target:getTypeName()), tc, zoneOf(e.target:getPoint())))
       end
     end) end })
   end
@@ -699,7 +709,7 @@ local function start()
       if b then W[#W + 1] = string.format("B;%.0f;%.0f;%d", b.x, b.y, n) end
     end
     for _, k in ipairs(beacons) do W[#W + 1] = k end
-    if RZ then W[#W + 1] = string.format("Z;%.0f;%.0f;%.0f", RZ.x, RZ.z, RZ.r) end   -- Range (A17)
+    for _, z in ipairs(RZS or {}) do W[#W + 1] = string.format("Z;%.0f;%.0f;%.0f;%s", z.x, z.z, z.r, z.name) end   -- Range (A17); #56: one line per zone with its name
     if not LL or #LL == 0 then   -- FI2: lat/lon grid 7x7 over the airfields +-150 km for the SRS transmitter positions (coord.LOtoLL once, the app interpolates)
       LL = {}
       local x0, x1, z0, z1 = math.huge, -math.huge, math.huge, -math.huge

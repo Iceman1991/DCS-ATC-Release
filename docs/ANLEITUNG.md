@@ -693,9 +693,10 @@ So funktionieren die Werte:
 
 | Einstellung | Standard | Bedeutung |
 |---|---|---|
-| `"RadioFx"` | `true` | Funkklang: Bandpass, leises Rauschen, Squelch-Ende. Im Gefecht kommen Sprüche schneller und klingen wie ein übersteuertes Maskenmikrofon. |
+| `"RadioFx"` | `true` | Funkklang: schmaler Bandpass (300–2700 Hz, je zwei Filterstufen) mit leichter Präsenzanhebung, harter Kompressor, leises Rauschen, Squelch-Ende. Im Gefecht kommen Sprüche schneller und klingen wie ein übersteuertes Maskenmikrofon. |
 | `"RadioText"` | `true` | Funksprüche auch als DCS-Text im Bild. Zahlen stehen dort als Ziffern (heading 045, 251.5, Enfield 1-1), die Stimme spricht sie weiter Ziffer für Ziffer. `false` = nur Stimme; Hinweise von DCS-ATC kommen weiter als Text. |
 | `"Volume"` | `0.6` | Lautstärke der Lotsen in SRS (0–1). Senken, wenn die Stimmen zu laut sind. |
+| `"ElevenLabsSpeed"` | `1.1` | Sprechtempo der ElevenLabs-Stimmen, unabhängig von `SpeechRate`: 1 = ElevenLabs-Normal, größer = schneller. Der Regler im Einstellungsfenster geht von 0,80 bis 1,50. |
 | `"SpeechRate"` | `0.85` | Sprechtempo: 1 = Piper-Standard, kleiner = schneller, größer = langsamer. Der Regler im Einstellungsfenster geht von 0,70 bis 1,50. Alle Stimmen sind auf dasselbe Tempo abgeglichen. |
 | `"ReplyPause"` | `1.5` | Sekunden Pause zwischen zwei Sprüchen auf einer Frequenz (Pilot → Lotse → Readback). Regler im Einstellungsfenster: 0–5 s. |
 
@@ -707,7 +708,7 @@ Statt Piper kann eine Lotsenrolle mit einer Stimme aus deinem eigenen ElevenLabs
 
 - **Eigenes Konto und Schlüssel:** Einen API-Schlüssel auf elevenlabs.io erstellen und im Einstellungsfenster eintragen (Seite Stimmen, Gruppe *ElevenLabs*) oder als `ElevenLabsKey` in der `config.jsonc`. Den ganzen Schlüssel (beginnt mit sk_) gleich kopieren, ElevenLabs zeigt ihn nur einmal. DCS-ATC nutzt den Schlüssel des PCs, auf dem es läuft, also des Mission-Hosts. Jede Installation hat ihren eigenen. Der Schlüssel braucht die Rechte *Text to Speech*, *Voices* (lesen) und *User* (lesen).
 - **Stimmen wählen:** **Verbinden** lädt die Stimmen deines Kontos (auch Bibliotheksstimmen, die du hinzugefügt hast) und das Restkontingent. Je Rolle (Tower, Ground, Approach, …) eine Stimme oder *Piper (wie oben)* wählen. ▶ spricht eine Probe. In der `config.jsonc` stehen die Stimmen-IDs in `ElevenVoices`, etwa `"Tower": "idA|idB"`; mit `|` behält jede Station eine davon, wie bei `Voices`. Pilotenstimmen bleiben immer Piper.
-- **Modell:** das Flash-Modell `eleven_flash_v2_5` (das schnellste ElevenLabs-Modell, in vielen Tarifen pro Zeichen günstiger als die anderen). Das Sprechtempo folgt `SpeechRate`; Gefechts- und AWACS-Sprüche kommen schneller.
+- **Modell:** das Flash-Modell `eleven_flash_v2_5` (das schnellste ElevenLabs-Modell, in vielen Tarifen pro Zeichen günstiger als die anderen). Das Sprechtempo folgt `ElevenLabsSpeed` (Regler *Tempo ElevenLabs* im Einstellungsfenster, 1 = normal, größer = schneller; über den 1,2, die die API erlaubt, hilft DCS-ATC per ffmpeg nach), unabhängig von `SpeechRate`; Gefechts- und AWACS-Sprüche kommen schneller.
 - **Kontingent:** Das Einstellungsfenster zeigt die verbleibenden Zeichen und das Rücksetzdatum. Bei jedem Start mit Schlüssel steht dasselbe als eine Zeile im Log.
 - **Kosten:** ElevenLabs rechnet nach Zeichen ab. Der kostenlose Tarif mit 10.000 Zeichen im Monat reicht für etwa ein bis zwei Stunden Funk. Kurze feste Sätze werden während einer Sitzung zwischengespeichert.
 - **Keine Mehrkosten:** DCS-ATC hört bei den im Tarif enthaltenen Zeichen auf und nutzt nie kostenpflichtige Zusatzzeichen. ElevenLabs wird nur genutzt, solange das Restkontingent bekannt ist (beim Start und alle 5 Minuten gelesen, mit jedem gesprochenen Text verringert). Ist das Kontingent nicht lesbar, etwa weil dem Key die Berechtigung *User (read)* fehlt, spricht Piper. Ein Text, der länger ist als der Rest, wird von Piper gesprochen; bleibt weniger als 1 % des Tarifs (mindestens 500 Zeichen), zeigt DCS-ATC einen Hinweis im Spiel und nutzt für den Rest der Sitzung Piper. Zusätzlich bei ElevenLabs ein Kreditlimit am API-Key setzen und die nutzungsbasierte Abrechnung im Konto aus lassen.
@@ -2187,7 +2188,12 @@ Texaco:  Enfield one one, Texaco, total offload 6.2, cleared to depart, contact 
 
 ### Range
 
-Einen Range-Lotsen gibt es nur, wenn die Mission eine Triggerzone hat, deren Name mit **Range** beginnt. Er heißt **Range Alpha**.
+Einen Range-Lotsen gibt es nur, wenn die Mission eine Triggerzone hat, deren Name mit **Range** beginnt. Jede solche Zone ist eine eigene Range, eine Mission kann also mehrere haben.
+
+- **Name:** der Zonenname ist der gesprochene Name. Heißt die Zone nur *Range* (oder ist der Name sehr kurz), wird sie nach der Reihenfolge *Range Alpha*, *Range Bravo* usw. genannt. Mit einem Namen wie *Range 62* oder *Range Nord* (`_` wird zum Leerzeichen) heißt der Lotse so.
+- **Frequenz:** steht im Zonennamen eine Frequenz zwischen 108 und 399 MHz (*Range 62 268.5*), hat diese Range ihre eigene Frequenz. Sonst gilt `"Range"` aus config.jsonc.
+- **Welche Range antwortet:** der genannte Name, sonst die Range, bei der du eingecheckt bist, sonst die zur gesendeten Frequenz, sonst die nächste zu deiner Position.
+- **Hot und Treffer** gelten je Range: ein Flugzeug in einer Range sperrt die andere nicht, Einschläge zählen nur für die Range, in der sie fallen.
 
 - **Ziele:** feindliche Bodeneinheiten in der Zone. DCS-ATC misst deine Treffer, spawnt aber nichts.
 - **Gewertete Waffen:** deine Bomben, Raketen und Luft-Boden-Flugkörper werden gegen die nächste feindliche Bodeneinheit in der Zone gemessen. Ein Einschlag innerhalb 500 m zählt.
@@ -2831,7 +2837,7 @@ Eine Abflugroute ist eine Kette von Fixes, die du nach dem Start abfliegst, dana
 }
 ```
 
-`"departures"` steht im Eintrag des Platzes neben `"routes"`. `"rwy"` und `"pts"` funktionieren wie bei Anflugrouten, ebenso eine Liste von Varianten unter einem Namen; ein `"to"` gibt es nicht.
+`"departures"` steht im Eintrag des Platzes neben `"routes"`. `"rwy"` und `"pts"` funktionieren wie bei Anflugrouten, ebenso eine Liste von Varianten unter einem Namen; ein `"to"` gibt es nicht. Ein Punkt, dessen Name mit `_` beginnt (etwa `"_ARC_SOUTH"`) oder der `"silent": true` hat, gehört zur Route, wird aber nie angesagt; der Lotse nennt nur die übrigen Punkte. Auf einem Abflug korrigiert er dich erst, wenn du mehr als 4 NM neben der Route fliegst. Die Route verläuft zwischen den Punkten geradlinig, für einen Bogen setzt du deshalb mehrere stille Punkte entlang des Bogens.
 
 #### Verfahrens-Editor
 
@@ -2930,6 +2936,7 @@ Links wählst du die Seite: Allgemein, Stimmen, Funk & Verkehr, AWACS, Frequenze
 | **Hinweise von DCS-ATC als Text im Spiel** | an/aus. Aus: Hinweise, Fehlermeldungen, Landebewertung und Verstöße erscheinen nicht mehr im Bild (für VR ohne Text im Sichtfeld). Sie stehen weiter in `atc-log.txt` und im Debriefing. | `HintText` |
 | **Pilotenstimme (spricht eigene Anfragen vor)** | Stimme wählen oder *aus*. Aus setzt die Pilotenstimme auf leer. | `PilotVoice` |
 | **ElevenLabs (optional)** | API-Schlüssel, **Verbinden** (lädt Stimmen und Kontingent), Kontingentanzeige, je Rolle eine Stimme oder *Piper (wie oben)* mit ▶ Probe. | `ElevenLabsKey`, `ElevenVoices` |
+| **Tempo ElevenLabs** (1 = normal, größer = schneller) | 0,80–1,50 | `ElevenLabsSpeed` |
 | **AWACS-Picture als Bullseye (statt BRAA)** | an/aus | `AwacsBullseye` |
 | **AWACS meldet neue Gruppen bis** | 40–200 NM | `AwacsNewGroupNm` |
 | **KI-Verkehr funkt hörbar mit** | an/aus | `AiChatter` |
@@ -3036,10 +3043,13 @@ Eigene Frequenzen je Platz und Lotse stehen nicht in `config.jsonc`, sondern in 
 | `PilotVoice` | `"en_US-joe-medium"` | Spricht deine Rad- und F10-Anfragen vor der Antwort. `""` = aus. |
 | `ElevenLabsKey` | `""` | Dein eigener ElevenLabs-API-Schlüssel (Rechte Text to Speech, Voices lesen, User lesen). Leer = nur Piper. Wird aus Diagnose-Zip und Logs entfernt. |
 | `ElevenVoices` | `{}` | Rolle → ElevenLabs-Stimmen-ID, etwa `{"Tower": "idA\|idB"}`. Mit `\|` behält jede Station eine. Fehlt die Rolle, gilt die Piper-Stimme aus `Voices`. |
-| `RadioFx` | `true` | Funkklang: Bandpass, leichtes Rauschen, Squelch-Ende. |
+| `RadioFx` | `true` | Funkklang: schmaler Bandpass, Kompressor, leichtes Rauschen, Squelch-Ende. |
+| `RadioFxBand` | `[300, 2700]` | Band des Funkklangs in Hz `[untere, obere Grenze]`, je zwei Filterstufen. Untere 100–1000, obere 1500–5000, sonst gilt der Standard. Breiter = klarer, schmaler = mehr Funkgerät. |
+| `RadioFxRatio` | `6` | Kompressor-Verhältnis des Funkklangs (1 = aus, höher = härter). Gefechtssprüche bleiben bei 1:3. |
 | `RadioText` | `true` | Funksprüche auch als DCS-Text im Bild. `false` = nur Stimme. |
 | `HintText` | `true` | Hinweise von DCS-ATC (Hinweise, Fehler, Landebewertung, Verstöße) als DCS-Text im Bild. `false` = nur in `atc-log.txt` und im Debriefing. |
 | `Volume` | `0.6` | Lautstärke der Lotsen in SRS (0–1). |
+| `ElevenLabsSpeed` | `1.1` | ElevenLabs-Sprechtempo: 1 = normal, größer = schneller (unabhängig von `SpeechRate`). |
 | `SpeechRate` | `0.85` | Sprechtempo: 1 = Piper-Standard, kleiner = schneller. |
 | `ReplyPause` | `1.5` | Sekunden zwischen zwei Sprüchen auf derselben Frequenz. |
 
@@ -3075,6 +3085,7 @@ Eigene Frequenzen je Platz und Lotse stehen nicht in `config.jsonc`, sondern in 
 | `RunwayLights` | `"silent"` | Bahnbefeuerung in Dämmerung, Nacht oder schlechter Sicht über das DCS-eigene ATC-Menü: `"silent"` (DCS-Lotse bleibt stumm), `"dcs"` (DCS-Lotse 15 s hörbar), `"off"`. |
 | `AltimeterUnit` | `"auto"` | Höhenmessereinstellung in Sprüchen. `"auto"`: westliche Typen „altimeter two niner niner two“ (inHg), andere „QNH one zero one three“ (hPa); die ATIS nennt beides. Oder `"hpa"`, `"inhg"`. |
 | `DebugLog` | `true` | `atc-debug.txt` schreiben. |
+| `AsrServer` | `true` | Die Spracherkennung bleibt, solange DCS-ATC läuft, in einem Hintergrundprozess geladen (auf der Grafikkarte etwa 1 GB Grafikspeicher) und antwortet in deutlich unter einer Sekunde, ohne das Ruckeln durch Modell-Neuladen bei jedem Funkspruch. Bis sie bereit ist und bei einem Fehler wird der Spruch über den alten Start je Funkspruch erkannt. `false` = immer der alte Start je Funkspruch. |
 | `AsrApiUrl` | `""` | Spracherkennung über einen OpenAI-kompatiblen Dienst statt des lokalen Whisper, z. B. `"https://api.openai.com/v1/audio/transcriptions"` oder ein Whisper-Server auf einem anderen PC mit Grafikkarte. `""` = lokal. Fällt der Dienst aus, wird dieser Spruch lokal erkannt; nach drei Fehlern in Folge läuft der Rest der Sitzung lokal. Alles, was auf den abgehörten Frequenzen gesprochen wird, geht an diesen Dienst. |
 | `AsrApiKey` | `""` | Schlüssel für `AsrApiUrl` (als `Bearer`). Leer für einen Server ohne Schlüssel. |
 | `AsrApiModel` | `"whisper-1"` | Modellname bei `AsrApiUrl`, z. B. `"whisper-1"` oder `"gpt-4o-mini-transcribe"`. |

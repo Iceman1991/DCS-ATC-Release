@@ -168,10 +168,11 @@ local function has(e) for _, x in ipairs(events) do if x == e then return true e
 local function hasTask(s) for _, x in ipairs(tasks) do if x:find(s, 1, true) then return true end end end
 
 -- A17: range zone of the mission and a red tank in it
-env.mission.triggers = { zones = { { name = "Range Alpha", x = 20000, y = 0, radius = 3000 } } }
+env.mission.triggers = { zones = { { name = "Range Alpha", x = 20000, y = 0, radius = 3000 }, { name = "Range 62 268.5", x = 26000, y = 0, radius = 1000 } } }   -- #56: second range, own name and frequency
 tank = unit("Tank1", 20000, 0, nil, 1)
 function tank:getTypeName() return "T-72B" end
-REDGROUND = { { getUnits = function() return { tank } end, getUnit = function() return tank end } }
+tank2 = unit("Tank2", 26000, 0, nil, 1); function tank2:getTypeName() return "BMP-2" end   -- #56: target of the second range
+REDGROUND = { { getUnits = function() return { tank } end, getUnit = function() return tank end }, { getUnits = function() return { tank2 } end, getUnit = function() return tank2 end } }
 static1 = unit("Depot1", 20000, 2000, nil, 1); function static1:getTypeName() return "Warehouse" end; REDSTATIC = { static1 }   -- R369: static object and ship of the red side in the range
 ship1 = unit("Boat1", 20000, -2000, nil, 1); function ship1:getTypeName() return "Speedboat" end
 REDSHIPS = { { getUnits = function() return { ship1 } end, getUnit = function() return ship1 end, getName = function() return "RedBoat" end,
@@ -519,7 +520,7 @@ function p1:getFuel() return 0.4 end   -- only here, the P line above expects th
 fire({ id = world.event.S_EVENT_REFUELING, initiator = p1 }); assert(has("F;P1;start;0.400;4899"), "F;start mit Innentank (A124) fehlt: " .. table.concat(events, " "))
 fire({ id = world.event.S_EVENT_REFUELING_STOP, initiator = p1 }); assert(has("F;P1;stop;0.400;4899"), "F;stop mit Innentank fehlt")
 -- A17: range zone "Range Alpha" -> Z line; player bomb 12 m before the red tank (approach to the north: 6 o'clock) -> R with flight time; gun hit/kill in the zone -> H/K
-assert(stateFile():find("Z;20000;0;3000", 1, true), "Z-Zeile (Range) fehlt: " .. stateFile())
+assert(stateFile():find("Z;20000;0;3000;Range Alpha", 1, true) and stateFile():find("Z;26000;0;1000;Range 62 268.5", 1, true), "Z-Zeilen (Range) fehlen: " .. stateFile())
 local bomb = { p = vec(19988, 0), alive = true }
 function bomb:getDesc() return { category = 3 } end
 function bomb:getTypeName() return "weapons.bombs.Mk_82" end
@@ -528,7 +529,17 @@ function bomb:getPoint() return self.p end
 function bomb:getVelocity() return vec(0, 0) end
 fire({ id = world.event.S_EVENT_SHOT, initiator = p1, weapon = bomb })
 run(T + 1); bomb.alive = false; run(T + 1)
-assert(table.concat(events, " "):find("R;P1;weapons.bombs.Mk_82;12;6;T%-72B;1%.%d"), "R-Ereignis (Einschlag) fehlt: " .. table.concat(events, " "))
+assert(table.concat(events, " "):find("R;P1;weapons.bombs.Mk_82;12;6;T%-72B;1%.%d;0"), "R-Ereignis (Einschlag) fehlt: " .. table.concat(events, " "))
+-- #56: a bomb in the second range: zone index 1, scored against the target of that range (not the first range's tank)
+local bomb2 = { p = vec(25988, 0), alive = true }
+function bomb2:getDesc() return { category = 3 } end
+function bomb2:getTypeName() return "weapons.bombs.Mk_82" end
+function bomb2:isExist() return self.alive end
+function bomb2:getPoint() return self.p end
+function bomb2:getVelocity() return vec(0, 0) end
+fire({ id = world.event.S_EVENT_SHOT, initiator = p1, weapon = bomb2 })
+run(T + 1); bomb2.alive = false; run(T + 1)
+assert(table.concat(events, " "):find("R;P1;weapons.bombs.Mk_82;12;6;BMP%-2;1%.%d;1"), "R-Ereignis in der zweiten Range fehlt: " .. table.concat(events, " "))
 -- R369: static objects and ships count as range targets, not only ground groups
 for _, c in ipairs({ { 20000, 1980, "Warehouse" }, { 20000, -2020, "Speedboat" } }) do
   local b2 = { p = vec(c[1], c[2]), alive = true }
@@ -539,15 +550,16 @@ for _, c in ipairs({ { 20000, 1980, "Warehouse" }, { 20000, -2020, "Speedboat" }
   function b2:getVelocity() return vec(0, 0) end
   fire({ id = world.event.S_EVENT_SHOT, initiator = p1, weapon = b2 })
   run(T + 1); b2.alive = false; run(T + 1)
-  assert(table.concat(events, " "):find("R;P1;weapons.bombs.Mk_82;20;%d+;" .. c[3] .. ";1%.%d"), "R-Ereignis auf " .. c[3] .. " fehlt: " .. table.concat(events, " "))
+  assert(table.concat(events, " "):find("R;P1;weapons.bombs.Mk_82;20;%d+;" .. c[3] .. ";1%.%d;0"), "R-Ereignis auf " .. c[3] .. " fehlt: " .. table.concat(events, " "))
 end
 local shell = { getDesc = function() return { category = 0 } end, getTypeName = function() return "shell" end }
-fire({ id = world.event.S_EVENT_HIT, initiator = p1, target = tank, weapon = shell }); assert(has("H;P1;T-72B"), "H-Ereignis (Kanonentreffer) fehlt")
-fire({ id = world.event.S_EVENT_KILL, initiator = p1, target = tank }); assert(has("K;P1;T-72B;1"), "K-Ereignis (Abschuss) fehlt")
+fire({ id = world.event.S_EVENT_HIT, initiator = p1, target = tank, weapon = shell }); assert(has("H;P1;T-72B;0"), "H-Ereignis (Kanonentreffer) fehlt")
+fire({ id = world.event.S_EVENT_KILL, initiator = p1, target = tank }); assert(has("K;P1;T-72B;1;0"), "K-Ereignis (Abschuss) fehlt")
+fire({ id = world.event.S_EVENT_KILL, initiator = p1, target = tank2 }); assert(has("K;P1;BMP-2;1;1"), "K-Ereignis in der zweiten Range (#56) fehlt")
 -- R369: K carries the coalition of the target (the app drops own-side kills)
-fire({ id = world.event.S_EVENT_KILL, initiator = p1, target = static1 }); assert(has("K;P1;Warehouse;1"), "K-Ereignis auf Static fehlt")
+fire({ id = world.event.S_EVENT_KILL, initiator = p1, target = static1 }); assert(has("K;P1;Warehouse;1;0"), "K-Ereignis auf Static fehlt")
 local own = unit("Own1", 20000, 500, nil, 2); function own:getTypeName() return "Truck" end
-fire({ id = world.event.S_EVENT_KILL, initiator = p1, target = own }); assert(has("K;P1;Truck;2"), "K-Ereignis auf eigene Seite ohne Koalition")
+fire({ id = world.event.S_EVENT_KILL, initiator = p1, target = own }); assert(has("K;P1;Truck;2;0"), "K-Ereignis auf eigene Seite ohne Koalition")
 -- R27: DCS LSO grade on trap -> W;Unit;Wire;grade (player only, only with wire); player under 2 NM at the carrier in the air -> state every 0.25 s instead of 0.5 s
 fire({ id = world.event.S_EVENT_LANDING_QUALITY_MARK, initiator = p1, comment = "LSO: GRADE:OK  : WIRE# 3" })
 fire({ id = world.event.S_EVENT_LANDING_QUALITY_MARK, initiator = vip, comment = "LSO: GRADE:OK  : WIRE# 2" })

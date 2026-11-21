@@ -41,6 +41,14 @@ static partial class Program
         else if (p[0] == "N" && p.Length >= 5) jn.Add(((int)D(1), p[2], D(3), D(4)));
     }
 
+    /// #56: Z;x;z;r[;zone name] -> range; the generic names ("Range", "Range-2") get NATO names in the order of the generic ones (`so far` = the zones before it).
+    internal static Ops.Zone ZoneLine(string[] p, List<Ops.Zone> sofar)
+    {
+        double D(int i) => double.Parse(p[i], CultureInfo.InvariantCulture);
+        var gen = sofar.Count(z => z.Name.StartsWith("Range ") && Array.IndexOf(Ops.NatoNames, z.Name[6..]) >= 0);
+        return Ops.ParseRange(p.Length > 4 ? string.Join(";", p[4..]) : "Range", gen, D(1), D(2), D(3));
+    }
+
     static readonly HashSet<string> JtacSeen = new();
     static void ReadState()
     {
@@ -60,7 +68,7 @@ static partial class Program
         var fu = new Dictionary<string, Flights.Unit>();
         var llg = new List<(double, double, double, double)>();   // FI2: L lines
         var jl = new List<Ops.Leader>(); var jt = new List<Ops.Trg>(); var jn = new List<(int, string, double, double)>();   // J/Q/N: JTAC leaders, their targets, navigation points
-        (double, double, double)? rz = null;   // A17: mission without range zone (mission change) -> no range controller any more
+        var rz = new List<Ops.Zone>();   // A17: mission without range zone (mission change) -> no range controller any more
         foreach (var line in lines)
         {
             var p = line.Split(';');
@@ -73,7 +81,7 @@ static partial class Program
                     case "S" when p.Length >= 2: MissionGap(D(1)); break;   // R120: mission runtime
                     case "J" or "Q" or "N": JtacLine(p, jl, jt, jn); break;   // J1-J3: JTAC leaders, their targets, navigation points
                     case "L" when p.Length >= 5: llg.Add((D(1), D(2), D(3), D(4))); break;   // FI2: lat/lon grid (x;z;lat;lon)
-                    case "Z" when p.Length >= 4: rz = (D(1), D(2), D(3)); break;     // Range Alpha
+                    case "Z" when p.Length >= 4: rz.Add(ZoneLine(p, rz)); break;     // #56: Z;x;z;r[;zone name] (without name: older mission = "Range Alpha")
                     case "B" when p.Length >= 3: Ops.Bulls[p.Length >= 4 && int.TryParse(p[3], out var bs) ? bs : 0] = (D(1), D(2)); break;   // Bullseye per side
                     case "K" when p.Length >= 3:                                                 // Tanker TACAN[;track]
                         Ops.Beacons[p[1]] = p[2];
@@ -138,7 +146,7 @@ static partial class Program
         Wx = wx;
         Ops.Detected = det;
         Ops.Gci = gci;
-        Ops.Range = rz;
+        Ops.Ranges = rz;
         (Ops.Leaders, Ops.Targets, Ops.NavPts) = (jl, jt, jn);
         if (llg.Count > 0) LlGrid = llg.ToArray();
         Ops.DefFreq = Cfg.Frequencies.GetValueOrDefault("JTAC", 133.5);

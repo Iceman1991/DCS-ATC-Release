@@ -96,6 +96,7 @@ static partial class Program
         ?? (Ops.AwacsFreq.Values.Any(f => Math.Abs(f - mhz) < 0.01) ? "AWACS" : null)   // mission AWACS
         ?? (Ops.TankerFreq.Values.Any(f => Math.Abs(f - mhz) < 0.01) ? "Tanker" : null)   // TP7: mission tanker
         ?? (Ops.Leaders.Any(l => l.Freq > 0 && Math.Abs(l.Freq - mhz) < 0.01) ? "JTAC" : null)   // J5: mission JTAC / FAC(A)
+        ?? (Ops.Ranges.Any(z => z.Freq > 0 && Math.Abs(z.Freq - mhz) < 0.01) ? "Range" : null)   // #56: own frequency of a range zone
         ?? (Carrier.Boats.Any(b => b.Freq > 0 && Math.Abs(b.Freq - mhz) < 0.01) ? "Carrier" : null)   // mission carrier
         ?? (Carrier.Boats.Count + Carrier.RadarShips.Count > 0 && Carrier.StationFreqs.Values.Any(f => Math.Abs(f - mhz) < 0.01) ? "Carrier" : null);   // #13: own carrier station frequency, #18 Red Crown
 
@@ -367,10 +368,11 @@ static partial class Program
             p = Pilots.GetValueOrDefault(e[1]);
             if (p == null) return;
             if (e[0] == "R" && e.Length >= 5) calls = p.Ops.OnImpact(MeOf(p), double.Parse(e[3], CultureInfo.InvariantCulture), int.Parse(e[4]), Now(), e[2],
-                e.Length > 6 && double.TryParse(e[6], NumberStyles.Float, CultureInfo.InvariantCulture, out var fl) ? fl : -1);   // flight time (older mission: no seventh field)
-            else if (e[0] == "H") p.Ops.OnGunHit();
+                e.Length > 6 && double.TryParse(e[6], NumberStyles.Float, CultureInfo.InvariantCulture, out var fl) ? fl : -1,
+                e.Length > 7 && int.TryParse(e[7], out var rz) ? rz : -1);   // flight time (older mission: no seventh field); #56: zone index (older mission: none)
+            else if (e[0] == "H") p.Ops.OnGunHit(e.Length > 3 && int.TryParse(e[3], out var hz) ? hz : -1);
             else if (e[0] == "W" && e.Length >= 3 && int.TryParse(e[2], out var wire)) { p.Boat.OnWire(wire); Log($"[LSO] {p.Callsign}: DCS-Wertung {(e.Length > 3 ? e[3] : "")} (Wire {wire})"); }   // R27: LANDING_QUALITY_MARK
-            else if (e[0] == "K") calls = p.Ops.OnKill(MeOf(p), Now(), e.Length > 3 && int.TryParse(e[3], out var kc) ? kc : -1);   // R369: fourth field = coalition of the destroyed object (older mission: none)
+            else if (e[0] == "K") calls = p.Ops.OnKill(MeOf(p), Now(), e.Length > 3 && int.TryParse(e[3], out var kc) ? kc : -1, e.Length > 4 && int.TryParse(e[4], out var kz) ? kz : -1);   // #56: fifth field = zone; R369: fourth field = coalition of the destroyed object (older mission: none)
             else if (e[0] == "F" && e.Length >= 4)   // Aerial refueling
             {
                 var kg = e.Length > 4 && double.TryParse(e[4], NumberStyles.Float, CultureInfo.InvariantCulture, out var k) ? k : 0;   // internal tank in kg (older mission: no fifth field)
@@ -728,6 +730,7 @@ static partial class Program
                         .Concat(Carrier.RadarShips.Where(s => s.Freq > 0 && On("carrier")).Select(s => s.Freq))   // Red Crown (cruiser frequency from the mission)
                         .Concat(pilots.Where(p => p.TankFq > 0 && RoleOn("Tanker")).Select(p => p.TankFq))   // R387: tanker frequency tuned by DCS
                         .Concat(Ops.TankerFreq.Values.Where(_ => RoleOn("Tanker")))   // TP7: mission tanker
+                        .Concat(Ops.Ranges.Where(z => z.Freq > 0 && RoleOn("Range")).Select(z => z.Freq))   // #56: own range frequencies
                         .Concat(Ops.Leaders.Where(l => l.Freq > 0 && RoleOn("JTAC")).Select(l => l.Freq))   // J5: mission JTAC / FAC(A)
                         .Concat(Tower.CenterSectors.Where(s => s.Freq > 0 && RoleOn(s.Gci ? "AWACS" : "Center")).Select(s => s.Freq));   // Center sectors, #15 GCI sectors
         // A22: order active airfields of all players, then taxiing, then neighboring airfields (SrsListener takes at most Max, duplicates count once)

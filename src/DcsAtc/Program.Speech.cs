@@ -74,10 +74,23 @@ static partial class Program
             if (keep) Keep(wav, api.Text);
             return (Tower.FixNames(api.Text, names), api.Conf);
         }
+        AsrServer.Ensure(model, Cfg.AsrGpu ? asrDev : -1);   // resident whisper-server (background start; until it answers whisper-cli below)
+        if (AsrServer.Up)
+        {
+            AsrGate.Wait();
+            (string Text, double Conf)? sr;
+            try { sr = AsrServer.Transcribe(wav, prompt); } finally { AsrGate.Release(); }
+            if (sr is { } srv)   // failure: server stopped by AsrServer (GPU -> asrDev CPU), whisper-cli takes this call
+            {
+                Trace("WHISPER", $"{Path.GetFileName(wav)} {Path.GetFileName(model)} server {(AsrServer.Dev < 0 ? "CPU" : $"GPU {AsrServer.Dev}")} {sw.ElapsedMilliseconds} ms conf {srv.Conf:0.00} (Sender {cs}, Prompt {role ?? "allgemein"}): {srv.Text}");
+                if (keep) Keep(wav, srv.Text);
+                return (Tower.FixNames(srv.Text, names), srv.Conf);
+            }
+        }
         var json = Path.ChangeExtension(wav, null);   // -of: <wav without extension>.json
         try { File.Delete(json + ".json"); } catch (IOException) { }   // do not read old confidence
         var exe = Path.Combine(Root, "tools", "whisper", "Release", "whisper-cli.exe");
-        string[] args = { "-m", model, "-t", Math.Clamp(Environment.ProcessorCount / 2 - 2, 2, 8).ToString(), "-f", wav, "-nt", "-l", "en", "--prompt", prompt, "-ojf", "-of", json };   // ponytail: -t leaves two cores to DCS (main/render thread), 16 threads -> 6; raise if replies lag, lower if DCS stutters while talking
+        string[] args = { "-m", model, "-t", AsrThreads.ToString(), "-f", wav, "-nt", "-l", "en", "--prompt", prompt, "-ojf", "-of", json };   // ponytail: -t leaves two cores to DCS (main/render thread), 16 threads -> 6; raise if replies lag, lower if DCS stutters while talking
         string[] On(int d) => args.Concat(d == -2 ? Array.Empty<string>() : d < 0 ? new[] { "-np", "-ng" } : new[] { "-np", "-dev", d.ToString() }).ToArray();   // -2: without -np, whisper lists its devices
         string output;
         AsrGate.Wait();   // #11 (log: 15 at once on a CPU server, minutes each): one whisper at a time, each already uses half the cores; one after the other is faster for all
@@ -100,6 +113,7 @@ static partial class Program
             }
         }
         finally { AsrGate.Release(); }
+        AsrServer.Ensure(model, Cfg.AsrGpu ? asrDev : -1);   // device known now (first call)
         double conf = 1;
         try { conf = Confidence(File.ReadAllText(json + ".json")); File.Delete(json + ".json"); } catch (Exception e) when (e is IOException or JsonException or KeyNotFoundException or InvalidOperationException) { Trace("FEHLER", $"Whisper-Sicherheit: {e.GetType().Name}: {e.Message}"); }
         Trace("WHISPER", $"{Path.GetFileName(wav)} {Path.GetFileName(model)} {(dev == -2 ? "Gerätewahl" : dev < 0 ? "CPU" : $"GPU {dev}")} {sw.ElapsedMilliseconds} ms{(queued > 100 ? $" (davon {queued} ms gewartet)" : "")} conf {conf:0.00} (Sender {cs}, Prompt {role ?? "allgemein"}): {output.Trim()}");
@@ -122,7 +136,7 @@ static partial class Program
     }
 
     /// GPU1: whisper device: -2 = not yet known (the first call lists the devices), -1 = CPU, otherwise Vulkan device of the dedicated GPU.
-    static volatile int asrDev = -2;
+    internal static volatile int asrDev = -2;
     static readonly SemaphoreSlim AsrGate = new(1);   // #11: whisper processes one after the other
 
     /// GPU1: whisper's Vulkan list ("ggml_vulkan: 0 = NVIDIA GeForce RTX 5070 Ti (NVIDIA) | uma: 0 | …") -> first dedicated GPU, -1 = none (no Vulkan or iGPU only:
@@ -148,7 +162,7 @@ static partial class Program
         if (PromptPhrases.TryGetValue(role ?? "", out var ph)) return $"{ph} {string.Join(", ", names.Append(cs).Distinct())}.";
         string Fn(Airfield x) => x.Name.Replace('-', ' ') + (x.Name.Contains(x.Callsign) ? "" : $" ({x.Callsign})");   // "Mineralnye Vody (Minvody)"
         var crps = f.Charted ? string.Join(", ", f.Crp.Keys.Select(k => Airfield.Say(k).Replace("C R P", "CRP"))   // chart CRP names ("black sea", "river west"), named fixes ("Craig")
-            .Concat(f.Routes.Values.SelectMany(r => r.Pts.Select(p => Airfield.Say(p.Fix)).Prepend(Airfield.Say(r.Name) + " recovery").Concat((r.Say ?? Array.Empty<string>()).Select(Airfield.Say))))
+            .Concat(f.Routes.Values.SelectMany(r => r.Pts.Where(p => !Airfield.Silent(p.Fix)).Select(p => Airfield.Say(p.Fix)).Prepend(Airfield.Say(r.Name) + " recovery").Concat((r.Say ?? Array.Empty<string>()).Select(Airfield.Say))))
             .Concat(f.Departures.Values.Select(r => Airfield.Say(r.Name) + " departure")).Distinct()) : "CRP South";
         return $"Request startup. Request taxi. Ready for departure runway 25. Airborne, switching to departure. Inbound, {crps}. " +
                "Initial 07, overhead, break, downwind. Final, touch and go. Request ILS approach. Runway vacated. Wilco. " +
@@ -172,6 +186,7 @@ static partial class Program
         {
             "AWACS" => awacs,
             "Tanker" => tankers,
+            "Range" => Ops.Ranges.Select(z => z.Name),   // #56: zone names
             "Center" => new[] { (h?.Tel is { } t ? Tower.CenterFor(h.Coalition, t.X, t.Z)?.Name : null) ?? Tower.CenterName(h?.Coalition ?? 2) ?? "Center" },
             "JTAC" => Ops.Leaders.Where(l => l.Alive && l.Side == (h?.Coalition ?? 2)).Select(l => l.Cs).Take(4),
             null => awacs.Concat(tankers),
@@ -249,6 +264,7 @@ static partial class Program
             errs += e; words += want.Length; conf += c;
             Console.WriteLine($"{Path.GetFileNameWithoutExtension(f)}  {e}/{want.Length}  ({c:0.00})  {text}" + (e > 0 ? $"   soll: {string.Join(' ', want)}" : ""));
         }
+        AsrServer.Stop();   // ProcessExit is not registered in the test modes
         int n = Math.Max(1, files.Count);
         Console.WriteLine($"{files.Count} Sprüche, Wortfehler {100.0 * errs / Math.Max(1, words):0.0} %, Sicherheit {conf / n:0.00}, {sw.Elapsed.TotalSeconds / n:0.0} s je Spruch");
         return 0;
@@ -258,16 +274,31 @@ static partial class Program
     internal static double Confidence(string json)
     {
         using var doc = JsonDocument.Parse(json);
+        return MeanWord(doc.RootElement.GetProperty("transcription").EnumerateArray().SelectMany(seg => seg.GetProperty("tokens").EnumerateArray())
+                           .Select(tok => (tok.GetProperty("text").GetString() ?? "", tok.GetProperty("p").GetDouble())));
+    }
+
+    /// Tokens (text, probability) -> mean word confidence; shared by whisper-cli (-ojf) and whisper-server (verbose_json).
+    internal static double MeanWord(IEnumerable<(string Text, double P)> tokens)
+    {
         var words = new List<double>();
-        foreach (var seg in doc.RootElement.GetProperty("transcription").EnumerateArray())
-            foreach (var tok in seg.GetProperty("tokens").EnumerateArray())
-            {
-                var s = tok.GetProperty("text").GetString() ?? "";
-                if (s.TrimStart().StartsWith('[') || !s.Any(char.IsLetterOrDigit)) continue;
-                double p = tok.GetProperty("p").GetDouble();
-                if (s.StartsWith(' ') || words.Count == 0) words.Add(p); else words[^1] = Math.Min(words[^1], p);
-            }
+        foreach (var (s, p) in tokens)
+        {
+            if (s.TrimStart().StartsWith('[') || !s.Any(char.IsLetterOrDigit)) continue;
+            if (s.StartsWith(' ') || words.Count == 0) words.Add(p); else words[^1] = Math.Min(words[^1], p);
+        }
         return words.Count == 0 ? 1 : words.Average();
+    }
+
+    /// whisper threads: leaves two cores to DCS (main/render thread), 16 threads -> 6
+    internal static int AsrThreads => Math.Clamp(Environment.ProcessorCount / 2 - 2, 2, 8);
+
+    /// Selftest: Transcribe with the airfield list of the test (prompt needs one).
+    internal static (string Text, double Conf) TranscribeForTest(string wav)
+    {
+        var f = Fields;
+        if (f.Count == 0) Fields = new() { new Airfield { Name = "Kutaisi" } };
+        try { return Transcribe(wav, keep: false); } finally { Fields = f; }
     }
 
     // ------------------------------------------------------------ Speech output (Piper -> ffmpeg -> SRS)
@@ -488,17 +519,44 @@ static partial class Program
     /// LK2: the AWACS speaks tersely and briskly as in combat (length_scale × 0.93; 0.85 sounded too fast in game, smaller = faster), without the overdriven combat voice; target ≤ 5 s per follow-up report.
     internal static double PaceOf(Tx tx) => tx.Pilot || tx.Stress ? 1 : tx.Role == "AWACS" ? 0.93 : 1;
 
-    static double Synth(string text, string voice, string mp3, bool pilot = false, bool stress = false, double pace = 1)
+    /// ElevenLabs speed: ElevenLabsSpeed (1 = normal, larger = faster) / (combat 0.85 x pace); the API takes 0.7-1.2, Extra is what ffmpeg atempo has to add.
+    internal static (double Api, double Extra) ElevenSpeed(bool stress, double pace)
     {
-        var key = $"{text}|{voice}|{pilot}|{stress}|{pace}";
+        var eff = Cfg.ElevenLabsSpeed / ((stress ? 0.85 : 1) * pace);
+        var api = Math.Clamp(eff, 0.7, 1.2);
+        return (api, eff / api);
+    }
+
+    /// Radio effect graph. Normal: narrow band from RadioFxBand (two stages each, 24 dB/octave), presence +3 dB at 1.5 kHz, compressor ratio RadioFxRatio. A bad band (or ratio) falls back to the default so ffmpeg never gets nonsense.
+    internal static string RadioGraph(string pre, bool stress)
+    {
+        var b = Cfg.RadioFxBand;
+        var (lo, hi) = b is { Length: 2 } && b[0] is >= 100 and <= 1000 && b[1] is >= 1500 and <= 5000 && b[0] < b[1] ? (b[0], b[1]) : (300, 2700);
+        var ratio = Cfg.RadioFxRatio is >= 1 and <= 20 ? Cfg.RadioFxRatio : 6;
+        var band = FormattableString.Invariant($"highpass=f={lo:0.##}:p=2,highpass=f={lo:0.##}:p=2,lowpass=f={hi:0.##}:p=2,lowpass=f={hi:0.##}:p=2,equalizer=f=1500:t=q:w=1:g=3,");
+        return $"[0:a]{pre}aresample=48000," + (stress ? "volume=6dB,asoftclip=type=tanh,highpass=f=400,lowpass=f=2800," : band) +   // Combat: mask microphone, overdriven
+               FormattableString.Invariant($"acompressor=threshold=0.125:ratio={(stress ? 3 : ratio):0.##}:makeup=1.5,") +
+               "loudnorm=I=-22:TP=-7:LRA=7,aresample=48000[v];" +   // all voices equally loud
+
+               "anoisesrc=r=48000:c=pink:a=0.008[n];[v][n]amix=inputs=2:duration=first:normalize=0[m];" +
+               "anoisesrc=r=48000:c=pink:a=0.03:d=0.1,highpass=f=500,lowpass=f=3000,afade=t=out:d=0.1[sq];" +   // quiet squelch tail instead of a bang
+               "[m][sq]concat=n=2:v=0:a=1,alimiter=limit=0.5:level=disabled[out]";                              // hard-limit peaks
+    }
+
+    static double Synth(string text,string voice, string mp3, bool pilot = false, bool stress = false, double pace = 1)
+    {
+        var key = FormattableString.Invariant($"{text}|{voice}|{pilot}|{stress}|{pace}|{Cfg.SpeechRate}|{Cfg.ElevenLabsSpeed}");
         lock (SynthCache)
             if (SynthCache.TryGetValue(key, out var hit) && File.Exists(hit.Mp3))
                 try { File.Copy(hit.Mp3, mp3, true); return hit.Sec; } catch (IOException) { }
         var wav = Path.ChangeExtension(mp3, ".wav");
         bool el = false, fell = false;   // ElevenLabs: "el:id#piper", on failure this call uses the Piper voice after the #
+        double rest = 1;
         if (voice.StartsWith("el:") && voice.IndexOf('#') is var h and > 0)
         {
-            el = ElevenLabs.Wav(voice[3..h], text, Math.Clamp(0.85 / (Cfg.SpeechRate * (stress ? 0.85 : 1) * pace), 0.7, 1.2), wav);
+            var (api, r) = ElevenSpeed(stress, pace);
+            rest = r;
+            el = ElevenLabs.Wav(voice[3..h], text, api, wav);
             if (!el) { voice = voice[(h + 1)..]; fell = true; }
         }
         var parts = el ? new[] { "el" } : voice.Split('@');
@@ -517,14 +575,9 @@ static partial class Program
         if (sec <= 0) return 0;
         // ponytail: Piper medium models deliver 22050 Hz; other rate -> pitch slightly different
         var pre = Math.Abs(pitch - 1) > 0.01 ? FormattableString.Invariant($"asetrate={22050 * pitch:0},atempo={1 / pitch:0.###},") : "";
+        if (el && Math.Abs(rest - 1) > 0.01) { pre += FormattableString.Invariant($"atempo={rest:0.###},"); sec /= rest; }   // beyond the API range 0.7-1.2; duration follows
         var graph = Cfg.RadioFx
-            ? $"[0:a]{pre}aresample=48000," + (stress ? "volume=6dB,asoftclip=type=tanh,highpass=f=400,lowpass=f=2800," : "highpass=f=300,lowpass=f=3400,") +   // Combat: mask microphone, overdriven
-              "acompressor=threshold=0.125:ratio=3:makeup=1.5," +
-              "loudnorm=I=-22:TP=-7:LRA=7,aresample=48000[v];" +   // all voices equally loud
-
-              "anoisesrc=r=48000:c=pink:a=0.008[n];[v][n]amix=inputs=2:duration=first:normalize=0[m];" +
-              "anoisesrc=r=48000:c=pink:a=0.03:d=0.1,highpass=f=500,lowpass=f=3000,afade=t=out:d=0.1[sq];" +   // quiet squelch tail instead of a bang
-              "[m][sq]concat=n=2:v=0:a=1,alimiter=limit=0.5:level=disabled[out]"                              // hard-limit peaks
+            ? RadioGraph(pre, stress)
             : $"[0:a]{pre}aresample=48000,alimiter=limit=0.5:level=disabled[out]";
         if (Run(Ffmpeg, null, "-y", "-loglevel", "error", "-i", wav, "-filter_complex", graph, "-map", "[out]", "-ac", "1",
             "-codec:a", "libmp3lame", "-q:a", "3", mp3).exit != 0) return 0;
@@ -646,7 +699,7 @@ static partial class Program
         : Array.Empty<string>();
 
     /// whisper/piper/ffmpeg below normal: DCS frames first. Not limited to half the cores (0.16.2 tried that: voices choppy, answers slow).
-    static void Background(Process p)
+    internal static void Background(Process p)
     {
         try { p.PriorityClass = ProcessPriorityClass.BelowNormal; } catch (Exception) { }
     }

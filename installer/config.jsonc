@@ -62,8 +62,11 @@
   "PilotVoice": "en_US-joe-medium",   // spricht deine Menü-/Rad-Anfragen vor der Antwort, "" = aus
   "ElevenLabsKey": "",   // optional: eigener ElevenLabs-API-Schlüssel (Rechte Text to Speech, Voices lesen, User lesen), "" = nur Piper; ElevenLabs rechnet nach Zeichen ab
   "ElevenVoices": {},    // Rolle -> ElevenLabs voice_id, z. B. {"Tower": "id1|id2"} (mit | je Station fest eine); fehlt die Rolle: Piper-Stimme von oben. Ohne Netz/Kontingent spricht Piper
+  "ElevenLabsSpeed": 1.1,   // Sprechtempo der ElevenLabs-Stimmen, unabhängig von SpeechRate: 1 = normal, größer = schneller (über 1,2 hilft DCS-ATC per ffmpeg nach)
 
   "RadioFx": true,   // Funkklang: Bandpass, leises Rauschen, Squelch am Ende
+  "RadioFxBand": [300, 2700],   // Funkklang-Band in Hz [untere, obere Grenze], je zweistufig (24 dB/Oktave); untere 100-1000, obere 1500-5000, sonst Standard. Breiter = klarer, schmaler = mehr Funkgerät
+  "RadioFxRatio": 6,   // Funkklang: Kompressor-Verhältnis (1 = aus, höher = härter, 1:6 ist Standard); im Gefecht fest 1:3
   "RadioText": true,   // Funksprüche auch als Text im Spiel; false = nur Stimme (Hinweise bleiben Text)
   "HintText": true,   // Hinweise von DCS-ATC als Text im Spiel (Fehler, Landebewertung, Verstöße, "ATC: jetzt ..."); false = nur in atc-log.txt und im Debriefing (VR ohne Texte im Bild)
   "Volume": 0.6,     // Lautstärke der Lotsen in SRS (0–1), zu laut/schmerzhaft -> kleiner
@@ -93,6 +96,7 @@
   "AirspaceWatch": true,   // Kontrollzonen überwachen (Einflug ohne Kontakt wird angerufen) und Verstöße ansagen ("possible pilot deviation", z. B. Start ohne Freigabe) und ins Debriefing; false = nur Sicherheitswarnungen
   "AltimeterUnit": "auto",   // Höhenmesser-Einstellung im Funk: "auto" (nach eigenem Flugzeugtyp: westliche Typen "altimeter two niner niner two" in inHg, sonst "QNH one zero one three" in hPa; ATIS nennt beides), "hpa", "inhg"
   "AsrGpu": true,   // Spracherkennung auf einer eigenen Grafikkarte (Vulkan, ca. 1 GB Grafikspeicher, unter 1 s pro Funkspruch); ohne eine oder wenn sie versagt auf der CPU; false = immer CPU
+  "AsrServer": true,   // Spracherkennung bleibt in einem Hintergrundprozess (whisper-server) geladen: ca. 50 ms statt ca. 1 s je Funkspruch, kein Ruckeln durch Modell-Neuladen (auf der GPU dauerhaft ca. 1 GB Grafikspeicher); false = wie früher ein Start je Funkspruch
   "AsrApiUrl": "",   // Spracherkennung über einen OpenAI-kompatiblen Dienst statt lokal (Server ohne Grafikkarte), z. B. "https://api.openai.com/v1/audio/transcriptions" oder ein Whisper-Server im Netz; "" = lokal. Alles Gesprochene auf den abgehörten Frequenzen geht an diesen Dienst; bei Fehlern lokal
   "AsrApiKey": "",   // Schlüssel für AsrApiUrl, leer = ohne
   "AsrApiModel": "whisper-1",   // Modell bei AsrApiUrl, z. B. "whisper-1" oder "gpt-4o-mini-transcribe"

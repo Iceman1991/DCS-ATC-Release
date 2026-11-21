@@ -82,6 +82,7 @@ public partial class Tower
         role = addressed ?? FreqRole() ?? Owner();
         bool ground = t == null || OnGround(t);
         var dir = Direction(n);
+        if (dir != null && DepOf(n) is { } dn && string.Equals(dn.Name, dir, StringComparison.OrdinalIgnoreCase)) dir = null;   // Issue #54: "Dream departure" where DREAM is also a CRP names the departure, not an exit direction
         var rw = Runway;
         if (Has(n, "say again", "say that again", "say (?:your|the) last", "say all after", "come again", "repeat", "say last", "last transmission", "didn t copy", "did not copy",
                 "not copy", "unable to copy", "missed", "garbled", "didn t get", "not understand", "pardon") && !Has(n, "going missed", "missed approach"))
@@ -401,7 +402,7 @@ public partial class Tower
                 depRoute = dpq ?? depRoute; depSaid = dpq;
                 if (dpq != null && dpq.Pts.Where(p => p.Cross is "at or above" or "between").Select(p => p.Ft).DefaultIfEmpty(0).Max() is var need && need > depFt)   // #31 (log Nellis): cleared altitude not below what the departure requires
                     cruiseFt = Math.Max(cruiseFt, depFt = Math.Ceiling(need / 1000) * 1000);
-                var lastFix = df == null ? dpq?.Pts.LastOrDefault().Fix : null;   // #31: departure without a named airfield: its last fix is the limit, not the next airfield
+                var lastFix = df == null ? dpq?.Pts.LastOrDefault(p => !Airfield.Silent(p.Fix)).Fix : null;   // #57: last spoken point   // #31: departure without a named airfield: its last fix is the limit, not the next airfield
                 return Say($"{hdr}, {rwAck}cleared " + (!string.IsNullOrEmpty(lastFix) ? $"to {CrpSay(lastFix)} via the {CrpSay(dpq!.Name)} departure, " :
                            $"{(dest != null ? $"to {dest.Name.Replace('-', ' ')} airport" : "out of the control zone")} via radar vectors, " +
                            $"after departure {(dpq != null ? $"fly the {CrpSay(dpq.Name)} departure" : "fly runway heading")}, ") + $"climb and maintain {Alt(depFt)}, {(cruiseFt > depFt ? $"expect {Alt(cruiseFt)} ten minutes after departure, " : "")}" +
@@ -505,7 +506,7 @@ public partial class Tower
                 if (Center || role == "Center") { var cb = Say($"{c}, radar service terminated, {SquawkVfr()}frequency change approved.", "Center"); CenterEnd(); return cb; }   // Center: leaving frequency; the next contact finds the next controller (Pick); LA11: on the Center frequency also after its handover to the AWACS
                 Following = false; transitFt = null;
                 bool depOff = handedOff && Phase == Phase.Away;   // A51: this is the departure sign-off (at 15 NM a second one would follow), same ending as there
-                var head = depOff && depClr && nav != null ? $"proceed direct {navName}, resume own navigation. Radar service terminated" : "radar service terminated";
+                var head = depOff && depClr && nav != null ? $"{(navName != "" ? $"proceed direct {navName}, " : "")}resume own navigation. Radar service terminated" : "radar service terminated";
                 var end = depOff && AwacsContact is { } awc ? $"contact {awc}." : SquawkVfr() + "frequency change approved.";   // A90: squawk VFR only after an assigned code, IFR never
                 var ho = depOff ? IfrHandoff() : null;   // R43: IFR route to another airfield -> handover to its Approach, as at 15 NM
                 var bye = Say(ho != null ? $"{c}, {ho}" : $"{c}, {head}, {end}", "Approach");   // before the reset: sign-off still from Departure (Dep)
@@ -739,9 +740,9 @@ public partial class Tower
                 if (!ro.Rwy.Contains(rw))
                     return Neg($"{hdr}, negative, {CrpSay(ro.Name)} recovery is for runway {string.Join(" and ", ro.Rwy.Select(RwSay))}, runway {RwSay(rw)} in use.");
                 (arrRoute, routeAt, entry, Phase, vec, holding, crpAsked, crpWaved, Expected) = (ro, 0, ro.To, Phase.Inbound, null, false, false, false, false);
-                var p0 = ro.Pts[0];
+                var (p0, sp0) = (ro.Pts[0], NextSpoken(ro, 0) ?? CrpSay(ro.To));   // #57: silent points are not said
                 var cross = CrossTxt(ro);
-                return Say($"{hdr}, {Qnh(t)}, cleared {CrpSay(ro.Name)} recovery runway {RwSay(rw)}, proceed direct {CrpSay(p0.Fix)}{SteerTo(t, (p0.X, p0.Z), CrpSay(p0.Fix))}" +
+                return Say($"{hdr}, {Qnh(t)}, cleared {CrpSay(ro.Name)} recovery runway {RwSay(rw)}, proceed direct {sp0}{SteerTo(t, (p0.X, p0.Z), sp0)}" +
                            $"{(cross != "" ? ", cross " + cross : "")}, report {CrpSay(ro.To)}.{TrafficNote(traffic, rw)}", "Approach");
             }
 
@@ -749,7 +750,7 @@ public partial class Tower
             {
                 var r = Rt!;
                 routeAt = RouteFix(n) + 1;
-                (nav, navName) = routeAt < r.Pts.Length ? ((r.Pts[routeAt].X, r.Pts[routeAt].Z), CrpSay(r.Pts[routeAt].Fix)) : (Crp[r.To], CrpSay(r.To));
+                (nav, navName) = (routeAt < r.Pts.Length ? (r.Pts[routeAt].X, r.Pts[routeAt].Z) : Crp[r.To], NextSpoken(r, routeAt) ?? CrpSay(r.To));   // #57
                 if (routeAt >= r.Pts.Length) arrRoute = null;
                 return Say($"{c}, roger, report {CrpSay(r.To)}.", "Approach");
             }

@@ -441,6 +441,8 @@ static class Settings
         Row(L("Stimmen und Kontingent laden", "Load voices and quota"), elConnect);
         var elQuota = new Label { Text = "–", AutoSize = true, MaximumSize = new Size(285, 0), UseMnemonic = false };
         Row(L("Kontingent", "Quota"), elQuota);
+        var elSpeed = new Slider(0.8, 1.5, 0.05, cfg.ElevenLabsSpeed, "0.00");
+        Row(L("Tempo ElevenLabs (1 = normal, größer = schneller)", "ElevenLabs speed (1 = normal, higher = faster)"), elSpeed);
         var elVt = new TableLayoutPanel { ColumnCount = 3, AutoSize = true, Margin = Padding.Empty };
         foreach (var w in new[] { 84, 300, 28 }) elVt.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, w));
         var elList = new List<(string Id, string Name)>();
@@ -472,7 +474,10 @@ static class Settings
                 play.Enabled = false;
                 try
                 {
-                    await Task.Run(() => Program.Preview(say, id == "" ? null : elKey.Text.Trim(), allowed));
+                    var speed = Program.Cfg.ElevenLabsSpeed;
+                    Program.Cfg.ElevenLabsSpeed = elSpeed.Value;   // sample with the slider's value, not yet the saved one
+                    try { await Task.Run(() => Program.Preview(say, id == "" ? null : elKey.Text.Trim(), allowed)); }
+                    finally { Program.Cfg.ElevenLabsSpeed = speed; }
                     if (id != "") { elQ = elQ! with { Count = elQ.Count + Program.PreviewText.Length }; elQuota.Text = ElevenLabs.QuotaText(elQ, false); }
                 }
                 catch (Exception e) { MessageBox.Show(f, e.Message, "DCS-ATC"); }
@@ -769,7 +774,7 @@ static class Settings
             var set = new (string Key, string Value, string After)[]
             {
                 ("MyCallsign", J(call!), "Callsign"), ("CallsignFromUnit", J(unitCs.Checked), "MyCallsign"), ("CallsignFromPlayer", J(playerCs.Checked), "CallsignFromUnit"), ("WheelFixed", J(wfix.Checked), "WheelSize"),("Volume", D(vol.Value / 100), "RadioFx"), ("SpeechRate", D(rate.Value), "Volume"),
-                ("ReplyPause", D(pause.Value), "SpeechRate"), ("RadioFx", J(fx.Checked), "PilotVoice"), ("RadioText", J(rtx.Checked), "RadioFx"), ("HintText", J(htx.Checked), "RadioText"),
+                ("ReplyPause", D(pause.Value), "SpeechRate"), ("ElevenLabsSpeed", D(elSpeed.Value), "ElevenVoices"), ("RadioFx", J(fx.Checked), "PilotVoice"), ("RadioText", J(rtx.Checked), "RadioFx"), ("HintText", J(htx.Checked), "RadioText"),
                 ("PilotVoice", J(pv.SelectedIndex == 0 ? "" : known[pv.SelectedIndex - 1] == pilot ? cfg.PilotVoice : known[pv.SelectedIndex - 1]), "Voices"),   // same model: its "@pitch" stays
                 ("AiChatter", J(chat.Checked), "ReplyPause"), ("AwacsBullseye", J(bull.Checked), "Coalition"), ("AwacsNewGroupNm", D(awNm.Value), "AwacsBullseye"), ("Atis", J(atis.Checked), "AiChatter"), ("RunwayLights", J(lights[light.SelectedIndex]), "Atis"), ("AltimeterUnit", J(units[unit.SelectedIndex]), "RunwayLights"), ("AiFlightComms", J(modes[combat.SelectedIndex]), "Volume"), ("IffCheck", J(iffc.Checked), "AirspaceWatch"), ("StationPositions", J(spos.Checked), "IffCheck"), ("RandomNotams", J(notam.Checked), "StationPositions"),("AirspaceWatch", J(watch.Checked), "RunwayLights"), ("DebugLog", J(dbg.Checked), "AirspaceWatch"),
                 ("WheelInGame", J(ingames[ingame.SelectedIndex]), "WheelSize"), ("MicName", J(mic.SelectedIndex == 0 ? "" : mics[mic.SelectedIndex - 1]), "WheelSize"), ("SrsPath", J(srs.Text.Trim()), "DebugLog"),

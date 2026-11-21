@@ -421,7 +421,7 @@ public partial class Tower
         {
             bool ifr = depClr && nav != null;
             var end = AwacsContact is { } aw ? $"contact {aw}." : depClr ? "frequency change approved." : SquawkVfr() + "frequency change approved.";
-            var head = ifr ? $"proceed direct {navName}, resume own navigation. Radar service terminated" : "radar service terminated";
+            var head = ifr ? $"{(navName != "" ? $"proceed direct {navName}, " : "")}resume own navigation. Radar service terminated" : "radar service terminated";
             var ho = IfrHandoff(t);
             var bye = Say(ho != null ? $"{c}, {ho}" : $"{c}, {head}, {end}", "Approach");   // still as Departure (Dep)
             depClr = false; nav = null; handedOff = false; Released = true;
@@ -440,24 +440,23 @@ public partial class Tower
                 return Say($"{c}, {Steer(t, kn, kneeName)}, {MilesTxt(Dist(t.X, t.Z, kn.X, kn.Z))} to {kneeName}.");
             }
             // charts.jsonc route: at the fix or once closer to the next fix than this one is, on to the next, after the last to the C R P (silent: the pilot flies the chart)
-            if (Rt is { } rt && routeAt < rt.Pts.Length && navName == CrpSay(rt.Pts[routeAt].Fix))
+            if (Rt is { } rt && routeAt < rt.Pts.Length && goal == (rt.Pts[routeAt].X, rt.Pts[routeAt].Z))   // #57: by position, the spoken name may be a later point
             {
                 var nx = routeAt + 1 < rt.Pts.Length ? (rt.Pts[routeAt + 1].X, rt.Pts[routeAt + 1].Z) : Crp[rt.To];
                 if (d < Math.Clamp(Gs(t) * FixLeadSec, 1.5 * NM, 4 * NM) || Dist(t.X, t.Z, nx.Item1, nx.Item2) < Dist(goal.X, goal.Z, nx.Item1, nx.Item2))
                 {
-                    (nav, navName, lastVector) = (nx, ++routeAt < rt.Pts.Length ? CrpSay(rt.Pts[routeAt].Fix) : CrpSay(rt.To), now - 46);   // 46: the heading check below (45 s) fires on the next tick if the course changes by more than 30 degrees
+                    (nav, navName, lastVector) = (nx, NextSpoken(rt, ++routeAt) ?? CrpSay(rt.To), now - 46);   // 46: the heading check below (45 s) fires on the next tick if the course changes by more than 30 degrees
                     if (routeAt >= rt.Pts.Length) arrRoute = null;
                     return new();
                 }
             }
             // charts.jsonc departure: the same from fix to fix, after the last fix own navigation (nav null, no more headings)
-            if (DRt is { } dp && depAt < dp.Pts.Length && navName == CrpSay(dp.Pts[depAt].Fix) &&
+            if (DRt is { } dp && depAt < dp.Pts.Length && goal == (dp.Pts[depAt].X, dp.Pts[depAt].Z) &&
                 (d < Math.Clamp(Gs(t) * FixLeadSec, 1.5 * NM, depAt + 1 < dp.Pts.Length ? 4 * NM : 1.5 * NM) || depAt + 1 < dp.Pts.Length && Dist(t.X, t.Z, dp.Pts[depAt + 1].X, dp.Pts[depAt + 1].Z) < Dist(goal.X, goal.Z, dp.Pts[depAt + 1].X, dp.Pts[depAt + 1].Z)))
             {
-                if (++depAt < dp.Pts.Length) (nav, navName) = ((dp.Pts[depAt].X, dp.Pts[depAt].Z), CrpSay(dp.Pts[depAt].Fix));
+                if (++depAt < dp.Pts.Length) (nav, navName) = ((dp.Pts[depAt].X, dp.Pts[depAt].Z), NextSpoken(dp, depAt) ?? "");
                 else (nav, depRoute) = (null, null);
-                lastVector = now - 46;   // #49: as on the arrival route, the heading check (45 s) fires on the next tick if the course changes by more than 30 degrees
-                return new();
+                return new();   // #57: no forced heading call after the turn any more (#49 had one): the departure is corrected only when more than 4 NM off the route (below)
             }
             bool crpLeg = !holding && entry != null && Rt == null && (Phase == Phase.Inbound || Phase == Phase.Entering && navName == CrpSay(entry!));
             // K22: Approach hands over so that the Tower is called about 2 minutes before the C R P (not yet at the point: that is the fallback below)
@@ -490,9 +489,15 @@ public partial class Tower
                 return Say($"{c}, no clearance to join, remain outside the pattern, say intentions.");
             }
             if (navName == "six mile final" && (d < 1.5 * NM || OnFinal(t.X, t.Z, t.Hdg, t.Agl, rw, 7 * NM))) nav = null;
-            else if (!holding && Phase != Phase.ClearedLand && leaveAt < 0 && now - lastVector > 45 && d > 1.5 * NM && HdgDiff(t.Hdg * 180 / Math.PI, Bearing(t.X, t.Z, goal.X, goal.Z)) > 30 &&
+            else if (!holding && Phase != Phase.ClearedLand && leaveAt < 0 && now - lastVector > 45 && d > 1.5 * NM &&
+                     (DRt is { } dq && depAt < dq.Pts.Length ? OffRoute(t, dq) : HdgDiff(t.Hdg * 180 / Math.PI, Bearing(t.X, t.Z, goal.X, goal.Z)) > 30) &&   // #57: chart departure only when more than 4 NM off the route, otherwise 30 degrees
                      !(Phase is Phase.ClearedTakeoff or Phase.Departing && (Dist(t.X, t.Z, CX, CZ) < 2 * NM || handedOff)))   // Reporting obligation #8: handed over, no check-in yet: Departure does not vector; landing clearance (e.g. emergency on the way to the initial), A13 after "say intentions": no heading any more
-                return Say($"{c}, {Steer(t, goal, navName)}, {MilesTxt(d)} to {navName}.");
+            {
+                if (DRt is not { } dr2 || depAt >= dr2.Pts.Length) return Say($"{c}, {Steer(t, goal, navName)}, {MilesTxt(d)} to {navName}.");
+                var si = NextSpokenAt(dr2, depAt);   // #57: names the next spoken point, miles along the route to it (silent points in between)
+                var miles = d + (si > depAt ? Enumerable.Range(depAt, si - depAt).Sum(j => Dist(dr2.Pts[j].X, dr2.Pts[j].Z, dr2.Pts[j + 1].X, dr2.Pts[j + 1].Z)) : 0);
+                return Say($"{c}, {Steer(t, goal, navName)}{(navName != "" ? $", {MilesTxt(miles)} to {navName}" : "")}.");
+            }
         }
         // Review l1: after "no clearance to join, remain outside the pattern" or "say position, remain outside the control zone" nevertheless (45 s later still or again) in the pattern
         // (3 NM, under pattern + 1000 ft) or further in the zone than the C R P: once redirect with violation (debriefing, "possible pilot deviation", FAA JO 7110.65 2-1-26) like the zone watch

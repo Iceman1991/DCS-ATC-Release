@@ -89,6 +89,13 @@ end
 local ref
 local function arm()
   pcall(timer.removeFunction, ref)
+  -- Issue #55: MP client = io sandboxed in this state, every failed io.open is an ERROR line in dcs.log. Probe once with this very file; no polling then, nor with DCS-ATC switched off.
+  local w = lfs.writedir()
+  local probe = io.open(w .. 'Scripts\\DcsAtc\\DcsAtcWing.lua', 'r')
+  if not probe then return end
+  probe:close()
+  local off = io.open(w .. 'Scripts\\DcsAtc\\DcsAtcOff.txt', 'r')
+  if off then off:close() return end
   ref = timer.scheduleFunction(function() pcall(wingPoll) return timer.getTime() + 0.3 end, nil, timer.getTime() + 1)
 end
 local after = afterStart

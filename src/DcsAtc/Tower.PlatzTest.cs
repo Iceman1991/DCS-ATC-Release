@@ -275,7 +275,7 @@ public partial class Tower
             Chk(rz.Count == 1 && rz[0].Text.Contains("negative, Zulu departure is for runway zero seven") && clr && ci.Any(m => m.Text.Contains("Continue Tiki departure")) &&
                 string.Join(",", seen) == "Alpha,Bravo" && w.nav == null && w.depRoute == null,
                 $"Abflug TIKI ({string.Join(",", seen)}, {w.Phase}, nav {w.nav != null}, dep {w.depRoute != null}, at {w.depAt}): " + J(rz) + " / " + J(r1) + " / " + J(ci) + " // " + J(msgs));
-            {   // #49/#36 (log Nellis: heading to the next departure fix came 30 s after the fix at 400 kt): the heading to Bravo is spoken before Alpha, like on the arrival route
+            {   // #49/#36 (log Nellis: heading to the next departure fix came 30 s after the fix at 400 kt): since #57 a chart departure gets no such call (only 4 NM off the route), the arrival route keeps it
                 var wd = Hold();
                 wd.OnTranscript("Kutaisi Tower, Enfield 11, ready for departure, tiki departure", G0(), none, 10);
                 double dsay = double.NaN, ds = 20; var dall = new List<Msg>();
@@ -291,7 +291,7 @@ public partial class Tower
                     dall.AddRange(dm);
                     if (dm.Any(m => m.Text.Contains("Bravo"))) dsay = dlen - q;
                 }
-                Chk(dsay > 0, $"Departure #49: Kurs zum naechsten Fix vor dem Fix bei 450 kt ({dsay / NM:0.0} NM davor, {wd.navName}, {wd.Phase}): " + J(dall));
+                Chk(double.IsNaN(dsay), $"Departure #57 (vorher #49: Kurs zum naechsten Fix nach jedem Fix): auf der Route bei 450 kt keine Kursansage ({dsay / NM:0.0} NM davor, {wd.navName}, {wd.Phase}): " + J(dall));
             }
             // #23 (log 12.11.): a departure asked for by name that the chart does not have is said so; known names, CRPs and ordinary wordings are not
             var ru = Hold().OnTranscript("Kutaisi Tower, Enfield 11, ready for departure, departure via Dream", G0(), none, 10);
@@ -310,6 +310,16 @@ public partial class Tower
                 && rf.Any(m => m.Text.Contains("cleared to Alpha via the Fyttr departure, climb and maintain")) && wf.depRoute?.Name == "FYTTR"
                 && Hold().OnTranscript("Kutaisi Ground, Enfield 11, request clearance, zulu departure", G0(), none, 10).Any(m => m.Text.Contains("Zulu departure is for runway zero seven")),
                 "#40 Clearance mit Departure: " + J(rc) + " / " + J(rf));
+            // #54 (log Nellis: "ready for departure, Dream departure" -> "negative, no departure via Dream"): DREAM is a CRP and a departure; the departure name is no exit direction.
+            // A real non-exit CRP without such a departure is still refused (K20)
+            k.Crp["FYTTR"] = k.Crp["north"]; k.Crp["XRAY"] = k.Crp["north"];
+            var r54 = Hold().OnTranscript("Kutaisi Tower, Enfield 11, ready for departure, fyttr departure", G0(), none, 10);
+            var t54 = Hold().OnTranscript("Kutaisi Ground, Enfield 11, request taxi, fyttr departure", G0(), none, 10);
+            var x54 = Hold().OnTranscript("Kutaisi Tower, Enfield 11, ready for departure via xray", G0(), none, 10);
+            k.Crp.Remove("FYTTR"); k.Crp.Remove("XRAY");
+            Chk(!r54.Any(m => m.Text.Contains("no departure via")) && r54.Any(m => m.Text.Contains("cleared for takeoff")) && !t54.Any(m => m.Text.Contains("no departure via"))
+                && x54.Any(m => m.Text.Contains("negative, no departure via")),
+                "#54 Departure-Name gleich CRP: " + J(r54) + " / " + J(t54) + " / " + J(x54));
             // #31 (log Nellis, "request clearance to Dream" -> "cleared to North Las Vegas airport"): departure without a named airfield: the limit is its last fix, no airfield, no radar vectors;
             // with a named airfield the wording stays
             var allSv = Tower.All;
@@ -330,7 +340,41 @@ public partial class Tower
             Chk(rh.Any(m => m.Text.Contains("via the High departure, climb and maintain flight level two zero zero, ") && !m.Text.Contains("expect")) && wh.depFt == 20000 && wh.cruiseFt >= 20000
                 && rc.Any(m => m.Text.Contains("expect")),
                 $"#31 Hoehe nach Departure: {wh.depFt}/{wh.cruiseFt} " + J(rh));
-            n += 9;
+            // #57 (LtJaeger, FYTTR departure with an arc): a point named "_..." is flown but never spoken; ATC corrects a chart departure only when the aircraft is more than 4 NM off the route
+            {
+                var (start57, sp, bp) = (e.At(-e.Len, 0), e.At(-e.Len - 9 * NM, 0), e.At(-e.Len - 12 * NM, 5.2 * NM));   // ALPHA, silent arc point, BRAVO: 60 degree turn at the silent point
+                k.Departures["ZEBRA"] = new("ZEBRA", new[] { "25" }, "", new[] { ("ALPHA", pa.X, pa.Z, 0.0, "", 0.0), ("_ARC_SOUTH", sp.X, sp.Z, 8000.0, "at", 0.0), ("BRAVO", bp.X, bp.Z, 12000.0, "at or above", 0.0) });
+                k.Departures["MUTE"] = new("MUTE", new[] { "25" }, "", new[] { ("_ONE", pa.X, pa.Z, 0.0, "", 0.0), ("_TWO", sp.X, sp.Z, 8000.0, "at", 0.0) });
+                var rg = Hold().OnTranscript("Kutaisi Ground, Enfield 11, request clearance, zebra departure", G0(), none, 10);
+                var rv = Hold().OnTranscript("Kutaisi Tower, Enfield 11, ready for departure, zebra departure", G0(), none, 10);
+                var rm = Hold().OnTranscript("Kutaisi Ground, Enfield 11, request clearance, mute departure", G0(), none, 10);
+                var rmt = Hold().OnTranscript("Kutaisi Tower, Enfield 11, ready for departure, mute departure", G0(), none, 10);
+                Chk(rg.Any(m => m.Text.Contains("cleared to Bravo via the Zebra departure")) && !rg.Any(m => m.Text.Contains("Arc") || m.Text.Contains("ARC"))
+                    && rv.Any(m => m.Text.Contains("proceed direct Alpha, cross Bravo at or above 12000 feet, then own navigation")) && !rv.Any(m => m.Text.Contains("Arc") || m.Text.Contains("8000")),
+                    "#57 stiller Punkt nicht angesagt: " + J(rg) + " / " + J(rv));
+                Chk(rm.Any(m => m.Text.Contains("after departure fly the Mute departure")) && !rm.Any(m => m.Text.Contains("Two")) && rmt.Any(m => m.Text.Contains("after departure fly the Mute departure"))
+                    && !rmt.Any(m => m.Text.Contains("proceed direct") || m.Text.Contains("Two")), "#57 nur stille Punkte: " + J(rm) + " / " + J(rmt));
+                double zs = 20;
+                Tower Zeb() { var w0 = Hold(); w0.OnTranscript("Kutaisi Tower, Enfield 11, ready for departure, zebra departure", G0(), none, 10); var a = Air(start57, e.Hdg); w0.Tick(a, none, 15); w0.OnTranscript("Kutaisi Approach, Enfield 11, airborne", a, none, 17); return w0; }
+                List<Msg> Fly(Tower w0, (double X, double Z) from, (double X, double Z) to, double off = 0)
+                {
+                    var ms = new List<Msg>(); double len = Dist(from.X, from.Z, to.X, to.Z), hd = Bearing(from.X, from.Z, to.X, to.Z);
+                    for (double q = 0; q <= len; q += 772) ms.AddRange(w0.Tick(new Telemetry(k.Elev + 3000, 3000, 300 * Kt, hd * Math.PI / 180, from.X + (to.X - from.X) * q / len, from.Z + (to.Z - from.Z) * q / len, 0, 0, 760), none, zs += 5));
+                    return ms;
+                }
+                var wz = Zeb(); var fz = new List<Msg>();
+                foreach (var (from, to) in new[] { (start57, pa), (pa, sp), (sp, bp) }) fz.AddRange(Fly(wz, from, to));
+                Chk(!fz.Any(m => m.Text.Contains("fly heading")) && wz.nav == null && wz.depRoute == null, $"#57 genau auf der Route, 60 Grad Knick am stillen Punkt: keine Kursansage ({wz.depAt}): " + J(fz));
+                var wo = Zeb(); Fly(wo, start57, pa);
+                double hdgLeg = Bearing(pa.X, pa.Z, sp.X, sp.Z) * Math.PI / 180;
+                Telemetry Off(double lat) { var p = e.At(-e.Len - 7.5 * NM, lat); return new Telemetry(k.Elev + 3000, 3000, 300 * Kt, hdgLeg, p.X, p.Z, 0, 0, 760); }
+                var near = wo.Tick(Off(-3 * NM), none, zs += 60).ToList();   // 3 NM beside the route: left alone
+                var far = wo.Tick(Off(-6 * NM), none, zs += 60).ToList();    // 6 NM: heading, naming the next spoken point (the zone watch may speak first)
+                if (!far.Any(m => m.Text.Contains("fly heading"))) far.AddRange(wo.Tick(Off(-6 * NM), none, zs += 60));
+                Chk(!near.Any(m => m.Text.Contains("fly heading")) && far.Any(m => m.Text.Contains("fly heading") && m.Text.Contains("to Bravo")) && !far.Any(m => m.Text.Contains("Arc")),
+                    "#57 Kurskorrektur erst ab 4 NM neben der Route: " + J(near) + " / " + J(far));
+            }
+            n += 12;
         }
 
         // Forum (Heling): chart with entries but no exit (Andersen: no published VFR exits) - departure as without a chart, arrival still from the entries; runway end missing in the chart: as without a chart

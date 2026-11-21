@@ -76,8 +76,11 @@ public partial class Tower
     static string CrpSay(string k) => Airfield.Say(k);
     Airfield.Route? depRoute, depSaid; int depAt;   // depSaid: departure the IFR clearance named (#31: the takeoff clearance then only names it again; not saved, like depRoute)   // charts.jsonc departure (on request with taxi or ready), index of the next fix; until the last fix (DRt)
     Airfield.Route? DRt => depRoute != null && (Phase is Phase.TaxiOut or Phase.HoldShort || Phase is Phase.ClearedTakeoff or Phase.Departing or Phase.Away && nav != null) ? depRoute : null;   // released (nav null): no longer flown
+    /// #57: index / spoken name of the first point from i on that is not silent (-1 / null = none left).
+    static int NextSpokenAt(Airfield.Route r, int i) => i < r.Pts.Length ? Array.FindIndex(r.Pts, i, p => !Airfield.Silent(p.Fix)) : -1;
+    static string? NextSpoken(Airfield.Route r, int i) => NextSpokenAt(r, i) is >= 0 and var j ? CrpSay(r.Pts[j].Fix) : null;
     /// Crossing altitudes of a route as said: "Mintt at or above 15000 feet, Simns at 5500 feet".
-    internal static string CrossTxt(Airfield.Route r) => string.Join(", ", r.Pts.Where(p => p.Ft > 0).Select(p => p.Cross == "between" ? $"{CrpSay(p.Fix)} between {(p.Ft2 < 18000 ? $"{p.Ft:0} and {p.Ft2:0} feet" : $"{Alt(p.Ft)} and {Alt(p.Ft2)}")}" : $"{CrpSay(p.Fix)} {p.Cross} {Alt(p.Ft)}"));
+    internal static string CrossTxt(Airfield.Route r) => string.Join(", ", r.Pts.Where(p => p.Ft > 0 && !Airfield.Silent(p.Fix)).Select(p => p.Cross == "between" ? $"{CrpSay(p.Fix)} between {(p.Ft2 < 18000 ? $"{p.Ft:0} and {p.Ft2:0} feet" : $"{Alt(p.Ft)} and {Alt(p.Ft2)}")}" : $"{CrpSay(p.Fix)} {p.Cross} {Alt(p.Ft)}"));
     public static IReadOnlyList<Airfield> All = new List<Airfield>();   // all airfields (Program): destination of the en-route clearance
     Airfield? dest; bool depClr; double depFt;   // V14: route clearance (Clearance Delivery) -> departure vector
     string? climbOut; double climbFt;   // requested departure: "free" (unrestricted climb) / "tactical" (spiral climb overhead), climbFt = requested altitude, 0 = none

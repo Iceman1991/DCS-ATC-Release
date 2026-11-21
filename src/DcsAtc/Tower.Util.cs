@@ -248,7 +248,7 @@ public partial class Tower
         "the", "and", "this", "is", "at", "to", "inbound", "feet", "knots", "degrees", "wind", "initial",
         "number", "crp", "north", "south", "east", "west", "via", "left", "right", "short",
         "state", "ball", "fuel", "flight", "cherubs", "thousand", "climb", "climbing", "descend", "descending", "passing", "leaving", "maintain",
-        "spot", "stand", "gate", "parking", "squawk", "frequency", "departure", "contact", "approach", "ground", "altimeter", "track", "speed", "radial", "report",
+        "spot", "stand", "gate", "parking", "squawk", "frequency", "departure", "contact", "approach", "ground", "altimeter", "track", "speed", "radial", "report", "range",   // #56: "Range 62" is a zone name, no call sign
     };
 
     internal static string Digits(string s) => string.Join(" ", s.Where(char.IsDigit).Select(ch => DigitWords[ch - '0']));
@@ -329,7 +329,15 @@ public partial class Tower
     Airfield.Route? Named(Dictionary<string, Airfield.Route> d, string n) =>
         d.Values.Where(r => (r.Say ?? Array.Empty<string>()).Prepend(r.Name).Any(k => Regex.IsMatch(Sq(n), $@"\b{Sq(Rx(k))}\b"))).OrderByDescending(r => r.Rwy.Contains(Runway)).FirstOrDefault();
     /// Index of the fix of the route being flown that the pilot reports, -1 = none.
-    int RouteFix(string n) => Rt is { } r ? Array.FindIndex(r.Pts, p => Regex.IsMatch(Sq(n), $@"\b{Sq(Rx(p.Fix))}\b")) : -1;
+    /// #57: chart departure, aircraft more than 4 NM from the route (current leg: previous point or the field, and the next leg).
+    bool OffRoute(Telemetry t, Airfield.Route r)
+    {
+        var cur = (r.Pts[depAt].X, r.Pts[depAt].Z);
+        var d = SegDist(t.X, t.Z, depAt > 0 ? (r.Pts[depAt - 1].X, r.Pts[depAt - 1].Z) : (CX, CZ), cur);   // ponytail: field centre instead of the runway end, the 4 NM cover the difference
+        if (depAt + 1 < r.Pts.Length) d = Math.Min(d, SegDist(t.X, t.Z, cur, (r.Pts[depAt + 1].X, r.Pts[depAt + 1].Z)));
+        return d > 4 * NM;
+    }
+    int RouteFix(string n) => Rt is { } r ? Array.FindIndex(r.Pts, p => !Airfield.Silent(p.Fix) && Regex.IsMatch(Sq(n), $@"\b{Sq(Rx(p.Fix))}\b")) : -1;
     /// Departure of the chart (charts.jsonc "departures") named in the transmission ("FLEX departure").
     Airfield.Route? DepOf(string n) => Named(F.Departures, n);
 

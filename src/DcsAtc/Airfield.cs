@@ -79,7 +79,9 @@ public class Airfield
     public static string Say(string k) => k.Any(char.IsLower) || !k.Any(char.IsLetter) ? "C R P " + k.Replace('_', ' ')
         : string.Join(' ', k.Replace('_', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w => w[0] + w[1..].ToLowerInvariant()));
     /// The same point as written on the F10 map and the kneeboard: "CRP north", "GASS PEAK".
-    public static string Label(string k) => (k.Any(char.IsLower) || !k.Any(char.IsLetter) ? "CRP " : "") + k.Replace('_', ' ');
+    public static string Label(string k) => ((k.Any(char.IsLower) || !k.Any(char.IsLetter) ? "CRP " : "") + k.Replace('_', ' ')).Trim();
+    /// #57 (LtJaeger): a route point named "_ARC_SOUTH" (or "silent": true in the chart) is flown, monitored and drawn, but never said.
+    public static bool Silent(string k) => k.StartsWith('_');
     double? ctrTopFt;
     public List<(double X, double Z, int Num, int Type)> Spots = new();   // Parking positions from DCS (Airbase:getParking): Term_Index, Term_Type (16 runway, 40 helicopter)
     public bool Charted => Crp.Count > 0;     // procedures per DCS kneeboard chart (charts/caucasus.jsonc)
@@ -349,7 +351,8 @@ public class Airfield
                             (cross, ft, ft2) = ("between", lo.GetDouble(), hi.GetDouble());
                             if (ft > ft2) throw new FormatException($"{Name} {key} {r.Name}: fix \"{p.GetProperty("fix").GetString()}\": \"above\" {ft:0} is higher than \"below\" {ft2:0}");
                         }
-                        return (p.GetProperty("fix").GetString()!, x, z, ft, cross, ft2);
+                        var fix = p.GetProperty("fix").GetString()!;
+                        return (p.TryGetProperty("silent", out var sl) && sl.ValueKind == JsonValueKind.True && !Silent(fix) ? "_" + fix : fix, x, z, ft, cross, ft2);   // #57
                     }).ToArray();
                     if (pts.Length == 0) throw new FormatException($"{Name} {key} {r.Name}: \"pts\" is empty");
                     if (!dep && rws.FirstOrDefault(rw => !(Entry.TryGetValue(rw, out var en) && en.Any(e => e.Crp == to))) is { } bad)

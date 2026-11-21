@@ -42,7 +42,10 @@ public class Config
     public string ElevenLabsKey { get; set; } = "";    // optional ElevenLabs text-to-speech (own account, API key with Text to Speech, Voices read, User read); "" = off, Piper only
     public Dictionary<string, string> ElevenVoices { get; set; } = new();   // role -> ElevenLabs voice_id ("id1|id2": one per station), "" or missing = Piper voice from Voices; fallback on errors/quota
     public string PilotVoice { get; set; } = "en_US-joe-medium";   // speaks your menu/wheel requests, "" = off
+    public double ElevenLabsSpeed { get; set; } = 1.1;   // ElevenLabs speaking rate (own, independent of SpeechRate): 1 = ElevenLabs normal, larger = faster; above 1.2 the rest is done by ffmpeg atempo
     public bool RadioFx { get; set; } = true;          // Radio sound: bandpass, noise, squelch
+    public double[] RadioFxBand { get; set; } = { 300, 2700 };   // radio effect band in Hz [low cut 100-1000, high cut 1500-5000], two filter stages each; invalid = default
+    public double RadioFxRatio { get; set; } = 6;      // radio effect compressor ratio (1 = off, higher = harder)
     public bool HintText { get; set; } = true;         // #27: notes of DCS-ATC (hints, errors, landing grade, deviations, "ATC: now ...") as text in the game; false = only in atc-log.txt and the debriefing
     public bool RadioText { get; set; } = true;       // #6 (issue): radio calls also as DCS text on screen; false = speech only (notes and calls without SRS unit ID stay text)
     public double Volume { get; set; } = 0.6;          // controller volume in SRS (0–1)
@@ -59,6 +62,7 @@ public class Config
     public bool AirspaceWatch { get; set; } = true;    // monitor control zones (N2) and announce violations ("possible pilot deviation") and into the debrief (N4); off: safety warnings only
     public bool DebugLog { get; set; } = true;         // atc-debug.txt for bug reports (speech recognition, airfield selection, phases, telemetry every 10 s), at most 2 × 20 MB
     public bool AsrGpu { get; set; } = true;           // GPU1: speech recognition on a dedicated graphics card (Vulkan), CPU without one or if it fails; false = always CPU
+    public bool AsrServer { get; set; } = true;        // speech recognition stays loaded in one background whisper-server (~50 ms per call instead of ~1 s, no stutter from reloading the model); false = whisper-cli per call
     public string AsrApiUrl { get; set; } = "";        // #11: speech recognition over an OpenAI-compatible endpoint (.../v1/audio/transcriptions: cloud or a whisper server on another PC), "" = local whisper; on errors local
     public string AsrApiKey { get; set; } = "";        // #11: Bearer key for AsrApiUrl ("" = none, e.g. own server)
     public string AsrApiModel { get; set; } = "whisper-1";   // #11: model name at AsrApiUrl
@@ -188,7 +192,7 @@ static partial class Program
         TestRun = args.Any(a => a is "--selftest" or "--anflugtest" or "--mptest" or "--asr-test" or "--srs-test" or "--platztest" or "--replay");
         if (args.Length >= 1 && args[0] == "--charttest") { if (args.Length > 1) Airfield.ChartFile = args[1]; ChartTest(); return 0; }   // chart data check, optionally a file instead of the embedded one
         if (args.Contains("--platztest")) { Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); return 0; }
-        if (args.Contains("--selftest")) { RadioTest(); ChartTest(); Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); DiagnoseTest(); ClientVersionTest(); Update.Test(); AtisTest(); CrewTest(); ExpectTest(); PromptTest(); GpuTest(); int rc = Tower.SelfTest(); ReplayTest(); return rc; }   // ReplayTest last: it runs the app loop (TickAll) and leaves static state behind
+        if (args.Contains("--selftest")) { RadioTest(); ChartTest(); Tower.PlatzTest(Airfield.Load(Path.Combine(Root, "airfields.txt"))); QueueTest(); SideTest(); FreqTest(); CaptureTest(); ControlAiTest(); FunkTest(); ConfigTest(); DiagnoseTest(); ClientVersionTest(); ElevenSpeedTest(); RadioGraphTest(); Update.Test(); AtisTest(); CrewTest(); ExpectTest(); PromptTest(); GpuTest(); int rc = Tower.SelfTest(); ReplayTest(); return rc; }   // ReplayTest last: it runs the app loop (TickAll) and leaves static state behind
         if (LoadConfig() is { } configError)
         {
             var message = configError + L("\nDatei korrigieren, speichern und DCS-ATC erneut starten.", "\nCorrect the file, save it and restart DCS-ATC.");
@@ -253,8 +257,10 @@ static partial class Program
             }) { IsBackground = true }.Start();
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);   // radio wheel error: no WinForms dialog, but crash -> restart
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Crash(e.ExceptionObject as Exception, args);
+        AsrServer.KillOrphans();   // left over after a crash (only here, behind the single-instance mutex)
         AppDomain.CurrentDomain.ProcessExit += (_, _) =>
         {
+            AsrServer.Stop();
             if (!Monitor.TryEnter(TowerLock, 250)) return;
             try { liveDebriefs?.Retry(); } finally { Monitor.Exit(TowerLock); }
         };
@@ -311,6 +317,7 @@ static partial class Program
                 var h = Host(); var f = (h?.Lead ?? h)?.Active?.F;
                 if (role == "AWACS" && h != null && Ops.AwacsFreqOf(h.Ops.MyAwacs(TrafficFor(h), MeOf(h)), MeOf(h)) is > 0 and var af) return af;   // mission AWACS (LA15: the one he checked in with)
                 if (role == "Tanker" && h != null && h.Ops.TankerFreqFor(TrafficFor(h), MeOf(h)) is > 0 and var tf) return tf;   // TP7: mission tanker
+                if (role == "Range" && h != null && h.Ops.RangeFor(MeOf(h)) is { Freq: > 0 } rz) return rz.Freq;   // #56: own frequency of the range (checked-in or nearest)
                 if (role == "JTAC" && h != null && h.Ops.JtacFreqFor(MeOf(h)) is > 0 and var jf) return jf;   // K3 (#7): mission JTAC instead of the config value
                 if (role == "Center") return h?.Tel is { } ct && Tower.CenterFor(h.Coalition, ct.X, ct.Z) is { } cc ? cc.Freq : null;   // Center: sector or map frequency
                 if (role == "Carrier" && h?.Tel is { } ht && Carrier.Boats.Where(b => b.Freq > 0 && b.Coalition == h.Coalition).MinBy(b => Dist(ht.X, ht.Z, b.X, b.Z)) is { } cb) return cb.Freq;
@@ -974,8 +981,9 @@ static partial class Program
         (Cfg.MyCallsign, Cfg.Volume, Cfg.SpeechRate, Cfg.ReplyPause, Cfg.RadioFx, Cfg.RadioText, Cfg.PilotVoice, Cfg.AiChatter, Cfg.AiFlightComms, Cfg.Atis, Cfg.AltimeterUnit, Cfg.WheelInGame, Cfg.AirspaceWatch, Cfg.RunwayLights, Cfg.CallsignFromUnit, Cfg.CallsignFromPlayer, Cfg.WheelFixed) =   // R392: RunwayLights is read per call (line ~995), applies immediately
             (n.MyCallsign, n.Volume, n.SpeechRate, n.ReplyPause, n.RadioFx, n.RadioText, n.PilotVoice, n.AiChatter, n.AiFlightComms, n.Atis, n.AltimeterUnit, n.WheelInGame, n.AirspaceWatch, n.RunwayLights, n.CallsignFromUnit, n.CallsignFromPlayer, n.WheelFixed);
         Cfg.HintText = n.HintText;
+        (Cfg.RadioFxBand, Cfg.RadioFxRatio) = (n.RadioFxBand, n.RadioFxRatio);
         if (Cfg.ElevenLabsKey != n.ElevenLabsKey || !Cfg.ElevenVoices.OrderBy(x => x.Key).SequenceEqual(n.ElevenVoices.OrderBy(x => x.Key))) { ElevenLabs.Disabled = false; ElevenLabs.Remaining = -1; if (n.ElevenLabsKey != "") { Cfg.ElevenLabsKey = n.ElevenLabsKey; _ = Task.Run(ElevenLabs.LogQuota); } }   // new key or voices: try again, quota read first
-        (Cfg.ElevenLabsKey, Cfg.ElevenVoices) = (n.ElevenLabsKey, n.ElevenVoices);
+        (Cfg.ElevenLabsKey, Cfg.ElevenVoices, Cfg.ElevenLabsSpeed) = (n.ElevenLabsKey, n.ElevenVoices, n.ElevenLabsSpeed);
         (Cfg.IffCheck, Cfg.StationPositions) = (n.IffCheck, n.StationPositions);   // Tower.IffCheck is set by LoadConfig, StationPositions is read per transmission
         (Cfg.RandomNotams, Cfg.Notams) = (n.RandomNotams, n.Notams);
         SetNotams();

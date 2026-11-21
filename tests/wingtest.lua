@@ -13,6 +13,8 @@ lfs = { mkdir = function(d) os.execute('mkdir "' .. d .. '" 2>nul') end, attribu
 package.loaded.lfs = lfs
 net = { log = function() end }
 Message = setmetatable({}, { __index = function(t, k) return k:match('^wMsgLeader') and k or nil end })   -- ids = names; unknown names nil
+os.execute('mkdir "' .. tmp .. '\\Scripts\\DcsAtc" 2>nul')
+do local h = io.open(tmp .. '\\Scripts\\DcsAtc\\DcsAtcWing.lua', 'w') h:write('-- probe file for the io check (arm)') h:close() end   -- Issue #55: arm() probes io with this file
 local started
 afterStart = function() started = true end   -- autoexec.lua
 dofile(hook)
@@ -127,6 +129,29 @@ P.commonCommandMenuIt, P.curDialogIt = nil, nil
 tick = nil
 afterStart()
 check(started and tick ~= nil, 'Missionsstart: afterStart von DCS laeuft weiter, Abfrage neu gestartet')
+
+-- Issue #55: MP client = io sandboxed in the simulation state: every failed io.open is an ERROR line in dcs.log. Load the script with a fake io, tick 100 times.
+local realopen = io.open
+local function fakeLoad(open)
+  local realio, realtimer, calls, scheduled = io, timer, 0, 0
+  local fakeio = setmetatable({ open = function(p, m) calls = calls + 1 return open(p, m) end }, { __index = realio })
+  io = fakeio
+  timer = { getTime = function() return 0 end, removeFunction = function() end, scheduleFunction = function(f) scheduled = scheduled + 1 tick = f return 1 end }
+  local after = afterStart
+  tick = nil
+  local ok, err = pcall(dofile, hook)
+  if tick then for _ = 1, 100 do tick() end end
+  io, timer, afterStart = realio, realtimer, after
+  assert(ok, err)
+  return calls, scheduled
+end
+local calls, scheduled = fakeLoad(function() return nil end)
+check(calls <= 2 and scheduled == 0, 'gesperrtes io (MP-Client): hoechstens 2 io.open, keine Abfrage -> ' .. calls .. ' io.open, ' .. scheduled .. ' geplant')
+calls, scheduled = fakeLoad(function(p, m) if p:find('DcsAtcOff', 1, true) then return nil end return realopen(p, m) end)   -- io works, no Off file
+check(scheduled == 1, 'io frei, DCS-ATC an: Abfrage geplant -> ' .. scheduled)
+calls, scheduled = fakeLoad(function(p, m) if p:find('DcsAtcOff', 1, true) then return { close = function() end } end return realopen(p, m) end)
+check(scheduled == 0, 'DCS-ATC aus (DcsAtcOff.txt): keine Abfrage -> ' .. scheduled)
+
 os.execute('rmdir /s /q "' .. tmp .. '" 2>nul')
 if fails > 0 then print('FAIL ' .. fails .. ' Fehler') os.exit(1) end
 print("wingtest OK")
