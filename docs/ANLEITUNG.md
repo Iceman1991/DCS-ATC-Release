@@ -1180,11 +1180,21 @@ Flugzeuge ohne ILS-Empfänger (F/A-18, F-14, AV-8B, F-5E, F-86, MiG-15/19, Warbi
 
 Ein ILS-Anflug wird nur überwacht: keine Gleitweg-Ansagen, nur die eine Tiefflugwarnung.
 
-**PAR** (IFR ohne ILS oder Notfall ohne ILS). Nach der Übergabe gibt Tower Präzisionsradar-Korrekturen höchstens alle 20 s und nur bei deutlicher Abweichung:
+**PAR** (IFR ohne ILS oder Notfall ohne ILS). Mit deinem ersten Ruf an Tower baut der Lotse den Talk-down auf und führt dich dann mit einem Ruf alle 5 Sekunden bis zur Schwelle:
 
-> **Tower:** Enfield one one, three miles, slightly above glidepath, reduce rate of descent, slightly left of course, turn right heading two five two.
+> **Tower:** Enfield one one, Kutaisi Tower, P A R final. This will be a P A R approach to runway two five, decision height two hundred sixty feet. Do not acknowledge further transmissions. If no transmissions are received for five seconds on final approach, execute missed approach.  
+> **Tower:** Enfield one one, on glidepath, begin descent, on course.  
+> **Tower:** Enfield one one, five miles from touchdown, slightly above glidepath, coming down, slightly right of course, turn left heading two four eight.  
+> **Tower:** Slightly above glidepath, on course.  
+> **Tower:** Enfield one one, at decision height, on course.  
+> **Tower:** Over landing threshold.
 
-Gleitweg-Begriffe: „well/slightly above/below glidepath“. Korrekturen: „increase rate of descent“, „reduce rate of descent“, „level off“.
+- **Nicht quittieren.** Einfach fliegen. Hörst du auf Final 5 Sekunden nichts, Fehlanflug fliegen (Funkausfall).
+- Vor dem Gleitweg gibt es nur den Kurs und „approaching glidepath“, dann „on glidepath, begin descent“. Danach hat jeder Ruf Gleitweg und Kurs, dazu die Entfernung bei jeder vollen Meile von 6 bis 1.
+- Begriffe: „slightly/well above/below glidepath“, „slightly/well left/right of course“, mit Tendenz „coming down“, „coming up“, „going further above/below/left/right“ oder „correcting“; „increase/reduce rate of descent“; „turn left/right heading ...“. Der Kurs ist exakt und berücksichtigt den Wind.
+- Die Landefreigabe wird im Talk-down mitgegeben.
+- **Sicherheitsgrenzen:** zwischen 3 NM und der Entscheidungshöhe mehr als 0,6° unter oder 1,2° über dem Gleitweg, oder innerhalb 2 NM mehr als 2,5° neben dem Kurs: „Enfield one one, too low for safe approach, if runway not in sight, execute missed approach.“ mit den Anweisungen für den Fehlanflug (ebenso „too high“, „too far left/right of course“).
+- Ein Ruf alle 5 s heißt etwa 40 Rufe pro Anflug; bei ElevenLabs-Stimmen zählt das auf dein Zeichenkontingent.
 
 **Sichtanflug** (nur VFR-Wetter):
 

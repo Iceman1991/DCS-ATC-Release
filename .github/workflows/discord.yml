@@ -1,0 +1,35 @@
+name: Discord bridge
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  issues: write
+  contents: read
+
+# overlapping runs would create duplicate issues
+concurrency:
+  group: discord-bridge
+  cancel-in-progress: false
+
+jobs:
+  bridge:
+    if: github.repository == 'Iceman1991/DCS-ATC-Release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 .github/discord_bridge.py
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GUILD_ID: '1574001937538355261'
+          BUG_FORUM_ID: '1574002724817600693'
+          FEATURE_FORUM_ID: '1574002753557237760'
+          RELEASE_CHANNEL_ID: '1574002414573457418'
