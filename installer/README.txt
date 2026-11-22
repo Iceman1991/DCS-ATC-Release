@@ -1,4 +1,4 @@
-DCS-ATC 0.23.27 ALPHA – talking air traffic control for DCS World (all maps, tested on Caucasus)
+DCS-ATC 0.23.28 ALPHA – talking air traffic control for DCS World (all maps, tested on Caucasus)
 ========================================================================
 
 !! ALPHA VERSION !!
