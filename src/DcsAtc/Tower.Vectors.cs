@@ -76,7 +76,7 @@ public partial class Tower
         vecFt = Math.Max(Math.Min(Math.Round((holding ? holdFt : IndFt(t)) / 500) * 500, vec != null ? vecFt : double.MaxValue), Math.Max(PatternFt, minFt));
         nav = null; vecWhy = why;
         bool fresh = vec == null;
-        if (fresh) { pdDescent = false; keepHighR = 0; }   // R303: new approach: the previous one's request no longer applies
+        if (fresh) { pdDescent = false; keepHighR = 0; preAlertFt = double.NaN; resumeFollow = false; }   // R303: new approach: the previous one's request no longer applies
         (vrw, gate, vecOver, vec) = Plan(t, final);
         vecFinal = final && !vecOver;   // Circling as overhead
         if (fresh) altFree = !holding && minFt == 0 && !Emergency && !Ifr && (!vecFinal || Proc(vrw) == "" || wantVisual) && vecFt == Math.Round(IndFt(t) / 500) * 500 && PathMva(t) <= vecFt && FreeNm(t) >= 10;   // R394: VFR far out (descent 10 NM or more away): altitude at his discretion; IFR (IMC or instrument approach) always an assigned altitude
@@ -594,6 +594,15 @@ public partial class Tower
         var rw = vrw;
         double hdg = t.Hdg * 180 / Math.PI;
         KeepLow(t);
+        if (!double.IsNaN(preAlertFt) && now >= alertUntil)   // traffic alert over (FAA JO 7110.65 2-1-6): the avoidance altitude was temporary, back to the vector altitude of the profile (the next call states it); a lower avoidance altitude stays, he is not sent back up
+        {
+            vecFt = Math.Min(vecFt, preAlertFt); preAlertFt = double.NaN; resumeFollow = true;
+        }
+        if (resumeFollow && !altFree)   // he descends on his own after the alert: vecFt follows him down (no climb back to the old level) until he has reached it
+        {
+            if (IndFt(t) < vecFt - 500) vecFt = Math.Max(Math.Round(IndFt(t) / 500) * 500, Math.Max(PathMva(t), vecFinal ? 0 : PatternFt));
+            else if (IndFt(t) <= vecFt + 300) resumeFollow = false;
+        }
         if (altFree)   // R394: follow his altitude (no deviation calls); below the minimum altitude the freedom ends with a climb
         {
             double min = Math.Max(PathMva(t), vecFinal ? 0 : PatternFt);

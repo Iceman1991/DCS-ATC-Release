@@ -137,7 +137,7 @@ class Pilot
 /// Output: in-game text (to group Gid) and speech via SRS. Role "Info" = text only.
 /// Prio: 0 urgent (before everything else), 1 normal, 2 AI radio. Standby: "…, stand by" beforehand if the frequency is still busy.
 record Tx(string Text, string Role, string Station, int Gid, bool Pilot = false, string? Voice = null, uint Unit = 0, double[]? Freqs = null,   // Unit: intercom target (Role "Crew")
-          int Prio = 1, Tx? Standby = null, double MaxAge = 0, bool Stress = false, int Side = 0, Func<string?>? Live = null, Action? Aired = null);   // MaxAge: afterwards text only (0 = per prio); Stress: combat voice; Side: SRS coalition of the sender (A133), 0 = Cfg.Coalition; Aired: when it goes out (Approach vectoring)
+          int Prio = 1, Tx? Standby = null, double MaxAge = 0, bool Stress = false, int Side = 0, Func<string?>? Live = null, Action<double>? Aired = null);   // MaxAge: afterwards text only (0 = per prio); Stress: combat voice; Side: SRS coalition of the sender (A133), 0 = Cfg.Coalition; Aired: when it goes out (Approach vectoring)
 
 class AtisInfo
 {

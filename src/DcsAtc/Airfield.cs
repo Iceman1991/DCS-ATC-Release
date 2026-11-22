@@ -42,6 +42,8 @@ public class Airfield
     };
     /// Forum request: own frequencies from frequencies.jsonc (Program.ApplyFreqs): role (ATIS, Ground, Tower, Departure, Approach) -> MHz, override the map.
     public Dictionary<string, double[]> Own = new();
+    /// frequencies.jsonc "OnlyListed": no own entry -> DCS-ATC is silent here (Program.Served is false: not picked, no calls, no ATIS, not offered). Reset on every ApplyFreqs.
+    public bool Off;
     public static readonly string[] Roles = { "Ground", "Tower", "Approach", "Departure" };
     /// Frequencies of a controller: own (Own), otherwise the map frequencies (UHF, VHF; Ground/Tower/Approach shared), Departure without own like Approach;
     /// "*" = all controllers of the airfield (locked?). null = none (without Radio.lua: config per controller).
@@ -119,7 +121,7 @@ public class Airfield
     /// Emergency (R37, A15 AWACS): nearest own/neutral airfield with a runway, preferably from 1800 m; null = none.
     public static Airfield? Emergency(IEnumerable<Airfield> fields, double x, double z, int side)
     {
-        var own = fields.Where(f => f.Ends.Count > 0 && (f.Side == 0 || f.Side == side)).ToList();
+        var own = fields.Where(f => f.Ends.Count > 0 && !f.Off && (f.Side == 0 || f.Side == side)).ToList();
         return (own.Any(f => f.Ends.Max(e => e.Len) >= 1800) ? own.Where(f => f.Ends.Max(e => e.Len) >= 1800) : own).MinBy(f => (f.X - x) * (f.X - x) + (f.Z - z) * (f.Z - z));
     }
 

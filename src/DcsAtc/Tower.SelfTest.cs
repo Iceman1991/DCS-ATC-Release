@@ -1199,6 +1199,59 @@ public partial class Tower
         r = twE52.Tick(me, new[] { bogey[0] with { Coalition = 1 } }, 2);
         var rOwn = twE52.Tick(me, new[] { bogey[0] with { Id = 79, Coalition = 2 } }, 3);
         Check(r.All(m => !m.Text.Contains("Traffic alert")) && rOwn.Any(m => m.Text.Contains("Traffic alert")), "A52 Verkehrswarnung nur eigene/neutrale: " + string.Join(" | ", r.Concat(rOwn)));
+        {   // Squadron log (F-104, Guetersloh): the avoidance altitude of a traffic alert is temporary - afterwards the vector altitude of before applies again, no "check altitude, climb" against it
+            var hiA = At(-291000, 660000, 6000 * Ft - 150, 90, 200);
+            var twAv = new Tower("Enfield 1-1");
+            twAv.Tick(hiA, none, 0);
+            twAv.OnTranscript("Kutaisi Approach Enfield one one inbound for landing", hiA, none, 1);
+            double preV = twAv.vecFt;
+            var raV = twAv.Tick(hiA, new[] { new Traffic(77, "Su-25T", hiA.X, hiA.Z + 3 * NM, hiA.AltMsl, 270 * Math.PI / 180, 120) }, 2);
+            double avoidV = twAv.vecFt;
+            var afterV = new List<string>();
+            for (int s = 3; s <= 200; s++) afterV.AddRange(twAv.Tick(hiA, none, s).Select(m => m.Text));   // traffic gone, he stays at his altitude (never climbed)
+            Check(raV.Any(m => m.Text.Contains("Traffic alert")) && avoidV > preV + 500 && twAv.vecFt <= preV && !afterV.Any(x => x.Contains("check altitude, climb")),
+                  $"Ausweichhöhe nur vorübergehend: vor {preV:0}, Ausweichen {avoidV:0}, danach {twAv.vecFt:0}: " + string.Join(" | ", afterV));
+        }
+        {   // Reporter case: pre-alert vector altitude high, climbed by the alerts, then he descends on his own well below it: no "check altitude, climb", vecFt follows him, the next vector states it
+            var hiB = At(-291000, 660000, 21000 * Ft - 150, 90, 200);
+            var twAw = new Tower("Enfield 1-1");
+            twAw.Tick(hiB, none, 0);
+            twAw.OnTranscript("Kutaisi Approach Enfield one one inbound for landing", hiB, none, 1);
+            twAw.vecFt = 21000;
+            var raW = twAw.Tick(hiB, new[] { new Traffic(77, "Su-25T", hiB.X, hiB.Z + 3 * NM, hiB.AltMsl, 270 * Math.PI / 180, 120) }, 2);
+            var afterW = new List<string>();
+            for (int s = 3; s <= 40; s++) afterW.AddRange(twAw.Tick(At(-291000, 660000, 24000 * Ft - 150, 90, 200), none, s).Select(m => m.Text));   // climbed to the avoidance altitude, alert over
+            var low = At(-291000, 660000, 3800 * Ft - 150, 90, 200);
+            for (int s = 41; s <= 200; s++) afterW.AddRange(twAw.Tick(low, none, s).Select(m => m.Text));   // then descends on his own to 3800 ft
+            string vcW = twAw.VecCall(low, 201);
+            Check(raW.Any(m => m.Text.Contains("Traffic alert")) && !afterW.Any(x => x.Contains("check altitude, climb")) && twAw.vecFt is >= 3500 and <= 4500 && (afterW.Any(x => x.Contains("maintain 3500") || x.Contains("maintain 4000")) || vcW.Contains("maintain")),
+                  $"Ausweichhöhe vorbei, er sinkt selbst: vecFt {twAw.vecFt:0}, Vektor: {vcW} | alert: {string.Join("/", raW.Select(m => m.Text))} | " + string.Join(" | ", afterW));
+        }
+        {   // Squadron log: after "traffic in sight" no further alert on that traffic; information on a contact that is (about to be) an alert conflict is not given, the alert replaces it
+            var meSg = At(-291000, 660000, 900, 90, 120);
+            var twSigt = new Tower("Enfield 1-1");
+            twSigt.Tick(meSg, none, 0);
+            twSigt.OnTranscript("Kutaisi Approach Enfield one one inbound for landing", meSg, none, 1);
+            var bogSg = new Traffic(77, "Su-25T", meSg.X, meSg.Z + 3 * NM, meSg.AltMsl, 270 * Math.PI / 180, 120);
+            var sg1 = twSigt.Tick(meSg, new[] { bogSg }, 2);
+            var sgRoger = twSigt.OnTranscript("Kutaisi Approach, Enfield 11, traffic in sight", meSg, new[] { bogSg }, 5);
+            var sg2 = new List<string>();
+            for (int s = 6; s <= 120; s++) sg2.AddRange(twSigt.Tick(meSg, new[] { bogSg }, s).Select(m => m.Text));
+            Check(sg1.Any(m => m.Text.Contains("Traffic alert")) && sgRoger.Count == 1 && sgRoger[0].Text.EndsWith("roger.") && !sg2.Any(x => x.Contains("Traffic alert") || x.Contains("traffic")),
+                  "Verkehr in Sicht: danach keine Warnung/Information auf denselben Verkehr: " + string.Join(" | ", sg2));
+            var twISg = new Tower("Enfield 1-1");
+            twISg.Tick(meSg, none, 0);
+            twISg.OnTranscript("Kutaisi Approach Enfield one one inbound for landing", meSg, none, 1);
+            var nearSg = bogSg with { X = meSg.X + 1.8 * NM, Z = meSg.Z + 4 * NM };   // passes 1.8 NM abeam: outside the alert limit (1.5 NM), still gets its traffic information
+            var ig2 = twISg.Tick(meSg, new[] { nearSg }, 2);
+            Check(ig2.Count == 1 && ig2[0].Text.Contains("traffic", StringComparison.OrdinalIgnoreCase) && !ig2[0].Text.Contains("Traffic alert"), "Kontakt 1,8 NM abeam: Verkehrsinformation: " + string.Join(" | ", ig2.Select(m => m.Text)));
+            var twIA = new Tower("Enfield 1-1");
+            twIA.Tick(meSg, none, 0);
+            twIA.OnTranscript("Kutaisi Approach Enfield one one inbound for landing", meSg, none, 1);
+            var ia = twIA.Tick(meSg, new[] { bogSg }, 2);   // meets the alert criterion in this tick: only the alert, no information (before or after)
+            var ia2 = twIA.TrafficInfo(meSg, new[] { bogSg }, 3);
+            Check(ia.Count == 1 && ia[0].Text.StartsWith("Traffic alert") && ia2 == null, "Alarmbedingung im selben Tick: nur der Alarm, keine Information: " + string.Join(" | ", ia.Select(m => m.Text)) + " / " + (ia2?[0].Text ?? "-"));
+        }
         // R213: safety alert also after handover to Departure and on the IFR route (until sign-off); R214: VFR without fixed altitude ("and climb immediately")
         foreach (var (dPh, dIfr) in new[] { (Phase.Away, true), (Phase.Away, false), (Phase.Departing, true) })
         {
@@ -2757,16 +2810,20 @@ public partial class Tower
                 string CT(double dHdg) => twk.CourseText(At(kx - 400 * Math.Sin(hk), kz + 400 * Math.Cos(hk), 300, LandHdg("25") + dHdg, 72), "25", 5 * NM);
                 string ctA = CT(40), ctB = CT(-60), ctC = CT(0);
                 Check(ctA.Contains("right of course, turn left heading") && ctB.Contains("right of course, turn right heading") && ctC.Contains("turn left heading"),$"CourseText Drehrichtung: {ctA} | {ctB} | {ctC}");
-                {   // FIX 1: test flight 11:5x, setup (17 s) goes on air late; the talk-down waits until it has ended (+1 s), calls at least 5 s apart
+                {   // FIX 1: test flight 11:5x, setup (17 s) goes on air late; the talk-down waits until it has ended (+2.5 s), calls at least 5 s apart
                     var tw1 = new Tower("Enfield 1-1");
                     tw1.F.Own["Tower"] = tw1.F.Own["Approach"] = new[] { 263.0 };
                     var p1 = FlyPar(tw1, true, false, 10);
                     tw1.F.Own.Remove("Tower"); tw1.F.Own.Remove("Approach");
                     var talk1 = p1.TakeWhile(x => !x.M.Text.Contains("decision height, on") && !x.M.Text.Contains("Over landing") && !x.M.Text.Contains("cleared to land")).ToList();   // decision height / threshold have a 2 s minimum; landing clearance comes from the tick, not the talk-down
                     int air1 = talk1.Count > 0 ? talk1[0].S + 10 : 999;
-                    double end1 = air1 + talk1[0].M.Text.Split(' ').Length / 2.5 + 1;
+                    double end1 = air1 + talk1[0].M.Text.Split(' ').Length / 2.5 + 2.5;
                     string t1 = $"end {end1:0.0}, gaps {string.Join(",", talk1.Skip(1).Zip(talk1, (b, a) => b.S - a.S))}: " + string.Join(" | ", talk1.Take(4).Select(x => $"{x.S}s {x.M.Text[..Math.Min(30, x.M.Text.Length)]}"));
-                    Check(talk1.Count > 3 && !talk1.Skip(1).Any(x => x.S < end1) && talk1.Skip(1).Zip(talk1, (b, a) => b.S - a.S).Skip(1).All(g => g >= 5), $"PAR Takt: Ansage erst nach Ende der Einweisung ({end1:0} s) und >= 5 s Abstand: {t1}");
+                    Check(talk1.Count > 3 && !talk1.Skip(1).Any(x => x.S < end1) && talk1.Skip(1).Zip(talk1, (b, a) => b.S - a.S).Skip(1).All(g => g >= 5) && talk1.Skip(2).Zip(talk1.Skip(1), (b, a) => b.S - a.S - a.M.Text.Split(' ').Length / 2.5).All(g => g >= 2.5), $"PAR Takt: Ansage erst nach Ende der Einweisung ({end1:0} s) und >= 5 s Abstand: {t1}");
+                    var t1r = new Tower("Enfield 1-1"); t1r.parOn = true; t1r.Aired(100, "Enfield one one, short.", "Tower", 7);   // real audio length 7 s (word estimate would be 2 s): 2.5 s pause after the real end
+                    var (xq, zq) = P("25", 5 * NM);
+                    Telemetry Tr = At(xq, zq, 5 * NM * Math.Tan(3 * Math.PI / 180) + 15, LandHdg("25"), 72);
+                    Check(t1r.ParTalk(Tr, "25", 5 * NM, 0, 109) == null && t1r.ParTalk(Tr, "25", 5 * NM, 0, 110) != null, "PAR Takt: Ende aus der echten Audiolänge, 2,5 s Pause danach");
                 }
                 {   // FIX 2: restated heading carries the turn direction
                     var t2 = new Tower("Enfield 1-1");

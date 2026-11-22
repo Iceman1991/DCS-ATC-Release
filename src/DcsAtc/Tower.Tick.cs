@@ -1080,7 +1080,7 @@ public partial class Tower
     /// Traffic alert with avoidance heading (60° away from the traffic, head-on: right) and avoidance altitude (1000 ft away, never below terrain,
     /// never through the traffic). Afterwards 30 s no other instructions (alertUntil).
     readonly Dictionary<int, double> alerted = new();
-    double alertUntil = -1, alertFt = double.NaN;
+    double alertUntil = -1, alertFt = double.NaN, preAlertFt = double.NaN; bool resumeFollow;   // preAlertFt: radar-vector altitude from before the alert (the avoidance altitude is temporary, VecTick restores it afterwards)
     IReadOnlyList<Traffic> near = Array.Empty<Traffic>();   // traffic from the last tick (StepDown)
 
     /// Altitude free (radar separation): on the way there no traffic closer than 3 NM and 1000 ft, no conflict in the next 60 s.
@@ -1122,7 +1122,7 @@ public partial class Tower
     public double? AsgFt => holding ? holdFt : vec != null ? vecFt : depClr && Phase is Phase.Departing or Phase.Away ? (Phase == Phase.Departing ? depFt : Cruise) : null;
     List<Msg>? TrafficAlert(Telemetry t, IReadOnlyList<Traffic> traffic, double now)
     {
-        traffic = Own(traffic);
+        traffic = Own(traffic).Where(a => !sighted.Contains(a.Id)).ToList();   // reported in sight: no alert on it any more
         bool ctl = holding || vec != null || depClr;   // R214: controlled flight (IFR departure, radar vectoring, holding) gets a fixed avoidance altitude, VFR only "climb/descend"
         double? have = AsgFt;   // assigned altitude (climb/descent towards it counts)
         // Traffic pattern: visual separation 0.5 NM in 30 s (downwind beside initial/final; turning there, continuing to project straight is misleading)
@@ -1143,7 +1143,7 @@ public partial class Tower
         double? ft = early ? null : dAlt + a.Vs * cf.Tc / Ft > 300 ? (down >= floor ? down : null) : up;
         // already assigned altitude separates 1000 ft on the same side: keep it (no new number at every warning)
         if (have is { } hv && ft is { } nf && Math.Abs(hv - itFt) >= 1000 && hv >= floor && hv > itFt == nf > itFt) ft = hv;
-        if (vec != null) { if (ft is { } f) (vecFt, altFree) = (f, false); vecHdg = (my + turn + 360) % 360; lastVecSaid = now; }
+        if (vec != null) { if (ft is { } f) { if (double.IsNaN(preAlertFt)) preAlertFt = vecFt; (vecFt, altFree, resumeFollow) = (f, false, false); } vecHdg = (my + turn + 360) % 360; lastVecSaid = now; }
         if (holding && ft is { } hf) holdFt = alertFt = hf;
         if (depClr && Phase == Phase.Departing && ft is { } df) depFt = df;   // R213: avoidance altitude applies (otherwise afterwards "check altitude, maintain" with the old departure altitude)
         lastHoldInfo = lastVector = now;
@@ -1196,6 +1196,7 @@ public partial class Tower
     List<Msg>? TrafficInfo(Telemetry t, IReadOnlyList<Traffic> traffic, double now)
     {
         traffic = Own(traffic);   // A52
+        sighted.RemoveWhere(id => traffic.FirstOrDefault(x => x.Id == id && x.InAir) is not { } so || Dist(t.X, t.Z, so.X, so.Z) > 6 * NM);   // encounter over
         if (now - followAt > 60) advised.Clear();   // N24: do not conclude advisories from an earlier service ("no longer a factor" for long-forgotten traffic)
         followAt = now;
         // N24: reported traffic diverges (> 6 NM or gone): once "no longer a factor", only without "in sight"; after "negative contact" an update after 30 s
@@ -1209,7 +1210,8 @@ public partial class Tower
         // R216: no advisory on controlled traffic separated by assigned altitudes (≥ 1000 ft) with both at their altitude (7110.65 2-1-21: only if separation can be lost)
         bool Sep(Traffic a) => AsgFt is { } my && a.AsgFt > 0 && Math.Abs(a.AsgFt - my) >= 1000 && Math.Abs(IndFt(t) - my) < 300 &&
                                Math.Abs((a.AltMsl - t.AltMsl) / Ft - (a.AsgFt - my)) < 300;
-        var a = traffic.Where(a => a.InAir && Dist(t.X, t.Z, a.X, a.Z) < 5 * NM && Math.Abs(a.AltMsl - t.AltMsl) / Ft < 1500 && !Sep(a) && now - (advised.TryGetValue(a.Id, out var av) ? av.At : -999) > 120)
+        var a = traffic.Where(a => a.InAir && Dist(t.X, t.Z, a.X, a.Z) < 5 * NM && Math.Abs(a.AltMsl - t.AltMsl) / Ft < 1500 && !Sep(a) && !sighted.Contains(a.Id) && now - alerted.GetValueOrDefault(a.Id, -999) >= 30 && AirConflict(t, new[] { a }, 1.5 * NM, AsgFt) == null   // the alert replaces the information (contact in conflict now / just alerted)
+                                  && now - (advised.TryGetValue(a.Id, out var av) ? av.At : -999) > 120)
                        .MinBy(a => Dist(t.X, t.Z, a.X, a.Z));
         if (a == null) return null;
         advised[a.Id] = new Advice { At = now };

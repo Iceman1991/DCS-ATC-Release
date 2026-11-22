@@ -533,7 +533,7 @@ static partial class Program
             if (opsRole != null && Off(opsRole.ToLowerInvariant(), text)) return;
             if (opsRole != null)
             {
-                var calls = p.Ops.OnTranscript(opsRole, text, MeOf(p) with { Freq = src == "SRS" ? p.CalledOn : 0 }, TrafficFor(p), Fields, Now(), conf < MinConf && !(opsRole == "AWACS" && conf >= ExpConf && Ops.AwacsReport(Tower.Normalize(spoken))), Cfg.Frequencies.GetValueOrDefault("AWACS", 251.5), FieldWxOf);
+                var calls = p.Ops.OnTranscript(opsRole, text, MeOf(p) with { Freq = src == "SRS" ? p.CalledOn : 0 }, TrafficFor(p), Fields.Where(f => !f.Off).ToList(), Now(), conf < MinConf && !(opsRole == "AWACS" && conf >= ExpConf && Ops.AwacsReport(Tower.Normalize(spoken))), Cfg.Frequencies.GetValueOrDefault("AWACS", 251.5), FieldWxOf);
                 if (p.Ops.Menu is { } mn && Cfg.CommsKey != 0 && MissionData && p == Host())   // basket/boom only via the DCS menu: "Intent to refuel" (mission looks it up in the list) or "Ready pre-contact"
                     TankerMenu(p, mn.Step, mn.Group);
                 p.Ops.Menu = null;
@@ -624,13 +624,14 @@ static partial class Program
     }
 
     /// N1: ATC only at own and neutral airfields (like AWACS, AI targets and the DCS-ATC menu).
-    static bool Served(int side, Airfield f) => f.Side == 0 || f.Side == side;
+    static bool Served(int side, Airfield f) => !f.Off && (f.Side == 0 || f.Side == side);   // Off: frequencies.jsonc "OnlyListed", airfield not set up
     /// A133: SRS side of an airfield controller: that of the airfield, at a neutral airfield that of the player.
     static int SideOf(Airfield f, Pilot p) => f.Side > 0 ? f.Side : p.Coalition;
 
     /// N1: enemy airfield called/selected: no reply, once per flight and airfield a text with the nearest own airfield ("Krasnodar-Center 270/35 NM", mag).
     static void Hostile(Pilot p, Airfield f)
     {
+        if (f.Off) { Log($"[ATC] {p.Callsign}: {f.Name} not in frequencies.jsonc (OnlyListed), no answer"); return; }   // not set up: silence like no station there
         Log($"[ATC] {p.Callsign}: {f.Name} feindlich, keine Flugsicherung");
         if (!p.HostileTold.Add(f.Name)) return;
         var n = p.Tel is { } t ? Fields.Where(o => o.Ends.Count > 0 && Served(p.Coalition, o)).MinBy(o => Dist(t.X, t.Z, o.X, o.Z)) : null;
@@ -742,7 +743,7 @@ static partial class Program
     }
 
     static Tx ToTx(Pilot p, Msg m) => new(m.Text, m.Role, p.Active!.StationOf(m.Role), p.Gid, Freqs: m.Role == "Center" ? new[] { p.Active.CenFreq } : FieldFreqs(p.Active.F, m.Role), Side: m.Role == "Center" ? p.Coalition : SideOf(p.Active.F, p),
-        Aired: m.Role is "Approach" or "Tower" && p.Active is { } tw ? () => tw.Aired(Now(), m.Text, m.Role) : null, MaxAge: m.MaxAge);
+        Aired: m.Role is "Approach" or "Tower" && p.Active is { } tw ? sec => tw.Aired(Now(), m.Text, m.Role, sec) : null, MaxAge: m.MaxAge);
 
     /// Ground/Tower/Approach/Departure of an airfield (Airfield.FreqsOf): own from AirfieldFrequencies, otherwise its DCS frequency (UHF, VHF), null = the one from the config;
     /// ATIS: the own, otherwise the airfield's ATIS frequency (A35, like AtisLoop).

@@ -167,6 +167,11 @@ static partial class Program
             var fl = a.Flag.Split(':', 2);   // "dep:Senaki-Kolkhi" (mod), old mission: "dep" = Kutaisi
             var flag = fl[0];
             if (Fields.FirstOrDefault(f => f.Name == (fl.Length > 1 ? fl[1] : "Kutaisi")) is not { } fld || fld.Ends.Count == 0) continue;
+            if (fld.Off)   // OnlyListed: no controller here -> held departures start at once (like "app not running"), arrivals are never held, no calls
+            {
+                if (flag == "dep" && Once("START;" + g.Key)) AiCmd($"START;{g.Key}");
+                continue;
+            }
             if (a.Coalition > 0 && !Served(a.Coalition, fld))   // N40: airfield captured: no radio from the hostile airfield, divert approaches once to the nearest own (they check in anew there)
             {
                 if (flag is "arr" or "arr-hold" && a.InAir && !a.Mission && Once("DIVERT;" + g.Key)) { AiCmd($"DIVERT;{g.Key}"); aiStage.Remove(g.Key); Holds.Remove("ai:" + g.Key); Log($"[KI ] {g.Key}: {fld.Name} erobert -> umgeleitet"); }

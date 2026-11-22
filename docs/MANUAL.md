@@ -1178,7 +1178,7 @@ Aircraft without an ILS receiver (F/A-18, F-14, AV-8B, F-5E, F-86, MiG-15/19, wa
 
 The controller only monitors an ILS approach: no glide-path calls, just the one low-altitude alert.
 
-**PAR** (IFR without an ILS, or an emergency without an ILS). With your first call to Tower the controller sets up the talk-down, then talks you down to the threshold with a call about every 5 seconds, each one only after the previous one has been spoken:
+**PAR** (IFR without an ILS, or an emergency without an ILS). With your first call to Tower the controller sets up the talk-down, then talks you down to the threshold with a call about every 5 to 10 seconds, each one 2.5 seconds after the previous one has ended:
 
 > **Tower:** Enfield one one, Kutaisi Tower, P A R final. This will be a P A R approach to runway two five, decision height two hundred sixty feet. Do not acknowledge further transmissions. If no transmissions are received for five seconds on final approach, execute missed approach.  
 > **Tower:** Enfield one one, on glidepath, begin descent, on course.  
@@ -1243,11 +1243,11 @@ Approach and Departure keep you apart from other traffic, players and AI alike. 
 | When | Call |
 |---|---|
 | First contact, vectors | "Traffic, Viper, 3 miles south of the field, 1500 feet." |
-| Conflict within 60 s (closer than 1.5 NM and 700 ft) under vectors or on approach | "traffic alert, traffic 2 o'clock, 3 miles, same altitude. Turn right heading one two zero immediately, climb and maintain 5000 feet." No other instructions for the next 30 s |
+| Conflict within 60 s (closer than 1.5 NM and 700 ft) under vectors or on approach | "traffic alert, traffic 2 o'clock, 3 miles, same altitude. Turn right heading one two zero immediately, climb and maintain 5000 feet." No other instructions for the next 30 s. The avoidance altitude is temporary: afterwards Approach returns to your vector altitude (or your present altitude if you have descended below it meanwhile) |
 | AI departure climbing into your path | "turn right heading …, traffic 11 o'clock, 4 miles, departing aircraft, climbing through 3000 feet." |
 | In the pattern: traffic not talking to Tower, closer than 0.5 NM within 30 s | "traffic 2 o'clock, 1 mile, FA-18C, 1500 feet, no contact with Tower." |
 
-- **Answering:** "traffic in sight" or "tally", "looking", "negative contact" or "no joy". Approach answers "roger."
+- **Answering:** "traffic in sight" or "tally", "looking", "negative contact" or "no joy". Approach answers "roger." After "traffic in sight" there are no more calls on that aircraft until it is more than 6 NM away.
 - **Whose traffic:** radar advisories cover only your own side and neutrals; enemy aircraft are the AWACS's job. Tower reports everyone in the pattern.
 
 #### Terrain warning
@@ -2643,6 +2643,13 @@ By default each airfield uses the frequency that DCS gives it on the map, the on
 - **Values:** one frequency in MHz, or a list such as `"Ground": [275.8, 121.8]` (UHF and VHF). Every value must be between 30 and 400 MHz.
 - **Airfield name:** as DCS names it. Case, hyphens, spaces and punctuation are ignored, so `"senaki kolkhi"` matches `Senaki-Kolkhi`. A unique part of the name is enough. If the part matches more than one airfield, the entry is ignored.
 - **Map sections:** lines under `// ===== <map> =====` apply only on that map, named after its folder in `Mods\terrains` as the file lists it (`Sinai`, `GermanyColdWar`). Lines above the first section apply on every map.
+- **Only the listed airfields:** with `"OnlyListed": true,` DCS-ATC works only at the airfields that have an active line in the file. All other airfields are silent: no Ground, Tower, Approach or ATIS, no control zone or runway calls, no entry in the radio wheel or on the kneeboard, and they are not used as destination, alternate or emergency field. A call to one of them gets no answer (atc-log.txt notes it). AI departures there take off without waiting for a clearance. Center, AWACS, tankers, carriers and ranges are not affected. Under a map heading the line applies to that map only, above the first heading to every map. If no airfield of the map is listed, all of them are silent. The file has a commented example at the top. Example for a squadron that runs only a few bases on Germany Cold War:
+  ```jsonc
+  // ===== GermanyColdWar =====
+  "OnlyListed": true,
+  "Nordholz": { "Ground": 251.0, "Tower": 257.8 },
+  "Wunstorf": { "Tower": 250.5 },
+  ```
 - **Controllers you don't list stay on the map frequency.** If you don't list Departure, Approach handles departures as before.
 - **Changes apply as soon as you save** the file. No restart is needed.
 - **Invalid entries are ignored**, and each one gets a line in `atc-log.txt`, for example:

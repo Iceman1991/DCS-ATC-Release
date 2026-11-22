@@ -1100,6 +1100,31 @@ static partial class Program
                 || csBad2.Count != 1 || bad18.Error == null || bad18.Own.Count != 0 || Tower.CenterSectors.Count != Cfg.CenterSectors.Count || Carrier.StationFreqs.Count != 0)
                 throw new Exception($"#18 Beispiele: {exErr} | {string.Join(" | ", exBad)} | {string.Join(",", exSf)} | {exCs.Count} {exRc} {exRole} | {string.Join(",", hd.Keys)} | {string.Join(" | ", csBad.Concat(csBad2))}\r\n{ex}");
             Console.WriteLine("OK   #18: Beispiele in frequencies.jsonc gehen ohne // (7 Trägerstationen mit Red Crown, Center und GCI), \"Carrier\" unter eigener Überschrift, CenterSectors-Fehler je Eintrag, kaputte Datei nennt die Beispiele");
+            // OnlyListed: off -> all on; on with Nellis + North Las Vegas listed -> Creech Off (no pick, no wheel entry, call to it silent), listed field answers; back -> all on; none listed -> all Off
+            string[] Offs() => Fields.Where(f => f.Off).Select(f => f.Name).ToArray();
+            Take();
+            var onOff = ApplyFreqs(Fields, OwnFreqs("""{ "Nellis": { "Tower": 327.0 } }""", "Nevada").Own);
+            var offNone = Offs();
+            var onBad = ApplyFreqs(Fields, OwnFreqs("""{ "OnlyListed": true, "Nellis": { "Tower": 327.0 }, "North Las Vegas": { "Tower": 360.75 } }""", "Nevada").Own);
+            var offTwo = Offs();
+            var lowOver = new Pilot { Unit = "O1", Callsign = "Enfield 1-1", Gid = 3, Tel = new Telemetry(cre.Elev + 150, 0, 0, 0, cre.X, cre.Z, 0, 0, 0) };
+            var (pickOff, wheelOff) = (Pick(lowOver, null)?.F.Name, string.Join(",", NearPlaces(lowOver.Tel, 0)));
+            Request(lowOver, "Creech Tower, Enfield 1-1, low pass", "T", false);
+            var callOff = Take();
+            Request(lowOver, "Nellis Tower, Enfield 1-1, radio check", "T", false);
+            var callOn = Take();
+            var onBack = ApplyFreqs(Fields, OwnFreqs("""{ "OnlyListed": false, "Nellis": { "Tower": 327.0 } }""", "Nevada").Own);
+            var offBack = Offs();
+            var onNone = ApplyFreqs(Fields, OwnFreqs("""{ "OnlyListed": true }""", "Nevada").Own);
+            var offAll = Offs();
+            var onBadVal = ApplyFreqs(Fields, OwnFreqs("""{ "OnlyListed": "yes" }""", "Nevada").Own);
+            var offBadVal = Offs();
+            ApplyFreqs(Fields, new());
+            if (onOff.Count != 0 || offNone.Length != 0 || onBad.Count != 1 || !onBad[0].Contains("OnlyListed") || !onBad[0].Contains("Nellis, North Las Vegas") || !onBad[0].Contains("2 of 3") && !onBad[0].Contains("2 von 3")
+                || offTwo is not ["Creech"] || pickOff != "North Las Vegas" || wheelOff.Contains("Creech") || callOff.Count != 0 || callOn.Count == 0 || onBack.Count != 0 || offBack.Length != 0
+                || onNone.Count != 1 || offAll.Length != 3 || onBadVal.Count != 1 || offBadVal.Length != 0 || Fields.Any(f => f.Off))
+                throw new Exception($"OnlyListed: {string.Join(",", offTwo)} / {string.Join(" | ", onBad)} / {pickOff} {wheelOff} / {callOff.Count} {callOn.Count} / {offBack.Length} {offAll.Length} {offBadVal.Length} / {string.Join(" | ", onNone.Concat(onBadVal))}");
+            Console.WriteLine($"OK   OnlyListed: aus = alles an, mit zwei Plätzen Creech Off (kein Pick, nicht im Funkrad, Ruf bleibt stumm), gelisteter Platz antwortet, zurück = alles an, kein Platz gelistet = alle Off, Wert \"yes\" ignoriert ({onBad[0]})");
             // create frequencies.jsonc (test Radio.lua: name from comment or beacon, config without UHF), uncomment a line, add without changing user lines
             var dir = Path.Combine(Path.GetTempPath(), "DcsAtc-FreqTest");
             Directory.CreateDirectory(Path.Combine(dir, "Mods", "terrains", "TestMap"));
@@ -1122,7 +1147,7 @@ static partial class Program
             var upd = FreqFile(user, maps, "TestMap", new() { [2] = "Bravo International" });
             var ul = upd.Split("\r\n").ToList();
             if (tab.Count != 2 || tabTh != 2 || dirTh != "TestMap" || OwnFreqs(user, "TestMapTheatre", dirTh).Own.Count != 1 || tab[1] != (250.0, 121.0, "Alpha", "Alpha Field") || tab[2] != (0, 118.75, "", "Bravo-Intl")
-                || !gen.StartsWith("// DCS-ATC") || !gen.Contains("\r\n{\r\n" + string.Join("\r\n", FreqExamples) + "\r\n  // ===== TestMap =====\r\n" + alpha + "\r\n  // \"Bravo-Intl\": { \"ATIS\": " + atisMhz + ", \"Ground\": [118.75], \"Tower\": [118.75],") || !gen.EndsWith("\r\n}\r\n")
+                || !gen.StartsWith("// DCS-ATC") || !gen.Contains("\r\n{\r\n" + string.Join("\r\n", OnlyExamples) + "\r\n" + string.Join("\r\n", FreqExamples) + "\r\n  // ===== TestMap =====\r\n" + alpha + "\r\n  // \"Bravo-Intl\": { \"ATIS\": " + atisMhz + ", \"Ground\": [118.75], \"Tower\": [118.75],") || !gen.EndsWith("\r\n}\r\n")
                 || rdErr != null || rd.Count != 1 || rd["Alpha Field"].GetProperty("Tower").GetDouble() != 255.5 || OwnFreqs(user, "NewMap").Own.Count != 0
                 || !ul.Contains(user.Split("\r\n").First(l => l.Contains("255.5"))) || !upd.Contains("  // \"Bravo International\": ") || upd.Contains("Bravo-Intl")
                 || ul.FindIndex(l => l.Contains("// id 3")) is not (> 0 and var i3) || i3 > ul.FindIndex(l => l.Contains("===== NewMap")) || ul.FindIndex(l => l.Contains("// id 5")) < 0

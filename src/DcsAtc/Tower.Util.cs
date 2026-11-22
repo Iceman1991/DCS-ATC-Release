@@ -137,7 +137,7 @@ public partial class Tower
     {
         double tan3 = Math.Tan(3 * Math.PI / 180), dhAlong = (200 * Ft - 15) / tan3;   // DH: path 200 ft above the field
         bool atDh = along <= dhAlong;
-        bool busy = awaitAir && now - lastAt < 20 || now < towerEnd + 1;   // the previous Tower call is not on air yet / still being spoken (+ 1 s): a call now would be queued and dropped as late
+        bool busy = awaitAir && now - lastAt < 20 || now < towerEnd + 2.5;   // the previous Tower call is not on air yet / still being spoken (+ 2.5 s pause between calls, stays below the 5 s silence limit): a call now would be queued and dropped as late
         if (along <= 0) { if (busy || now - lastAt < 2) return null; parEnd = true; return ParSay("Over landing threshold."); }
         if (busy || now - lastAt < (parBegun && atDh && !parDh ? 2 : 4.5)) return null;   // 5 s rhythm (any Tower call counts), decision height at its point
         var (tx, tz) = Thr(rw);

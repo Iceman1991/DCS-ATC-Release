@@ -81,7 +81,7 @@ static partial class Program
         var dir = Path.Combine(SavedGamesDcs(), "Kneeboard");
         try
         {
-            var done = Cfg.KneeboardPages ? Kneeboard.Write(dir, Fields, Cfg) : new();
+            var done = Cfg.KneeboardPages ? Kneeboard.Write(dir, Fields.Where(f => !f.Off).ToList(), Cfg) : new();
             boardDrop = Kneeboard.Owned(dir).Except(done, StringComparer.OrdinalIgnoreCase).Where(File.Exists).ToList();
             Kneeboard.Note(boardDrop);
         }
@@ -206,11 +206,18 @@ static partial class Program
         var bad = new List<string>();
         // #28 (log): "Buechel AB" is the DCS airfield "Buchel": ü/ue, ö/oe, ä/ae and ß/ss count as u, o, a, s on both sides
         static string N(string s) => Regex.Replace(Regex.Replace(s.ToLowerInvariant().Replace("ü", "u").Replace("ö", "o").Replace("ä", "a").Replace("ß", "s"), "([uoa])e", "$1").Replace("ss", "s"), "[^a-z0-9]", "");
-        foreach (var f in fields) f.Own.Clear();
+        foreach (var f in fields) { f.Own.Clear(); f.Off = false; }
         Carrier.StationFreqs.Clear();
         OwnSectors = new();
+        bool only = false;
         foreach (var (name, roles) in cfg ?? new())
         {
+            if (N(name) == "onlylisted")   // squadron request: DCS-ATC silent at every airfield without an entry in this file
+            {
+                if (roles.ValueKind is JsonValueKind.True or JsonValueKind.False) only = roles.GetBoolean();
+                else bad.Add(L("[ATC] frequencies.jsonc: OnlyListed muss true oder false sein – ignoriert", "[ATC] frequencies.jsonc: OnlyListed must be true or false – ignored"));
+                continue;
+            }
             if (N(name) == "centersectors")   // #18: Center/GCI sectors as in config.jsonc, in addition to those
             {
                 List<CenterSector>? cs = null;
@@ -253,6 +260,13 @@ static partial class Program
             }
         }
         Tower.CenterSectors = Cfg.CenterSectors.Concat(OwnSectors).ToList();
+        if (only)
+        {
+            foreach (var f in fields) f.Off = f.Own.Count == 0;
+            var on = fields.Where(f => !f.Off).Select(f => f.Name).ToList();
+            bad.Add(L($"[ATC] frequencies.jsonc: OnlyListed – DCS-ATC nur an {(on.Count == 0 ? "keinem Platz dieser Karte" : string.Join(", ", on))} ({on.Count} von {fields.Count} Plätzen)",
+                      $"[ATC] frequencies.jsonc: OnlyListed – DCS-ATC active only at {(on.Count == 0 ? "no airfield of this map" : string.Join(", ", on))} ({on.Count} of {fields.Count} airfields)"));
+        }
         // Own controller frequency at two airfields or = map frequency of another: FreqRoute takes the first airfield with own frequencies, the others cannot be reached on it (warning only)
         var order = fields.OrderBy(f => f.Own.Count == 0).ToList();
         foreach (var x in fields.SelectMany(f => f.Own.Where(o => o.Key != "ATIS").SelectMany(o => o.Value)).Distinct())
@@ -280,6 +294,13 @@ static partial class Program
         var (own, err) = OwnFreqs(text, Airfield.Theatre, Path.GetFileName(Airfield.TerrainDir(DcsDir(), Airfield.Theatre)));   // #19: heading = folder of the map (Sinai for SinaiMap)
         if (err != null) Log(err);
         foreach (var w in ApplyFreqs(Fields, own)) Log(w);
+        Tower.All = Fields.Where(f => !f.Off).ToList();   // OnlyListed: not a destination, alternate or emergency field either
+        foreach (var p in Pilots.Values.Append(Solo))   // switched on the fly: flights at a field that is now off lose it (no "captured" message)
+        {
+            if (p.Active?.F.Off == true) p.Active = null;
+            if (p.Pinned?.F.Off == true) (p.Pinned, p.PinFreqs) = (null, null);
+            foreach (var k in p.Towers.Where(t => t.Value.F.Off).Select(t => t.Key).ToList()) p.Towers.Remove(k);
+        }
         if (atisOn.Count > 0) StartAtis();
     }
 
@@ -356,6 +377,15 @@ static partial class Program
         "",
     };
 
+    /// Commented example for "OnlyListed", also added to files that already have the other examples
+    static readonly string[] OnlyExamples =
+    {
+        "  // EN: DCS-ATC only at the airfields listed in this file, all others silent (above all map headings on every map, under \"// ===== Map =====\" on that map only):",
+        "  // DE: DCS-ATC nur an den Plätzen, die in dieser Datei stehen, alle anderen stumm (über allen Kartenüberschriften auf jeder Karte, unter \"// ===== Karte =====\" nur dort):",
+        "  // \"OnlyListed\": true,   // DCS-ATC only at the airfields listed in this file",
+        "",
+    };
+
     /// Content of frequencies.jsonc: add missing maps (section) and airfields (line with "// id N"), change nothing else; only an unchanged generated line
     /// of the running map gets the exact DCS name from the mission (exact), Radio.lua does not always know it.
     internal static string FreqFile(string? old, IDictionary<string, Dictionary<int, (double Uhf, double Vhf, string Cs, string Name)>> maps, string theatre, Dictionary<int, string> exact)
@@ -370,6 +400,7 @@ static partial class Program
         }
         var lines = (old ?? FreqHeader).Replace("\r\n", "\n").TrimEnd('\n').Split('\n').ToList();
         if (!lines.Any(l => l.Contains("\"CenterSectors\"")) && lines.FindIndex(l => l.Trim() == "{") is >= 0 and var o) lines.InsertRange(o + 1, FreqExamples);   // #18: also into older files
+        if (!lines.Any(l => l.Contains("\"OnlyListed\"")) && lines.FindIndex(l => l.Trim() == "{") is >= 0 and var o2) lines.InsertRange(o2 + 1, OnlyExamples);
         bool Head(string l) => Regex.IsMatch(l, @"^\s*// ===== .+ =====");
         int Close() => lines.FindLastIndex(l => l.TrimStart().StartsWith('}')) is >= 0 and var c ? c : lines.Count;
         foreach (var (map, ids) in maps)

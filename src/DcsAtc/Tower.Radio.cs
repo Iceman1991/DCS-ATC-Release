@@ -23,9 +23,9 @@ public partial class Tower
     public bool ReadbackOnly(string text, Telemetry? t) => Normalize(text) is var n && Addressed(n) == null
         && !Has(n, "request", "requesting", "again", "confirm", "verify", "still", "say") && ReadsBack(n, Intent(n, t == null || OnGround(t)));
     /// Program: the transmission has actually gone out (radio queue) -> nag windows count from its end, not from queueing (vector repeated before the first call aired)
-    public void Aired(double now, string text, string role = "Approach")
+    public void Aired(double now, string text, string role = "Approach", double sec = 0)
     {
-        double end = now + text.Split(' ').Length / 2.5;
+        double end = now + (sec > 0 ? sec : text.Split(' ').Length / 2.5);   // real audio length; word estimate only without it (tests, text only)
         if (role != "Tower") { lastVecSaid = Math.Max(lastVecSaid, end); return; }
         towerEnd = Math.Max(towerEnd, end);   // PAR talk-down waits for it (also for a dropped call: text only, small phantom wait)
         if (text == last?.Text) awaitAir = false;
@@ -526,6 +526,8 @@ public partial class Tower
             case "traffic":   // "traffic in sight", "looking", "negative contact": acknowledge, remember the state of the last advisory (N24), never radar vectoring
                 if (advised.Count > 0 && advised.Values.MaxBy(v => v.At) is { } last)
                     last.St = Has(n, "negative", "not in sight", "no joy", "no visual", "blind") ? 2 : Has(n, "in sight", "tally") ? 1 : 0;
+                if (Has(n, "in sight", "tally") && !Has(n, "negative", "not in sight", "no joy", "no visual", "blind") && advised.Select(kv => (Id: kv.Key, At: kv.Value.At)).Concat(alerted.Select(kv => (Id: kv.Key, At: kv.Value))).ToList() is { Count: > 0 } repT)
+                    sighted.Add(repT.MaxBy(x => x.At).Id);   // the traffic he refers to: the last one called (information or alert)
                 return Say($"{c}, {OneOf("roger", "copy")}.");
 
             case "airborne_ready":

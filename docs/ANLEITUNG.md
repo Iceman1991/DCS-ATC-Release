@@ -1180,7 +1180,7 @@ Flugzeuge ohne ILS-Empfänger (F/A-18, F-14, AV-8B, F-5E, F-86, MiG-15/19, Warbi
 
 Ein ILS-Anflug wird nur überwacht: keine Gleitweg-Ansagen, nur die eine Tiefflugwarnung.
 
-**PAR** (IFR ohne ILS oder Notfall ohne ILS). Mit deinem ersten Ruf an Tower baut der Lotse den Talk-down auf und führt dich dann mit einem Ruf etwa alle 5 Sekunden bis zur Schwelle, jeder erst, wenn der vorige gesprochen ist:
+**PAR** (IFR ohne ILS oder Notfall ohne ILS). Mit deinem ersten Ruf an Tower baut der Lotse den Talk-down auf und führt dich dann mit einem Ruf etwa alle 5 bis 10 Sekunden bis zur Schwelle, jeder 2,5 Sekunden nach dem Ende des vorigen:
 
 > **Tower:** Enfield one one, Kutaisi Tower, P A R final. This will be a P A R approach to runway two five, decision height two hundred sixty feet. Do not acknowledge further transmissions. If no transmissions are received for five seconds on final approach, execute missed approach.  
 > **Tower:** Enfield one one, on glidepath, begin descent, on course.  
@@ -1245,11 +1245,11 @@ Approach und Departure halten dich von anderem Verkehr fern, Spieler wie KI. Die
 | Wann | Spruch |
 |---|---|
 | Erstanruf, Radarführung | „Traffic, Viper, 3 miles south of the field, 1500 feet.“ |
-| Konflikt innerhalb 60 s (näher als 1,5 NM und 700 ft) unter Führung oder im Anflug | „traffic alert, traffic 2 o'clock, 3 miles, same altitude. Turn right heading one two zero immediately, climb and maintain 5000 feet.“ Die nächsten 30 s keine anderen Anweisungen |
+| Konflikt innerhalb 60 s (näher als 1,5 NM und 700 ft) unter Führung oder im Anflug | „traffic alert, traffic 2 o'clock, 3 miles, same altitude. Turn right heading one two zero immediately, climb and maintain 5000 feet.“ Die nächsten 30 s keine anderen Anweisungen. Die Ausweichhöhe gilt nur vorübergehend: danach geht Approach zurück auf deine Vektorhöhe (oder deine aktuelle Höhe, wenn du inzwischen tiefer bist) |
 | KI-Abflug steigt in deinen Weg | „turn right heading …, traffic 11 o'clock, 4 miles, departing aircraft, climbing through 3000 feet.“ |
 | In der Platzrunde: Verkehr ohne Kontakt zum Tower, innerhalb 30 s näher als 0,5 NM | „traffic 2 o'clock, 1 mile, FA-18C, 1500 feet, no contact with Tower.“ |
 
-- **Antworten:** „traffic in sight“ bzw. „tally“, „looking“, „negative contact“ bzw. „no joy“. Approach antwortet „roger.“
+- **Antworten:** „traffic in sight“ bzw. „tally“, „looking“, „negative contact“ bzw. „no joy“. Approach antwortet „roger.“ Nach „traffic in sight“ kommen keine Ansagen mehr zu diesem Flugzeug, bis es mehr als 6 NM entfernt ist.
 - **Wessen Verkehr:** Radarhinweise nur für die eigene Seite und Neutrale; Feinde sind Sache des AWACS. Tower meldet alle in der Platzrunde.
 
 #### Geländewarnung
@@ -2645,6 +2645,13 @@ Standardmäßig nutzt jeder Platz die Frequenz, die DCS ihm auf der Karte gibt, 
 - **Werte:** eine Frequenz in MHz oder eine Liste wie `"Ground": [275.8, 121.8]` (UHF und VHF). Jeder Wert muss zwischen 30 und 400 MHz liegen.
 - **Platzname:** wie in DCS. Groß-/Kleinschreibung, Bindestriche, Leerzeichen und Satzzeichen sind egal, `"senaki kolkhi"` passt also zu `Senaki-Kolkhi`. Ein eindeutiger Teil des Namens reicht. Passt der Teil zu mehreren Plätzen, wird der Eintrag ignoriert.
 - **Kartenabschnitte:** Zeilen unter `// ===== <Karte> =====` gelten nur auf dieser Karte, benannt nach ihrem Ordner in `Mods\terrains`, wie die Datei ihn aufführt (`Sinai`, `GermanyColdWar`). Zeilen vor dem ersten Abschnitt gelten auf jeder Karte.
+- **Nur die gelisteten Plätze:** Mit `"OnlyListed": true,` arbeitet DCS-ATC nur an den Plätzen, die in der Datei eine aktive Zeile haben. Alle anderen Plätze bleiben stumm: kein Ground, Tower, Approach oder ATIS, keine Ansagen zu Kontrollzone oder Bahn, kein Eintrag im Funkrad oder auf dem Kneeboard, und sie werden nicht als Ziel-, Ausweich- oder Notlandeplatz genommen. Ein Ruf an einen davon bekommt keine Antwort (atc-log.txt vermerkt ihn). KI-Abflüge dort starten, ohne auf eine Freigabe zu warten. Center, AWACS, Tanker, Träger und Schießplätze sind nicht betroffen. Unter einer Kartenüberschrift gilt die Zeile nur für diese Karte, vor der ersten Überschrift für jede Karte. Steht kein Platz der Karte in der Datei, sind alle stumm. Oben in der Datei steht ein auskommentiertes Beispiel. Beispiel für eine Staffel, die auf Germany Cold War nur ein paar Plätze betreibt:
+  ```jsonc
+  // ===== GermanyColdWar =====
+  "OnlyListed": true,
+  "Nordholz": { "Ground": 251.0, "Tower": 257.8 },
+  "Wunstorf": { "Tower": 250.5 },
+  ```
 - **Nicht genannte Lotsen bleiben auf der Kartenfrequenz.** Ohne Departure übernimmt Approach die Abflüge wie bisher.
 - **Änderungen gelten sofort nach dem Speichern** der Datei, ohne Neustart.
 - **Ungültige Einträge werden ignoriert**, jeder mit einer Zeile in `atc-log.txt`, zum Beispiel:

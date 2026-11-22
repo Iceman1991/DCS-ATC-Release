@@ -438,10 +438,11 @@ static partial class Program
             var fm = mod != null && !mod.Equals(Cfg.Modulation, StringComparison.OrdinalIgnoreCase) ? " " + mod : "";
             if (!tx.Pilot) Log(info ? $"[INF] {tx.Text}" : $"[{tx.Role[..3].ToUpperInvariant()}] {tx.Station}{(freq > 0 ? $" ({freq:0.0##}{fm})" : "")}: {tx.Text}");
             double freq2 = tx.Freqs is { Length: > 1 } f2 ? f2[1] : 0;
+            double airSec = 0;   // real length of the synthesized call (Aired: end of the transmission for the PAR rhythm)
             var text = tx.Text;   // LD4: may change until sending (live)
             void Show()   // Text for the mission (*.out in the game, to the player's group; Gid -1 = speech only)
             {
-                tx.Aired?.Invoke();
+                tx.Aired?.Invoke(airSec);
                 if (!info) lock (RadioLog) { RadioLog.Add((Clock, label.TrimStart('>', ' ').TrimEnd(' ', ':'), text, tx.Gid, tx.Pilot)); if (RadioLog.Count > 30) RadioLog.RemoveAt(0); }   // FI7 map
                 if (tx.Gid < 0 || !Cfg.RadioText && !info && freq != 0 || info && !Cfg.HintText) return;   // #6: RadioText off = speech only; #27: HintText off = notes only in the log
                 var dur = ShowSec(tx, label);
@@ -462,10 +463,11 @@ static partial class Program
             var voice = tx.Voice ?? (tx.Pilot ? Cfg.PilotVoice : VoiceFor(tx.Role, tx.Station));
             var sw = Stopwatch.StartNew();
             sec = Synth(tx.Text, voice, mp3, tx.Pilot, tx.Stress, PaceOf(tx));
-            Trace("TTS", FormattableString.Invariant($"{Path.GetFileName(mp3)} {tx.Role} {tx.Station} {freq:0.0##}{(freq2 > 0 ? $"/{freq2:0.0##}" : "")} gid {tx.Gid} prio {PrioOf(tx)} Seite {tx.Side} Stimme {voice} Tempo {(tx.Pilot ? 1.0 : Cfg.SpeechRate) * (tx.Stress ? 0.85 : 1) * PaceOf(tx):0.00} {sec:0.0} s, Synth {sw.ElapsedMilliseconds} ms, Rückstau {Backlog(freq):0} s: {tx.Text}"));
+            airSec = sec;
+            Trace("TTS", FormattableString.Invariant($"{Path.GetFileName(mp3)} {tx.Role}{tx.Station} {freq:0.0##}{(freq2 > 0 ? $"/{freq2:0.0##}" : "")} gid {tx.Gid} prio {PrioOf(tx)} Seite {tx.Side} Stimme {voice} Tempo {(tx.Pilot ? 1.0 : Cfg.SpeechRate) * (tx.Stress ? 0.85 : 1) * PaceOf(tx):0.00} {sec:0.0} s, Synth {sw.ElapsedMilliseconds} ms, Rückstau {Backlog(freq):0} s: {tx.Text}"));
             if (SayQueue.IsAddingCompleted) { Show(); Transmit(mp3, freq, tx.Station, freq2, tx.Side, mod); }   // --say: wait until sent
             else Play(mp3, freq, tx.Station, Show, freq2, PrioOf(tx), sec, tx.MaxAge > 0 ? tx.MaxAge : tx.Prio == 2 || tx.Role == "AWACS" ? 20 : 45, tx.Side, RankOf(tx),   // AI radio, picture: becomes outdated quickly
-                      tx.Live == null ? null : () => tx.Live() is { } t2 && t2 != text ? Synth(text = t2, voice, mp3, tx.Pilot, tx.Stress, PaceOf(tx)) : -1, mod);   // LD4: re-spoken if the BRAA has changed
+                      tx.Live == null ? null : () => tx.Live() is { } t2 && t2 != text ? airSec = Synth(text = t2, voice, mp3, tx.Pilot, tx.Stress, PaceOf(tx)) : -1, mod);   // LD4: re-spoken if the BRAA has changed
         }
     }
 
