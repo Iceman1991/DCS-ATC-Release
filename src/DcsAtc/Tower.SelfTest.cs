@@ -4106,6 +4106,11 @@ public partial class Tower
               $"R212 Batumi Circling: {fcFt:0} ft, {cc:0} ft, {fc} | {lastMsg} | {string.Join(" | ", ci31)}");
         Check(new Tower(bat, "x").AtisText("B", new Telemetry(bat.Elev + 2, 0, 0, 0, bat.X, bat.Z, 0, 0, 760), 15, true, 200, 3000).Contains("expect vectors for ILS approach runway one three, localizer one one zero decimal three"),
               "Batumi ATIS IFR -> 13");
+        // aircraft without ILS receiver (Hornet) gets PAR instead of ILS, F-16 keeps ILS
+        var atnh = new Tower(bat, "x") { AcType = "FA-18C_hornet" }.AtisText("B", new Telemetry(bat.Elev + 2, 0, 0, 0, bat.X, bat.Z, 0, 0, 760), 15, true, 200, 3000);
+        var atnf = new Tower(bat, "x") { AcType = "F-16C_50" }.AtisText("B", new Telemetry(bat.Elev + 2, 0, 0, 0, bat.X, bat.Z, 0, 0, 760), 15, true, 200, 3000);
+        Check(atnh.Contains("expect vectors for P A R approach runway one three") && !atnh.Contains("expect vectors for ILS approach") && atnf.Contains("expect vectors for ILS approach runway one three")
+              && !new Tower(bat, "x") { AcType = "FA-18C_hornet" }.IlsFor("13") && new Tower(bat, "x") { AcType = "F-16C_50" }.IlsFor("13"), "Typ ohne ILS-Empfaenger bekommt PAR statt ILS: " + atnh);
         // FI5: NOTAM ILS 13 u/s -> ATIS reads it, IFR gets PAR instead of ILS; own free text read as written; empty list = everything back
         Airfield.SetNotams(new[] { bat }, new() { ["Batumi"] = new() { "ILS 13 u/s", "Taxiway B closed." } }, false, new DateTime(2026, 10, 18));
         var atn5 = new Tower(bat, "x").AtisText("B", new Telemetry(bat.Elev + 2, 0, 0, 0, bat.X, bat.Z, 0, 0, 760), 15, true, 200, 3000);

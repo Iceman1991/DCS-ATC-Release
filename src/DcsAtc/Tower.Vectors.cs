@@ -53,9 +53,10 @@ public partial class Tower
 
     /// K9: instrument approach as on the charts (minima only for ILS/PAR/SRA, no TACAN or VOR procedure): ILS of the runway (Beacons.lua),
     /// otherwise with IFR precision radar (PAR, final callouts from the controller); "" = in visual conditions without ILS "straight in approach". TACAN/VOR only navigation aid.
-    string Proc(string rw) => F.IlsOn(rw) ? "ILS" : Ifr ? "P A R" : "";   // FI5: ILS unserviceable (NOTAM) -> PAR or visual
+    string Proc(string rw) => IlsFor(rw) ? "ILS" : Ifr ? "P A R" : "";   // FI5: ILS unserviceable (NOTAM) -> PAR or visual
+    internal bool IlsFor(string rw) => F.IlsOn(rw) && !NoIls.IsMatch(AcType ?? "");   // type without ILS receiver gets PAR/straight in
     /// "ILS approach runway one three, localizer one one zero decimal three", "P A R approach runway two five", otherwise "straight in approach runway one three".
-    string ProcSay(string rw) => F.IlsOn(rw) ? $"ILS approach runway {RwSay(rw)}, localizer {FreqSay(F.Ils[rw].Mhz)}"
+    string ProcSay(string rw) => IlsFor(rw) ? $"ILS approach runway {RwSay(rw)}, localizer {FreqSay(F.Ils[rw].Mhz)}"
         : $"{(Proc(rw) is var p && p != "" ? p : "straight in")} approach runway {RwSay(rw)}";
 
     /// R352: replanning under radar; other runway or route than before: "due to terrain, expect …" before the vector (FAA JO 7110.65 4-8-1, 5-9-2)
@@ -425,6 +426,7 @@ public partial class Tower
     /// Night (sun below -6°, Y line of the mission; unknown = day) or type without overhead break: inbound gets straight-in/instrument approach right away.
     static bool Night => Carrier.Sun < -6;
     static readonly Regex NoBreak = new(@"^(UH-|Mi-|Ka-|AH-|CH-|OH|SA342|AS532|C-1[37]|C-47|An-|Il-|Tu-|B-1|B-52|KC|E-[23]|S-3)");
+    static readonly Regex NoIls = new(@"^(FA-18|EA-18|F-14|AV8B|F-5E|F-86|MiG-15|MiG-19|P-51|TF-51|P-47|SpitfireLFMkIX|Bf-109|FW-190|I-16|MosquitoFBMkVI)");   // ICLS/TACAN/ADF only, no ILS -> PAR
     bool wantOverhead;   // explicitly overhead/visual requested: applies at night too
     static readonly (string Rx, int[] Kts)[] SlowTypes =
     {

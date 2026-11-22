@@ -873,7 +873,7 @@ Plätze können NOTAMs haben. Die ATIS liest sie vor „Advise on initial contac
 Der Platz ist **IFR**, wenn die Missionssicht unter 5 km oder die Wolkenuntergrenze unter 600 m (etwa 2000 ft) über NN liegt. Unter IFR:
 
 - Kein Initial und kein Overhead. „initial“ bekommt „negative, field is I F R. Expect vectors for ILS approach runway two five, localizer …, report inbound to Kutaisi Approach.“ „overhead“ bekommt „negative, field is I F R, no overhead.“
-- Approach führt dich auf ein **ILS**, wenn die Bahn eins hat, sonst auf einen **PAR**-Anflug mit Gleitweg-Ansagen.
+- Approach führt dich auf ein **ILS**, wenn die Bahn eins hat, sonst auf einen **PAR**-Anflug mit Gleitweg-Ansagen. Flugzeuge ohne ILS-Empfänger (F/A-18, F-14, AV-8B, F-5E, F-86, MiG-15/19, Warbirds) bekommen statt des ILS einen PAR-Anflug (VFR: Geradeausanflug).
 - „cancel IFR“, „VFR“ und „request visual approach“ werden abgelehnt.
 - Touch-and-go und Low Approach werden radargeführte Instrumentenrunden.
 
@@ -1175,6 +1175,8 @@ Approach führt dich zum **Initial**: etwa 2 NM (4000 m) vor der Schwelle auf de
 > **Approach:** Enfield one one, 12 miles from touchdown, maintain 3000 feet until established, cleared ILS approach runway two five, QNH one zero one three, contact Kutaisi Tower.
 
 - **Die Freigabe kommt mit der letzten Kurve zur Mittellinie** (ILS und PAR). Die Kurve ist höchstens 30° und trifft die Mittellinie mindestens 2 NM vor dem Gate. Näher am Gate gilt höchstens 20°, und nur bei einer Wolkenuntergrenze mindestens 500 ft über der Mindestführungshöhe und 3 Meilen Sicht. Bist du schon nahe der Mittellinie, bekommst du eine Kurve von 10 bis 30° darauf, nie einen Parallelkurs.
+
+Flugzeuge ohne ILS-Empfänger (F/A-18, F-14, AV-8B, F-5E, F-86, MiG-15/19, Warbirds) bekommen keine ILS-Freigabe, sondern einen PAR-Anflug (VFR: Geradeausanflug).
 
 Ein ILS-Anflug wird nur überwacht: keine Gleitweg-Ansagen, nur die eine Tiefflugwarnung.
 

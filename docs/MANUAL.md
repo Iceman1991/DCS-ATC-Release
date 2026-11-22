@@ -871,7 +871,7 @@ Airfields can have NOTAMs. The ATIS reads them before "Advise on initial contact
 The airfield is **IFR** when the mission visibility is below 5 km or the cloud base is below 600 m (about 2,000 ft) above sea level. Under IFR:
 
 - There is no initial or overhead. "initial" gets "negative, field is I F R. Expect vectors for ILS approach runway two five, localizer …, report inbound to Kutaisi Approach." "overhead" gets "negative, field is I F R, no overhead."
-- Approach vectors you onto an **ILS** if the runway has one, otherwise onto a **PAR** approach with glide-path calls.
+- Approach vectors you onto an **ILS** if the runway has one, otherwise onto a **PAR** approach with glide-path calls. Aircraft without an ILS receiver (F/A-18, F-14, AV-8B, F-5E, F-86, MiG-15/19, warbirds) get a PAR approach instead of the ILS (VFR: straight in).
 - "cancel IFR", "VFR" and "request visual approach" are refused.
 - Touch-and-go and low-approach practice become radar-vectored instrument circuits.
 
@@ -1173,6 +1173,8 @@ Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the t
 > **Approach:** Enfield one one, 12 miles from touchdown, maintain 3000 feet until established, cleared ILS approach runway two five, QNH one zero one three, contact Kutaisi Tower.
 
 - **The clearance comes with the last turn toward the centreline** (ILS and PAR). The turn is at most 30° and meets the centreline at least 2 NM before the gate. Closer to the gate, the limit is 20°, and only with a ceiling at least 500 ft above the minimum vectoring altitude and 3 miles visibility. If you are already close to the centreline, you get a turn of 10 to 30° onto it, never a parallel heading.
+
+Aircraft without an ILS receiver (F/A-18, F-14, AV-8B, F-5E, F-86, MiG-15/19, warbirds) are not cleared for the ILS; they get a PAR approach instead (VFR: straight in).
 
 The controller only monitors an ILS approach: no glide-path calls, just the one low-altitude alert.
 

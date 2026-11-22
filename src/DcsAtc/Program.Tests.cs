@@ -1913,6 +1913,16 @@ static partial class Program
             if (c0 != "0" || c1 != "12" || c2 != "0" || F(0, "ClientGuid").Length != 22 || F(0, "ClientGuid") == F(1, "ClientGuid"))
                 throw new Exception($"K4 Coalition Security: {c0} {c1} {c2}");
             Console.WriteLine("OK   SRS Coalition Security (K4): ohne Koalition 0 (Zuschauer), mit Security Blau + zweite Verbindung Rot (eigene GUID), aus -> wieder 0");
+            // SPECTATORS_AUDIO_DISABLED: spectators get no voice -> join as red + blue like with security
+            var nsl = new SrsListener(5002, lf, _ => false, _ => { });
+            string G(int conn) => System.Text.RegularExpressions.Regex.Match(nsl.Message(3, conn), "\"Coalition\":\"?([^\",]*)").Groups[1].Value;
+            nsl.OnServerMessage("""{"MsgType":2,"Clients":[],"ServerSettings":{"COALITION_AUDIO_SECURITY":"false","SPECTATORS_AUDIO_DISABLED":"True"}}""");
+            string s1 = G(0) + G(1);
+            nsl.OnServerMessage("""{"MsgType":4,"ServerSettings":{"SPECTATORS_AUDIO_DISABLED":"false"}}""");
+            string s2 = G(0);
+            if (s1 != "12" || s2 != "0")
+                throw new Exception($"SRS Zuschauer-Audio gesperrt: erwartet 12 und 0, war {s1} und {s2}");
+            Console.WriteLine("OK   SRS Spectators audio disabled: Server sperrt Zuschauer -> Blau + zweite Verbindung Rot, wieder erlaubt -> 0");
         }
         // Neighboring airfield: 4000 ft at the point, 5000 ft 1 km beside -> 5 NM away next free 6000; 15 NM away free; own does not count
         Holds["ai:X"] = (0, 0, 4000);

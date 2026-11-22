@@ -17,12 +17,14 @@ sealed class SrsListener
     internal const int Max = 20;
     volatile int resync;   // counter: every connection sends RADIO_UPDATE when it changes
     volatile bool security;   // K4: COALITION_AUDIO_SECURITY of the server (SYNC/SERVER_SETTINGS) - it forwards voice only within the coalition
+    volatile bool noSpec;   // SPECTATORS_AUDIO_DISABLED: spectators get no voice -> join as red + blue like K4
+    bool Split => security || noSpec;
     string serverSettings = "";
     readonly Action<Transmission> onTx;
     readonly Func<string, bool> ignoreName;   // do not monitor own controller voices (ExternalAudio)
-    readonly string[] guids = { NewGuid(), NewGuid() };   // K4: connection 0 (spectator, blue with security), 1 (red, only with security)
+    readonly string[] guids = { NewGuid(), NewGuid() };   // K4: connection 0 (spectator, blue with security or spectators-disabled), 1 (red, only with security or spectators-disabled)
     static string NewGuid() => Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '_').Replace('+', '-')[..22];
-    int Side(int conn) => conn == 1 ? 2 : security ? 1 : 0;
+    int Side(int conn) => conn == 1 ? 2 : Split ? 1 : 0;
     readonly Dictionary<string, (string Name, uint UnitId, double[]? Freqs, Iff? Iff)> clients = new();
     readonly Dictionary<string, Rx> open = new();
     public bool Connected { get; private set; }
@@ -81,7 +83,7 @@ sealed class SrsListener
     {
         while (true)
         {
-            try { if (conn == 0 || security) Session(conn); }   // K4: red connection only with coalition security
+            try { if (conn == 0 || Split) Session(conn); }   // K4: red connection only with coalition security
             catch (Exception e) { if (Connected) { if (conn == 0) Console.WriteLine(L("      SRS-Abhören getrennt: ", "      SRS listening disconnected: ") + e.Message); Program.Trace("SRS", $"getrennt ({conn}): {e.GetType().Name}: {e.Message}"); } }
             if (conn == 0) Connected = false;
             Thread.Sleep(5000);   // SRS server not there yet / restarted
@@ -126,7 +128,7 @@ sealed class SrsListener
         var noPongAt = (DateTime?)DateTime.Now.AddSeconds(10);   // Forum (Tony86): TCP up, UDP blocked (firewall) = no voice, no error
         var nextSync = DateTime.Now.AddSeconds(30);
         udp.Client.ReceiveTimeout = 100;
-        while (reader.IsAlive && (conn == 0 || security))
+        while (reader.IsAlive && (conn == 0 || Split))
         {
             try { var any = new IPEndPoint(IPAddress.Any, 0); var b = udp.Receive(ref any); if (Debug) Console.WriteLine($"udp {b.Length}"); if (b.Length == 22) pong = true; else OnVoice(b); }   // K4: duplicate packets (global frequencies) land on the same packet ID
             catch (SocketException e) when (e.SocketErrorCode == SocketError.TimedOut) { }
@@ -203,6 +205,13 @@ sealed class SrsListener
                 security = !security;
                 resync++;   // connection 0 becomes blue or spectator again
                 Program.Trace("SRS", $"Coalition Security {(security ? "an: zweite Verbindung als Rot" : "aus")}");
+            }
+            if (root.TryGetProperty("ServerSettings", out var ss2) && ss2.ValueKind == JsonValueKind.Object && ss2.TryGetProperty("SPECTATORS_AUDIO_DISABLED", out var sd)
+                && (bool.TryParse(sd.ToString(), out var nsp) && nsp) != noSpec)   // "True"/"false" both occur
+            {
+                noSpec = !noSpec;
+                resync++;
+                Program.Trace("SRS", $"Spectators audio disabled {(noSpec ? "an: als Rot + Blau statt Zuschauer" : "aus")}");
             }
             if (root.TryGetProperty("Clients", out var list) && list.ValueKind == JsonValueKind.Array) foreach (var c in list.EnumerateArray()) Add(c);
             if (root.TryGetProperty("Client", out var one) && one.ValueKind == JsonValueKind.Object)
