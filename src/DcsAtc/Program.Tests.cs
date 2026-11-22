@@ -1938,16 +1938,29 @@ static partial class Program
             if (c0 != "0" || c1 != "12" || c2 != "0" || F(0, "ClientGuid").Length != 22 || F(0, "ClientGuid") == F(1, "ClientGuid"))
                 throw new Exception($"K4 Coalition Security: {c0} {c1} {c2}");
             Console.WriteLine("OK   SRS Coalition Security (K4): ohne Koalition 0 (Zuschauer), mit Security Blau + zweite Verbindung Rot (eigene GUID), aus -> wieder 0");
-            // SPECTATORS_AUDIO_DISABLED: spectators get no voice -> join as red + blue like with security
+            // SPECTATORS_AUDIO_DISABLED: the server drops audio SENT by coalition-0 clients; we only listen, so we stay a spectator (no red connection)
             var nsl = new SrsListener(5002, lf, _ => false, _ => { });
             string G(int conn) => System.Text.RegularExpressions.Regex.Match(nsl.Message(3, conn), "\"Coalition\":\"?([^\",]*)").Groups[1].Value;
             nsl.OnServerMessage("""{"MsgType":2,"Clients":[],"ServerSettings":{"COALITION_AUDIO_SECURITY":"false","SPECTATORS_AUDIO_DISABLED":"True"}}""");
-            string s1 = G(0) + G(1);
+            string s1 = G(0);
             nsl.OnServerMessage("""{"MsgType":4,"ServerSettings":{"SPECTATORS_AUDIO_DISABLED":"false"}}""");
             string s2 = G(0);
-            if (s1 != "12" || s2 != "0")
-                throw new Exception($"SRS Zuschauer-Audio gesperrt: erwartet 12 und 0, war {s1} und {s2}");
-            Console.WriteLine("OK   SRS Spectators audio disabled: Server sperrt Zuschauer -> Blau + zweite Verbindung Rot, wieder erlaubt -> 0");
+            if (s1 != "0" || s2 != "0")
+                throw new Exception($"SRS Zuschauer-Audio gesperrt: erwartet 0 und 0, war {s1} und {s2}");
+            // Own player client in coalition 0 (real message shape): the server drops what it sends -> warn once per client
+            string Msg(string name, int coal, string spec) => """{"MsgType":2,"Clients":[{"ClientGuid":"p1","Name":"@NAME","Coalition":@SIDE,"RadioInfo":{"unitId":16881664,"radios":[]}}],"ServerSettings":{"COALITION_AUDIO_SECURITY":"false","SPECTATORS_AUDIO_DISABLED":"@SPEC"}}""".Replace("@NAME", name).Replace("@SIDE", coal.ToString()).Replace("@SPEC", spec);
+            int Warns(params string[] msgs)
+            {
+                var w = new List<string>();
+                var sl = new SrsListener(5002, lf, _ => false, _ => { }) { Warned = w.Add };
+                foreach (var m in msgs) sl.OnServerMessage(m);
+                return w.Count;
+            }
+            int w1 = Warns(Msg("player", 0, "True")), w2 = Warns(Msg("player", 0, "True"), Msg("player", 0, "True")), w3 = Warns(Msg("player", 2, "True")), w4 = Warns(Msg("DCS-ATC", 0, "True")), w5 = Warns(Msg("player", 0, "false")),
+                w6 = Warns(Msg("player", 0, "false"), """{"MsgType":4,"ServerSettings":{"SPECTATORS_AUDIO_DISABLED":"True"}}""");
+            if (w1 != 1 || w2 != 1 || w3 != 0 || w4 != 0 || w5 != 0 || w6 != 1)
+                throw new Exception($"SRS Zuschauer-Warnung: erwartet 1 1 0 0 0 1, war {w1} {w2} {w3} {w4} {w5} {w6}");
+            Console.WriteLine("OK   SRS Spectators audio disabled: wir bleiben Zuschauer (keine rote Verbindung); eigener Client in Koalition 0 -> genau eine Warnung, keine bei Koalition 2/DCS-ATC/Einstellung aus, auch wenn die Einstellung später kommt");
         }
         // Neighboring airfield: 4000 ft at the point, 5000 ft 1 km beside -> 5 NM away next free 6000; 15 NM away free; own does not count
         Holds["ai:X"] = (0, 0, 4000);

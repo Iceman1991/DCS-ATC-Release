@@ -2203,9 +2203,10 @@ Texaco:  Enfield one one, Texaco, total offload 6.2, cleared to depart, contact 
 
 ### Range
 
-Einen Range-Lotsen gibt es nur, wenn die Mission eine Triggerzone hat, deren Name mit **Range** beginnt. Jede solche Zone ist eine eigene Range, eine Mission kann also mehrere haben.
+Einen Range-Lotsen gibt es nur, wenn die Mission eine Triggerzone mit dem Wort **Range** im Namen hat (an beliebiger Stelle: *Range 62*, *Dogbone Range*; nicht *Orange*). Jede solche Zone ist eine eigene Range, eine Mission kann also mehrere haben.
 
 - **Name:** der Zonenname ist der gesprochene Name. Heißt die Zone nur *Range* (oder ist der Name sehr kurz), wird sie nach der Reihenfolge *Range Alpha*, *Range Bravo* usw. genannt. Mit einem Namen wie *Range 62* oder *Range Nord* (`_` wird zum Leerzeichen) heißt der Lotse so.
+- **Rufzeichen:** steht Range nicht am Anfang, sind die Wörter davor das Rufzeichen der Range. Eine Zone *Dogbone Range 268.5* meldet sich als *Dogbone Range*, rufen kannst du sie mit *„Dogbone, Enfield 1-1, checking in“* oder *„Dogbone Range, Enfield 1-1, checking in“*.
 - **Frequenz:** steht im Zonennamen eine Frequenz zwischen 108 und 399 MHz (*Range 62 268.5*), hat diese Range ihre eigene Frequenz. Sonst gilt `"Range"` aus config.jsonc.
 - **Welche Range antwortet:** der genannte Name, sonst die Range, bei der du eingecheckt bist, sonst die zur gesendeten Frequenz, sonst die nächste zu deiner Position.
 - **Hot und Treffer** gelten je Range: ein Flugzeug in einer Range sperrt die andere nicht, Einschläge zählen nur für die Range, in der sie fallen.
@@ -2471,7 +2472,7 @@ Was passiert:
 
 - **Geparkt:** stehst du 10 s still auf einem Parkplatz, erscheinen vorne links ein Crew Chief und vorne rechts ein Brandposten. Der Crew Chief spricht über SRS auf der **Bordsprechanlage** deines Flugzeugs. Ohne SRS siehst du nur den Text.
 - **Nach der Landung:** ein Tank- und ein Munitionswagen kommen von einem freien Platz in der Nähe und bleiben 4 Minuten. Sie sind nur Kulisse. Tanken und Aufmunitionieren laufen weiter über die DCS-Bodencrew (`\` → F8), ein Texthinweis erinnert daran.
-- **Losrollen:** die Soldaten treten zurück, die Wagen fahren weg, alles verschwindet.
+- **Losrollen:** sobald du anrollst, geht jeder Soldat seitlich aus deinem Weg. Die Wagen bleiben stehen, alles verschwindet, wenn du weg bist. Nach ihren 4 Minuten fahren die Wagen seitlich vom Flugzeug weg.
 - **Absturz oder schwer beschädigte Landung:** ein Feuerwehrwagen kommt und fährt nach 5 Minuten wieder.
 
 | Wann | Crew Chief (Bordsprechanlage) |
@@ -3170,6 +3171,7 @@ Den Moment markieren: Geht im Flug etwas schief, wähle im Funkrad oder in F10 *
   - Bei „say again“ wiederholen oder das Funkrad nehmen.
 - **Text im Spiel, aber keine Stimme?** Zeigt das DCS-ATC-Fenster „(SRS-Server nicht erreichbar)“, läuft der SRS-Server nicht lokal oder auf einem anderen Port. Dein SRS-Client muss mit dem SRS-Server auf dem DCS-ATC-PC verbunden sein (`127.0.0.1`), nicht mit einem anderen Server, sonst geht in keine Richtung Ton. Beides erscheint auch einmal als Text im Spiel.
 - **Virenscanner oder Firewall:** Sie können Piper und andere Teile von DCS-ATC oder den SRS-Ton über UDP blockieren, während SRS weiter „verbunden“ zeigt. Bleibt die Stimme aus, trage Ausnahmen für den DCS-ATC-Ordner und `C:\Program Files\DCS-SimpleRadio-Standalone` ein, auch in der Firewall.
+- **„Spectators audio disabled“ im SRS-Server:** Der Server verwirft dann alles, was ein Zuschauer sendet, und im Einzelspieler ist dein SRS-Client oft Zuschauer (Koalition 0), auch im Flugzeug. Dann hört dich niemand, auch DCS-ATC nicht. Schalte die Einstellung aus; das DCS-ATC-Fenster weist darauf hin, wenn es das sieht.
 - **VoiceAttack, VAICOM, WhisperAttack:** DCS-ATC braucht sie nicht, nur SRS und deine SRS-Sprechtaste. Kommst du nicht durch, schalte sie aus und teste nur mit SRS.
 - **Kein F10 → DCS-ATC und falsches Rufzeichen?** DCS-ATC hat keine Missionsdaten, `MissionScripting.lua` ist also nicht angepasst. Siehe „Nach einem DCS-Update“ unten.
 

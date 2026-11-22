@@ -168,7 +168,8 @@ local function has(e) for _, x in ipairs(events) do if x == e then return true e
 local function hasTask(s) for _, x in ipairs(tasks) do if x:find(s, 1, true) then return true end end end
 
 -- A17: range zone of the mission and a red tank in it
-env.mission.triggers = { zones = { { name = "Range Alpha", x = 20000, y = 0, radius = 3000 }, { name = "Range 62 268.5", x = 26000, y = 0, radius = 1000 } } }   -- #56: second range, own name and frequency
+env.mission.triggers = { zones = { { name = "Range Alpha", x = 20000, y = 0, radius = 3000 }, { name = "Range 62 268.5", x = 26000, y = 0, radius = 1000 },
+  { name = "Dogbone Range 268.5", x = 32000, y = 0, radius = 500 }, { name = "Orange zone", x = 38000, y = 0, radius = 500 } } }   -- the word Range anywhere counts, "Orange" not   -- #56: second range, own name and frequency
 tank = unit("Tank1", 20000, 0, nil, 1)
 function tank:getTypeName() return "T-72B" end
 tank2 = unit("Tank2", 26000, 0, nil, 1); function tank2:getTypeName() return "BMP-2" end   -- #56: target of the second range
@@ -193,7 +194,23 @@ assert(DCSATC, "DCSATC fehlt")
 -- Player stands on Kutaisi parking spot 1 (player slot, taboo for AI)
 local p1 = plane("P1", 0, 0, "Player1")
 plane("RwyStart", 1500, 0)   -- #26: stands on the runway spawn point, gets no ground crew (the count below stays 1)
-assert(cvSilent == nil); run(18); assert(cvSilent == true, "DCS-ATC des Trägers nicht stumm"); assert(#find("ATC GC") == 1 and has("C;P1;crew"), "Crew P1 fehlt: GC=" .. #find("ATC GC") .. " ev=" .. table.concat(events, ","))
+assert(cvSilent == nil); run(18); assert(cvSilent == true, "DCS-ATC des Trägers nicht stumm"); assert(#find("ATC GC") == 2 and has("C;P1;crew"), "Crew P1 fehlt: GC=" .. #find("ATC GC") .. " ev=" .. table.concat(events, ","))
+-- Forum (A-10C): each soldier is its own group; when the aircraft rolls (> 0.7 m/s) both walk sideways out of the wing span, never along the nose
+do
+  local half = p1:getDesc().box.max.z
+  local st = {}
+  for n, g in pairs(groups) do if n:find("ATC GC", 1, true) then st[#st + 1] = { n = n, g = g, p = g:getUnit():getPoint() } end end
+  assert(#st == 2 and #st[1].g:getUnits() == 1 and #st[2].g:getUnits() == 1, "Soldaten nicht je eigene Gruppe")
+  p1.v = vec(1, 0); run(T + 2); p1.v = vec(0, 0)
+  for _, s in ipairs(st) do
+    local pts = s.g.task and s.g.task.params.route.points
+    assert(pts and #pts >= 2, "Soldat ohne Route beim Rollen: " .. s.n)
+    local e = pts[#pts]
+    assert(math.abs(e.y - 0) > half + 5, "Soldat bleibt in der Flaechenbreite: lat=" .. (e.y))
+    assert(e.x <= s.p.x + 0.01, "Soldat geht nach vorn: " .. e.x .. " vs " .. s.p.x)
+    for i = 2, #pts do assert(not (math.abs(pts[i].y) < half + 2 and pts[i].x > 0), "Route quert den Korridor vor dem Flugzeug") end
+  end
+end
 
 assert(#find("ATC Senaki ARR") == 2, "Startanflüge Senaki: " .. #find("ATC Senaki ARR"))
 -- R8: F10 Ground -> IFR clearance: without destination, then own/neutral airfields without the own one (Kutaisi under 5 km)
@@ -331,6 +348,32 @@ run(T + 14); assert(has("C;P2;back"), "Welcome back fehlt")
 run(T + 25); assert(has("C;P2;fuel"), "Lkw fehlen")
 p1.v = vec(5, 0)
 run(T + 50)
+do   -- Forum (A-10C): trucks stay when the aircraft rolls; at the end of their turn they leave sideways, never across the aircraft
+  local half = p2:getDesc().box.max.z
+  local function trucks() local l = {} for n, g in pairs(groups) do if n:find("ATC GC", 1, true) and g.d.units[1].type == "M978 HEMTT Tanker" then l[#l + 1] = g end end return l end
+  local p1v = p1.v; p1.v = vec(0, 0)   -- a moving P1 nearby delays the trucks (taxiingNear)
+  local p3 = plane("P3", 0, 150, "Wing3")
+  for _, h in ipairs(handlers) do h:onEvent({ id = world.event.S_EVENT_LAND, initiator = p3 }) end
+  run(T + 40); local tr3 = trucks(); local before = #tr3
+  assert(before >= 2, "Lkw fuer P3 fehlen: " .. before)
+  p3.v = vec(2, 0); run(T + 4); p3.v = vec(0, 0); p1.v = p1v
+  for _, g in ipairs(tr3) do if g.d.route and g.d.route.points[2].y > 120 then assert(g.task == nil, "Lkw fahren beim Rollen los") end end
+  for _ = 1, 20 do   -- until P2's turn is over (doneAt = TURN after arrival)
+    run(T + 20)
+    local l = trucks()
+    if #l == 1 and l[1].task then break end
+  end
+  local checked = 0  for _, g in ipairs(trucks()) do
+    local pts = g.task and g.task.params.route.points
+    if pts and g.d.route.points[2].y < 120 then   -- P2's trucks (z near 100)
+      checked = checked + 1
+      for _, q in ipairs(pts) do assert(math.abs(q.y - 100) >= half + 3, "Lkw quert das Flugzeug: lat=" .. (q.y - 100)) end
+      local a, e = pts[1], pts[#pts]
+      assert(math.abs(math.sqrt((e.x - a.x) ^ 2 + (e.y - a.y) ^ 2) - 40) < 0.5 and math.abs(e.x - a.x) < 0.01, "Lkw fahren nicht 40 m seitlich weg")
+    end
+  end
+  assert(checked == 1, "P2-Lkw ohne Abfahrt-Route: " .. checked)
+end
 run(T + 300); assert(not has("C;P2;done"), "Lkw melden \"done\", getankt wird nichts (A37)")
 -- DCS radio menu: tanker position in the DCS list (by distance), airfield only at night
 coalition.service = { ATC = 0, AWACS = 1, TANKER = 2 }
@@ -521,6 +564,7 @@ fire({ id = world.event.S_EVENT_REFUELING, initiator = p1 }); assert(has("F;P1;s
 fire({ id = world.event.S_EVENT_REFUELING_STOP, initiator = p1 }); assert(has("F;P1;stop;0.400;4899"), "F;stop mit Innentank fehlt")
 -- A17: range zone "Range Alpha" -> Z line; player bomb 12 m before the red tank (approach to the north: 6 o'clock) -> R with flight time; gun hit/kill in the zone -> H/K
 assert(stateFile():find("Z;20000;0;3000;Range Alpha", 1, true) and stateFile():find("Z;26000;0;1000;Range 62 268.5", 1, true), "Z-Zeilen (Range) fehlen: " .. stateFile())
+assert(stateFile():find("Z;32000;0;500;Dogbone Range 268.5", 1, true) and not stateFile():find("Orange", 1, true), "Range als Wort im Zonennamen: " .. stateFile())
 local bomb = { p = vec(19988, 0), alive = true }
 function bomb:getDesc() return { category = 3 } end
 function bomb:getTypeName() return "weapons.bombs.Mk_82" end

@@ -613,13 +613,13 @@ local function start()
     g:getController():setTask({ id = "Mission", params = { route = { points = pts } } })
   end
 
-  -- Range (A17, from KutaisiATC.lua): first trigger zone "Range…" of the mission (circle or quad: farthest corner point) -> Z line; without a zone no range controller.
+  -- Range (A17, from KutaisiATC.lua): trigger zone with the word "Range" in its name (circle or quad: farthest corner point) -> Z line; without a zone no range controller.
   -- Impacts of players' bombs/missiles/air-to-ground guided weapons in it: distance and clock position (12 = approach direction) to the nearest ground, ship or static target of the opposing side in the zone,
   -- flight time (the app checks the clearance for the drop, R58); gun hits and kills in the zone -> R/H/K events. Only measure, spawn nothing.
-  -- #56: every zone "Range…" is one range (RZS, 0-based index in the events); the zone name gives name and frequency in the app ("Range 62 268.5").
+  -- #56: every zone with the word Range is one range (RZS, 0-based index in the events); the zone name gives name and frequency in the app ("Range 62 268.5").
   local RZS = {}
   for _, z in ipairs(env.mission.triggers and env.mission.triggers.zones or {}) do
-    if tostring(z.name or ""):lower():find("^range") then
+    if tostring(z.name or ""):lower():find("%f[%a]range%f[%A]") then   -- the word "range" anywhere ("Dogbone Range 268.5"), not "Orange"/"Ranger"
       local r = z.radius or 0
       for _, v in ipairs(z.verticies or {}) do r = math.max(r, math.sqrt((v.x - z.x) ^ 2 + (v.y - z.y) ^ 2)) end
       RZS[#RZS + 1] = { x = z.x, z = z.y, r = r, name = clean(z.name) }
@@ -1149,7 +1149,8 @@ local function start()
   -- Ground crew ------------------------------------------------------------------------------------------
   -- When an aircraft stands at a parking spot for 10 s: crew chief front left, fire watch front right. After a landing
   -- fuel and ammunition trucks drive up from the next free parking spot (4 min, scenery only – refueling/arming continues via F8).
-  -- When it starts rolling: soldiers step back, trucks drive away, then all disappear. Crash/crash landing: fire brigade.
+  -- When it starts rolling: each soldier (own group) walks 15 m sideways away from the centreline, trucks stay, then all disappear.
+  -- Trucks leave after their turn by driving 40 m sideways outward (never across the aircraft). Crash/crash landing: fire brigade.
   local GC = {
     [2] = { soldier = "Soldier M4", fuel = "M978 HEMTT Tanker", ammo = "M 818", fire = "HEMTT TFFT" },
     [1] = { soldier = "Infantry AK", fuel = "ATZ-10", ammo = "KAMAZ Truck", fire = "Ural ATsP-6" },
@@ -1174,6 +1175,11 @@ local function start()
   local function drive(name, from, to, speed)
     local g = Group.getByName(name)
     if g then g:getController():setTask({ id = "Mission", params = { route = { points = { wp(from, speed), wp(to, speed) } } } }) end
+  end
+  -- walk/drive from p 'dist' m sideways (aircraft lateral axis pos.z) away from the centreline on p's own side
+  local function sideStep(pos, p, dist)
+    local s = ((p.x - pos.p.x) * pos.z.x + (p.z - pos.p.z) * pos.z.z) < 0 and -1 or 1
+    return { x = p.x + pos.z.x * s * dist, z = p.z + pos.z.z * s * dist }
   end
   local function kill(names) for _, nm in ipairs(names) do local g = Group.getByName(nm) if g then g:destroy() end end end
   local function clear(c) kill(c.soldiers); for _, t in ipairs(c.trucks) do kill({ t.name }) end end
@@ -1246,20 +1252,21 @@ local function start()
                 local b = u:getDesc().box or { max = { x = 8, z = 5 }, min = { x = -8 } }
                 local cc, fg = rel(pos, b.max.x + 5, -b.max.z * 0.7), rel(pos, b.max.x * 0.4, b.max.z + 5)
                 local function face(q) return math.atan2(pos.p.z - q.z, pos.p.x - q.x) end
-                c = { soldiers = { spawnGround(u:getCountry(), { { type = types.soldier, x = cc.x, z = cc.z, hdg = face(cc) },
-                                                                 { type = types.soldier, x = fg.x, z = fg.z, hdg = face(fg) } }) },
+                c = { soldiers = { spawnGround(u:getCountry(), { { type = types.soldier, x = cc.x, z = cc.z, hdg = face(cc) } }),
+                                   spawnGround(u:getCountry(), { { type = types.soldier, x = fg.x, z = fg.z, hdg = face(fg) } }) },
                       trucks = {}, box = b, ctry = u:getCountry(), types = types, field = f, player = u:getPlayerName() ~= nil }
                 if landed[name] then c.trucksAt = now + 20 end
                 if c.player then evt("C;" .. clean(name) .. (landed[name] and ";back" or ";crew")) end
                 landed[name] = nil
                 crew[name] = c
               end
-            elseif c and not c.leaving and spd > 1.5 then
-              c.leaving = now   -- starts rolling
-              local s = Group.getByName(c.soldiers[1])
-              local q = s and s:getUnit(1) and s:getUnit(1):getPoint()
-              if q then drive(c.soldiers[1], q, { x = q.x + (q.x - pos.p.x), z = q.z + (q.z - pos.p.z) }, 3) end
-              for _, t in ipairs(c.trucks) do drive(t.name, t.at, t.home, 8) end
+            elseif c and not c.leaving and spd > 0.7 then
+              c.leaving = now   -- starts rolling: soldiers step aside (sideways, not along the taxi path), trucks stay until clear() removes them
+              for _, nm in ipairs(c.soldiers) do
+                local s = Group.getByName(nm)
+                local q = s and s:getUnit(1) and s:getUnit(1):getPoint()
+                if q then drive(nm, q, sideStep(pos, q, 15), 3) end
+              end
             elseif c and not c.leaving and c.trucksAt and now >= c.trucksAt and #c.trucks == 0 then
               if taxiingNear(pos.p, 200) then
                 c.trucksAt = now + 10   -- drive only when nobody is taxiing here
@@ -1275,7 +1282,7 @@ local function start()
               end
             elseif c and not c.leaving and c.doneAt and now >= c.doneAt then
               c.doneAt = nil
-              for _, t in ipairs(c.trucks) do drive(t.name, t.at, t.home, 8) end
+              for _, t in ipairs(c.trucks) do drive(t.name, t.at, sideStep(pos, t.at, 40), 8) end
               c.trucksGone = now   -- Trucks drive away silently (A37: nothing refueled, so no "done" message)
             end
           end

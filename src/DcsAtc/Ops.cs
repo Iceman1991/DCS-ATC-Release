@@ -133,10 +133,18 @@ partial class Ops
     /// Forum (Abr): the name of a mission AWACS/tanker is a station too, also an own one from the unit name ("Sentry 1-1", CallsignFromUnit)
     static bool Named(Dictionary<string, double> groups, string n) =>
         groups.Keys.Any(g => Callsigns.TryGetValue(g, out var cs) && Regex.Match(cs, "^[A-Za-z]{3,}").Value is { Length: > 0 } w && Has(n, w.ToLowerInvariant() + @"\b"));
+    /// #56: call sign of a zone whose name does not start with "range" ("Dogbone Range" -> "dogbone", "R-62A Dogbone Range" -> "dogbone"): the letter words of 3+ letters except "range".
+    /// "Range Alpha" / "Range Kutaisi" have none ("alpha" is also a taxiway).
+    static IEnumerable<string> CallWords(Zone z)
+    {
+        var w = Normalize(z.Name).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return w.Length == 0 || w[0] == "range" ? Array.Empty<string>() : w.Where(x => x != "range" && Regex.IsMatch(x, "^[a-z]{3,}$"));
+    }
+    static Regex CallRx(IEnumerable<string> words) => new($@"\b(?:{string.Join("|", words.Select(Regex.Escape))})\b");
     public static string? RoleOf(string n, string? own = null)
     {
         n = Blank(n, own);
-        return Range != null && (Regex.IsMatch(n, @"^range\b") || Has(n, "range control", "range alpha", "range ")) ? "Range"   // A17: without a range zone in the mission no range controller
+        return Range != null && (Regex.IsMatch(n, @"^range\b") || Has(n, "range control", "range alpha", "range ") || Ranges.SelectMany(CallWords).ToList() is { Count: > 0 } cw && Regex.IsMatch(n.TrimStart(), "^" + CallRx(cw))) ? "Range"   // call sign only at the start (station is called first; "north" in "request vectors north" is no range call); A17: without a range zone in the mission no range controller
           : Has(n, "overlord", "awacs", "magic", "moscow", "darkstar", "wizard", "focus", "spike", "request sort", "picture", "bogey dope") || Named(AwacsFreq, n)
             || Has(n, "declare") && !Has(n, "tower", "ground", "approach", "departure", "mayday", "pan pan", "emergency") && Regex.IsMatch(n, @"\bdeclare\b(?: [a-z]+){0,3}? \d") ? "AWACS"
           : Has(n, "tanker", "shell", "texaco", "arco", "refuel") || Named(TankerFreq, n) ? "Tanker"
@@ -182,6 +190,7 @@ partial class Ops
         var r = Regex.Replace(Blank(n, own), @"\b(?:roger|copy|copied|wilco|affirm(?:ative)?|understood|okay|ok|thanks|thank you|will do|\d+)\b", " ");
         var bare = Regex.Replace(r, @"\b(?:texaco|shell|arco|tanker|range alpha|range)\b", " ");
         foreach (var z in Ranges) bare = NameRx(z.Name).Replace(bare, " ");   // #56: zone names are station words
+        if (Ranges.SelectMany(CallWords).ToList() is { Count: > 0 } cw) bare = CallRx(cw).Replace(bare, " ");   // #56: so are range call signs
         return bare.Trim() == "" && n.Trim() != "" && (bare == r || role == "Tanker" && tank >= 1 || role == "Range" && checkedIn);
     }
 
@@ -207,6 +216,8 @@ partial class Ops
         if (Ranges.Count < 2) return 0;
         var byName = Ranges.Select((z, i) => (z, i)).Where(x => NameRx(x.z.Name).IsMatch(n)).OrderByDescending(x => x.z.Name.Length).ToList();
         if (byName.Count > 0) return byName[0].i;
+        var byCall = Ranges.FindIndex(z => CallWords(z).ToList() is { Count: > 0 } cw && CallRx(cw).IsMatch(n));   // #56: range call sign
+        if (byCall >= 0) return byCall;
         if (checkedIn) return Math.Min(rg, Ranges.Count - 1);
         var fi = me.Freq > 0 ? Ranges.FindIndex(z => z.Freq > 0 && Math.Abs(z.Freq - me.Freq) < 0.01) : -1;
         if (fi >= 0) return fi;
@@ -2443,6 +2454,20 @@ partial class Ops
         check(cd56[0].Text.StartsWith("Enfield one one, Range 62") && ce56[0].Text.StartsWith("Viper two one, Range 62") && ce56[0].Freq == 268.5, "#56: ohne Namen: naechste Range / Frequenz -> " + cd56[0].Text + " | " + ce56[0].Text);
         var ci56 = T56(new Ops(), m56a, "Range sixty two, Viper 2-1, checking in");
         check(ci56[0].Text.StartsWith("Viper two one, Range 62"), "#56: Zonenname gesprochen -> " + ci56[0].Text);
+        // #56: range call sign ("Dogbone Range 268.5" -> "Dogbone"); "Range Alpha" has none (taxiway)
+        Ranges = new() { ParseRange("Dogbone Range 268.5", 0, 5 * NM, 0, 2500), ParseRange("Range 62", 1, -20 * NM, 0, 2500) };
+        var m56d = m56a with { Callsign = "Enfield 1-1" };
+        var cs1 = T56(new Ops(), m56d, "Dogbone, Enfield 1-1, checking in"); var cs2 = T56(new Ops(), m56d, "Dogbone Range, Enfield 1-1, checking in"); var cs3 = T56(new Ops(), m56b, "Range 62, Enfield 1-1, checking in");
+        var role56 = RoleOf("dogbone enfield 1 1 checking in");
+        Ranges = new() { ParseRange("Range Alpha", 0, 0, 0, 0), ParseRange("R-62A Dogbone Range", 1, 0, 0, 0) };
+        var cw56 = Ranges.Select(z => string.Join("/", CallWords(z))).ToArray(); var rt56 = RoleOf("kutaisi ground enfield 1 1 request taxi via alpha");
+        Ranges = new() { ParseRange("Range Alpha", 0, 0, 0, 0) };
+        var rt56b = RoleOf("kutaisi ground enfield 1 1 request taxi via alpha");
+        Ranges = new() { ParseRange("North Range", 0, 0, 0, 0) };
+        var rn56 = RoleOf("approach enfield 1 1 request vectors north"); var rn56b = RoleOf("north enfield 1 1 checking in");
+        check(role56 == "Range" && cs1[0].Text.StartsWith("Enfield one one, Dogbone Range, ") && cs1[0].Freq == 268.5 && cs2[0].Text.StartsWith("Enfield one one, Dogbone Range, ") && cs3[0].Text.StartsWith("Enfield one one, Range 62, ")
+              && cw56[0] == "" && cw56[1] == "dogbone" && rt56 != "Range" && rt56b != "Range" && rn56 != "Range" && rn56b == "Range",$"#56: Rufzeichen der Range -> {role56} | {cs1[0].Text} | {cs2[0].Text} | {cs3[0].Text} | {string.Join(",", cw56)} | {rt56}");
+        Ranges = new() { new("Range Alpha", 5 * NM, 0, 2500, 0), new("Range 62", -20 * NM, 0, 2500, 268.5) };
         var oth56 = o56b.OnImpact(m56b, 12, 6, 40, "", -1, 0);
         var own56 = o56b.OnImpact(m56b, 12, 6, 41, "", -1, 1); var sc56 = o56b.Flush(m56b, 45);
         o56b.OnGunHit(0); o56b.OnGunHit(1);

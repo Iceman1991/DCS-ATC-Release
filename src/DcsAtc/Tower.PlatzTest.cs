@@ -604,6 +604,30 @@ public partial class Tower
             finally { File.Delete(rf); }
         }
 
+        // Issue #60: Andersen (X~10000/Z~14000) has zero-filled blocks in the .rn4 that looked like edges ((0,0,0) points, valid a/b): 1828 of 2992 edges, shortcuts in the path search
+        {
+            var rb = new byte[800];
+            void W(int o, double v) => BitConverter.GetBytes(v).CopyTo(rb, o);
+            void WU(int o, uint v) => BitConverter.GetBytes(v).CopyTo(rb, o);
+            void Edge(int p, double x, double z) { WU(p - 16, 0); WU(p - 12, 1); WU(p - 4, 2); W(p, x); W(p + 16, z); W(p + 24, x); W(p + 40, z); }
+            Edge(100, 10000, 14000);
+            WU(166 - 16, 0); WU(166 - 12, 1); WU(166 - 4, 2);   // zero-filled block: valid a/b/n, points (0,0,0)
+            for (int k = 0; k < 2; k++)
+            {
+                int p = 400 + 200 * k;
+                W(p - 96, 1); W(p - 56, 1); W(p - 16, 1); W(p, 10000 + 100 * k); W(p + 16, 14000); W(p + 24, 1);
+            }
+            var rf = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "dcsatc-rn60-" + Environment.ProcessId + ".rn4");
+            try
+            {
+                File.WriteAllBytes(rf, rb);
+                var net = Rollnetz.Read(rf);
+                Chk(net != null && net.Nodes.Length == 2 && net.Edges.Length == 1 && net.Edges[0].Poly[0].Item1 > 1, "Rollnetz #60: Nullblock ist keine Kante: " + net?.Edges.Length);
+                n++;
+            }
+            finally { File.Delete(rf); }
+        }
+
         if (err.Count > 0) throw new Exception("PlatzTest: " + string.Join(" | ", err));
         Console.WriteLine($"OK   PlatzTest: {all.Count(a => a.Charted)} Plätze mit Platzverfahren, {n} Prüfungen (Seite, Höhe, CRP, Initial, Ausflug, exit_only, Knickpunkt, Übergabe, Rollweg {nTaxi} Rampe x Bahn, Warteplatz, Backtrack, Standname)");
     }

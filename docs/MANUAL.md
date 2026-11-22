@@ -2201,9 +2201,10 @@ Texaco:  Enfield one one, Texaco, total offload 6.2, cleared to depart, contact 
 
 ### Range
 
-A range controller exists only when the mission has a trigger zone whose name starts with **Range**. Every such zone is a range of its own, so a mission can have several.
+A range controller exists only when the mission has a trigger zone with the word **Range** in its name (anywhere: *Range 62*, *Dogbone Range*; not *Orange*). Every such zone is a range of its own, so a mission can have several.
 
 - **Name:** the zone name is the spoken name. A zone called just *Range* (or a very short name) becomes *Range Alpha*, *Range Bravo* and so on by order. With a name like *Range 62* or *Range North* (`_` becomes a space) the controller uses that name.
+- **Call sign:** when Range is not the first word, the words in front are the range's call sign. A zone *Dogbone Range 268.5* answers as *Dogbone Range*, and you can call it with *"Dogbone, Enfield 1-1, checking in"* or *"Dogbone Range, Enfield 1-1, checking in"*.
 - **Frequency:** if the zone name contains a frequency between 108 and 399 MHz (*Range 62 268.5*), that range has its own frequency. Otherwise the Range frequency from config.jsonc applies.
 - **Which range answers:** the name you say, else the range you are checked in with, else the one matching the frequency you transmit on, else the nearest to your position.
 - **Hot and impacts** are per range: an aircraft in one range does not block another, and impacts count only for the range they land in.
@@ -2469,7 +2470,7 @@ What happens:
 
 - **Parked:** after you have stood still on a parking spot for 10 s, a crew chief appears front left and a fire guard front right. The crew chief talks to you **on the intercom** of your aircraft through SRS. Without SRS you only see the text.
 - **After landing:** a fuel truck and an ammo truck drive up from a nearby free spot and stay for 4 minutes. They are scenery only. Refueling and rearming still go through the DCS ground crew (`\` → F8), and a text reminder tells you so.
-- **Taxiing out:** the soldiers step back, the trucks drive off, and everything disappears.
+- **Taxiing out:** as soon as you start to roll, each soldier walks off sideways, away from your path. The trucks stay where they are, and everything disappears after you have left. After their 4 minutes the trucks drive off sideways, away from the aircraft.
 - **Crash or heavily damaged landing:** a fire truck comes and leaves after 5 minutes.
 
 | When | Crew chief (intercom) |
@@ -3167,6 +3168,7 @@ Mark the moment: when something goes wrong in flight, choose radio wheel or F10 
   - If you get "say again", repeat your call or use the radio wheel.
 - **Text in the game but no voice?** If the DCS-ATC window shows "(SRS server not reachable)", the SRS server isn't running locally or is on another port. Your SRS client must be connected to the SRS server on the PC running DCS-ATC (`127.0.0.1`), not to another server; otherwise no voice goes either way. Both cases also show once as text in the game.
 - **Antivirus or firewall:** these can block Piper and other parts of DCS-ATC, or SRS voice over UDP, while SRS still shows connected. If there is still no voice, add exceptions for the DCS-ATC folder and `C:\Program Files\DCS-SimpleRadio-Standalone`, in the firewall too.
+- **"Spectators audio disabled" in the SRS server:** the server then drops everything a spectator transmits, and in single player your SRS client is often a spectator (coalition 0) even in the aircraft. Nobody hears you then, DCS-ATC included. Switch the setting off; the DCS-ATC window says so when it sees this.
 - **VoiceAttack, VAICOM, WhisperAttack:** DCS-ATC doesn't need them, only SRS and your SRS push-to-talk. If you can't transmit, turn them off and test with SRS alone.
 - **No F10 → DCS-ATC menu and the wrong callsign?** DCS-ATC has no mission data, which means `MissionScripting.lua` isn't patched. See "After a DCS update" below.
 

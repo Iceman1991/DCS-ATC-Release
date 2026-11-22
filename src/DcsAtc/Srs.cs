@@ -17,12 +17,15 @@ sealed class SrsListener
     internal const int Max = 20;
     volatile int resync;   // counter: every connection sends RADIO_UPDATE when it changes
     volatile bool security;   // K4: COALITION_AUDIO_SECURITY of the server (SYNC/SERVER_SETTINGS) - it forwards voice only within the coalition
-    volatile bool noSpec;   // SPECTATORS_AUDIO_DISABLED: spectators get no voice -> join as red + blue like K4
-    bool Split => security || noSpec;
+    volatile bool noSpec;   // SPECTATORS_AUDIO_DISABLED: the server drops audio SENT by coalition-0 clients (we only listen, so no change for us); players in coalition 0 are not heard
+    bool Split => security;
+    readonly Dictionary<string, int> coal = new();   // guid -> Coalition of the other SRS clients (under lock clients)
+    readonly HashSet<string> warned = new();
+    internal Action<string>? Warned;   // self-test seam: client name per warning
     string serverSettings = "";
     readonly Action<Transmission> onTx;
     readonly Func<string, bool> ignoreName;   // do not monitor own controller voices (ExternalAudio)
-    readonly string[] guids = { NewGuid(), NewGuid() };   // K4: connection 0 (spectator, blue with security or spectators-disabled), 1 (red, only with security or spectators-disabled)
+    readonly string[] guids = { NewGuid(), NewGuid() };   // K4: connection 0 (spectator, blue with security), 1 (red, only with security)
     static string NewGuid() => Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('/', '_').Replace('+', '-')[..22];
     int Side(int conn) => conn == 1 ? 2 : Split ? 1 : 0;
     readonly Dictionary<string, (string Name, uint UnitId, double[]? Freqs, Iff? Iff)> clients = new();
@@ -190,6 +193,7 @@ sealed class SrsListener
                     if (was.Name != name || was.UnitId != unit || was.Iff != iff || !(was.Freqs ?? Array.Empty<double>()).SequenceEqual(fq ?? Array.Empty<double>()))   // Debug log: tuned frequencies and transponder per player
                         Program.Trace("SRS", $"Client '{name}' unit {unit} Koalition {(c.TryGetProperty("Coalition", out var side) ? side.ToString() : "?")}: {Fl(was.Freqs)} -> {Fl(fq)}{(iff == null ? "" : $", IFF {iff.Mode3} Status {iff.Status}{(iff.Mode4 ? " M4" : "")}")}");
                     clients[id] = (name, unit, fq, iff);
+                    if (c.TryGetProperty("Coalition", out var cv) && (cv.TryGetInt32(out var ci) || int.TryParse(cv.ToString(), out ci))) coal[id] = ci;
                 }
             }
             static string Fl(double[]? f) => f == null ? "?" : string.Join("/", f.Select(x => x.ToString("0.0##")));
@@ -211,7 +215,7 @@ sealed class SrsListener
             {
                 noSpec = !noSpec;
                 resync++;
-                Program.Trace("SRS", $"Spectators audio disabled {(noSpec ? "an: als Rot + Blau statt Zuschauer" : "aus")}");
+                Program.Trace("SRS", $"Spectators audio disabled {(noSpec ? "an" : "aus")}");
             }
             if (root.TryGetProperty("Clients", out var list) && list.ValueKind == JsonValueKind.Array) foreach (var c in list.EnumerateArray()) Add(c);
             if (root.TryGetProperty("Client", out var one) && one.ValueKind == JsonValueKind.Object)
@@ -219,8 +223,23 @@ sealed class SrsListener
                 if (type == 5) lock (clients) { if (clients.Remove(one.GetProperty("ClientGuid").GetString() ?? "", out var gone)) Program.Trace("SRS", $"Client '{gone.Name}' unit {gone.UnitId} getrennt"); }   // CLIENT_DISCONNECT
                 else Add(one);
             }
+            if (noSpec) WarnSpectators();   // both orders: setting after the client, client after the setting
         }
         catch (Exception e) { Program.Trace("SRS", $"Nachricht nicht gelesen ({e.GetType().Name}: {e.Message}): {line[..Math.Min(200, line.Length)]}"); }   // ignore unknown messages
+    }
+
+    /// Server drops everything a coalition-0 client transmits (UDPVoiceRouter): once per client, a player in coalition 0 is not heard by anyone.
+    void WarnSpectators()
+    {
+        List<string> names;
+        lock (clients) names = clients.Where(kv => kv.Value.Name != "DCS-ATC" && kv.Value.UnitId != 0 && !ignoreName(kv.Value.Name) && coal.GetValueOrDefault(kv.Key, -1) == 0 && warned.Add(kv.Key)).Select(kv => kv.Value.Name).ToList();
+        foreach (var name in names)
+        {
+            Console.WriteLine(L($"      SRS: Der Server hat \"Spectators audio disabled\" an und dein SRS-Client '{name}' ist Zuschauer (Koalition 0): Der Server verwirft alles, was er sendet, niemand hört dich. Schalte die Einstellung im SRS-Server aus.",
+                $"      SRS: the server has \"Spectators audio disabled\" on and your SRS client '{name}' is a spectator (coalition 0): the server drops everything it transmits, nobody hears you. Switch that setting off in the SRS server."));
+            Program.Trace("SRS", $"Spectators audio disabled und Client '{name}' in Koalition 0: Server verwirft seine Sendungen");
+            Warned?.Invoke(name);
+        }
     }
 
     /// UDP packet: header (length, audio length, frequency length), Opus, 10 bytes per frequency, UnitId, PacketId, Hops, 2× GUID.

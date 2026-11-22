@@ -136,7 +136,7 @@ public sealed class Rollnetz
         {
             if (D(p + 24) != 1.0 || D(p - 8) != 0.0 || D(p - 24) != 0.0 || Math.Abs(D(p - 56) - 1.0) > 1e-9) continue;
             double s = D(p - 32), c = D(p - 16), x = D(p), y = D(p + 8), z = D(p + 16);
-            if (Math.Abs(s * s + c * c - 1) > 1e-3 || !(Math.Abs(x) > 1e3 && Math.Abs(z) > 1e3 && Math.Abs(y) < 1e5)) continue;
+            if (Math.Abs(s * s + c * c - 1) > 1e-3 || !(Math.Abs(x) + Math.Abs(z) > 1 && Math.Abs(y) < 1e5)) continue;
             if (Math.Abs(D(p - 96) - c) > 1e-6 || Math.Abs(D(p - 80) + s) > 1e-6) continue;
             if (nodes.Count > 0 && (Math.Abs(x - nodes[0].X) > 50000 || Math.Abs(z - nodes[0].Z) > 50000)) continue;
             if (nodes.Count == 0) firstNode = p;
@@ -145,7 +145,7 @@ public sealed class Rollnetz
         }
         if (nodes.Count < 2) return null;
         // Edges lie before the first node. Header directly before the point array: u16 class, u32 a, u32 b, u32 0, u32 n, then n * (x, y, z) as double
-        bool Near(int o) => o + 24 <= b.Length && Math.Abs(D(o) - nodes[0].X) < 20000 && Math.Abs(D(o + 16) - nodes[0].Z) < 20000 && Math.Abs(D(o + 8)) < 1e5;
+        bool Near(int o) => o + 24 <= b.Length && Math.Abs(D(o) - nodes[0].X) < 20000 && Math.Abs(D(o + 16) - nodes[0].Z) < 20000 && Math.Abs(D(o + 8)) < 1e5 && Math.Abs(D(o)) + Math.Abs(D(o + 16)) > 1;   // #60: zero-filled blocks are (0,0) points, "near" for fields close to the origin (Andersen)
         var edges = new List<(int, int, (double, double)[], double)>();
         for (int p = 24; p < firstNode - 24; p++)
         {
