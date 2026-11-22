@@ -441,12 +441,12 @@ static class Settings
         Row(L("Stimmen und Kontingent laden", "Load voices and quota"), elConnect);
         var elQuota = new Label { Text = "–", AutoSize = true, MaximumSize = new Size(285, 0), UseMnemonic = false };
         Row(L("Kontingent", "Quota"), elQuota);
-        var elSpeed = new Slider(0.8, 1.5, 0.05, cfg.ElevenLabsSpeed, "0.00");
-        Row(L("Tempo ElevenLabs (1 = normal, größer = schneller)", "ElevenLabs speed (1 = normal, higher = faster)"), elSpeed);
-        var elVt = new TableLayoutPanel { ColumnCount = 3, AutoSize = true, Margin = Padding.Empty };
-        foreach (var w in new[] { 84, 300, 28 }) elVt.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, w));
+        Note(L("Tempo je Rolle in der Spalte neben der Stimme: 1.00 = normal, größer = schneller.", "Speed per role in the column next to the voice: 1.00 = normal, higher = faster."));
+        var elVt = new TableLayoutPanel { ColumnCount = 4, AutoSize = true, Margin = Padding.Empty };
+        foreach (var w in new[] { 84, 240, 58, 28 }) elVt.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, w));
         var elList = new List<(string Id, string Name)>();
-        var elRows = new List<(string Key, ComboBox Cb, List<string> Ids, string Was)>();
+        var elRows = new List<(string Key, ComboBox Cb, List<string> Ids, string Was, ComboBox Sp)>();
+        var elSpeeds = Enumerable.Range(0, 15).Select(i => (0.8 + i * 0.05).ToString("0.00", CultureInfo.InvariantCulture)).ToArray();
         foreach (var role in cfg.Voices.Keys.Where(k => k != "Departure"))   // Departure speaks with the Approach voice
         {
             int row = elRows.Count;
@@ -456,15 +456,22 @@ static class Settings
             var cb = Combo(new[] { L("Piper (wie oben)", "Piper (as above)") }, 0);
             (cb.Anchor, cb.Margin) = (AnchorStyles.Left, new Padding(0, 5, 0, 5));
             elVt.Controls.Add(cb, 1, row);
+            var stored = cfg.ElevenVoices.GetValueOrDefault(role, "").Split('|').Select(Program.ElevenSpec).ToArray();   // "id@1.3|id2": ids stripped, speed of the first part (default without @)
+            var sp = Combo(elSpeeds, 0);
+            (sp.Width, sp.Anchor, sp.Margin) = (58, AnchorStyles.Left, new Padding(0, 5, 0, 5));
+            var spText = stored[0].Speed.ToString("0.00", CultureInfo.InvariantCulture);
+            if (!sp.Items.Contains(spText)) sp.Items.Add(spText);
+            sp.SelectedItem = spText;
+            elVt.Controls.Add(sp, 2, row);
             var play = Btn("▶", false);
             (play.AutoSize, play.Size, play.Padding, play.Margin, play.Anchor) = (false, new Size(26, 25), Padding.Empty, new Padding(0, 5, 0, 5), AnchorStyles.Left);
-            elVt.Controls.Add(play, 2, row);
+            elVt.Controls.Add(play, 3, row);
             var ids = new List<string>();
-            elRows.Add((role, cb, ids, cfg.ElevenVoices.GetValueOrDefault(role, "")));
+            elRows.Add((role, cb, ids, string.Join("|", stored.Select(x => x.Id)), sp));
             play.Click += async (_, _) =>   // sample on the PC speakers: the voice chosen here, otherwise the Piper voice of the row above
             {
                 var id = ids[cb.SelectedIndex].Split('|')[0];
-                var say = id == "" ? voices.First(v => v.Key == role).Get() : $"el:{id}#en_US-ryan-medium";
+                var say = id == "" ? voices.First(v => v.Key == role).Get() : $"el:{id}@{sp.Text}#en_US-ryan-medium";
                 long allowed = 0;
                 if (id != "")   // ElevenLabs sample only with a known quota and enough left above the floor (never paid extra characters)
                 {
@@ -474,10 +481,7 @@ static class Settings
                 play.Enabled = false;
                 try
                 {
-                    var speed = Program.Cfg.ElevenLabsSpeed;
-                    Program.Cfg.ElevenLabsSpeed = elSpeed.Value;   // sample with the slider's value, not yet the saved one
-                    try { await Task.Run(() => Program.Preview(say, id == "" ? null : elKey.Text.Trim(), allowed)); }
-                    finally { Program.Cfg.ElevenLabsSpeed = speed; }
+                    await Task.Run(() => Program.Preview(say, id == "" ? null : elKey.Text.Trim(), allowed));
                     if (id != "") { elQ = elQ! with { Count = elQ.Count + Program.PreviewText.Length }; elQuota.Text = ElevenLabs.QuotaText(elQ, false); }
                 }
                 catch (Exception e) { MessageBox.Show(f, e.Message, "DCS-ATC"); }
@@ -486,7 +490,7 @@ static class Settings
         }
         void ElFill()   // voice names of the account; a stored id the account does not list stays selectable as its id
         {
-            foreach (var (_, cb, ids, was) in elRows)
+            foreach (var (_, cb, ids, was, _) in elRows)
             {
                 var cur = ids.Count > 0 && cb.SelectedIndex >= 0 ? ids[cb.SelectedIndex] : was;
                 ids.Clear(); cb.Items.Clear();
@@ -774,7 +778,7 @@ static class Settings
             var set = new (string Key, string Value, string After)[]
             {
                 ("MyCallsign", J(call!), "Callsign"), ("CallsignFromUnit", J(unitCs.Checked), "MyCallsign"), ("CallsignFromPlayer", J(playerCs.Checked), "CallsignFromUnit"), ("WheelFixed", J(wfix.Checked), "WheelSize"),("Volume", D(vol.Value / 100), "RadioFx"), ("SpeechRate", D(rate.Value), "Volume"),
-                ("ReplyPause", D(pause.Value), "SpeechRate"), ("ElevenLabsSpeed", D(elSpeed.Value), "ElevenVoices"), ("RadioFx", J(fx.Checked), "PilotVoice"), ("RadioText", J(rtx.Checked), "RadioFx"), ("HintText", J(htx.Checked), "RadioText"),
+                ("ReplyPause", D(pause.Value), "SpeechRate"), ("RadioFx", J(fx.Checked), "PilotVoice"), ("RadioText", J(rtx.Checked), "RadioFx"), ("HintText", J(htx.Checked), "RadioText"),
                 ("PilotVoice", J(pv.SelectedIndex == 0 ? "" : known[pv.SelectedIndex - 1] == pilot ? cfg.PilotVoice : known[pv.SelectedIndex - 1]), "Voices"),   // same model: its "@pitch" stays
                 ("AiChatter", J(chat.Checked), "ReplyPause"), ("AwacsBullseye", J(bull.Checked), "Coalition"), ("AwacsNewGroupNm", D(awNm.Value), "AwacsBullseye"), ("Atis", J(atis.Checked), "AiChatter"), ("RunwayLights", J(lights[light.SelectedIndex]), "Atis"), ("AltimeterUnit", J(units[unit.SelectedIndex]), "RunwayLights"), ("AiFlightComms", J(modes[combat.SelectedIndex]), "Volume"), ("IffCheck", J(iffc.Checked), "AirspaceWatch"), ("StationPositions", J(spos.Checked), "IffCheck"), ("RandomNotams", J(notam.Checked), "StationPositions"),("AirspaceWatch", J(watch.Checked), "RunwayLights"), ("DebugLog", J(dbg.Checked), "AirspaceWatch"),
                 ("WheelInGame", J(ingames[ingame.SelectedIndex]), "WheelSize"), ("MicName", J(mic.SelectedIndex == 0 ? "" : mics[mic.SelectedIndex - 1]), "WheelSize"), ("SrsPath", J(srs.Text.Trim()), "DebugLog"),
@@ -798,7 +802,16 @@ static class Settings
                 foreach (var s in set.Where(s => !was.TryGetProperty(s.Key, out var o) || o.GetRawText() != s.Value)) text = Program.WithConfigValue(text, s.Key, s.Value, s.After);
                 text = WithNested(text, "Frequencies", mhz.Where(x => x.Value != cfg.Frequencies[x.Key]).Select(x => (x.Key, D(x.Value))), J(mhz));
                 text = WithNested(text, "Voices", voice.Where(x => x.Value != cfg.Voices[x.Key]).Select(x => (x.Key, J(x.Value))), J(voice));
-                var elv = elRows.ToDictionary(r => r.Key, r => r.Ids[r.Cb.SelectedIndex]);
+                var defSpeed = cfg.ElevenLabsSpeed.ToString("0.00", CultureInfo.InvariantCulture);
+                string ElSave((string Key, ComboBox Cb, List<string> Ids, string Was, ComboBox Sp) r)
+                {
+                    var sel = r.Ids[r.Cb.SelectedIndex];
+                    if (sel == "") return "";
+                    var raw = cfg.ElevenVoices.GetValueOrDefault(r.Key, "");
+                    if (sel == r.Was && r.Sp.Text == Program.ElevenSpec(raw.Split('|')[0]).Speed.ToString("0.00", CultureInfo.InvariantCulture)) return raw;   // untouched: as stored
+                    return string.Join("|", sel.Split('|').Select(i => r.Sp.Text == defSpeed ? i : $"{i}@{r.Sp.Text}"));   // "@speed" only when it differs from the default
+                }
+                var elv = elRows.ToDictionary(r => r.Key, ElSave);
                 text = WithNested(text, "ElevenVoices", elv.Where(x => x.Value != cfg.ElevenVoices.GetValueOrDefault(x.Key, "")).Select(x => (x.Key, J(x.Value))), J(elv.Where(x => x.Value != "").ToDictionary(x => x.Key, x => x.Value)));
                 if (text != before) File.WriteAllText(Program.ConfigPath, text);
                 if ((lang.SelectedIndex == 1) != En)   // like the installer: app and mission (F10 menu)

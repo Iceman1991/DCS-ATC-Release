@@ -250,6 +250,10 @@ static class ElevenLabs
             if (plain != "en_US-ryan-medium" || tok != "el:idA#en_US-ryan-medium" || g1 == g2 || !g1.StartsWith("el:id") || !g2.StartsWith("el:id") || g1 != Program.VoiceFor("Ground", "A", "en_US-bryce-medium")
                 || empty.StartsWith("el:") || offTok != plain)
                 throw new Exception($"ElevenLabs VoiceFor: {plain} | {tok} | {g1} | {g2} | {empty} | {offTok}");
+            Program.Cfg.ElevenVoices = new() { ["Approach"] = "idS@1.30" };
+            var spd = Program.VoiceFor("Approach", "Kutaisi Approach", "en_US-ryan-medium");
+            if (!spd.StartsWith("el:idS@1.30#")) throw new Exception($"ElevenLabs VoiceFor mit Tempo: {spd}");
+            Program.Cfg.ElevenVoices = new() { ["Tower"] = "idA", ["Ground"] = "idA|idB", ["ATIS"] = "" };   // as before for the following checks
 
             // hard stop at the included characters (the earlier calls used requests 0-3)
             Disabled = false;

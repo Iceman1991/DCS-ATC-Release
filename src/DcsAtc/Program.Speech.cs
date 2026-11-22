@@ -520,11 +520,20 @@ static partial class Program
     internal static double PaceOf(Tx tx) => tx.Pilot || tx.Stress ? 1 : tx.Role == "AWACS" ? 0.93 : 1;
 
     /// ElevenLabs speed: ElevenLabsSpeed (1 = normal, larger = faster) / (combat 0.85 x pace); the API takes 0.7-1.2, Extra is what ffmpeg atempo has to add.
-    internal static (double Api, double Extra) ElevenSpeed(bool stress, double pace)
+    internal static (double Api, double Extra) ElevenSpeed(bool stress, double pace, double? speed = null)
     {
-        var eff = Cfg.ElevenLabsSpeed / ((stress ? 0.85 : 1) * pace);
+        var eff = (speed ?? Cfg.ElevenLabsSpeed) / ((stress ? 0.85 : 1) * pace);
         var api = Math.Clamp(eff, 0.7, 1.2);
         return (api, eff / api);
+    }
+
+    /// ElevenLabs voice part "id@1.25" -> (id, speed); no or bad "@speed" -> ElevenLabsSpeed; speed clamped to 0.5-2.0.
+    internal static (string Id, double Speed) ElevenSpec(string spec)
+    {
+        var at = spec.IndexOf('@');
+        if (at < 0) return (spec, Cfg.ElevenLabsSpeed);
+        var ok = double.TryParse(spec[(at + 1)..], NumberStyles.Float, CultureInfo.InvariantCulture, out var s) && double.IsFinite(s);
+        return (spec[..at], Math.Clamp(ok ? s : Cfg.ElevenLabsSpeed, 0.5, 2.0));
     }
 
     /// Radio effect graph. Normal: narrow band from RadioFxBand (two stages each, 24 dB/octave), presence +3 dB at 1.5 kHz, compressor ratio RadioFxRatio. A bad band (or ratio) falls back to the default so ffmpeg never gets nonsense.
@@ -554,9 +563,10 @@ static partial class Program
         double rest = 1;
         if (voice.StartsWith("el:") && voice.IndexOf('#') is var h and > 0)
         {
-            var (api, r) = ElevenSpeed(stress, pace);
+            var (id, spd) = ElevenSpec(voice[3..h]);
+            var (api, r) = ElevenSpeed(stress, pace, spd);
             rest = r;
-            el = ElevenLabs.Wav(voice[3..h], text, api, wav);
+            el = ElevenLabs.Wav(id, text, api, wav);
             if (!el) { voice = voice[(h + 1)..]; fell = true; }
         }
         var parts = el ? new[] { "el" } : voice.Split('@');

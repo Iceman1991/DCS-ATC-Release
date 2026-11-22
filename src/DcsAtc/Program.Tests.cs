@@ -132,6 +132,11 @@ static partial class Program
             if (Math.Abs(a - 1.1) > 1e-9 || Math.Abs(r - 1) > 1e-9 || sa <= a || Math.Abs(a2 - 1.2) > 1e-9 || Math.Abs(r2 - 1.4 / 1.2) > 1e-9
                 || Math.Abs(a3 - 0.8) > 1e-9 || Math.Abs(r3 - 1) > 1e-9 || Math.Abs(a4 - 0.7) > 1e-9 || Math.Abs(r4 - 0.8 / 1.2 / 0.7) > 1e-9)
                 throw new Exception($"ElevenLabs-Tempo: {a} {r} | Stress {sa} | 1,4: {a2} {r2} | 0,8: {a3} {r3} | 0,8 Pace 1,2: {a4} {r4}");
+            Cfg.ElevenLabsSpeed = 1.1;
+            var (a5, r5) = ElevenSpeed(false, 1, 1.3);
+            if (ElevenSpec("abc@1.30") != ("abc", 1.3) || ElevenSpec("abc") != ("abc", 1.1) || ElevenSpec("abc@x") != ("abc", 1.1) || ElevenSpec("abc@9") != ("abc", 2.0)
+                || Math.Abs(a5 - 1.2) > 1e-9 || Math.Abs(r5 - 1.3 / 1.2) > 1e-9)
+                throw new Exception($"ElevenLabs-Tempo je Stimme: {ElevenSpec("abc@1.30")} {ElevenSpec("abc")} {ElevenSpec("abc@x")} {ElevenSpec("abc@9")} | {a5} {r5}");
         }
         finally { (Cfg.SpeechRate, Cfg.ElevenLabsSpeed) = (rate, speed); }
         Console.WriteLine("OK   ElevenLabs-Tempo: eigene Einstellung ElevenLabsSpeed (nicht SpeechRate), Stress schneller, über 1,2 / unter 0,7 der Rest per atempo");

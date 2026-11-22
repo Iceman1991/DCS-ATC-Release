@@ -696,7 +696,7 @@ So funktionieren die Werte:
 | `"RadioFx"` | `true` | Funkklang: schmaler Bandpass (300–2700 Hz, je zwei Filterstufen) mit leichter Präsenzanhebung, harter Kompressor, leises Rauschen, Squelch-Ende. Im Gefecht kommen Sprüche schneller und klingen wie ein übersteuertes Maskenmikrofon. |
 | `"RadioText"` | `true` | Funksprüche auch als DCS-Text im Bild. Zahlen stehen dort als Ziffern (heading 045, 251.5, Enfield 1-1), die Stimme spricht sie weiter Ziffer für Ziffer. `false` = nur Stimme; Hinweise von DCS-ATC kommen weiter als Text. |
 | `"Volume"` | `0.6` | Lautstärke der Lotsen in SRS (0–1). Senken, wenn die Stimmen zu laut sind. |
-| `"ElevenLabsSpeed"` | `1.1` | Sprechtempo der ElevenLabs-Stimmen, unabhängig von `SpeechRate`: 1 = ElevenLabs-Normal, größer = schneller. Der Regler im Einstellungsfenster geht von 0,80 bis 1,50. |
+| `"ElevenLabsSpeed"` | `1.1` | Standard-Tempo der ElevenLabs-Stimmen ohne eigenes Tempo, unabhängig von `SpeechRate`: 1 = ElevenLabs-Normal, größer = schneller. Nur in der Config; das Tempo je Rolle steht in der Stimmentabelle (0,80 bis 1,50) und wird als `"id@1.3"` in `ElevenVoices` gespeichert. |
 | `"SpeechRate"` | `0.85` | Sprechtempo: 1 = Piper-Standard, kleiner = schneller, größer = langsamer. Der Regler im Einstellungsfenster geht von 0,70 bis 1,50. Alle Stimmen sind auf dasselbe Tempo abgeglichen. |
 | `"ReplyPause"` | `1.5` | Sekunden Pause zwischen zwei Sprüchen auf einer Frequenz (Pilot → Lotse → Readback). Regler im Einstellungsfenster: 0–5 s. |
 
@@ -708,7 +708,7 @@ Statt Piper kann eine Lotsenrolle mit einer Stimme aus deinem eigenen ElevenLabs
 
 - **Eigenes Konto und Schlüssel:** Einen API-Schlüssel auf elevenlabs.io erstellen und im Einstellungsfenster eintragen (Seite Stimmen, Gruppe *ElevenLabs*) oder als `ElevenLabsKey` in der `config.jsonc`. Den ganzen Schlüssel (beginnt mit sk_) gleich kopieren, ElevenLabs zeigt ihn nur einmal. DCS-ATC nutzt den Schlüssel des PCs, auf dem es läuft, also des Mission-Hosts. Jede Installation hat ihren eigenen. Der Schlüssel braucht die Rechte *Text to Speech*, *Voices* (lesen) und *User* (lesen).
 - **Stimmen wählen:** **Verbinden** lädt die Stimmen deines Kontos (auch Bibliotheksstimmen, die du hinzugefügt hast) und das Restkontingent. Je Rolle (Tower, Ground, Approach, …) eine Stimme oder *Piper (wie oben)* wählen. ▶ spricht eine Probe. In der `config.jsonc` stehen die Stimmen-IDs in `ElevenVoices`, etwa `"Tower": "idA|idB"`; mit `|` behält jede Station eine davon, wie bei `Voices`. Pilotenstimmen bleiben immer Piper.
-- **Modell:** das Flash-Modell `eleven_flash_v2_5` (das schnellste ElevenLabs-Modell, in vielen Tarifen pro Zeichen günstiger als die anderen). Das Sprechtempo folgt `ElevenLabsSpeed` (Regler *Tempo ElevenLabs* im Einstellungsfenster, 1 = normal, größer = schneller; über den 1,2, die die API erlaubt, hilft DCS-ATC per ffmpeg nach), unabhängig von `SpeechRate`; Gefechts- und AWACS-Sprüche kommen schneller.
+- **Modell:** das Flash-Modell `eleven_flash_v2_5` (das schnellste ElevenLabs-Modell, in vielen Tarifen pro Zeichen günstiger als die anderen). Das Sprechtempo stellst du je Rolle in der Stimmentabelle ein (Spalte neben der Stimme, gespeichert als `"id@1.3"` in `ElevenVoices`; ohne eigenes Tempo gilt `ElevenLabsSpeed`; 1 = normal, größer = schneller; über den 1,2, die die API erlaubt, hilft DCS-ATC per ffmpeg nach), unabhängig von `SpeechRate`; Gefechts- und AWACS-Sprüche kommen schneller.
 - **Kontingent:** Das Einstellungsfenster zeigt die verbleibenden Zeichen und das Rücksetzdatum. Bei jedem Start mit Schlüssel steht dasselbe als eine Zeile im Log.
 - **Kosten:** ElevenLabs rechnet nach Zeichen ab. Der kostenlose Tarif mit 10.000 Zeichen im Monat reicht für etwa ein bis zwei Stunden Funk. Kurze feste Sätze werden während einer Sitzung zwischengespeichert.
 - **Keine Mehrkosten:** DCS-ATC hört bei den im Tarif enthaltenen Zeichen auf und nutzt nie kostenpflichtige Zusatzzeichen. ElevenLabs wird nur genutzt, solange das Restkontingent bekannt ist (beim Start und alle 5 Minuten gelesen, mit jedem gesprochenen Text verringert). Ist das Kontingent nicht lesbar, etwa weil dem Key die Berechtigung *User (read)* fehlt, spricht Piper. Ein Text, der länger ist als der Rest, wird von Piper gesprochen; bleibt weniger als 1 % des Tarifs (mindestens 500 Zeichen), zeigt DCS-ATC einen Hinweis im Spiel und nutzt für den Rest der Sitzung Piper. Zusätzlich bei ElevenLabs ein Kreditlimit am API-Key setzen und die nutzungsbasierte Abrechnung im Konto aus lassen.
@@ -2936,7 +2936,7 @@ Links wählst du die Seite: Allgemein, Stimmen, Funk & Verkehr, AWACS, Frequenze
 | **Hinweise von DCS-ATC als Text im Spiel** | an/aus. Aus: Hinweise, Fehlermeldungen, Landebewertung und Verstöße erscheinen nicht mehr im Bild (für VR ohne Text im Sichtfeld). Sie stehen weiter in `atc-log.txt` und im Debriefing. | `HintText` |
 | **Pilotenstimme (spricht eigene Anfragen vor)** | Stimme wählen oder *aus*. Aus setzt die Pilotenstimme auf leer. | `PilotVoice` |
 | **ElevenLabs (optional)** | API-Schlüssel, **Verbinden** (lädt Stimmen und Kontingent), Kontingentanzeige, je Rolle eine Stimme oder *Piper (wie oben)* mit ▶ Probe. | `ElevenLabsKey`, `ElevenVoices` |
-| **Tempo ElevenLabs** (1 = normal, größer = schneller) | 0,80–1,50 | `ElevenLabsSpeed` |
+| **Tempo** je Rolle in der ElevenLabs-Stimmentabelle (1 = normal, größer = schneller) | 0,80–1,50 | `ElevenVoices` (`"id@1.3"`) |
 | **AWACS-Picture als Bullseye (statt BRAA)** | an/aus | `AwacsBullseye` |
 | **AWACS meldet neue Gruppen bis** | 40–200 NM | `AwacsNewGroupNm` |
 | **KI-Verkehr funkt hörbar mit** | an/aus | `AiChatter` |
@@ -3049,7 +3049,7 @@ Eigene Frequenzen je Platz und Lotse stehen nicht in `config.jsonc`, sondern in 
 | `RadioText` | `true` | Funksprüche auch als DCS-Text im Bild. `false` = nur Stimme. |
 | `HintText` | `true` | Hinweise von DCS-ATC (Hinweise, Fehler, Landebewertung, Verstöße) als DCS-Text im Bild. `false` = nur in `atc-log.txt` und im Debriefing. |
 | `Volume` | `0.6` | Lautstärke der Lotsen in SRS (0–1). |
-| `ElevenLabsSpeed` | `1.1` | ElevenLabs-Sprechtempo: 1 = normal, größer = schneller (unabhängig von `SpeechRate`). |
+| `ElevenLabsSpeed` | `1.1` | Standard-Tempo für ElevenLabs-Stimmen ohne eigenes `@Tempo` in `ElevenVoices`: 1 = normal, größer = schneller (unabhängig von `SpeechRate`). |
 | `SpeechRate` | `0.85` | Sprechtempo: 1 = Piper-Standard, kleiner = schneller. |
 | `ReplyPause` | `1.5` | Sekunden zwischen zwei Sprüchen auf derselben Frequenz. |
 
