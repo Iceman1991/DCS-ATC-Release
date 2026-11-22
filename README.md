@@ -52,9 +52,13 @@ More under [Support](#support).
 - Update from the app: the settings window shows a newer release and installs it on a button. Only the app is downloaded (about 70 MB) when models and voices are already there.
 - Works next to DCS Retribution and DCS Liberation, which replace `MissionScripting.lua` while they run.
 
-## Video
+## Videos
 
 [![DCS-ATC video](https://img.youtube.com/vi/JDQSN2WmkFo/hqdefault.jpg)](https://youtu.be/JDQSN2WmkFo)
+
+ElevenLabs voices example:
+
+[![DCS-ATC ElevenLabs voices example](https://img.youtube.com/vi/YZjKYv8Wa1o/hqdefault.jpg)](https://youtu.be/YZjKYv8Wa1o)
 
 ## Download
 
