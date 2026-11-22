@@ -56,7 +56,8 @@ class SimPilot
         bool fixedTrack = Mode is "brk" or "dw" or "fin" || Mode == "loc" && Glide;   // Pattern/final: headings (PAR, steering) are advisory only
         if (HdgOf(s) is { } h && !fixedTrack && !(Mode == "loc" && Tower.HdgDiff(h, F.End(Rw).Hdg) < 15)) { tHdg = h; Mode = "hdg"; Glide = false; tDir = s.Contains("urn right") ? 1 : s.Contains("urn left") ? -1 : 0; }   // ≈ runway heading: stays on the centerline
         if (!strict && IcptRe.Match(s) is { Success: true } ic) icpt = RwOf(ic.Groups[1].Value);
-        var alt = Regex.Replace(s, @"[Tt]raffic[^.]*?(?=advise you|\.|$)\.?", "");   // Traffic advisories ("..., 100 feet", "climbing through 1500 feet") are not an altitude instruction, the avoidance altitude in the safety alert ("advise you … climb to …", R214) is
+        var alt = Regex.Replace(s, @"[Tt]raffic[^.]*?(?=advise you|\.|$)\.?", "");
+        alt = Regex.Replace(alt, @"decision height \d+ feet", "");   // PAR setup "decision height 260 feet" is no altitude instruction; traffic advisories ("..., 100 feet", "climbing through 1500 feet") are not an altitude instruction, the avoidance altitude in the safety alert ("advise you … climb to …", R214) is
         var fm = FtRe.Match(alt);
         var lm = FlRe.Match(alt);
         if (lm.Success && (!fm.Success || lm.Index < fm.Index)) tAlt = Num(lm.Groups[1].Value) * 100 * Ft;
@@ -206,7 +207,7 @@ public partial class Tower
         return bad == 0 ? 0 : 1;
     }
 
-    static readonly string[] Bad = { "check runway", "check altitude", "low altitude alert", "expedite", "wrong side", "negative", "not following", "go around", "too low", "unable", "say again", "pattern is south", "no transmissions", "verify heading" };   // R271: PAR lost-comm ("… five seconds on final approach") only with talk-down
+    static readonly string[] Bad = { "check runway", "check altitude", "low altitude alert", "expedite", "wrong side", "negative", "not following", "go around", "too low", "unable", "say again", "pattern is south", "verify heading" };   // R271: "no transmissions" is allowed now: the PAR setup call carries the lost-comm instruction
 
     static (bool Ok, string Info, List<string> Log) SimRun(Airfield f, string rw, bool ifr, double dir, bool strict)
     {

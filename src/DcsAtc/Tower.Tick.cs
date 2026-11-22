@@ -683,7 +683,7 @@ public partial class Tower
             }
             // Precision approach like GCA/PAR: only for the straight-in approach from radar vectoring with PAR clearance. ILS, visual/straight-in (visual) and
             // visual traffic pattern (break) get no glidepath/course callouts, only the low-altitude warning once
-            bool par = navName == "six mile final" && Phase != Phase.Pattern && (Proc(rw) == "P A R" || Emergency && Proc(rw) == "") && !wantVisual && !visAsk;   // Emergency without ILS: distance/glidepath like PAR; R115: no approach callouts before the visual report
+            bool par = ParApp(rw);   // Emergency without ILS: distance/glidepath like PAR; R115: no approach callouts before the visual report
             var lat = Approach(t.X, t.Z, rw).lateral;
             if (along > 0.3 * NM && along < 8.5 * NM && lat < 150 + along * 0.18 && HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(rw)) < 30)
             {
@@ -691,7 +691,7 @@ public partial class Tower
                 double dev = (t.AltMsl - FieldElev - (along * Math.Tan(3 * Math.PI / 180) + 15)) / Ft;
                 if (along < 3 * NM) glide.Add((dev, lat));
                 // FAA JO 7110.65 2-1-6: low-altitude warning only for checked-in aircraft (not Away/Initial), once per approach (finalLowTold, PatternReset)
-                if (along < 2.5 * NM && dev < -200 && !finalLowTold && option != "low pass" && Phase is Phase.Entering or Phase.Pattern or Phase.ClearedLand)
+                if (along < 2.5 * NM && dev < -200 && !finalLowTold && option != "low pass" && !(par && parOn) && Phase is Phase.Entering or Phase.Pattern or Phase.ClearedLand)
                 {
                     finalLowTold = true;
                     lastLow = lastGuide = now;
@@ -701,13 +701,16 @@ public partial class Tower
                 // glidepath more than 300 ft off only within 5 NM (before that it descends to the initial altitude below the glidepath), not in level flight below it (ILS from below)
                 var course = CourseText(t, rw, along);
                 bool glideOff = Math.Abs(dev) > 300 && along < 5 * NM && !(dev < 0 && t.Vs > -1);
-                if (par && (glideOff || !course.StartsWith("on") && !course.StartsWith("slightly")) && along > 0.6 * NM && now - lastGuide > 20)
+                if (par && !parOn && (glideOff ||!course.StartsWith("on") && !course.StartsWith("slightly")) && along > 0.6 * NM && now - lastGuide > 20)
                 {
                     lastGuide = now;
                     int mile = (int)Math.Round(along / NM);
                     return Say($"{c}, {DigitWords[mile]} mile{(mile > 1 ? "s" : "")}, {(glideOff ? $"{GlideText(dev)}{GlideFix(dev)}, " : "")}{course}.");
                 }
             }
+            // PAR talk-down after the setup call: one transmission every 5 s down to the threshold (own geometry, also the last 0.3 NM)
+            if (par && parOn && !parEnd && along < 8.5 * NM && lat < 1500 && HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(rw)) < 45 &&
+                ParTalk(t, rw, along, (t.AltMsl - FieldElev - (along * Math.Tan(3 * Math.PI / 180) + 15)) / Ft, now) is { } pm) return pm;
         }
 
         // Landing: during rollout (2 s on ground, below 100 kt) announce the vacating taxiway; touch-and-go only once it is really braking

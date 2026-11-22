@@ -110,6 +110,97 @@ public partial class Tower
         _ => "",
     };
 
+    // ======================================================================= PAR talk-down (FAA JO 7110.65 5-10, 5-12): one call every 5 s from the setup to the threshold
+    bool ParApp(string rw) => navName == "six mile final" && Phase != Phase.Pattern && (Proc(rw) == "P A R" || Emergency && Proc(rw) == "") && !wantVisual && !visAsk && option != "low approach";   // practice approach keeps the old calls; R115: no approach callouts before the visual report
+    bool parOn, parAppr, parBegun, parSafe, parDh, parEnd, parHave;   // set up / "approaching glidepath" / "begin descent" / safety call / decision height / over threshold said / previous values valid
+    int parMile = 7, parHdg = -1;   // last mile announced, last heading issued (magnetic)
+    double parDev, parRight, parAlong, parAt;   // glidepath deviation (ft), offset (m), distance and time at the previous call
+    void ParReset() { parOn = parAppr = parBegun = parSafe = parDh = parEnd = parHave = false; parMile = 7; parHdg = -1; }
+    List<Msg> ParSay(string s) { var m = Say(s, "Tower"); m[0] = last = m[0] with { MaxAge = 3 }; return m; }   // a delayed call is dropped, the next one comes 5 s later anyway
+
+    /// Setup (first call to Tower on a PAR final): decision height (200 ft above the field, 10 ft steps), no acknowledgement, lost communications = missed approach.
+    List<Msg> ParSetup(string hdr, string rw)
+    {
+        parOn = landCall = true; parHdg = -1;   // landing clearance comes from the tick at 3 NM (no "report final")
+        double dh = Math.Round((FieldElev / Ft + 200) / 10) * 10;
+        return Say($"{hdr}, P A R final. This will be a P A R approach to runway {RwSay(rw)}, decision height {Alt(dh)}. Do not acknowledge further transmissions. " +
+                   "If no transmissions are received for five seconds on final approach, execute missed approach.", "Tower");
+    }
+
+    /// One talk-down call (null = none yet). devFt: height above the 3° path (TCH 15 m), along: distance before the threshold (m).
+    List<Msg>? ParTalk(Telemetry t, string rw, double along, double devFt, double now)
+    {
+        double tan3 = Math.Tan(3 * Math.PI / 180), dhAlong = (200 * Ft - 15) / tan3;   // DH: path 200 ft above the field
+        bool atDh = along <= dhAlong;
+        if (along <= 0) { if (now - lastAt < 2) return null; parEnd = true; return ParSay("Over landing threshold."); }
+        if (now - lastAt < 4.5 && !(parBegun && atDh && !parDh && now - lastAt >= 2)) return null;   // 5 s rhythm (any Tower call counts), decision height at its point
+        var (tx, tz) = Thr(rw);
+        double h = LandHdg(rw) * Math.PI / 180, right = (t.X - tx) * -Math.Sin(h) + (t.Z - tz) * Math.Cos(h), dev = devFt;   // right > 0 = right of the centreline (as CourseText)
+        double th = Math.Atan(dev * Ft / (along + 286)) * 180 / Math.PI, az = Math.Atan(right / (along + 300)) * 180 / Math.PI;   // angles seen from the glidepath/azimuth antenna (GPI 286 m, azimuth 300 m past the threshold)
+        int gp = Math.Abs(th) <= 0.10 || Math.Abs(dev) <= 10 ? 0 : Math.Abs(th) <= 0.35 ? 1 : 2, cr = Math.Abs(az) <= 0.25 || Math.Abs(right) <= 10 ? 0 : Math.Abs(az) <= 1.0 ? 1 : 2;
+        string above = dev > 0 ? "above" : "below", lr = right > 0 ? "right" : "left", c = Cs();
+        string gpTrend = !parHave || gp == 0 ? "" : Math.Abs(dev) < Math.Abs(parDev) - 10 ? (dev > 0 ? ", coming down" : ", coming up") : Math.Abs(dev) > Math.Abs(parDev) + 10 ? $", going further {above}" : "";
+        string crTrend = !parHave || cr == 0 ? "" : Math.Abs(right) < Math.Abs(parRight) - 5 ? ", correcting" : Math.Abs(right) > Math.Abs(parRight) + 5 ? $", going further {lr}" : "";
+        string Gp() => gp == 0 ? "on glidepath" : $"{(gp == 2 ? "well" : "slightly")} {above} glidepath{gpTrend}" +
+            (gp == 2 && !gpTrend.StartsWith(", coming") ? (dev > 0 ? ", increase rate of descent" : ", reduce rate of descent") : "");
+        string Course()
+        {
+            string s = cr == 0 ? "on course" : $"{(cr == 2 ? "well" : "slightly")} {lr} of course{crTrend}";
+            if (crTrend == ", correcting") return s;
+            // heading to a point on the centreline ahead (as CourseText), wind drift corrected, limited to the runway heading +-10° (+-5° inside 3 NM, +-3° inside 1 NM)
+            var aim = Pt(rw, Math.Max(along - Math.Max(NM, along * 0.4), 0), 0);
+            double brg = Bearing(t.X, t.Z, aim.X, aim.Z), br = brg * Math.PI / 180, wn = -t.WindX * Math.Sin(br) + t.WindZ * Math.Cos(br);   // wn: wind across the track (m/s)
+            if (t.Ias > 20) brg -= Math.Asin(Math.Clamp(wn / t.Ias, -0.5, 0.5)) * 180 / Math.PI;   // no ground track in the telemetry: IAS as airspeed
+            double lim = along < NM ? 3 : along < 3 * NM ? 5 : 10, d = ((brg - LandHdg(rw)) % 360 + 540) % 360 - 180;
+            int mag = (int)Math.Round(((LandHdg(rw) + Math.Clamp(d, -lim, lim) - MagVar) % 360 + 360) % 360); if (mag == 0) mag = 360;
+            if (parHdg < 0) { parHdg = (int)Math.Round(((LandHdg(rw) - MagVar) % 360 + 360) % 360); if (parHdg == 0) parHdg = 360; }   // on course the runway heading needs no call
+            int rwyMag = (int)Math.Round(((LandHdg(rw) - MagVar) % 360 + 360) % 360);
+            double Corr(int m) => (((m - rwyMag) % 360 + 540) % 360 - 180) * (right > 0 ? -1 : 1);   // correction toward the centreline (°), > 0 = toward it
+            if (HdgDiff(mag, parHdg) < 2 || cr != 0 && Corr(mag) < Corr(parHdg) + 2)   // off course and not correcting: never a weaker correction than the last one
+            {
+                if (cr == 0) return s;
+                string Say3(int m) => Digits(m.ToString("000"));
+                if (cr == 1) return $"{s}, heading {Say3(parHdg)}";   // slightly off, not correcting: restate the heading
+                int more =((parHdg + (right > 0 ? -3 : 3)) % 360 + 360) % 360;   // well off, not correcting: 3° more toward the centreline
+                if (more == 0) more = 360;
+                if (Math.Abs(((more - rwyMag) % 360 + 540) % 360 - 180) > lim) return $"{s}, heading {Say3(parHdg)}";   // limit reached: restate
+                mag = more;
+            }
+            parHdg = mag;
+            double turn = ((mag - (t.Hdg * 180 / Math.PI - MagVar)) % 360 + 540) % 360 - 180;
+            return Math.Abs(turn) < 1.5 ? $"{s}, heading {Digits(mag.ToString("000"))}" : $"{s}, turn {(turn < 0 ? "left" : "right")} heading {Digits(mag.ToString("000"))}";   // already on it: "heading ...", no turn
+        }
+        string call;
+        double gs = parHave && now - parAt >= 4 ? (parAlong - along) / (now - parAt) : Gs(t);   // ground speed from the distance flown, first call: IAS - wind
+        if (!parBegun)
+        {
+            if (dev >= -10) { parBegun = true; call = $"{c}, {(gp == 0 ? "on glidepath" : $"{(gp == 2 ? "well" : "slightly")} {above} glidepath")}, begin descent, {Course()}."; }
+            else
+            {
+                double aGp = (t.AltMsl - FieldElev - 15) / tan3;   // distance where the path meets the current altitude
+                bool soon = !parAppr && along > aGp && (along - aGp) / Math.Max(gs, 10) <= 20;
+                parAppr |= soon;
+                call = Cap($"{(soon ? "approaching glidepath, " : "")}{Course()}.");
+            }
+        }
+        else if (!atDh && !parSafe && along < 3 * NM && (th < -0.6 || th > 1.2 || along < 2 * NM && (Math.Abs(az) > 2.5 || Math.Abs(right) > 300)))
+        {
+            parSafe = true;   // once per approach, only between 3 NM and decision height (PatternReset clears it with the missed approach)
+            return Missed(t, now, $"{(th < -0.6 ? "too low" : th > 1.2 ? "too high" : $"too far {lr} of course")} for safe approach, if runway not in sight, execute missed approach.");
+        }
+        else if (atDh && !parDh) { parDh = true; call = $"{c}, at decision height, {Course()}."; }
+        else if (parDh) call = Cap($"{Course()}.");
+        else
+        {
+            int mile = (int)Math.Ceiling(along / NM);   // whole mile crossed
+            bool mi = mile is >= 1 and <= 6 && mile < parMile;
+            if (mi) parMile = mile;
+            call = mi ? $"{c}, {DigitWords[mile]} mile{(mile > 1 ? "s" : "")} from touchdown, {Gp()}, {Course()}." : Cap($"{Gp()}, {Course()}.");
+        }
+        (parHave, parDev, parRight, parAlong, parAt) = (true, dev, right, along, now);
+        return ParSay(call);
+    }
+
     // ======================================================================= Geometry & weather
     internal static double Sq(double v) => v * v;
     internal static double Dist(double x1, double z1, double x2, double z2) => Math.Sqrt(Sq(x1 - x2) + Sq(z1 - z2));

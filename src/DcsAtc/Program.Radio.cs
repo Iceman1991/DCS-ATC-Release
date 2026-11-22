@@ -742,7 +742,7 @@ static partial class Program
     }
 
     static Tx ToTx(Pilot p, Msg m) => new(m.Text, m.Role, p.Active!.StationOf(m.Role), p.Gid, Freqs: m.Role == "Center" ? new[] { p.Active.CenFreq } : FieldFreqs(p.Active.F, m.Role), Side: m.Role == "Center" ? p.Coalition : SideOf(p.Active.F, p),
-        Aired: m.Role == "Approach" && p.Active is { } tw ? () => tw.Aired(Now(), m.Text) : null);
+        Aired: m.Role == "Approach" && p.Active is { } tw ? () => tw.Aired(Now(), m.Text) : null, MaxAge: m.MaxAge);
 
     /// Ground/Tower/Approach/Departure of an airfield (Airfield.FreqsOf): own from AirfieldFrequencies, otherwise its DCS frequency (UHF, VHF), null = the one from the config;
     /// ATIS: the own, otherwise the airfield's ATIS frequency (A35, like AtisLoop).

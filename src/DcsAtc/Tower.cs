@@ -20,6 +20,7 @@ public record Traffic(int Id, string Type, double X, double Z, double AltMsl, do
 /// Radio call of a controller. Role: Ground / Tower / Approach / ATIS, "Info" = text only in the game (not spoken).
 public record Msg(string Role, string Text)
 {
+    public double MaxAge { get; init; }   // > 0: a delayed call is dropped after this many seconds (PAR talk-down), 0 = always spoken
     public static implicit operator string(Msg m) => m.Text;
     public bool Contains(string s) => Text.Contains(s);
     public bool StartsWith(string s) => Text.StartsWith(s);

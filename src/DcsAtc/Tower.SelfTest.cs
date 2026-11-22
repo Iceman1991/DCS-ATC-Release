@@ -2638,6 +2638,49 @@ public partial class Tower
         r = tw9.Tick(At(g2x, g2z, 50, LandHdg("25"), 70) with { Gear = 1 }, none, 90).Concat(tw9.Tick(At(g2x, g2z, 50, LandHdg("25"), 70) with { Gear = 1 }, none, 91)).ToList();
         Check(r.Any(m => m.Text.Contains("Low altitude alert")), "Tiefenwarnung nach Durchstarten vom Tower: " + string.Join(" | ", r.Select(m => m.Text)));
         ForceIfr = false;
+        {   // PAR talk-down (FAA JO 7110.65 5-10, 5-12): 140 kt from 7 NM, level below the path until the intercept at 5.8 NM; 150 m right at 5-4 NM, 120 ft high at 2.5-2 NM
+            ForceIfr = true;
+            List<(int S, Msg M)> FlyPar(Tower twx, bool exact)
+            {
+                var o = new List<(int, Msg)>();
+                double lvAgl = 5.8 * NM * Math.Tan(3 * Math.PI / 180) + 15, hh = LandHdg("25") * Math.PI / 180;
+                Telemetry Pos(int s)
+                {
+                    double along = 7 * NM - 72.02 * s, agl = Math.Max(5, Math.Min(lvAgl, along * Math.Tan(3 * Math.PI / 180) + 15));
+                    if (!exact && along is > 2 * NM and < 2.5 * NM) agl += 120 * Ft;
+                    double off = !exact && along is > 4 * NM and < 5 * NM ? 150 : 0;
+                    var (x, z) = P("25", along);
+                    return At(x - off * Math.Sin(hh), z + off * Math.Cos(hh), agl, LandHdg("25"), 72) with { Gear = 1 };
+                }
+                twx.Tick(Pos(0), none, 0);
+                twx.Phase = Phase.Entering; twx.navName = "six mile final"; twx.towerDue = true; twx.handoffAt = 0;   // handed over by Approach
+                foreach (var m in twx.OnTranscript("Kutaisi Tower, Enfield 11, six mile final", Pos(1), none, 1)) o.Add((1, m));
+                for (int s = 2; s <= 183; s++) foreach (var m in twx.Tick(Pos(s), none, s).Where(m => m.Role != "Info")) o.Add((s, m));
+                return o;
+            }
+            bool Has(List<(int S, Msg M)> l, string s) => l.Any(x => x.M.Text.Contains(s, StringComparison.OrdinalIgnoreCase));
+            int Cnt(List<(int S, Msg M)> l, string s) => l.Count(x => x.M.Text.Contains(s, StringComparison.OrdinalIgnoreCase));
+            var pr = FlyPar(new Tower("Enfield 1-1"), false);
+            string parTxt = string.Join(" | ", pr.Select(x => $"{x.S}s {x.M.Text}"));
+            int iAppr = pr.FindIndex(x => x.M.Text.Contains("pproaching glidepath")), iBegin = pr.FindIndex(x => x.M.Text.Contains("begin descent")), iOver = pr.FindIndex(x => x.M.Text.Contains("Over landing threshold"));
+            Check(pr.Count > 0 && pr[0].M.Text.Contains("This will be a P A R approach") && pr[0].M.Text.Contains("decision height") && pr[0].M.Text.Contains("Do not acknowledge further transmissions")
+                  && pr[0].M.Text.Contains("five seconds on final approach") && pr[0].M.MaxAge == 0, "PAR: Setup mit Entscheidungshöhe, ohne Quittieren, Funkausfall: " + (pr.FirstOrDefault().M?.Text ?? "-"));
+            Check(Cnt(pr, "approaching glidepath") == 1 && Cnt(pr, "begin descent") == 1 && iAppr >= 0 && iAppr < iBegin, "PAR: 'approaching glidepath' einmal vor 'begin descent' einmal: " + parTxt);
+            Check(iBegin >= 0 && iOver > iBegin && Enumerable.Range(iBegin + 1, iOver - iBegin).All(i => pr[i].S - pr[i - 1].S <= 6), "PAR: von 'begin descent' bis zur Schwelle keine Lücke über 6 s: " + parTxt);
+            Check(new[] { "four", "three", "two", "one" }.All(w => Cnt(pr, $"{w} mile{(w == "one" ? "" : "s")} from touchdown") == 1), "PAR: jede Meile 4..1 genau einmal: " + parTxt);
+            int iRight = pr.FindIndex(x => x.M.Text.Contains("right of course") && Regex.IsMatch(x.M.Text, @"turn left heading \w+ \w+ \w+"));
+            Check(iRight >= 0 && pr.Skip(iRight + 1).Any(x => x.M.Text.Contains("correcting") || x.M.Text.Contains("on course")), "PAR: rechts vom Kurs mit Kurs auf die Mittellinie, danach correcting/on course: " + parTxt);
+            Check(pr.Any(x => x.S is >= 116 and <= 135 && x.M.Text.Contains("above glidepath")), "PAR: 120 ft zu hoch bei 2.5-2 NM -> 'above glidepath': " + parTxt);
+            Check(Cnt(pr, "at decision height") == 1 && Cnt(pr, "Over landing threshold") == 1 && iOver == pr.Count - 1, "PAR: Entscheidungshöhe einmal, Schwelle einmal, danach nichts: " + parTxt);
+            Check(Has(pr, "cleared to land") && !Has(pr, "report final") && !Has(pr, "no landing clearance"), "PAR: Landefreigabe ohne 'report final': " + parTxt);
+            var talk = pr.Where(x => x.S > 1 && (x.M.Text.Contains("glidepath") || x.M.Text.Contains("of course") || x.M.Text.Contains("decision height") || x.M.Text.Contains("Over landing")) && !x.M.Text.Contains("cleared to land")).ToList();
+            Check(talk.Count > 20 && talk.All(x => x.M.MaxAge == 3 && x.M.Role == "Tower"), "PAR: alle Ansagen MaxAge 3: " + string.Join(" | ", talk.Where(x => x.M.MaxAge != 3).Select(x => x.M.Text)));
+            var ilsT = new Tower("Enfield 1-1"); ilsT.F.Ils["25"] = (109.75, "KTS");
+            var parIls = FlyPar(ilsT, true);
+            Check(!Has(parIls, "glidepath") && !Has(parIls, "of course") && !Has(parIls, "This will be a P A R"), "ILS: kein Talk-down: " + string.Join(" | ", parIls.Select(x => x.M.Text)));
+            ilsT.F.Ils.Remove("25");   // shared airfield: no ILS on 25 for the following tests
+            ForceIfr = false;
+        }
         // Gear up shortly before landing (descending: landing cue, R11): "check wheels down" (once)
         var twWh = new Tower("Enfield 1-1");
         var (g1x, g1z) = P("25", 1.5 * NM);

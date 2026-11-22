@@ -340,7 +340,7 @@ public partial class Tower
     }
 
     void PatternReset() { nav = null; kneeTo = null; lastAltFt = -1; if (navName == "circle") navName = "";   // Review R212: no old "circle" (otherwise a later first call at the Tower becomes circling)
-        baseCalled = extended = s360 = wrongRwyTold = finalLowTold = iniAsked = iniWaved = ovhAsked = ovhWaved = crpAsked = crpWaved = landCall = finAsked = gearDown = sfo = towerDue = towerNag = false; sideWarns = 0; }
+        baseCalled = extended = s360 = wrongRwyTold = finalLowTold = iniAsked = iniWaved = ovhAsked = ovhWaved = crpAsked = crpWaved = landCall = finAsked = gearDown = sfo = towerDue = towerNag = false; sideWarns = 0; ParReset(); }
     int sideWarns;   // LA14: "wrong side" in this pattern (at most twice, the second time with heading)
     double vecLim;   // R315: lead for the next waypoint turn
     bool intentsAsked;   // R318: "say intentions" already said within the gate

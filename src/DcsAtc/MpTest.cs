@@ -107,7 +107,7 @@ static partial class Program
         return bad == 0 ? 0 : 1;
     }
 
-    static readonly string[] MpBad = { "check runway", "check altitude", "low altitude alert", "expedite", "wrong side", "negative", "not following", "go around", "too low", "unable", "say again", "traffic alert", "no transmissions", "verify heading" };   // R271: PAR lost-comm only with talk-down
+    static readonly string[] MpBad = { "check runway", "check altitude", "low altitude alert", "expedite", "wrong side", "negative", "not following", "go around", "too low", "unable", "say again", "traffic alert", "verify heading" };   // R271: "no transmissions" is allowed now: the PAR setup call carries the lost-comm instruction
 
     static (bool Ok, string Info, List<string> Log) MpRun(Airfield f, bool ifr, int np, int na, int nd)
     {
