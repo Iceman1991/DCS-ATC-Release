@@ -207,6 +207,34 @@ public partial class Tower
         return bad == 0 ? 0 : 1;
     }
 
+    /// Self-test: one straight-in flight on rw from distNm out at bearing brg (deg from the field), 2500 ft, 220 kt, heading hdg, request "straight in"; the pilot flies the instructions until touchdown.
+    /// Returns every radio call (second, distance before the threshold in NM, role, text) and the pilot's own calls (role "Pilot").
+    internal static List<(int S, double A, string Role, string Text)> StraightInFlight(Airfield f, string rw, string acType, double brg, double distNm, double hdg)
+    {
+        var e = f.End(rw);
+        var wind = (X: -e.Dx * 5, Z: -e.Dz * 5);
+        var p = new SimPilot(f, f.X + distNm * NM * Math.Cos(brg * Math.PI / 180), f.Z + distNm * NM * Math.Sin(brg * Math.PI / 180), 2500 * Ft, hdg, 220 * Kt, wind, false);
+        var tw = new Tower(f, "Enfield 1-1") { FieldWind = wind, AcType = acType };
+        var none = new List<Traffic>();
+        var o = new List<(int, double, string, string)>();
+        int sec = 0;
+        void Hear(List<Msg> ms)
+        {
+            foreach (var m in ms.Where(m => m.Role != "Info")) { o.Add((sec, p.AL(e).A / NM, m.Role, m.Text)); p.Hear(m.Text, sec); }
+        }
+        tw.Tick(p.Tel(), none, 0);
+        sec = 1;
+        Hear(tw.OnTranscript($"{f.StationOf("Approach")}, Enfield 1-1, request straight in", p.Tel(), none, 1));
+        for (sec = 2; sec < 1500 && !p.Landed; sec++)
+        {
+            p.Step(sec);
+            var ms = tw.Tick(p.Tel(), none, sec);
+            if (p.Call(sec) is { } call) { o.Add((sec, p.AL(e).A / NM, "Pilot", call)); ms.AddRange(tw.OnTranscript(call, p.Tel(), none, sec)); }
+            Hear(ms);
+        }
+        return o;
+    }
+
     static readonly string[] Bad = { "check runway", "check altitude", "low altitude alert", "expedite", "wrong side", "negative", "not following", "go around", "too low", "unable", "say again", "pattern is south", "verify heading" };   // R271: "no transmissions" is allowed now: the PAR setup call carries the lost-comm instruction
 
     static (bool Ok, string Info, List<string> Log) SimRun(Airfield f, string rw, bool ifr, double dir, bool strict)
@@ -248,7 +276,7 @@ public partial class Tower
                     lastApp = sec;
                     // R353: approach clearance with the intercept vector, at most one call in between
                     if (Regex.IsMatch(m.Text, @"cleared (ILS|P A R) approach")) { if (sinceIcpt > 1) errs.Add($"Freigabe {sinceIcpt} Ansagen nach dem Eindrehvektor @{sec}s"); sinceIcpt = -1; }
-                    else if (m.Text.Contains("intercept")) sinceIcpt = 0;
+                    else if (m.Text.Contains("intercept") && tw.Proc(tw.Runway) != "P A R") sinceIcpt = 0;   // PAR: the clearance comes once with the final turn-on / handoff (8 NM or more), not with the first intercept vector
                     else if (sinceIcpt >= 0 && !Regex.IsMatch(m.Text, @"^[^,]+, (descend|climb) and maintain [^,]+\.$")) sinceIcpt++;   // profile descent alone (R305, long final) does not count
                     // R355: no other altitude shortly before the handoff
                     if (Regex.Match(m.Text, @"maintain (flight level [a-z ]+?|\d+ feet)\b") is { Success: true } am)

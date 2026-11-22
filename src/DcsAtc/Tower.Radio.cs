@@ -190,7 +190,7 @@ public partial class Tower
         if (!ground && Has(n, "gear (?:is )?down", "wheels (?:are )?down", "3 green", "down and locked")) gearDown = true;   // R201: gear reported, no wheels-down check
         var hdr = $"{c}, {Station}";
         // PAR final: first call to Tower starts the talk-down (decision height, no acknowledgement, lost communications); the clearance comes from the tick
-        if (!ground && t != null && firstTower && !parOn && intent is "final" or "callup" or "inbound" or "straightin" && ParApp(rw) && OnFinalLoose(t, rw)) return ParSetup(hdr, rw);
+        if (!ground && t != null && firstTower && !parOn && intent is not ("goaround" or "visual" or "cancelapproach" or "unable" or "emergency" or "minfuel" or "cancelemergency") && ParApp(rw) && OnParFinal(t, rw)) return ParSetup(hdr, rw);   // whatever he says: no landing clearance before the talk-down
 
         // Traffic pattern request, also applies together with ready / inbound / final
         // Practice instrument approach = low approach, then straight back to radar vectoring (tick)
@@ -658,7 +658,7 @@ public partial class Tower
                     double gsFt = Math.Floor((FieldElev / Ft + refA / NM * 318) / 500) * 500, now100 = Math.Round(IndFt(t) / 100) * 100;
                     double fl = fin ? FinalFloor(rw, refA) : F.MvaLeg(t.X, t.Z, rp.X, rp.Z);   // MVA (terrain + 1000 ft) would lie above the glide path on a short final
                     double af = Math.Max(fl, Math.Min(gsFt, now100));
-                    alt = Proc(rw) != "" ? $"{AltTo(t, af)} until established{(Proc(rw) == "ILS" ? " on the localizer" : "")}, " : $" {Cap(AltTo(t, af))}.";
+                    alt = Proc(rw) != "" ? $"{AltTo(t, af)}{Until(Proc(rw))}, " : $" {Cap(AltTo(t, af))}.";
                 }
                 // R220: clearance without localizer frequency (it is in the "expect"); R217: climb-out on practice approach; R271: PAR lost-comm instruction comes with the talk-down setup (ParSetup)
                 return Say((vis ? $"{hdr}, cleared visual approach runway {RwSay(rw)}, {Qnh(t)}."

@@ -97,9 +97,10 @@ public partial class Tower
         if (Math.Abs(right) < tol) return "on course";
         // Heading to a point on the centreline ahead, to the degree as with PAR
         var aim = Pt(rw, Math.Max(along - Math.Max(NM, along * 0.4), 0), 0);
-        int mag = (int)Math.Round(((Bearing(t.X, t.Z, aim.X, aim.Z) - MagVar) % 360 + 360) % 360);
+        double brg = Bearing(t.X, t.Z, aim.X, aim.Z), turn = Turn(t, brg);   // turn direction from his own heading (not from the side he is on)
+        int mag = (int)Math.Round(((brg - MagVar) % 360 + 360) % 360);
         return $"{(Math.Abs(right) < 2.5 * tol ? "slightly " : "")}{(right > 0 ? "right" : "left")} of course, " +
-               $"turn {(right > 0 ? "left" : "right")} heading {Digits((mag == 0 ? 360 : mag).ToString("000"))}";
+               $"{(Math.Abs(turn) < 1.5 ? "" : $"turn {(turn > 0 ? "right" : "left")} ")}heading {Digits((mag == 0 ? 360 : mag).ToString("000"))}";
     }
 
     static string GlideFix(double devFt) => devFt switch
@@ -111,7 +112,8 @@ public partial class Tower
     };
 
     // ======================================================================= PAR talk-down (FAA JO 7110.65 5-10, 5-12): one call every 5 s from the setup to the threshold
-    bool ParApp(string rw) => navName == "six mile final" && Phase != Phase.Pattern && (Proc(rw) == "P A R" || Emergency && Proc(rw) == "") && !wantVisual && !visAsk && option != "low approach";   // practice approach keeps the old calls; R115: no approach callouts before the visual report
+    bool ParApp(string rw) => navName == "six mile final" && Phase is not (Phase.Pattern or Phase.Inbound) && (Proc(rw) == "P A R" || Emergency && Proc(rw) == "") && !wantVisual && !visAsk && option != "low approach";   // practice approach keeps the old calls; R115: no approach callouts before the visual report
+    bool OnParFinal(Telemetry t, string rw) => OnLongFinal(t, rw) || OnFinalLoose(t, rw);   // PAR final is long (handoff 8-12 NM out): setup already there
     bool parOn, parAppr, parBegun, parSafe, parDh, parEnd, parHave;   // set up / "approaching glidepath" / "begin descent" / safety call / decision height / over threshold said / previous values valid
     int parMile = 7, parHdg = -1;   // last mile announced, last heading issued (magnetic)
     double parDev, parRight, parAlong, parAt;   // glidepath deviation (ft), offset (m), distance and time at the previous call

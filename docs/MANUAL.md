@@ -1188,6 +1188,7 @@ The controller only monitors an ILS approach: no glide-path calls, just the one 
 > **Tower:** Over landing threshold.
 
 - **Do not acknowledge.** Just fly. If you hear nothing for 5 seconds on final, execute the missed approach (lost communication).
+- **A PAR needs a long final.** Approach brings you onto the final course at least 8 NM from the threshold, level at the altitude named with the clearance ("maintain ..."), and clears you once, with the last turn. Inside about 8 NM, Approach first vectors you out so that you meet the glidepath from below about 6-7 NM out. The descent starts with "begin descent" from Tower. With Tower and Approach on the same frequency the talk-down starts by itself after the handover, without a call to Tower; with your first call to Tower you always get the setup, never a landing clearance first.
 - Before the glidepath you get course only and "approaching glidepath", then "on glidepath, begin descent". After that every call has glidepath and course, and the distance every whole mile from 6 to 1.
 - Terms: "slightly/well above/below glidepath", "slightly/well left/right of course", with the trend "coming down", "coming up", "going further above/below/left/right" or "correcting"; "increase/reduce rate of descent"; "turn left/right heading ...". The heading is exact and allows for wind.
 - The landing clearance is relayed inside the talk-down.

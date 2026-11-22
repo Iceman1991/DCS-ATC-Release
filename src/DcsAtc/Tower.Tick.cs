@@ -684,6 +684,11 @@ public partial class Tower
             // Precision approach like GCA/PAR: only for the straight-in approach from radar vectoring with PAR clearance. ILS, visual/straight-in (visual) and
             // visual traffic pattern (break) get no glidepath/course callouts, only the low-altitude warning once
             bool par = ParApp(rw);   // Emergency without ILS: distance/glidepath like PAR; R115: no approach callouts before the visual report
+            if (par && !parOn && towerDue && Phase == Phase.Entering && Math.Abs(FreqOf(F, "Tower") - FreqOf(F, "Approach")) < 0.005 && now - handoffAt >= 5 && OnParFinal(t, rw))
+            {
+                towerDue = false;   // Tower and Approach share the frequency: no call to Tower, the talk-down starts by itself
+                return ParSetup($"{c}, {F.StationOf("Tower")}", rw);
+            }
             var lat = Approach(t.X, t.Z, rw).lateral;
             if (along > 0.3 * NM && along < 8.5 * NM && lat < 150 + along * 0.18 && HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(rw)) < 30)
             {

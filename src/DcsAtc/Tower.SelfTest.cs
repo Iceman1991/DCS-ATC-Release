@@ -2640,7 +2640,7 @@ public partial class Tower
         ForceIfr = false;
         {   // PAR talk-down (FAA JO 7110.65 5-10, 5-12): 140 kt from 7 NM, level below the path until the intercept at 5.8 NM; 150 m right at 5-4 NM, 120 ft high at 2.5-2 NM
             ForceIfr = true;
-            List<(int S, Msg M)> FlyPar(Tower twx, bool exact)
+            List<(int S, Msg M)> FlyPar(Tower twx, bool exact, bool call = true)
             {
                 var o = new List<(int, Msg)>();
                 double lvAgl = 5.8 * NM * Math.Tan(3 * Math.PI / 180) + 15, hh = LandHdg("25") * Math.PI / 180;
@@ -2654,7 +2654,7 @@ public partial class Tower
                 }
                 twx.Tick(Pos(0), none, 0);
                 twx.Phase = Phase.Entering; twx.navName = "six mile final"; twx.towerDue = true; twx.handoffAt = 0;   // handed over by Approach
-                foreach (var m in twx.OnTranscript("Kutaisi Tower, Enfield 11, six mile final", Pos(1), none, 1)) o.Add((1, m));
+                if (call) foreach (var m in twx.OnTranscript("Kutaisi Tower, Enfield 11, six mile final", Pos(1), none, 1)) o.Add((1, m));
                 for (int s = 2; s <= 183; s++) foreach (var m in twx.Tick(Pos(s), none, s).Where(m => m.Role != "Info")) o.Add((s, m));
                 return o;
             }
@@ -2679,6 +2679,78 @@ public partial class Tower
             var parIls = FlyPar(ilsT, true);
             Check(!Has(parIls, "glidepath") && !Has(parIls, "of course") && !Has(parIls, "This will be a P A R"), "ILS: kein Talk-down: " + string.Join(" | ", parIls.Select(x => x.M.Text)));
             ilsT.F.Ils.Remove("25");   // shared airfield: no ILS on 25 for the following tests
+            {   // Tower and Approach on one frequency: the talk-down starts 5 s after the handoff without a call to Tower; different frequencies: it waits for the call
+                var sameT = new Tower("Enfield 1-1");
+                sameT.F.Own["Tower"] = sameT.F.Own["Approach"] = new[] { 263.0 };
+                var parSame = FlyPar(sameT, true, false);
+                sameT.F.Own["Tower"] = new[] { 264.0 };
+                var parDiff = FlyPar(new Tower("Enfield 1-1"), true, false);
+                sameT.F.Own.Remove("Tower"); sameT.F.Own.Remove("Approach");
+                int iSet = parSame.FindIndex(x => x.M.Text.Contains("This will be a P A R approach"));
+                Check(iSet >= 0 && parSame[iSet].S is >= 5 and <= 7 && parSame[iSet].M.Text.StartsWith("Enfield one one, Kutaisi Tower, P A R final") && Has(parSame, "begin descent"), "PAR gleiche Frequenz: Setup ohne Tower-Ruf 5-7 s nach der Übergabe: " + string.Join(" | ", parSame.Take(3).Select(x => $"{x.S}s {x.M.Text}")));
+                Check(!parDiff.Any(x => x.S < 20 && x.M.Text.Contains("This will be a P A R")), "PAR verschiedene Frequenzen: kein Setup ohne Tower-Ruf: " + string.Join(" | ", parDiff.Take(3).Select(x => $"{x.S}s {x.M.Text}")));
+            }
+            {   // Missed approach on a PAR final (400 m off course inside 2 NM): afterwards no talk-down/monitor calls from the old final-approach block
+                var twm = new Tower("Enfield 1-1");
+                double hhm = LandHdg("25") * Math.PI / 180;
+                Telemetry PosM(int s)
+                {
+                    double al = 7 * NM - 72.02 * s, agl = Math.Max(5, Math.Min(5.8 * NM * Math.Tan(3 * Math.PI / 180) + 15, al * Math.Tan(3 * Math.PI / 180) + 15)), off = al < 2 * NM ? 400 : 0;
+                    var (x, z) = P("25", al);
+                    return At(x - off * Math.Sin(hhm), z + off * Math.Cos(hhm), agl, LandHdg("25"), 72) with { Gear = 1 };
+                }
+                twm.Tick(PosM(0), none, 0);
+                twm.Phase = Phase.Entering; twm.navName = "six mile final"; twm.towerDue = true; twm.handoffAt = 0;
+                twm.OnTranscript("Kutaisi Tower, Enfield 11, six mile final", PosM(1), none, 1);
+                int sMiss = -1; var after = new List<string>();
+                for (int s = 2; s <= 183 && (sMiss < 0 || s <= sMiss + 20); s++)
+                {
+                    foreach (var m in twm.Tick(PosM(s), none, s).Where(m => m.Role != "Info"))
+                        if (sMiss < 0 && twm.Phase == Phase.Inbound) sMiss = s; else if (sMiss >= 0) after.Add(m.Text);
+                }
+                Check(sMiss > 0 && !after.Any(x => x.Contains("of course") || x.Contains("glidepath")), "PAR Fehlanflug: danach kein Monitor/Talk-down: " + sMiss + " " + string.Join(" | ", after));
+            }
+            {   // PAR needs a long clean final (test flight Kutaisi 25 IFR, 10 NM north-east at 2500 ft): Approach vectors out first, clearance and glidepath from 8 NM and further out
+                var kf = new Tower("Enfield 1-1").F;
+                var fl = StraightInFlight(kf, "25", "FA-18C_hornet", 65, 10, 250);
+                string flTxt = string.Join(" | ", fl.Select(x => $"{x.S}s {x.A:0.0}NM {x.Role}: {x.Text}"));
+                var clrP = fl.FirstOrDefault(x => x.Text.Contains("cleared P A R approach"));
+                var begP = fl.FirstOrDefault(x => x.Text.Contains("begin descent"));
+                Check(clrP.Text != null && clrP.A >= 8 && begP.Text != null && begP.A >= 6 && fl.Any(x => x.Text.Contains("over landing threshold", StringComparison.OrdinalIgnoreCase)) &&
+                      !fl.Any(x => x.Text.Contains("for safe approach") || x.Text.Contains("go around") || x.Text.Contains("missed approach") && !x.Text.Contains("This will be a P A R")), "PAR lange Endanflug: Freigabe " + clrP.A.ToString("0.0") + " NM, 'begin descent' " + begP.A.ToString("0.0") + " NM: " + flTxt);
+            }
+            {   // Test flight 2: first Tower call at 11 NM ("11 mile final, gear down, full stop"): always the setup, never "cleared to land" before the talk-down; no "until established" for PAR
+                foreach (var callTxt in new[] { "11 mile final, gear down, full stop", "final", "inbound", "with you", "request full stop landing" })
+                {
+                    var twc = new Tower("Dagger 1-1");
+                    var (cx11, cz11) = P("25", 11 * NM);
+                    var t11 = At(cx11, cz11, 2900 * Ft - twc.F.Elev, LandHdg("25"), 150) with { Gear = 1 };
+                    twc.Tick(t11, none, 0);
+                    twc.Phase = Phase.Entering; twc.navName = "six mile final"; twc.towerDue = true; twc.handoffAt = 0;
+                    var rc = twc.OnTranscript("Kutaisi Tower, Dagger 1-1, " + callTxt, t11, none, 1);
+                    Check(rc.Count > 0 && rc[0].Text.Contains("This will be a P A R approach") && !rc.Any(m => m.Text.Contains("cleared to land")), $"PAR erster Tower-Ruf '{callTxt}' bei 11 NM: " + string.Join(" | ", rc.Select(m => m.Text)));
+                }
+                var kf = new Tower("Enfield 1-1").F;
+                var fl = StraightInFlight(kf, "25", "FA-18C_hornet", 65, 10, 250);
+                var firstAp = fl.FirstOrDefault(x => x.Role == "Approach" && x.Text.Contains("heading"));
+                var hw = Regex.Match(firstAp.Text ?? "", @"heading (\w+) (\w+) (\w+)").Groups;
+                string[] dgw = { "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine" };
+                int firstHdg = hw.Count == 4 ? Array.IndexOf(dgw, hw[1].Value) * 100 + Array.IndexOf(dgw, hw[2].Value) * 10 + Array.IndexOf(dgw, hw[3].Value) : -1;
+                Check(firstHdg >= 0 && Math.Abs(((firstHdg - 250 + 540) % 360) - 180) > 60 && firstAp.Text.Contains("vectors"), "PAR 10 NM: erster Vektor führt vom Platz weg: " + firstAp.Text);
+                Check(!fl.Any(x => x.Role == "Approach" && x.Text.Contains("P A R") && x.Text.Contains("until established")), "PAR: kein 'until established' in der Freigabe");
+                kf.Ils["25"] = (109.75, "KTS");
+                var flI = StraightInFlight(kf, "25", "F-16C_50", 65, 10, 250);
+                kf.Ils.Remove("25");
+                Check(flI.Any(x => x.Text.Contains("cleared ILS approach")) && !flI.Any(x => x.Text.Contains("P A R")) && flI.Any(x => x.Text.Contains("until established on the localizer")), "ILS gleicher Anflug wie bisher: " + string.Join(" | ", flI.Take(6).Select(x => $"{x.S}s {x.A:0.0}NM {x.Text}")));
+                Check(fl.Count(x => x.Text.Contains("cleared P A R approach")) == 1, "PAR: Freigabe genau einmal: " + string.Join(" | ", fl.Where(x => x.Text.Contains("cleared P A R")).Select(x => $"{x.S}s {x.A:0.0}NM {x.Text}")));
+                // FIX 6: CourseText turns toward the centreline from his own heading
+                var twk = new Tower("Enfield 1-1");
+                var (kx, kz) = P("25", 5 * NM);
+                double hk = LandHdg("25") * Math.PI / 180;
+                string CT(double dHdg) => twk.CourseText(At(kx - 400 * Math.Sin(hk), kz + 400 * Math.Cos(hk), 300, LandHdg("25") + dHdg, 72), "25", 5 * NM);
+                string ctA = CT(40), ctB = CT(-60), ctC = CT(0);
+                Check(ctA.Contains("right of course, turn left heading") && ctB.Contains("right of course, turn right heading") && ctC.Contains("turn left heading"),$"CourseText Drehrichtung: {ctA} | {ctB} | {ctC}");
+            }
             ForceIfr = false;
         }
         // Gear up shortly before landing (descending: landing cue, R11): "check wheels down" (once)
@@ -2720,7 +2792,7 @@ public partial class Tower
         var tP = At(g4x, g4z, along4 * Math.Tan(3 * Math.PI / 180) + 15 + 400 * Ft, LandHdg("25"), 70) with { Gear = 1 };
         var rP = twPar.Tick(tP, none, 30).Concat(twPar.Tick(tP, none, 36)).ToList();   // cleared on final: PAR calls anyway (the first tick may be "contact Tower now")
         ForceIfr = false;
-        Check(atisP.Contains("expect vectors for P A R approach runway two five") && !atisP.Contains("TACAN approach") && r[0].Contains("until established, cleared P A R approach runway two five")
+        Check(atisP.Contains("expect vectors for P A R approach runway two five") && !atisP.Contains("TACAN approach") && r[0].Contains("maintain 2000 feet, cleared P A R approach runway two five") && !r[0].Contains("until established")
               && !r[0].Contains("no transmissions")   // R271: without talk-down no lost-comm instruction (R221 promised calls every 5 s on final)
               && rP.Any(m => m.Text.Contains("well above glidepath")) && rP.Any(m => m.Text.Contains("contact Kutaisi Tower now")), $"K9 PAR Kutaisi 25 (29 s ohne Tick geflogen: kein Neuspawn): {atisP} | {r[0]} | {string.Join(" | ", rP.Select(m => m.Text))}");
         // R42: on short final (2.5 NM, on the glide path) terrain + 250 ft as lower limit, not the MVA (flat terrain 0 m: 1000 ft, above the glide path)
@@ -4485,7 +4557,7 @@ public partial class Tower
             var neg14 = off14.OnTranscript("Kutaisi Tower, Dagger 1-2, 9 mile final, full stop", T14(9 * NM, 3 * NM, 2700), none, 300);
             ForceIfr = false;
             var hoMsg = ho14.LastOrDefault(m => m.Contains("contact Kutaisi Tower")) ?? "-";
-            Check(!hoMsg.Contains("report four mile final") && sug14?.Text == "9 mile final, gear down, full stop" && fin14.Count > 0 && fin14[0].Text.StartsWith("Dagger one one, Kutaisi Tower") && fin14[0].Text.Contains("cleared to land")
+            Check(!hoMsg.Contains("report four mile final") && sug14?.Text == "9 mile final, gear down, full stop" && fin14.Count > 0 && fin14[0].Text.StartsWith("Dagger one one, Kutaisi Tower") && fin14[0].Text.Contains("P A R final") && !fin14[0].Text.Contains("cleared to land")
                   && neg14.Count > 0 && neg14[0].Text.Contains("negative, I don't have you on final"),
                   $"R314 langer Endanflug: {hoMsg} | {sug14?.Text} -> {fin14.FirstOrDefault()?.Text} | 3 NM daneben: {neg14.FirstOrDefault()?.Text}");
             // R332: preceding traffic on long final (9 NM, 800 m) counts in the sequence (before only up to 8 NM/900 m: "cleared to land")
@@ -4565,11 +4637,11 @@ public partial class Tower
             }
             ForceIfr = false;
             var hdgCalls6 = said6.Skip(1).Where(m => m.Contains("heading") && !m.Contains("contact")).ToList();
-            Check(t6.Phase == Phase.Entering && hdgCalls6.Count == 0 && Regex.IsMatch(said6[0], "intercept|until established, cleared"),   // R353: turn-in vector with the clearance
+            Check(t6.Phase == Phase.Entering && hdgCalls6.Count == 0 && Regex.IsMatch(said6[0], "intercept|until established, cleared|, cleared P A R"),   // R353: turn-in vector with the clearance
                   $"R306 Eindrehen: ein Eindrehkurs, kein Nachsteuern/\"join\" ({hdgCalls6.Count}) | " + string.Join(" | ", said6));
             // R353: 30° turn-in vector, meets the centreline 2 NM or more before the gate, altitude fits: vector, "maintain … until established" and clearance in one call;
             // afterwards no descent or second clearance, the handover only says "contact Tower" (FAA JO 7110.65 5-9-1, 5-9-2)
-            Check(Regex.IsMatch(said6[0], @"heading [a-z ]+, .*maintain \d+ feet until established, cleared P A R approach runway zero seven\.$") && !said6.Skip(1).Any(m => m.Contains("cleared") || m.Contains("descend"))
+            Check(Regex.IsMatch(said6[0], @"heading [a-z ]+, .*maintain \d+ feet, cleared P A R approach runway zero seven\.$") && !said6.Skip(1).Any(m => m.Contains("cleared") || m.Contains("descend"))
                   && said6.Skip(1).Any(m => m.Contains("contact Kutaisi Tower")), "R353 Eindrehvektor und Freigabe in einem Ruf | " + string.Join(" | ", said6));
         }
 

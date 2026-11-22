@@ -1190,6 +1190,7 @@ Ein ILS-Anflug wird nur überwacht: keine Gleitweg-Ansagen, nur die eine Tiefflu
 > **Tower:** Over landing threshold.
 
 - **Nicht quittieren.** Einfach fliegen. Hörst du auf Final 5 Sekunden nichts, Fehlanflug fliegen (Funkausfall).
+- **Ein PAR braucht einen langen Endanflug.** Approach bringt dich mindestens 8 NM vor der Schwelle auf den Endanflugkurs, eben auf der mit der Freigabe genannten Höhe („maintain ...“), und gibt die Freigabe einmal mit der letzten Kurve. Innerhalb von etwa 8 NM führt Approach dich erst hinaus, damit du den Gleitweg etwa 6-7 NM vor der Schwelle von unten triffst. Der Sinkflug beginnt mit „begin descent“ von Tower. Liegen Tower und Approach auf derselben Frequenz, beginnt der Talk-down nach der Übergabe von selbst, ohne Ruf an Tower; mit deinem ersten Ruf an Tower bekommst du immer die Einweisung, nie zuerst eine Landefreigabe.
 - Vor dem Gleitweg gibt es nur den Kurs und „approaching glidepath“, dann „on glidepath, begin descent“. Danach hat jeder Ruf Gleitweg und Kurs, dazu die Entfernung bei jeder vollen Meile von 6 bis 1.
 - Begriffe: „slightly/well above/below glidepath“, „slightly/well left/right of course“, mit Tendenz „coming down“, „coming up“, „going further above/below/left/right“ oder „correcting“; „increase/reduce rate of descent“; „turn left/right heading ...“. Der Kurs ist exakt und berücksichtigt den Wind.
 - Die Landefreigabe wird im Talk-down mitgegeben.

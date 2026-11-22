@@ -872,6 +872,58 @@ Ablauf:
 end }
 
 ---------------------------------------------------------------------------------------------------
+missions[#missions + 1] = { file = "DCS-ATC Test - PAR.miz", build = function()
+  local K = KUTAISI
+  local m = newMission({ title = "DCS-ATC Test - PAR", start = 10 * 3600, center = { x = -284860, y = 700000 }, wind = { 40, 5, 8, 12 },
+    clouds = { preset = "Preset19", thickness = 200, density = 0, base = 250, iprecptns = 0 }, vis = 8000, wxName = "OVC 650 ft, wind 220/10",
+    brief = [[
+DCS-ATC TEST – PAR APPROACH
+
+EN
+Purpose: PAR talk-down at Kutaisi runway 25. The Hornet has no ILS receiver, so DCS-ATC gives it a PAR approach even though Kutaisi has an ILS.
+Conditions: 15 June, 10:00 local, overcast about 650 ft above the field (instrument conditions), visibility 8 km below the clouds, wind 10 kt from 220° (crosswind from the left on runway 25).
+
+Frequencies: Kutaisi Ground, Tower and Approach are all on the field frequency 263.0 (UHF preset ch 3, radio already set), ATIS 263.5 (ch 5). Approach still says "contact Kutaisi Tower": stay on 263.0 and call Tower once.
+
+Slots:
+- Enfield 1-1      Hornet airborne 25 NM east of Kutaisi, 7000 ft (full flow with vectors)
+- Colt 1-1         Hornet airborne 11 NM on the extended centreline of runway 25, 2500 ft (quick test)
+- Uzi 1-1          F-16C airborne 25 NM east, 7000 ft (comparison: ILS, no talk-down)
+- Springfield 1-1  Hornet cold on Kutaisi stand 24 (IFR departure, then back with PAR)
+
+Flow:
+1. Approach: "Kutaisi Approach, Enfield 1-1, inbound for landing". Fly the vectors until "cleared P A R approach runway two five, contact Kutaisi Tower".
+2. Switch to Tower and call once, on the final approach course: "Kutaisi Tower, Enfield 1-1, final". Tower sets up the talk-down (decision height, do not acknowledge).
+3. From then on do not talk, just fly. Gear down. One call every 5 s: glidepath and course, headings to the degree, distance every mile, landing clearance at 3 NM, "at decision height", "over landing threshold".
+4. Try deviations: fly off the centreline or above/below the glidepath and follow the corrections. Far off between 3 NM and the decision height: "too low/high for safe approach" with a missed approach.
+Do not request a low approach: practice approaches still get the old calls.
+
+DE
+Zweck: PAR-Talk-down in Kutaisi, Piste 25. Die Hornet hat keinen ILS-Empfänger, deshalb gibt DCS-ATC ihr einen PAR-Anflug, obwohl Kutaisi ein ILS hat.
+Lage: 15. Juni, 10:00 Ortszeit, geschlossene Wolkendecke etwa 650 ft über dem Platz (Instrumentenbedingungen), Sicht 8 km unter den Wolken, Wind 10 kt aus 220° (Seitenwind von links auf Piste 25).
+
+Frequenzen: Kutaisi Ground, Tower und Approach sind alle auf der Platzfrequenz 263.0 (UHF Kanal 3, Funk schon eingestellt), ATIS 263.5 (Kanal 5). Approach sagt trotzdem "contact Kutaisi Tower": auf 263.0 bleiben und einmal Tower rufen.
+
+Slots:
+- Enfield 1-1      Hornet in der Luft, 25 NM östlich Kutaisi, 7000 ft (ganzer Ablauf mit Vektoren)
+- Colt 1-1         Hornet in der Luft, 11 NM auf der verlängerten Pistenachse 25, 2500 ft (schneller Test)
+- Uzi 1-1          F-16C in der Luft, 25 NM östlich, 7000 ft (Vergleich: ILS, kein Talk-down)
+- Springfield 1-1  Hornet kalt auf Stand 24 in Kutaisi (IFR-Abflug, dann zurück mit PAR)
+
+Ablauf:
+1. Approach: "Kutaisi Approach, Enfield 1-1, inbound for landing". Den Vektoren folgen bis "cleared P A R approach runway two five, contact Kutaisi Tower".
+2. Auf Tower wechseln und einmal rufen, auf dem Endanflugkurs: "Kutaisi Tower, Enfield 1-1, final". Tower weist den Talk-down ein (Entscheidungshöhe, nicht quittieren).
+3. Danach nicht mehr funken, nur fliegen. Fahrwerk raus. Alle 5 s eine Ansage: Gleitweg und Kurs, gradgenaue Steuerkurse, Entfernung jede Meile, Landefreigabe bei 3 NM, "at decision height", "over landing threshold".
+4. Abweichungen ausprobieren: neben die Achse oder über/unter den Gleitweg fliegen und den Korrekturen folgen. Weit daneben zwischen 3 NM und Entscheidungshöhe: "too low/high for safe approach" mit Fehlanflug.
+Keinen Low Approach anfragen: Übungsanflüge haben noch die alten Ansagen.]],
+    blueTask = "Slots: Enfield 1-1 (Hornet 25 NM), Colt 1-1 (Hornet 11 NM final 25), Uzi 1-1 (F-16 25 NM, ILS), Springfield 1-1 (Hornet Kutaisi). Kutaisi 263.0 (Ground/Tower/Approach)." })
+  slot(m, { name = "Enfield 1-1 (Hornet 25 NM, PAR)", cs = "Enfield", type = "FA-18C_hornet", p = off(K, 70, 25), alt = 7000 * FT, spd = 280 * KT * 1.1, to = K, load = "hornetLight", freq = 263.0, uhf = UHF_LAND })
+  slot(m, { name = "Colt 1-1 (Hornet 11 NM final 25)", cs = "Colt", type = "FA-18C_hornet", p = off(K, 67.5, 11), alt = 2500 * FT, spd = 220 * KT, to = K, load = "hornetLight", freq = 263.0, uhf = UHF_LAND })
+  slot(m, { name = "Uzi 1-1 (F-16 25 NM, ILS)", cs = "Uzi", type = "F-16C_50", p = off(K, 80, 25), alt = 7000 * FT, spd = 280 * KT * 1.1, to = K, load = "viperAA", freq = 263.0, uhf = UHF_LAND, vhf = VHF_LAND })
+  slot(m, { name = "Springfield 1-1 (Hornet Kutaisi)", cs = "Springfield", type = "FA-18C_hornet", stand = "24", to = off(K, 250, 10), load = "hornetLight", freq = 263.0, uhf = UHF_LAND })
+  return m
+end }
+
 -- Build, pack, unpack again, check
 sh('mkdir "' .. OUTDIR .. '" 2>nul & exit /b 0')
 local allOk, cases = true, {}
