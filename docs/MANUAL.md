@@ -1178,7 +1178,7 @@ Aircraft without an ILS receiver (F/A-18, F-14, AV-8B, F-5E, F-86, MiG-15/19, wa
 
 The controller only monitors an ILS approach: no glide-path calls, just the one low-altitude alert.
 
-**PAR** (IFR without an ILS, or an emergency without an ILS). With your first call to Tower the controller sets up the talk-down, then talks you down to the threshold with one call every 5 seconds:
+**PAR** (IFR without an ILS, or an emergency without an ILS). With your first call to Tower the controller sets up the talk-down, then talks you down to the threshold with a call about every 5 seconds, each one only after the previous one has been spoken:
 
 > **Tower:** Enfield one one, Kutaisi Tower, P A R final. This will be a P A R approach to runway two five, decision height two hundred sixty feet. Do not acknowledge further transmissions. If no transmissions are received for five seconds on final approach, execute missed approach.  
 > **Tower:** Enfield one one, on glidepath, begin descent, on course.  
@@ -1189,11 +1189,13 @@ The controller only monitors an ILS approach: no glide-path calls, just the one 
 
 - **Do not acknowledge.** Just fly. If you hear nothing for 5 seconds on final, execute the missed approach (lost communication).
 - **A PAR needs a long final.** Approach brings you onto the final course at least 8 NM from the threshold, level at the altitude named with the clearance ("maintain ..."), and clears you once, with the last turn. Inside about 8 NM, Approach first vectors you out so that you meet the glidepath from below about 6-7 NM out. The descent starts with "begin descent" from Tower. With Tower and Approach on the same frequency the talk-down starts by itself after the handover, without a call to Tower; with your first call to Tower you always get the setup, never a landing clearance first.
-- Before the glidepath you get course only and "approaching glidepath", then "on glidepath, begin descent". After that every call has glidepath and course, and the distance every whole mile from 6 to 1.
-- Terms: "slightly/well above/below glidepath", "slightly/well left/right of course", with the trend "coming down", "coming up", "going further above/below/left/right" or "correcting"; "increase/reduce rate of descent"; "turn left/right heading ...". The heading is exact and allows for wind.
+- If you are still off the centreline at the last turn, Approach gives you a heading that converges with it (10-30°, allowing for wind); Tower's talk-down takes it from there.
+- Before the glidepath you get course only and "approaching glidepath", then "on glidepath, begin descent". If you descend more than 200 ft below the cleared altitude before that, you hear "check altitude, maintain ...". After "begin descent" every call has glidepath and course, and the distance every whole mile from 6 to 1.
+- During the talk-down Tower makes no general broadcasts on the frequency (no new ATIS announcement); you get the new information later.
+- Terms: "slightly/well above/below glidepath", "slightly/well left/right of course", with the trend "coming down", "coming up", "going further above/below/left/right" or "correcting"; "increase/reduce rate of descent"; "turn left/right heading ..." (just "heading ..." only when you are already on it). The heading is exact and allows for wind.
 - The landing clearance is relayed inside the talk-down.
 - **Safety limits:** between 3 NM and the decision height, more than 0.6° below or 1.2° above the glidepath, or inside 2 NM more than 2.5° off course: "Enfield one one, too low for safe approach, if runway not in sight, execute missed approach." with the missed-approach instructions (likewise "too high", "too far left/right of course").
-- One call every 5 s means about 40 calls per approach; with ElevenLabs voices that counts against your characters.
+- A call every 5 to 10 s means about 30 to 40 calls per approach; with ElevenLabs voices that counts against your characters.
 
 **Visual approach** (VFR weather only):
 

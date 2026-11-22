@@ -834,6 +834,17 @@ public partial class Tower
         return $"approach cancelled, resume own navigation, {Qnh(t)}. {OneOf("Call me when ready for another approach.", "Call when ready for another approach.")}";
     }
 
+    /// PAR: last vector to the final. Off the centreline it converges (10-30°, flatter the closer), wind drift corrected; on it the runway heading (true).
+    double FinalBrg(Telemetry t, string rw)
+    {
+        var (tx, tz) = Thr(rw);
+        double h = LandHdg(rw), hr = h * Math.PI / 180, right = (t.X - tx) * -Math.Sin(hr) + (t.Z - tz) * Math.Cos(hr), a = AL(t.X, t.Z, rw).A;   // right > 0 = right of the centreline (as ParTalk)
+        if (Math.Abs(right) < 0.1 * NM || a <= 0) return h;
+        double brg = h + (right > 0 ? -1 : 1) * Math.Clamp(Math.Atan(Math.Abs(right) / (0.4 * a)) * 180 / Math.PI, 10, 30), br = brg * Math.PI / 180, wn = -t.WindX * Math.Sin(br) + t.WindZ * Math.Cos(br);
+        if (t.Ias > 20) brg -= Math.Asin(Math.Clamp(wn / t.Ias, -0.5, 0.5)) * 180 / Math.PI;   // as ParTalk: IAS as airspeed
+        return brg;
+    }
+
     /// On the centreline: handover to the tower.
     List<Msg> Established(Telemetry t, bool direct = false)
     {
@@ -854,8 +865,9 @@ public partial class Tower
             }
             if (clr) return Say($"{c}, {(Dist(t.X, t.Z, thr.X, thr.Z) < 9 * NM || AheadR >= 0 ? "reduce to final approach speed, " : "")}{Qnh(t)}, contact {Contact("Tower")}.", "Approach");   // R353: cleared with the turn-in vector: handover only
             // R220: position before heading, "until established on the localizer" (FAA JO 7110.65 5-9-4); R271: PAR without lost-comm instruction here – it comes with the talk-down setup (ParSetup, first call to Tower); R217: practice approach with climb-out
-            return Say($"{c}, {MilesTxt(Dist(t.X, t.Z, thr.X, thr.Z))} from touchdown, {(HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(rw)) > 5 ? TurnTo(t, LandHdg(rw)) + ", " : "")}" +
-                       (Proc(rw) is var p && p != "" && !wantVisual ? $"{(HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(rw)) > 5 || Math.Abs(AL(t.X, t.Z, rw).L) > 0.3 * NM ? $"maintain {Alt(vecFt)}{Until(p)}, " : "")}cleared {p} approach runway {RwSay(rw)}" : $"on course, {(wantVisual ? "cleared visual approach" : "proceed straight in")} runway {RwSay(rw)}") + OnTheGo(rw) + (Dist(t.X, t.Z, thr.X, thr.Z) < 9 * NM || AheadR >= 0 ? ", reduce to final approach speed, " : ", ") +   // R46: with preceding traffic also at the 10 NM gate (otherwise he catches up with the speed from radar vectoring)
+            double fb = Proc(rw) == "P A R" ? FinalBrg(t, rw) : LandHdg(rw);   // PAR: converging, wind corrected (the plain runway heading diverges from an offset in a crosswind)
+            return Say($"{c}, {MilesTxt(Dist(t.X, t.Z, thr.X, thr.Z))} from touchdown, {(HdgDiff(t.Hdg * 180 / Math.PI, fb) > 5 ? TurnTo(t, fb) + ", " : "")}" +
+                       (Proc(rw) is var p && p != "" && !wantVisual ? $"{(HdgDiff(t.Hdg * 180 / Math.PI, fb) > 5 || Math.Abs(AL(t.X, t.Z, rw).L) > 0.3 * NM ? $"maintain {Alt(vecFt)}{Until(p)}, " : "")}cleared {p} approach runway {RwSay(rw)}" : $"on course, {(wantVisual ? "cleared visual approach" : "proceed straight in")} runway {RwSay(rw)}") + OnTheGo(rw) + (Dist(t.X, t.Z, thr.X, thr.Z) < 9 * NM || AheadR >= 0 ? ", reduce to final approach speed, " : ", ") +   // R46: with preceding traffic also at the 10 NM gate (otherwise he catches up with the speed from radar vectoring)
                        $"{Qnh(t)}, contact {Contact("Tower")}.", "Approach");   // R314: "report four mile final" is given by the tower (first call), not Approach
         }
         // Visual: to initial or overhead (reciprocal), never lower than 500 ft above terrain on the rest of the path

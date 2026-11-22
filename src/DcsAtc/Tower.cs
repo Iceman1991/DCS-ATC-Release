@@ -70,6 +70,7 @@ public partial class Tower
     string callsign;
     Msg? last;
     string lastIntent = "";
+    double towerEnd = -1e9; bool awaitAir;   // PAR talk-down: end of the last Tower transmission on air (+ estimate) / last Tower call queued but not yet on air
     double lastAt = -999, callAt;   // lastAt: time of the last controller call (readback window), callAt: time of the current call (Tick/OnTranscript)
     string? exitDir, entry;
     Airfield.Route? arrRoute; int routeAt;   // charts.jsonc route being flown, index of the next fix; only valid while entry is its "to" (Rt)

@@ -2640,9 +2640,10 @@ public partial class Tower
         ForceIfr = false;
         {   // PAR talk-down (FAA JO 7110.65 5-10, 5-12): 140 kt from 7 NM, level below the path until the intercept at 5.8 NM; 150 m right at 5-4 NM, 120 ft high at 2.5-2 NM
             ForceIfr = true;
-            List<(int S, Msg M)> FlyPar(Tower twx, bool exact, bool call = true)
+            List<(int S, Msg M)> FlyPar(Tower twx, bool exact, bool call = true, int airDelay = 0)
             {
                 var o = new List<(int, Msg)>();
+                (int At, Msg M)? late = null;   // first call goes on air airDelay s after it was queued (radio busy)
                 double lvAgl = 5.8 * NM * Math.Tan(3 * Math.PI / 180) + 15, hh = LandHdg("25") * Math.PI / 180;
                 Telemetry Pos(int s)
                 {
@@ -2654,8 +2655,14 @@ public partial class Tower
                 }
                 twx.Tick(Pos(0), none, 0);
                 twx.Phase = Phase.Entering; twx.navName = "six mile final"; twx.towerDue = true; twx.handoffAt = 0;   // handed over by Approach
-                if (call) foreach (var m in twx.OnTranscript("Kutaisi Tower, Enfield 11, six mile final", Pos(1), none, 1)) o.Add((1, m));
-                for (int s = 2; s <= 183; s++) foreach (var m in twx.Tick(Pos(s), none, s).Where(m => m.Role != "Info")) o.Add((s, m));
+                bool first = true;
+                void Air(int s, Msg m) { o.Add((s, m)); if (first && airDelay > 0) late = (s + airDelay, m); else twx.Aired(s, m.Text, m.Role); first = false; }   // otherwise the radio queue airs it at once
+                if (call) foreach (var m in twx.OnTranscript("Kutaisi Tower, Enfield 11, six mile final", Pos(1), none, 1)) Air(1, m);
+                for (int s = 2; s <= 183; s++)
+                {
+                    if (late is { } l && s >= l.At) { twx.Aired(s, l.M.Text, l.M.Role); late = null; }
+                    foreach (var m in twx.Tick(Pos(s), none, s).Where(m => m.Role != "Info")) Air(s, m);
+                }
                 return o;
             }
             bool Has(List<(int S, Msg M)> l, string s) => l.Any(x => x.M.Text.Contains(s, StringComparison.OrdinalIgnoreCase));
@@ -2666,7 +2673,7 @@ public partial class Tower
             Check(pr.Count > 0 && pr[0].M.Text.Contains("This will be a P A R approach") && pr[0].M.Text.Contains("decision height") && pr[0].M.Text.Contains("Do not acknowledge further transmissions")
                   && pr[0].M.Text.Contains("five seconds on final approach") && pr[0].M.MaxAge == 0, "PAR: Setup mit Entscheidungshöhe, ohne Quittieren, Funkausfall: " + (pr.FirstOrDefault().M?.Text ?? "-"));
             Check(Cnt(pr, "approaching glidepath") == 1 && Cnt(pr, "begin descent") == 1 && iAppr >= 0 && iAppr < iBegin, "PAR: 'approaching glidepath' einmal vor 'begin descent' einmal: " + parTxt);
-            Check(iBegin >= 0 && iOver > iBegin && Enumerable.Range(iBegin + 1, iOver - iBegin).All(i => pr[i].S - pr[i - 1].S <= 6), "PAR: von 'begin descent' bis zur Schwelle keine Lücke über 6 s: " + parTxt);
+            Check(iBegin >= 0 && iOver > iBegin && Enumerable.Range(iBegin + 1, iOver - iBegin).All(i => pr[i].S - pr[i - 1].S <= 12), "PAR: von 'begin descent' bis zur Schwelle keine Lücke über 12 s (Ansage kann bis zu 10 s dauern, Sprechzeit + 1 s): " + parTxt);
             Check(new[] { "four", "three", "two", "one" }.All(w => Cnt(pr, $"{w} mile{(w == "one" ? "" : "s")} from touchdown") == 1), "PAR: jede Meile 4..1 genau einmal: " + parTxt);
             int iRight = pr.FindIndex(x => x.M.Text.Contains("right of course") && Regex.IsMatch(x.M.Text, @"turn left heading \w+ \w+ \w+"));
             Check(iRight >= 0 && pr.Skip(iRight + 1).Any(x => x.M.Text.Contains("correcting") || x.M.Text.Contains("on course")), "PAR: rechts vom Kurs mit Kurs auf die Mittellinie, danach correcting/on course: " + parTxt);
@@ -2750,6 +2757,50 @@ public partial class Tower
                 string CT(double dHdg) => twk.CourseText(At(kx - 400 * Math.Sin(hk), kz + 400 * Math.Cos(hk), 300, LandHdg("25") + dHdg, 72), "25", 5 * NM);
                 string ctA = CT(40), ctB = CT(-60), ctC = CT(0);
                 Check(ctA.Contains("right of course, turn left heading") && ctB.Contains("right of course, turn right heading") && ctC.Contains("turn left heading"),$"CourseText Drehrichtung: {ctA} | {ctB} | {ctC}");
+                {   // FIX 1: test flight 11:5x, setup (17 s) goes on air late; the talk-down waits until it has ended (+1 s), calls at least 5 s apart
+                    var tw1 = new Tower("Enfield 1-1");
+                    tw1.F.Own["Tower"] = tw1.F.Own["Approach"] = new[] { 263.0 };
+                    var p1 = FlyPar(tw1, true, false, 10);
+                    tw1.F.Own.Remove("Tower"); tw1.F.Own.Remove("Approach");
+                    var talk1 = p1.TakeWhile(x => !x.M.Text.Contains("decision height, on") && !x.M.Text.Contains("Over landing") && !x.M.Text.Contains("cleared to land")).ToList();   // decision height / threshold have a 2 s minimum; landing clearance comes from the tick, not the talk-down
+                    int air1 = talk1.Count > 0 ? talk1[0].S + 10 : 999;
+                    double end1 = air1 + talk1[0].M.Text.Split(' ').Length / 2.5 + 1;
+                    string t1 = $"end {end1:0.0}, gaps {string.Join(",", talk1.Skip(1).Zip(talk1, (b, a) => b.S - a.S))}: " + string.Join(" | ", talk1.Take(4).Select(x => $"{x.S}s {x.M.Text[..Math.Min(30, x.M.Text.Length)]}"));
+                    Check(talk1.Count > 3 && !talk1.Skip(1).Any(x => x.S < end1) && talk1.Skip(1).Zip(talk1, (b, a) => b.S - a.S).Skip(1).All(g => g >= 5), $"PAR Takt: Ansage erst nach Ende der Einweisung ({end1:0} s) und >= 5 s Abstand: {t1}");
+                }
+                {   // FIX 2: restated heading carries the turn direction
+                    var t2 = new Tower("Enfield 1-1");
+                    int rm = (int)Math.Round(((LandHdg("25") - 6) % 360 + 360) % 360);
+                    (t2.parOn, t2.parBegun, t2.parHave, t2.parRight, t2.parDev, t2.parAlong, t2.parAt, t2.parHdg) = (true, true, true, 300, 0, 5 * NM + 360, 95, rm - 8);
+                    var (x2, z2) = P("25", 5 * NM);
+                    var r2 = t2.ParTalk(At(x2 - 400 * Math.Sin(hk), z2 + 400 * Math.Cos(hk), 5 * NM * Math.Tan(3 * Math.PI / 180) + 15, LandHdg("25") + 5, 72), "25", 5 * NM, 0, 100);
+                    Check(r2 != null && r2[0].Text.Contains("turn left heading " + Digits((rm - 8).ToString("000"))), "PAR Wiederholung ohne Drehrichtung: " + (r2?[0].Text ?? "-"));
+                }
+                {   // FIX 5: descent before "begin descent": check altitude; too low is no missed approach only for a begun descent
+                    var t5 = new Tower("Enfield 1-1");
+                    t5.parOn = true; t5.vecFt = 2600;   // altitude of the approach clearance
+                    var (x5, z5) = P("25", 8 * NM); var (x6, z6) = P("25", 7 * NM);
+                    double DevAt(double alt, double al) => (alt - 45 - (al * Math.Tan(3 * Math.PI / 180) + 15)) / Ft;
+                    var c5a = t5.ParTalk(At(x5, z5, 2600 * Ft - 45, LandHdg("25"), 72), "25", 8 * NM, DevAt(2600 * Ft, 8 * NM), 100);
+                    if (c5a != null) t5.Aired(100, c5a[0].Text, "Tower");
+                    var c5b = t5.ParTalk(At(x6, z6, 2200 * Ft - 45, LandHdg("25"), 72), "25", 7 * NM, DevAt(2200 * Ft, 7 * NM), 112);
+                    Check(c5a != null && c5b != null && c5b[0].Text.Contains("check altitude, maintain 2600 feet"), "PAR Sinkflug vor 'begin descent': " + (c5b?[0].Text ?? "-"));
+                    var t5b = new Tower("Enfield 1-1"); t5b.parOn = true;
+                    var (x7, z7) = P("25", 2.5 * NM);
+                    var c5c = t5b.ParTalk(At(x7, z7, 2.5 * NM * Math.Tan(3 * Math.PI / 180) + 15 - 300 * Ft, LandHdg("25"), 72), "25", 2.5 * NM, -300, 100);
+                    Check(c5c != null && c5c[0].Text.Contains("too low for safe approach"), "PAR zu tief ohne 'begin descent': " + (c5c?[0].Text ?? "-"));
+                }
+                {   // FIX 6: Approach's last vector is a converging, wind corrected intercept (not the runway heading)
+                    var t6 = new Tower("Enfield 1-1");
+                    (t6.vrw, t6.vecFinal, t6.vec, t6.gate, t6.vecFt) = ("25", true, new(), 8 * NM, 2600);
+                    t6.Phase = Phase.Inbound; t6.Runway = "25";
+                    var (x8, z8) = P("25", 9.4 * NM);
+                    var tel6 = At(x8 - 720 * Math.Sin(hk), z8 + 720 * Math.Cos(hk), 2650 * Ft - 45, 265, 125.5) with { WindX = 5.14 * Math.Cos(30 * Math.PI / 180), WindZ = 5.14 * Math.Sin(30 * Math.PI / 180), Gear = 1 };
+                    var r6 = t6.Established(tel6);
+                    var m6 = Regex.Match(r6[0].Text, @"heading (\w+) (\w+) (\w+)").Groups;
+                    int h6 = m6.Count == 4 ? Array.IndexOf(DigitWords, m6[1].Value) * 100 + Array.IndexOf(DigitWords, m6[2].Value) * 10 + Array.IndexOf(DigitWords, m6[3].Value) + 6 : -1;   // true
+                    Check(h6 > 0 && h6 <= LandHdg("25") - 4 && h6 >= LandHdg("25") - 35, $"PAR letzter Vektor: konvergierend statt Bahnrichtung ({h6} true, Bahn {LandHdg("25"):0}): " + r6[0].Text);
+                }
             }
             ForceIfr = false;
         }

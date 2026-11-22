@@ -742,7 +742,7 @@ static partial class Program
     }
 
     static Tx ToTx(Pilot p, Msg m) => new(m.Text, m.Role, p.Active!.StationOf(m.Role), p.Gid, Freqs: m.Role == "Center" ? new[] { p.Active.CenFreq } : FieldFreqs(p.Active.F, m.Role), Side: m.Role == "Center" ? p.Coalition : SideOf(p.Active.F, p),
-        Aired: m.Role == "Approach" && p.Active is { } tw ? () => tw.Aired(Now(), m.Text) : null, MaxAge: m.MaxAge);
+        Aired: m.Role is "Approach" or "Tower" && p.Active is { } tw ? () => tw.Aired(Now(), m.Text, m.Role) : null, MaxAge: m.MaxAge);
 
     /// Ground/Tower/Approach/Departure of an airfield (Airfield.FreqsOf): own from AirfieldFrequencies, otherwise its DCS frequency (UHF, VHF), null = the one from the config;
     /// ATIS: the own, otherwise the airfield's ATIS frequency (A35, like AtisLoop).
@@ -917,6 +917,10 @@ static partial class Program
     }
     static (double Qnh, double Wx, double Wz) FieldWxOf(Airfield f) => (FieldQnhOf(f), Wx.GetValueOrDefault(f.Name).Wx, Wx.GetValueOrDefault(f.Name).Wz);   // R132: QNH and surface wind at the airfield for the range check-in
 
+    /// Mission weather for the towers (R340: IFR per airfield, Tower.IfrAt; FEW/SCT is no ceiling, R367).
+    /// Pause/resume (no mission data for a while) keeps the last weather, otherwise the ATIS loses its IFR line and the identifier jumps twice (MissionGap clears it for a new mission).
+    internal static void SyncSky() { if (MissionData) Tower.Sky = (Sky.Clouds && Carrier.Ceiling, Sky.BaseM, Sky.VisM); }
+
     /// Situation at the airfield for the player's tower: others' emergencies, weather, landing order, ATIS identifier (every second and before the reply to a radio call).
     static void Prep(Pilot p, Tower tw, List<Pilot> pilots)
     {
@@ -1003,6 +1007,7 @@ static partial class Program
             var lf = ListenFreqs(pilots).ToList();
             WingFq = WingFreqs(Host(), lf);
             Srs?.SetFreqs(WingFq.Concat(lf));
+            SyncSky();   // before the ATIS: its IFR line comes from Tower.Sky
             foreach (var f in pilots.Where(p => p.Active != null).Select(p => p.Active!.F).Distinct())
                 if (MissionData && UpdateAtis(f)) outq.AddRange(AtisCall(f, pilots));   // new identifier: announcement to all at the airfield; R120: only with fresh mission data
             LoadTerrain();
@@ -1043,7 +1048,6 @@ static partial class Program
                 outq.AddRange(TransitNotes(p, tw, pilots));
             }
             Carrier.WireEvents = MissionData;   // R27: wire comes from the DCS event
-            Tower.Sky = MissionData ? (Sky.Clouds && Carrier.Ceiling, Sky.BaseM, Sky.VisM) : null;   // R340: IFR per airfield (Tower.IfrAt), FEW/SCT is no ceiling (R367)
             outq.AddRange(CsarTick(ActivePilots().ToList()).ToList());   // FI6
             foreach (var p in ActivePilots())   // range, AWACS, tanker; debrief after shutdown
             {

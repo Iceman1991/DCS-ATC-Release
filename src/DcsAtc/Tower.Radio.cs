@@ -23,7 +23,13 @@ public partial class Tower
     public bool ReadbackOnly(string text, Telemetry? t) => Normalize(text) is var n && Addressed(n) == null
         && !Has(n, "request", "requesting", "again", "confirm", "verify", "still", "say") && ReadsBack(n, Intent(n, t == null || OnGround(t)));
     /// Program: the transmission has actually gone out (radio queue) -> nag windows count from its end, not from queueing (vector repeated before the first call aired)
-    public void Aired(double now, string text) => lastVecSaid = Math.Max(lastVecSaid, now + text.Split(' ').Length / 2.5);
+    public void Aired(double now, string text, string role = "Approach")
+    {
+        double end = now + text.Split(' ').Length / 2.5;
+        if (role != "Tower") { lastVecSaid = Math.Max(lastVecSaid, end); return; }
+        towerEnd = Math.Max(towerEnd, end);   // PAR talk-down waits for it (also for a dropped call: text only, small phantom wait)
+        if (text == last?.Text) awaitAir = false;
+    }
 
     /// Check-in with Departure (Approach) after the handover. LA25 (log: "contact Kandahar Approach." without frequency, pilot confused): on the frequency shared with the Tower
     /// Approach checks in directly at the handover (tick), without "contact … Approach".

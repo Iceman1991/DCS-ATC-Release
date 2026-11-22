@@ -114,7 +114,10 @@ public partial class Tower
     // ======================================================================= PAR talk-down (FAA JO 7110.65 5-10, 5-12): one call every 5 s from the setup to the threshold
     bool ParApp(string rw) => navName == "six mile final" && Phase is not (Phase.Pattern or Phase.Inbound) && (Proc(rw) == "P A R" || Emergency && Proc(rw) == "") && !wantVisual && !visAsk && option != "low approach";   // practice approach keeps the old calls; R115: no approach callouts before the visual report
     bool OnParFinal(Telemetry t, string rw) => OnLongFinal(t, rw) || OnFinalLoose(t, rw);   // PAR final is long (handoff 8-12 NM out): setup already there
-    bool parOn, parAppr, parBegun, parSafe, parDh, parEnd, parHave;   // set up / "approaching glidepath" / "begin descent" / safety call / decision height / over threshold said / previous values valid
+    internal bool parOn;   // set up
+    bool parAppr, parBegun, parSafe, parDh, parEnd, parHave;   // "approaching glidepath" / "begin descent" / safety call / decision height / over threshold said / previous values valid
+    /// A talk-down is running (set up, threshold not yet passed): the frequency carries nothing else (Program: no general broadcasts).
+    public bool ParTalking => parOn && !parEnd;
     int parMile = 7, parHdg = -1;   // last mile announced, last heading issued (magnetic)
     double parDev, parRight, parAlong, parAt;   // glidepath deviation (ft), offset (m), distance and time at the previous call
     void ParReset() { parOn = parAppr = parBegun = parSafe = parDh = parEnd = parHave = false; parMile = 7; parHdg = -1; }
@@ -134,8 +137,9 @@ public partial class Tower
     {
         double tan3 = Math.Tan(3 * Math.PI / 180), dhAlong = (200 * Ft - 15) / tan3;   // DH: path 200 ft above the field
         bool atDh = along <= dhAlong;
-        if (along <= 0) { if (now - lastAt < 2) return null; parEnd = true; return ParSay("Over landing threshold."); }
-        if (now - lastAt < 4.5 && !(parBegun && atDh && !parDh && now - lastAt >= 2)) return null;   // 5 s rhythm (any Tower call counts), decision height at its point
+        bool busy = awaitAir && now - lastAt < 20 || now < towerEnd + 1;   // the previous Tower call is not on air yet / still being spoken (+ 1 s): a call now would be queued and dropped as late
+        if (along <= 0) { if (busy || now - lastAt < 2) return null; parEnd = true; return ParSay("Over landing threshold."); }
+        if (busy || now - lastAt < (parBegun && atDh && !parDh ? 2 : 4.5)) return null;   // 5 s rhythm (any Tower call counts), decision height at its point
         var (tx, tz) = Thr(rw);
         double h = LandHdg(rw) * Math.PI / 180, right = (t.X - tx) * -Math.Sin(h) + (t.Z - tz) * Math.Cos(h), dev = devFt;   // right > 0 = right of the centreline (as CourseText)
         double th = Math.Atan(dev * Ft / (along + 286)) * 180 / Math.PI, az = Math.Atan(right / (along + 300)) * 180 / Math.PI;   // angles seen from the glidepath/azimuth antenna (GPI 286 m, azimuth 300 m past the threshold)
@@ -161,11 +165,15 @@ public partial class Tower
             if (HdgDiff(mag, parHdg) < 2 || cr != 0 && Corr(mag) < Corr(parHdg) + 2)   // off course and not correcting: never a weaker correction than the last one
             {
                 if (cr == 0) return s;
-                string Say3(int m) => Digits(m.ToString("000"));
-                if (cr == 1) return $"{s}, heading {Say3(parHdg)}";   // slightly off, not correcting: restate the heading
+                string HdgCall(int m)   // with the turn from his own heading (as below)
+                {
+                    double tn = ((m - (t.Hdg * 180 / Math.PI - MagVar)) % 360 + 540) % 360 - 180;
+                    return Math.Abs(tn) < 1.5 ? $"{s}, heading {Digits(m.ToString("000"))}" : $"{s}, turn {(tn < 0 ? "left" : "right")} heading {Digits(m.ToString("000"))}";
+                }
+                if (cr == 1) return HdgCall(parHdg);   // slightly off, not correcting: restate the heading
                 int more =((parHdg + (right > 0 ? -3 : 3)) % 360 + 360) % 360;   // well off, not correcting: 3° more toward the centreline
                 if (more == 0) more = 360;
-                if (Math.Abs(((more - rwyMag) % 360 + 540) % 360 - 180) > lim) return $"{s}, heading {Say3(parHdg)}";   // limit reached: restate
+                if (Math.Abs(((more - rwyMag) % 360 + 540) % 360 - 180) > lim) return HdgCall(parHdg);   // limit reached: restate
                 mag = more;
             }
             parHdg = mag;
@@ -174,9 +182,15 @@ public partial class Tower
         }
         string call;
         double gs = parHave && now - parAt >= 4 ? (parAlong - along) / (now - parAt) : Gs(t);   // ground speed from the distance flown, first call: IAS - wind
-        if (!parBegun)
+        if (!atDh && !parSafe && along < 3 * NM && (th < -0.6 || parBegun && (th > 1.2 || along < 2 * NM && (Math.Abs(az) > 2.5 || Math.Abs(right) > 300))))   // too low also before "begin descent" (descended on his own)
+        {
+            parSafe = true;   // once per approach, only between 3 NM and decision height (PatternReset clears it with the missed approach)
+            return Missed(t, now, $"{(th < -0.6 ? "too low" : th > 1.2 ? "too high" : $"too far {lr} of course")} for safe approach, if runway not in sight, execute missed approach.");
+        }
+        else if (!parBegun)
         {
             if (dev >= -10) { parBegun = true; call = $"{c}, {(gp == 0 ? "on glidepath" : $"{(gp == 2 ? "well" : "slightly")} {above} glidepath")}, begin descent, {Course()}."; }
+            else if (vecFt > 0 && IndFt(t) < vecFt - 200) call = $"{c}, check altitude, maintain {Alt(vecFt)}, {Course()}.";   // descended before "begin descent": back to the cleared altitude ("maintain" in the approach clearance)
             else
             {
                 double aGp = (t.AltMsl - FieldElev - 15) / tan3;   // distance where the path meets the current altitude
@@ -184,11 +198,6 @@ public partial class Tower
                 parAppr |= soon;
                 call = Cap($"{(soon ? "approaching glidepath, " : "")}{Course()}.");
             }
-        }
-        else if (!atDh && !parSafe && along < 3 * NM && (th < -0.6 || th > 1.2 || along < 2 * NM && (Math.Abs(az) > 2.5 || Math.Abs(right) > 300)))
-        {
-            parSafe = true;   // once per approach, only between 3 NM and decision height (PatternReset clears it with the missed approach)
-            return Missed(t, now, $"{(th < -0.6 ? "too low" : th > 1.2 ? "too high" : $"too far {lr} of course")} for safe approach, if runway not in sight, execute missed approach.");
         }
         else if (atDh && !parDh) { parDh = true; call = $"{c}, at decision height, {Course()}."; }
         else if (parDh) call = Cap($"{Course()}.");

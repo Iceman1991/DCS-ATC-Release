@@ -45,7 +45,7 @@ static partial class Program
     /// Announcement of the new identifier on the airfield frequency to everyone listening: players at the airfield, on the ground or under 20 NM. Empty = nobody there or ATIS off.
     /// A133: with the side of the airfield, at a neutral airfield once per side of the listeners.
     static List<Tx> AtisCall(Airfield f, List<Pilot> pilots) =>
-        !Cfg.Atis || !Atis.TryGetValue(f.Name, out var a) ? new()
+        !Cfg.Atis || !Atis.TryGetValue(f.Name, out var a) || pilots.Any(p => p.Active?.F == f && p.Active.ParTalking) ? new()   // PAR talk-down running: the frequency is not blocked by a broadcast
         : pilots.Where(p => p.Active?.F == f && p.Tel is { } t && (t.Agl < 5 || Dist(t.X, t.Z, f.X, f.Z) < 20 * NM)).Select(p => SideOf(f, p)).Distinct()
                 .Select(s => new Tx(a.Call, "Tower", f.Station, 0, Freqs: FieldFreqs(f, "Tower"), Prio: 2, Side: s)).ToList();
 
@@ -135,6 +135,24 @@ static partial class Program
             var sides = string.Join(",", AtisCall(fld, new() { ground, near, red }).Select(x => x.Side));
             if (tx == null || AtisCall(fld, new() { near }).Count != 1 || tx.Text != a.Call || tx.Gid != 0 || tx.Station != "Kutaisi Tower" || tx.Side != 2 || sides != "2,1")
                 throw new Exception($"ATIS Ansage: Spieler am Platz hört sie (Seiten {sides})");
+            // FIX 4: nobody of the field is in a PAR talk-down -> the frequency stays free of the broadcast
+            var inPar = P(0, 0); inPar.Active!.parOn = true;
+            int parCnt = AtisCall(fld, new() { inPar }).Count; inPar.Active.parOn = false;
+            if (parCnt != 0 || AtisCall(fld, new() { inPar }).Count != 1) throw new Exception($"ATIS Ansage: keine Durchsage im PAR-Talk-down ({parCnt}), danach wieder");
+            // FIX 3: pause/resume (state file stale for a while) must not drop the IFR line: no new identifier on resume (UpdateAtis runs before SyncSky in the tick)
+            var (sk3, tsk3, st3) = (Sky, Tower.Sky, stateTime);
+            try
+            {
+                Sky = (true, fld.Elev + 200, 80000);
+                stateTime = Clock; SyncSky();
+                UpdateAtis(fld);
+                var at3 = Atis[fld.Name]; char l3 = at3.Letter;
+                bool ifr3 = at3.Text.Contains("expect vectors");
+                stateTime = Clock - TimeSpan.FromSeconds(60); SyncSky();   // paused: no mission data
+                stateTime = Clock; bool jump3 = UpdateAtis(fld); SyncSky();   // resumed
+                if (!ifr3 || jump3 || at3.Letter != l3 || !at3.Text.Contains("expect vectors")) throw new Exception($"ATIS Pause/Fortsetzen: IFR-Zeile {ifr3}, neue Kennung {jump3} {l3}->{at3.Letter}: {at3.Text}");
+            }
+            finally { (Sky, Tower.Sky, stateTime) = (sk3, tsk3, st3); }
             Cfg.Atis = false;
             if (AtisCall(fld, new() { ground }).Count != 0) throw new Exception("ATIS Ansage: mit Atis=false keine");
             // A35: own ATIS frequency per airfield, collision with airfield and function frequencies
@@ -151,7 +169,7 @@ static partial class Program
             }
             finally { Cfg.AtisFreqs = atis0; }
             // R120: mission run time jumps back (new mission/restart): identifiers gone; afterwards exactly one first identifier without announcement. ESC pause (run time stands, wall clock runs) clears nothing.
-            var (st0, ms0) = (stateTime, missionSec);
+            var (st0, ms0, tsky0) = (stateTime, missionSec, Tower.Sky);
             try
             {
                 missionSec = -1; MissionGap(500); stateTime = Clock - TimeSpan.FromSeconds(60); MissionGap(500.5);
@@ -169,7 +187,7 @@ static partial class Program
                 if (early || !Atis.ContainsKey(nf22.Name)) throw new Exception($"ATIS LA22: ohne Gelände {early}, nach 3 min {Atis.ContainsKey(nf22.Name)}");
                 Atis.Remove(nf22.Name); Wx.Remove(nf22.Name);
             }
-            finally { (stateTime, missionSec) = (st0, ms0); }
+            finally { (stateTime, missionSec, Tower.Sky) = (st0, ms0, tsky0); }
             // LA17: own aircraft frozen in the air at speed (game paused) -> Now() stands from the 3rd identical tick, afterwards it runs on without the pause
             var (sim17, po17, pa17, fr17, ft17) = (SimSec, pauseOff, pausedAt, frozen, frozenTel);
             try

@@ -1342,7 +1342,7 @@ public partial class Tower
         else if (!airborne && !landing && slow && (OnRunwayPos(t.X, t.Z) || OnRwySpot(t))) (Phase, lineUp, holdSince, Runway) = (Phase.HoldShort, true, -1, RwyOf(t));
     }
 
-    List<Msg> Say(string s, string? r = null) { last = new Msg(Dep(r ?? role), Regex.Replace(s + sayTail, @"\b1 miles\b", "1 mile")); sayTail = ""; if (simPair != null) { similarSaid.Add(simPair); simPair = null; } lastAt = callAt; return new() { last }; }   // Miles() from 1: "1 mile"
+    List<Msg> Say(string s, string? r = null) { last = new Msg(Dep(r ?? role), Regex.Replace(s + sayTail, @"\b1 miles\b", "1 mile")); sayTail = ""; if (simPair != null) { similarSaid.Add(simPair); simPair = null; } lastAt = callAt; awaitAir = last.Role == "Tower"; return new() { last }; }   // Miles() from 1: "1 mile"
     string? simPair; readonly HashSet<string> similarSaid = new();   // A139: group of the appended similar callsign (only noted on spoken reply) / already announced
     string sayTail = "";               // addition for the next reply (rejected runway request, OnTranscript)
     string? wantRw;                      // pilot's runway request, valid until landing

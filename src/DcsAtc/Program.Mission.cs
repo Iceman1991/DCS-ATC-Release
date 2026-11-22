@@ -27,7 +27,7 @@ static partial class Program
     static void MissionGap(double sec)
     {
         if (sec < missionSec && Atis.Count > 0) { Atis.Clear(); Log("[ATIS] neue Mission (Laufzeit zurückgesprungen) -> Kennungen neu"); }
-        if (sec < missionSec) Carrier.NewMission();   // Review l4: R229 "99" state reset per ship
+        if (sec < missionSec) { Tower.Sky = null; Carrier.NewMission(); }   // new mission: weather of the old one is gone   // Review l4: R229 "99" state reset per ship
         missionSec = sec;
     }
 
