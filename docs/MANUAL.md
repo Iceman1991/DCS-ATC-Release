@@ -1249,6 +1249,7 @@ Approach and Departure keep you apart from other traffic, players and AI alike. 
 
 - **Answering:** "traffic in sight" or "tally", "looking", "negative contact" or "no joy". Approach answers "roger." After "traffic in sight" there are no more calls on that aircraft until it is more than 6 NM away.
 - **Whose traffic:** radar advisories cover only your own side and neutrals; enemy aircraft are the AWACS's job. Tower reports everyone in the pattern.
+- **Escort and formation:** an aircraft that has stayed with you for a minute (within 2.5 NM and 1500 ft, same general direction) counts as your escort or formation partner, for example an AI escort spawned during the mission. Approach gives no traffic advisories or traffic alerts on it until it has left the formation for 20 s.
 
 #### Terrain warning
 

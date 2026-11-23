@@ -1020,7 +1020,9 @@ static partial class Program
             {
                 var tw = p.Active!;
                 Prep(p, tw, pilots);
-                var msgs = tw.Tick(p.Tel, TrafficFor(p), Now());   // also without the atc module: phases for debrief and crew
+                var tf = TrafficFor(p);
+                tw.Escorts = Escorts(p.Form, p.Tel, tf, Now());
+                var msgs = tw.Tick(p.Tel, tf, Now());   // also without the atc module: phases for debrief and crew
                 if (!On("atc")) msgs.Clear();
                 if (p.Ride is { } ride && p.Tel is { } rt)   // FI4
                 {

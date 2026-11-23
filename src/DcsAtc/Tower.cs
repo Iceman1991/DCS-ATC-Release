@@ -284,6 +284,7 @@ public partial class Tower
     /// N24: reported traffic per aircraft: time of the advisory, state (0 reported/looking, 1 in sight, 2 no contact), completion/update already said
     sealed class Advice { public double At; public int St; public bool Done; }
     readonly Dictionary<int, Advice> advised = new();
+    public HashSet<int> Escorts = new();   // traffic ids in formation with the pilot for 60 s (Program.Escorts): no radar advisories on them
     readonly HashSet<int> sighted = new();   // reported "traffic in sight": no further information or alert on it for the rest of the encounter
     double followAt = -1e9;   // N24: last FollowTick; after a pause (service ended, landing, airfield change) old advisories no longer apply
     bool lowTold, lowAck;   // A106: terrain warning once per flight, not at all after "terrain in sight"

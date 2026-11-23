@@ -1117,7 +1117,11 @@ public partial class Tower
     }
     /// A52: radar traffic advisories (warning, flight following, approach) only for own and neutral traffic in the air, the AWACS reports enemies;
     /// runway, final, traffic pattern and sequence know all traffic (hence do not filter in Program.TrafficFor).
-    IReadOnlyList<Traffic> Own(IReadOnlyList<Traffic> traffic) => Side == 0 ? traffic : traffic.Where(a => !a.InAir || a.Coalition == 0 || a.Coalition == Side).ToList();
+    IReadOnlyList<Traffic> Own(IReadOnlyList<Traffic> traffic)
+    {
+        if (Escorts.Count > 0) traffic = traffic.Where(a => !Escorts.Contains(a.Id)).ToList();   // formation partner counts as one aircraft with the pilot (JO 7110.65 2-1-13)
+        return Side == 0 ? traffic : traffic.Where(a => !a.InAir || a.Coalition == 0 || a.Coalition == Side).ToList();
+    }
     /// Altitude assigned by ATC (holding, radar vectoring, IFR departure/en route), null = none (Program.TrafficFor passes it on to the others as Traffic.AsgFt).
     public double? AsgFt => holding ? holdFt : vec != null ? vecFt : depClr && Phase is Phase.Departing or Phase.Away ? (Phase == Phase.Departing ? depFt : Cruise) : null;
     List<Msg>? TrafficAlert(Telemetry t, IReadOnlyList<Traffic> traffic, double now)

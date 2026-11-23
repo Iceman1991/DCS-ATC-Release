@@ -104,6 +104,7 @@ class Pilot
     public bool Heli;                                 // Helicopter (mission: P line, N50)
     public int Gid;                                   // DCS group ID for in-game text, 0 = to all
     public Telemetry? Tel;
+    public readonly Dictionary<int, (double Since, double Last)> Form = new();   // traffic id -> start / last tick of its formation streak (Program.Escorts)
     public DateTime Seen;
     public readonly Dictionary<string, Tower> Towers = new();   // one separate sequence per airfield
     public Tower? Active;

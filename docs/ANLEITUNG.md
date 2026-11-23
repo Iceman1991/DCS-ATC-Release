@@ -1251,6 +1251,7 @@ Approach und Departure halten dich von anderem Verkehr fern, Spieler wie KI. Die
 
 - **Antworten:** „traffic in sight“ bzw. „tally“, „looking“, „negative contact“ bzw. „no joy“. Approach antwortet „roger.“ Nach „traffic in sight“ kommen keine Ansagen mehr zu diesem Flugzeug, bis es mehr als 6 NM entfernt ist.
 - **Wessen Verkehr:** Radarhinweise nur für die eigene Seite und Neutrale; Feinde sind Sache des AWACS. Tower meldet alle in der Platzrunde.
+- **Begleitschutz und Verband:** Ein Flugzeug, das seit einer Minute bei dir bleibt (innerhalb 2,5 NM und 1500 ft, ungefähr gleiche Richtung), gilt als dein Begleitschutz oder Verbandspartner, zum Beispiel eine während der Mission erzeugte KI-Eskorte. Approach gibt darauf keine Verkehrshinweise und keine Traffic Alerts, bis es 20 s lang nicht mehr im Verband ist.
 
 #### Geländewarnung
 

@@ -1252,6 +1252,28 @@ public partial class Tower
             var ia2 = twIA.TrafficInfo(meSg, new[] { bogSg }, 3);
             Check(ia.Count == 1 && ia[0].Text.StartsWith("Traffic alert") && ia2 == null, "Alarmbedingung im selben Tick: nur der Alarm, keine Information: " + string.Join(" | ", ia.Select(m => m.Text)) + " / " + (ia2?[0].Text ?? "-"));
         }
+        {   // Squadron log: AI escort trailing 1 NM behind for minutes got seven alerts and two informations - a formation partner is one aircraft, no advisories on it; other contacts still do
+            var meEs = At(-291000, 660000, 900, 90, 120);
+            Traffic Esc(double behindNm, double belowFt) => new(88, "F-15C", meEs.X, meEs.Z - behindNm * NM, meEs.AltMsl - belowFt * Ft, meEs.Hdg, 130);
+            var strange = new Traffic(77, "Su-25T", meEs.X, meEs.Z + 3 * NM, meEs.AltMsl, 270 * Math.PI / 180, 120);
+            foreach (var below in new[] { 0.0, 300 })
+            {
+                var twEs = new Tower("Enfield 1-1");
+                twEs.Tick(meEs, none, 0);
+                twEs.OnTranscript("Kutaisi Approach Enfield one one inbound for landing", meEs, none, 1);
+                var withEsc = new List<string>();
+                for (int s = 2; s <= 120; s++) withEsc.AddRange(twEs.Tick(meEs, new[] { Esc(1, below) }, s).Select(m => m.Text));
+                Check(withEsc.Any(x => x.Contains("Traffic alert") || x.Contains("traffic", StringComparison.OrdinalIgnoreCase)), $"Eskorte {below:0} ft darunter, Escorts leer: Warnung/Information auf den eigenen Begleiter (Log-Fehler): " + string.Join(" | ", withEsc));
+                var twEs2 = new Tower("Enfield 1-1") { Escorts = new() { 88 } };
+                twEs2.Tick(meEs, none, 0);
+                twEs2.OnTranscript("Kutaisi Approach Enfield one one inbound for landing", meEs, none, 1);
+                var muted = new List<string>();
+                for (int s = 2; s <= 120; s++) muted.AddRange(twEs2.Tick(meEs, new[] { Esc(1, below) }, s).Select(m => m.Text));
+                Check(!muted.Any(x => x.Contains("Traffic alert") || x.Contains("traffic", StringComparison.OrdinalIgnoreCase)), $"Eskorte {below:0} ft darunter in Escorts: keine Verkehrsansage: " + string.Join(" | ", muted));
+                var other = twEs2.Tick(meEs, new[] { Esc(1, below), strange }, 121);
+                Check(other.Any(m => m.Text.Contains("Traffic alert")), "Escorts gesetzt: anderer Kontakt bekommt weiter seinen Alarm: " + string.Join(" | ", other.Select(m => m.Text)));
+            }
+        }
         // R213: safety alert also after handover to Departure and on the IFR route (until sign-off); R214: VFR without fixed altitude ("and climb immediately")
         foreach (var (dPh, dIfr) in new[] { (Phase.Away, true), (Phase.Away, false), (Phase.Departing, true) })
         {

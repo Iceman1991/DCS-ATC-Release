@@ -1543,6 +1543,28 @@ static partial class Program
         stateTime = st; AiGid.Clear();
         if (tf.Count != 1 || tf[0].Group != "Other") throw new Exception("KI-Rottenflieger als Verkehr: " + string.Join(",", tf.Select(a => a.Group)));
         Console.WriteLine("OK   eigener KI-Rottenflieger ist kein Verkehr");
+        {   // Escort detection: 60 s streak in formation, short gaps tolerated, ground/crossing/high traffic never
+            double D2R = Math.PI / 180;
+            Telemetry Me(double agl = 900) => new(agl + 100, agl, 120, 90 * D2R, 0, 0, 0, 0, 0);
+            Traffic Pt(double behindNm, double hdgDeg = 90, double upFt = 0) => new(5, "F-15C", 0, -behindNm * NM, 100 + 900 + upFt * 0.3048, hdgDeg * D2R, 130);
+            HashSet<int> Run(Dictionary<int, (double Since, double Last)> f, int from, int to, Func<int, Traffic> pt, Telemetry? me = null)
+            {
+                var r = new HashSet<int>();
+                for (int s = from; s <= to; s++) r = Escorts(f, me ?? Me(), new[] { pt(s) }, s);
+                return r;
+            }
+            var form = new Dictionary<int, (double Since, double Last)>();
+            var r59 = Run(form, 0, 59, _ => Pt(1)); var r60 = Run(form, 60, 60, _ => Pt(1));
+            var fGap = new Dictionary<int, (double Since, double Last)>();   // turns 60 deg away for 10 s (gap), then back
+            var rGap = Run(fGap, 0, 100, s => s is >= 30 and < 40 ? Pt(1, 150) : Pt(1));
+            var fFar = new Dictionary<int, (double Since, double Last)>();
+            var rFar0 = Run(fFar, 0, 70, _ => Pt(1)); var rFar1 = Run(fFar, 71, 95, _ => Pt(4)); var rFar2 = Run(fFar, 96, 130, _ => Pt(1)); var rFar3 = Run(fFar, 131, 156, _ => Pt(1));
+            var rCross = Run(new(), 0, 120, _ => Pt(1, 180)); var rHigh = Run(new(), 0, 120, _ => Pt(1, 90, 3000));
+            var rGnd = Run(new(), 0, 120, _ => Pt(1), Me(0));
+            if (r59.Count != 0 || !r60.Contains(5) || !rGap.Contains(5) || !rFar0.Contains(5) || rFar1.Count != 0 || rFar2.Count != 0 || !rFar3.Contains(5) || rCross.Count != 0 || rHigh.Count != 0 || rGnd.Count != 0)
+                throw new Exception($"Eskorte erkannt: 59 s {r59.Count}, 60 s {r60.Count}, Kurslücke {rGap.Count}, 4 NM weg {rFar1.Count}, neuer Streak {rFar2.Count}/{rFar3.Count}, Kreuzer {rCross.Count}, 3000 ft höher {rHigh.Count}, am Boden {rGnd.Count}");
+            Console.WriteLine("OK   Eskorte: 60 s im Verband, kurze Lücken (<20 s) egal, 4 NM weg/Kreuzer/3000 ft höher/am Boden nie");
+        }
         // A121: tanker turn to everyone (Gid 0), otherwise to the player's group
         var (txAll, txOwn) = (OpsTx(new Pilot { Gid = 7 }, new("Tanker", "Texaco", "Texaco, turning right.", All: true)), OpsTx(new Pilot { Gid = 7 }, new("Tanker", "Texaco", "x")));
         if (txAll.Gid != 0 || txOwn.Gid != 7) throw new Exception($"Tanker-Kurve an alle: Gid {txAll.Gid} / {txOwn.Gid}");

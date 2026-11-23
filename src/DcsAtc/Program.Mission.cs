@@ -267,4 +267,20 @@ static partial class Program
         return list;
     }
 
+    /// Escort/formation partner: in the air within 2.5 NM, 1500 ft and 45 deg of the pilot for >= 60 s (gaps under 20 s while it cuts a turn don't break the streak).
+    /// Radar advisories skip it (Tower.Escorts); TrafficFor stays unfiltered (AWACS, tanker, sequencing).
+    internal static HashSet<int> Escorts(Dictionary<int, (double Since, double Last)> form, Telemetry? t, IReadOnlyList<Traffic> traffic, double now)
+    {
+        if (t == null || t.Agl <= 0) { form.Clear(); return new(); }
+        foreach (var a in traffic)
+        {
+            double dh = Math.Abs(a.Hdg - t.Hdg) % (2 * Math.PI);
+            if (dh > Math.PI) dh = 2 * Math.PI - dh;
+            if (!a.InAir || Dist(a.X, a.Z, t.X, t.Z) >= 2.5 * NM || Math.Abs(a.AltMsl - t.AltMsl) >= 1500 * 0.3048 || dh >= Math.PI / 4) continue;
+            form[a.Id] = (form.TryGetValue(a.Id, out var f) && now - f.Last <= 20 ? f.Since : now, now);
+        }
+        foreach (var id in form.Where(kv => now - kv.Value.Last > 20).Select(kv => kv.Key).ToList()) form.Remove(id);
+        return form.Where(kv => now - kv.Value.Since >= 60).Select(kv => kv.Key).ToHashSet();
+    }
+
 }
