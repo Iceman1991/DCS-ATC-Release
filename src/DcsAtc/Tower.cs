@@ -84,7 +84,7 @@ public partial class Tower
     /// Crossing altitudes of a route as said: "Mintt at or above 15000 feet, Simns at 5500 feet".
     internal static string CrossTxt(Airfield.Route r) => string.Join(", ", r.Pts.Where(p => p.Ft > 0 && !Airfield.Silent(p.Fix)).Select(p => p.Cross == "between" ? $"{CrpSay(p.Fix)} between {(p.Ft2 < 18000 ? $"{p.Ft:0} and {p.Ft2:0} feet" : $"{Alt(p.Ft)} and {Alt(p.Ft2)}")}" : $"{CrpSay(p.Fix)} {p.Cross} {Alt(p.Ft)}"));
     public static IReadOnlyList<Airfield> All = new List<Airfield>();   // all airfields (Program): destination of the en-route clearance
-    Airfield? dest; bool depClr; double depFt;   // V14: route clearance (Clearance Delivery) -> departure vector
+    Airfield? dest; Ops.Zone? toRange; bool depClr; double depFt;   // #61: toRange = range as clearance limit (not saved)   // V14: route clearance (Clearance Delivery) -> departure vector
     string? climbOut; double climbFt;   // requested departure: "free" (unrestricted climb) / "tactical" (spiral climb overhead), climbFt = requested altitude, 0 = none
     public static bool ParkSpot = true;   // config AssignParkingSpot: Ground names a stand after landing; false = only the ramp where the chart names one
     public static bool IffCheck;   // FI1: config IffCheck (code check, ident, 7600, AWACS parrot); 7700 always

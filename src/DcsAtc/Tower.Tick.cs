@@ -923,7 +923,7 @@ public partial class Tower
         return $"{vis}{cl}.{(visM < 550 || ceil < 200 ? " Say intentions." : "")}";
     }
     void Park() { if (lastTel is { } pk) spot ??= (pk.X, pk.Z);   // ramp only (ParkSpot off): where he stopped is his stand from now on
-        wxTold = false; special = null; Phase = Phase.Parked; exitDir = null; entry = null; Separate = false; depClr = false; dest = null; Following = false; cenName = null; cenTo = null; lowTold = lowAck = false; Squawk = null; cruiseFt = 0; climbOut = null; iffTold = emSq = 0; depRoute = null; }
+        wxTold = false; special = null; Phase = Phase.Parked; exitDir = null; entry = null; Separate = false; depClr = false; dest = null; toRange = null; Following = false; cenName = null; cenTo = null; lowTold = lowAck = false; Squawk = null; cruiseFt = 0; climbOut = null; iffTold = emSq = 0; depRoute = null; }
 
     /// R128: identification by code (FAA JO 7110.65 5-3-3): "radar contact" only once the code is observed; idAt = time, idFf = flight following instead of departure report.
     double idAt = -1; bool idFf;
@@ -936,8 +936,8 @@ public partial class Tower
         if (climbOut != null) return $"{Rc}{(t != null ? $", {Where(t)}" : "")}. {(climbOut == "tactical" ? "Continue spiral climb as cleared, then resume" : "Unrestricted climb approved, resume")} own navigation.";
         if (DRt is { } dr && nav != null && t != null) return $"{Rc}, {Where(t)}. Continue {CrpSay(dr.Name)} departure{(zoneReport ? ", report leaving the control zone" : depClr ? $", then climb and maintain {Alt(Cruise)}" : "")}.";   // charts.jsonc departure being flown
         if (zoneReport && t != null) return $"{Rc}, {Where(t)}. Continue as cleared, report leaving the control zone.";   // R7: VFR still in the zone
-        if (depClr && t != null && (dest != null ? (dest.X, dest.Z) : exitDir != null && Crp.TryGetValue(exitDir, out var xp) ? xp : ((double, double)?)null) is { } dg)
-            return $"{Rc}, {Where(t)}. {Cap(Steer(t, dg, dest?.Name.Replace('-', ' ') ?? CrpSay(exitDir!)))}, climb and maintain {Alt(Cruise)}.";
+        if (depClr && t != null && (dest != null ? (dest.X, dest.Z) : toRange != null ? (toRange.X, toRange.Z) : exitDir != null && Crp.TryGetValue(exitDir, out var xp) ? xp : ((double, double)?)null) is { } dg)
+            return $"{Rc}, {Where(t)}. {Cap(Steer(t, dg, dest?.Name.Replace('-', ' ') ?? toRange?.Name ?? CrpSay(exitDir!)))}, climb and maintain {Alt(Cruise)}.";
         return depClr ? $"{Rc}{(t != null ? $", {Where(t)}" : "")}. Climb and maintain {Alt(Cruise)}, resume own navigation."
                       : $"{Rc}{(t != null ? $", {Where(t)}" : "")}. Resume own navigation, maintain VFR.";   // Visual: do not prescribe an altitude
     }
@@ -977,10 +977,10 @@ public partial class Tower
     /// low for an airfield under 40 NM (at least 1000 ft above departure altitude); always at least terrain of the route + 2000 ft.
     double CruiseLevel()
     {
-        (double X, double Z)? to = dest != null ? (dest.X, dest.Z) : exitDir != null && Crp.TryGetValue(exitDir, out var xp) ? xp : null;
+        (double X, double Z)? to = dest != null ? (dest.X, dest.Z) : toRange != null ? (toRange.X, toRange.Z) : exitDir != null && Crp.TryGetValue(exitDir, out var xp) ? xp : null;
         bool east = ((to is { } g ? Bearing(CX, CZ, g.X, g.Z) : LandHdg(Runway)) - MagVar + 360) % 360 < 180;
         double mva = to is { } m ? F.MvaLeg(CX, CZ, m.X, m.Z) + 2000 : 0;   // even long routes never below terrain + 2000 ft
-        bool far = dest == null || Dist(CX, CZ, dest.X, dest.Z) >= 40 * NM;
+        bool far = dest == null && toRange == null || Dist(CX, CZ, dest?.X ?? toRange!.X, dest?.Z ?? toRange!.Z) >= 40 * NM;   // #61: range as limit counts like an airfield
         double k = Math.Ceiling(Math.Max(mva, far ? (east ? 15000 : 14000) : depFt + 1000) / 1000);
         return (k % 2 == 1) == east ? k * 1000 : (k + 1) * 1000;
     }

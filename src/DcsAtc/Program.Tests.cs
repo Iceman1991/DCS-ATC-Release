@@ -142,6 +142,15 @@ static partial class Program
         Console.WriteLine("OK   ElevenLabs-Tempo: eigene Einstellung ElevenLabsSpeed (nicht SpeechRate), Stress schneller, über 1,2 / unter 0,7 der Rest per atempo");
     }
 
+    /// Self-test: child priorities: ExternalAudio at Normal (High ran its start burst above DCS, SimShaker touchdown loop), the rest below normal.
+    static void ChildPriorityTest()
+    {
+        if (ChildPriority(@"C:\x\DCS-SR-ExternalAudio.exe") != ProcessPriorityClass.Normal || ChildPriority("whisper-cli.exe") != ProcessPriorityClass.BelowNormal
+            || ChildPriority("piper.exe") != ProcessPriorityClass.BelowNormal || ChildPriority("ffmpeg.exe") != ProcessPriorityClass.BelowNormal)
+            throw new Exception("Child priority: ExternalAudio " + ChildPriority("DCS-SR-ExternalAudio.exe") + ", whisper " + ChildPriority("whisper-cli.exe"));
+        Console.WriteLine("OK   Kindprozesse: ExternalAudio mit Normal (nicht High), whisper/piper/ffmpeg unter Normal");
+    }
+
     /// Self-test: radio effect graph: narrow two-stage band, presence boost, compressor ratio from the config, bad band -> default, ffmpeg accepts it.
     static void RadioGraphTest()
     {

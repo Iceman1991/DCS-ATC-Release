@@ -135,7 +135,7 @@ partial class Ops
         groups.Keys.Any(g => Callsigns.TryGetValue(g, out var cs) && Regex.Match(cs, "^[A-Za-z]{3,}").Value is { Length: > 0 } w && Has(n, w.ToLowerInvariant() + @"\b"));
     /// #56: call sign of a zone whose name does not start with "range" ("Dogbone Range" -> "dogbone", "R-62A Dogbone Range" -> "dogbone"): the letter words of 3+ letters except "range".
     /// "Range Alpha" / "Range Kutaisi" have none ("alpha" is also a taxiway).
-    static IEnumerable<string> CallWords(Zone z)
+    internal static IEnumerable<string> CallWords(Zone z)
     {
         var w = Normalize(z.Name).Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return w.Length == 0 || w[0] == "range" ? Array.Empty<string>() : w.Where(x => x != "range" && Regex.IsMatch(x, "^[a-z]{3,}$"));
@@ -198,7 +198,7 @@ partial class Ops
     Call R(string s) => new("Range", Z.Name, s, Z.Freq);
 
     /// Regex of a zone name in the normalised transcript; numbers also as spoken ("Range 62": "range 62", "range 6 2", "range sixty two").
-    static Regex NameRx(string name)
+    internal static Regex NameRx(string name)
     {
         var tens = new[] { "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety" };
         var parts = Normalize(name).Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w =>

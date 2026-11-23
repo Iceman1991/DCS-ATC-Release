@@ -740,6 +740,9 @@ static partial class Program
         return psi;
     }
 
+    /// Forum (oz555): ExternalAudio at Normal, not High: its start (0.3 s CPU on 21 threads) ran above DCS and triggered SimShaker's touchdown loop on every call. whisper/piper/ffmpeg: DCS frames first.
+    internal static ProcessPriorityClass ChildPriority(string exe) => exe.Contains("ExternalAudio") ? ProcessPriorityClass.Normal : ProcessPriorityClass.BelowNormal;
+
     /// Run with stderr (GPU1: whisper's device list).
     static (string stdout, int exit, string stderr) RunErr(string exe, string? stdin, params string[] args)
     {
@@ -748,8 +751,7 @@ static partial class Program
         try
         {
             using var p = Process.Start(psi)!;
-            if (!exe.Contains("ExternalAudio")) Background(p);
-            else try { p.PriorityClass = ProcessPriorityClass.High; } catch (Exception) { }   // ExternalAudio: steady rhythm, otherwise choppy when DCS maxes out the CPU; whisper/piper/ffmpeg: DCS frames first (stutter)
+            try { p.PriorityClass = ChildPriority(exe); } catch (Exception) { }
             if (stdin != null) { p.StandardInput.WriteLine(stdin); p.StandardInput.Close(); }
             var err = p.StandardError.ReadToEndAsync();
             var o = p.StandardOutput.ReadToEnd();

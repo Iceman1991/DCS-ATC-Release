@@ -328,6 +328,17 @@ public partial class Tower
             Tower.All = allSv;
             Chk(rn.Any(m => m.Text.Contains("cleared to Batumi airport via radar vectors, after departure fly the Tiki departure")),
                 "#31: Clearance mit Flugplatz und Departure: " + J(rn));
+            // #61: a range as clearance limit (full name, without departure, call-sign form), no "airport"
+            var rgSv = Ops.Ranges;
+            Ops.Ranges = new() { new("Three Lakes Range", k.X + 20 * 1852, k.Z, 2500, 0), new("R-62A Dogbone Range", -20000, 20000, 2500, 0) };   // Three Lakes 20 NM from the field: no far cruise level
+            var rr1 = Hold().OnTranscript("Kutaisi Ground, Enfield 11, request clearance to Three Lakes Range, tiki departure", G0(), none, 10);
+            var rr2 = Hold().OnTranscript("Kutaisi Ground, Enfield 11, request IFR clearance to Three Lakes Range", G0(), none, 10);
+            var rr3 = Hold().OnTranscript("Kutaisi Ground, Enfield 11, request clearance to Dogbone Range", G0(), none, 10);
+            Ops.Ranges = rgSv;
+            Chk(rr1.Any(m => m.Text.Contains("cleared to Three Lakes Range via the Tiki departure") && !m.Text.Contains("airport"))
+                && rr2.Any(m => m.Text.Contains("cleared to Three Lakes Range via radar vectors") && !m.Text.Contains("airport") && !m.Text.Contains("expect 14000 feet") && !m.Text.Contains("expect 15000 feet"))
+                && rr3.Any(m => m.Text.Contains("cleared to R-62A Dogbone Range via radar vectors")),
+                "#61: Clearance zu einer Range: " + J(rr1) + " / " + J(rr2) + " / " + J(rr3));
             // #31 (log Nellis): takeoff clearance after the IFR clearance names the departure only (no second list of fixes); VFR keeps the long form
             var rt = wc.OnTranscript("Kutaisi Tower, Enfield 11, ready for departure", G0(), none, 20);
             Chk(rt.Any(m => m.Text.Contains("after departure fly the Tiki departure, runway") && m.Text.Contains("cleared for takeoff") && !m.Text.Contains("cross")) && wc.navName == "Alpha"

@@ -390,7 +390,8 @@ public partial class Tower
             {
                 var df = ClrDest(n);
                 if (Hostile(df)) return Neg($"{c}, unable clearance to {df!.Name.Replace('-', ' ')}, say alternate destination.");   // N1: hostile target
-                dest = df ?? Limit(rw);   // R8: clearance limit always an airfield, without destination the next one in departure direction
+                toRange = df == null ? ClrRange(n) : null;   // #61: a range named instead of an airfield is the limit, no airfield
+                dest = df ?? (toRange != null ? null : Limit(rw));   // R8: clearance limit always an airfield, without destination the next one in departure direction
                 depClr = true;
                 depFt = ClimbFt(rw);
                 cruiseFt = CruiseLevel();
@@ -411,8 +412,9 @@ public partial class Tower
                 if (dpq != null && dpq.Pts.Where(p => p.Cross is "at or above" or "between").Select(p => p.Ft).DefaultIfEmpty(0).Max() is var need && need > depFt)   // #31 (log Nellis): cleared altitude not below what the departure requires
                     cruiseFt = Math.Max(cruiseFt, depFt = Math.Ceiling(need / 1000) * 1000);
                 var lastFix = df == null ? dpq?.Pts.LastOrDefault(p => !Airfield.Silent(p.Fix)).Fix : null;   // #57: last spoken point   // #31: departure without a named airfield: its last fix is the limit, not the next airfield
-                return Say($"{hdr}, {rwAck}cleared " + (!string.IsNullOrEmpty(lastFix) ? $"to {CrpSay(lastFix)} via the {CrpSay(dpq!.Name)} departure, " :
-                           $"{(dest != null ? $"to {dest.Name.Replace('-', ' ')} airport" : "out of the control zone")} via radar vectors, " +
+                var lim = toRange != null ? toRange.Name : !string.IsNullOrEmpty(lastFix) ? CrpSay(lastFix) : null;   // #61: the range replaces the last fix
+                return Say($"{hdr}, {rwAck}cleared " + (lim != null && dpq != null ? $"to {lim} via the {CrpSay(dpq.Name)} departure, " :
+                           $"{(toRange != null ? $"to {toRange.Name}" : dest != null ? $"to {dest.Name.Replace('-', ' ')} airport" : "out of the control zone")} via radar vectors, " +
                            $"after departure {(dpq != null ? $"fly the {CrpSay(dpq.Name)} departure" : "fly runway heading")}, ") + $"climb and maintain {Alt(depFt)}, {(cruiseFt > depFt ? $"expect {Alt(cruiseFt)} ten minutes after departure, " : "")}" +
                            $"{(F.Own.ContainsKey("Departure") ? $"departure frequency {FreqSay(FreqOf(F, "Departure"))}" : $"departure {Contact("Approach")}")}, squawk {Digits(TakeSquawk())}.");   // own departure frequency (AirfieldFrequencies): the one in the clearance
             }
@@ -1017,6 +1019,13 @@ public partial class Tower
     internal string IntentOf(string text, Telemetry? t) => Intent(Normalize(text), t == null || OnGround(t));   // Debug log (Program)
     /// Destination of the route clearance after "clearance"/"ifr", not the station called; most name words (Krasnodar Center/Pashkovsky)
     Airfield? ClrDest(string n) => Named(Regex.Match(n, @"\b(?:clearance|ifr)\b.*").Value);
+    /// #61: range as clearance limit ("request clearance to Three Lakes Range via ..."): full zone name or its call sign directly before "range", longest name wins.
+    Ops.Zone? ClrRange(string n)
+    {
+        var s = Regex.Match(n, @"\b(?:clearance|ifr)\b.*").Value;
+        return Ops.Ranges.Where(z => Ops.NameRx(z.Name).IsMatch(s) || Ops.CallWords(z).ToList() is { Count: > 0 } cw && Regex.IsMatch(s, $@"\b(?:{string.Join("|", cw.Select(Regex.Escape))}) range\b"))
+            .OrderByDescending(z => z.Name.Length).FirstOrDefault();
+    }
 
     string Intent(string n, bool ground)
     {
