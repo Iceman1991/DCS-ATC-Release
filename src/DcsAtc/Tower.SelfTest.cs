@@ -3059,6 +3059,15 @@ public partial class Tower
               && dxAtis.Contains("Landing runway three zero left, departure runway three zero right,"),
               $"Vorzugsbahn land_rwy: {dxb.BestRunway(0, 0)} {dxb.BestRunway(5 * dxb.Ends[3].Dx, 5 * dxb.Ends[3].Dz)} {dxb.BestRunway(0, 0, dep: true)} / {dxAtis}");
         dxb.LandRwy = "";
+        // forum (Nellis): tailwind_kt = chart ends used as named (land 12R / dep 30L opposite) while tailwind <= limit, else wind + strip as before
+        (dxb.LandRwy, dxb.DepRwy, dxb.TailwindKt) = ("12R", "30L", 10);
+        var (e12, wLo8, wHi12) = (dxb.Ends[2], 4.1, 6.2);
+        var dxTw = new Tower(dxb, "").AtisText("A", new Telemetry(7, 0, 0, 0, dxb.X, dxb.Z, 0, 0, 101325), 20, false, 0, 10000);
+        Check(dxb.BestRunway(0, 0) == "12R" && dxb.BestRunway(0, 0, dep: true) == "30L" && dxb.BestRunway(0, 0, dcs: true) == "30R"
+              && dxb.BestRunway(wLo8 * e12.Dx, wLo8 * e12.Dz) == "12R" && dxb.BestRunway(wHi12 * e12.Dx, wHi12 * e12.Dz) == "30L"
+              && dxTw.Contains("Landing runway one two right, departure runway three zero left,"),
+              $"tailwind_kt: {dxb.BestRunway(0, 0)} {dxb.BestRunway(0, 0, dep: true)} {dxb.BestRunway(wLo8 * e12.Dx, wLo8 * e12.Dz)} {dxb.BestRunway(wHi12 * e12.Dx, wHi12 * e12.Dz)} / {dxTw}");
+        (dxb.LandRwy, dxb.DepRwy, dxb.TailwindKt) = ("", "", null);
         // Duplicate runway from DCS (Abu Dhabi, real data): second "31" with 3032 m on the centerline of the "31" with 3907 m -> one runway (the longer, also in reverse
         // order), the parallel 2 km beside it remains; before: six ends, twice 31L/13R
         (string, double, double, double, double) a13 = ("13", -2.24720, -188457.5, -162031.0, 3907.0), a31 = ("31", 0.89450, -190960.8, -162107.0, 3907.0), a31d = ("31", -2.24700, -189781.3, -163576.8, 3032.0);

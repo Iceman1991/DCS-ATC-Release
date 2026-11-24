@@ -788,14 +788,14 @@ static partial class Program
             Console.WriteLine("OK   charts.jsonc: \"Nellis AFB\" = DCS \"Nellis\", \"Buechel AB\" = DCS \"Buchel\", fremde Karten gemeldet, Tippfehler in \"via\" erkannt");
             // Forum (Lt_Jaeger): one route name with a variant per runway ("STRYK": [ {...}, {...} ])
             File.WriteAllText(ownF, """
-                { "Banias": { "land_rwy": "27", "dep_rwy": "09", "crp": { "north": [1, 2], "APEX": [3, 4] }, "rwy": { "09": { "entry": { "north": { "via": "overhead" } } }, "27": { "entry": { "APEX": { "via": "initial" } } } },
+                { "Banias": { "land_rwy": "27", "dep_rwy": "09", "tailwind_kt": 10, "crp": { "north": [1, 2], "APEX": [3, 4] }, "rwy": { "09": { "entry": { "north": { "via": "overhead" } } }, "27": { "entry": { "APEX": { "via": "initial" } } } },
                   "routes": { "STRYK": [ { "rwy": ["09"], "to": "north", "pts": [ { "fix": "STRYK", "pos": [5, 6], "above": 9500 } ] },
                                          { "rwy": ["27"], "to": "APEX", "pts": [ { "fix": "STRYK", "pos": [5, 6] }, { "fix": "GASS_PEAK", "pos": [7, 8], "above": 8500 } ] } ] } } }
                 """);
             Airfield.OwnChart = OwnChart(ownF);
             var bn = Airfield.FromDcs("Banias", 22735.7, 5935.4, 8, rw).ApplyChart();
             var st = bn.Routes.Values.Where(r => r.Name == "STRYK").ToList();
-            if (st.Count != 2 || st[0].Rwy[0] != "09" || st[0].To != "north" || st[1].Rwy[0] != "27" || st[1].To != "APEX" || st[1].Pts.Length != 2 || bn.LandRwy != "27" || bn.DepRwy != "09")
+            if (st.Count != 2 || st[0].Rwy[0] != "09" || st[0].To != "north" || st[1].Rwy[0] != "27" || st[1].To != "APEX" || st[1].Pts.Length != 2 || bn.LandRwy != "27" || bn.DepRwy != "09" || bn.TailwindKt != 10)
                 throw new Exception($"charts.jsonc Routenvarianten: {string.Join(" | ", st.Select(r => $"{r.Name} {string.Join(",", r.Rwy)} {r.To} {r.Pts.Length}"))} land {bn.LandRwy} dep {bn.DepRwy}");
             // F10 map: zone circle with label, CRPs, route fixes and legs once each (STRYK is in both variants), arrival ends at its CRP; Kutaisi placeholder on another map not drawn
             var dl = DrawLine(new[] { Airfield.Kutaisi(), bn }).Split('|');

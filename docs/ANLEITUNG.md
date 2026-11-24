@@ -2708,6 +2708,7 @@ Die Platzverfahren im Kaukasus (CRPs, Ein- und Ausflug je Bahn, Platzrundenhöhe
 - Gilt auf jeder Karte. Eingebaute Verfahren hat nur der Kaukasus, auf anderen Karten hat ein Platz nur welche, wenn er in `charts.jsonc` steht. Breite/Länge braucht dort die installierte Karte, weil DCS-ATC die Kartenprojektion aus ihren Funkfeuerdaten nimmt. DCS-Koordinaten `[x, z]` gehen immer.
 - Die Kontrollzone reicht 0,5 NM über den entferntesten CRP hinaus und bis `ctr_top_ft` (ohne CRPs: 5 NM um den Platz, bis 3000 ft darüber). Diesen Luftraum überwacht DCS-ATC auf Verstöße.
 - Parallelbahnen: `"land_rwy": "21L"` legt fest, auf welcher du landest, `"dep_rwy": "21R"`, von welcher du startest. Du nennst die Bahn selbst, die Richtung richtet sich weiter nach dem Wind: bei Nordwind heißt `"21L"` dann 03R. Ohne diese Schlüssel nimmt DCS-ATC die Bahn der DCS-KI. Die KI behält ihre Bahn, und „request runway 21 left“ geht für einen einzelnen Flug weiterhin. Bei verschiedenen Bahnen sagt die ATIS „landing runway 21L, departure runway 21R“.
+- Feste Bahnrichtung: mit `"tailwind_kt": 10` behalten `land_rwy`/`dep_rwy` ihre Richtung, solange der Rückenwind auf dieser Bahn höchstens 10 kt beträgt. Nellis mit `"land_rwy": "21R", "dep_rwy": "03L", "tailwind_kt": 10` landet auf 21R und startet von 03L; ab mehr als 10 kt Rückenwind entscheidet wieder der Wind. Die DCS-KI nimmt weiter ihre eigene Bahn.
 - Echte SIDs und STARs mit Wegpunktfolgen kennt DCS-ATC nicht, es geht um die Sichtflugverfahren.
 
 Beispiel: Kutaisi mit Platzrunde 1500 ft und nur zwei CRPs.

@@ -2706,6 +2706,7 @@ The Caucasus airfield procedures (CRPs, entry and exit per runway, pattern altit
 - Works on every map. Only the Caucasus has procedures built in; on other maps an airfield has them only if it is in `charts.jsonc`. Latitude/longitude there needs the map installed, because DCS-ATC takes the map projection from its beacon data. DCS coordinates `[x, z]` always work.
 - The control zone reaches 0.5 NM beyond the farthest CRP and up to `ctr_top_ft` (without CRPs: 5 NM around the airfield, 3000 ft above it). This is the airspace DCS-ATC watches for deviations.
 - Parallel runways: `"land_rwy": "21L"` picks the one you land on, `"dep_rwy": "21R"` the one you take off from. You name the runway itself, the direction still follows the wind: with wind from the north, `"21L"` means 03R. Without these keys DCS-ATC uses the one the DCS AI uses. The AI keeps its runway, and "request runway 21 left" still works for a single flight. With different runways the ATIS says "landing runway 21L, departure runway 21R".
+- Fixed runway directions: add `"tailwind_kt": 10` and `land_rwy`/`dep_rwy` keep their direction as long as the tailwind on that runway is 10 kt or less. Nellis with `"land_rwy": "21R", "dep_rwy": "03L", "tailwind_kt": 10` lands on 21R and departs from 03L; above 10 kt tailwind the wind decides again. The DCS AI still uses its own runway.
 - DCS-ATC has no real SIDs and STARs with waypoint sequences; this is about the visual procedures.
 
 Example: Kutaisi with a 1500 ft pattern and only two CRPs.

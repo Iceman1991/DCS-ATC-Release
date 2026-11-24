@@ -201,7 +201,7 @@ static class Kneeboard
         foreach (var (rw, hand) in k.HandOf)
             r.Add("  " + L($"Bahn {rw}: {(hand == "right hand" ? "rechts" : "links")}", $"Runway {rw}: {(hand == "right hand" ? "right" : "left")}") + (k.SideOf.TryGetValue(rw, out var sd) ? ", " + Cardinal(sd) : ""));
         if (k.LandRwy != "" || k.DepRwy != "")
-            r.Add("  " + L($"Bevorzugt: Landung {k.LandRwy}, Abflug {k.DepRwy}", $"Preferred: landing {k.LandRwy}, departure {k.DepRwy}"));
+            r.Add("  " + L($"Bevorzugt: Landung {k.LandRwy}, Abflug {k.DepRwy}", $"Preferred: landing {k.LandRwy}, departure {k.DepRwy}") + (k.TailwindKt is { } tk ? L($", bis {tk:0} kt Rückenwind", $", up to {tk:0} kt tailwind") : ""));
         if (k.MaxFt > 0) r.Add(L($"An-/Abflug max. {k.MaxFt:0} ft", $"Arrival/departure max. {k.MaxFt:0} ft"));
         r.Add(L($"Kontrollzone {k.CtrNm:0.0} NM bis {k.CtrTopFt:0} ft", $"Control zone {k.CtrNm:0.0} NM up to {k.CtrTopFt:0} ft"));   // A100/N2
         r.Add(L("  ohne Anruf nicht einfliegen,", "  do not enter without a call,"));

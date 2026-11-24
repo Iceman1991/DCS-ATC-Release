@@ -159,6 +159,9 @@ public class Airfield
     public string BestRunway(double wx, double wz, bool dcs = false, bool dep = false)
     {
         var open = dcs || Ends.All(e => Closed.Contains(e.Name)) ? Ends : Ends.Where(e => !Closed.Contains(e.Name)).ToList();
+        // forum (Nellis): with tailwind_kt the chart end (land_rwy/dep_rwy) is used as named while its tailwind is within the limit
+        if (!dcs && TailwindKt is { } tk && Ends.FirstOrDefault(e => e.Name == (dep ? DepRwy : LandRwy)) is { } ce && !Closed.Contains(ce.Name)
+            && wx * ce.Dx + wz * ce.Dz <= tk * 0.514444) return ce.Name;
         var m = open.FirstOrDefault(e => e.Name == Main);
         if (dep && open.FirstOrDefault(e => e.Name == DepMain) is { } md) m = md;
         var b = Math.Sqrt(wx * wx + wz * wz) < 3.5 && m != null ? m : open.MaxBy(e => -(wx * e.Dx + wz * e.Dz))!;
@@ -166,6 +169,7 @@ public class Airfield
         return open.Where(e => Diff(e.Hdg, b.Hdg) < 10).OrderBy(e => pref != null && e.CX == pref.CX && e.CZ == pref.CZ ? 0 : 1).First().Name;
     }
     public string LandRwy = "", DepRwy = "";
+    public double? TailwindKt;
     /// DCS main runway = named direction from Airbase:getRunways (correct at all test airfields). Program corrects it
     /// when an AI takes off/lands differently in light wind.
     public string Main = "";
@@ -317,6 +321,7 @@ public class Airfield
         foreach (var (key, set) in new (string, Action<string>)[] { ("land_rwy", v => LandRwy = v), ("dep_rwy", v => DepRwy = v) })
             if (a.TryGetProperty(key, out var pr))
                 set(Ends.Count == 0 || Ends.Any(e => e.Name == pr.GetString()) ? pr.GetString()! : throw new FormatException($"{Name}: \"{key}\": \"{pr.GetString()}\" ({string.Join(", ", Ends.Select(e => e.Name))})"));
+        if (a.TryGetProperty("tailwind_kt", out var twk)) TailwindKt = twk.GetDouble();
         if (a.TryGetProperty("rwy", out var rwy))
             foreach (var r in rwy.EnumerateObject())
             {
