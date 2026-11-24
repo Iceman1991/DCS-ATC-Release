@@ -12,7 +12,7 @@ namespace DcsAtc;
 static class Settings
 {
     /// Ko-fi supporters, named on the "Thanks" page (only with their OK, under the name they want)
-    static readonly string[] Supporters = { "Heling", "buur", "Pascali Alessandro", "Kampfkoloss" };
+    static readonly string[] Supporters = { "Heling", "buur", "Pascali Alessandro", "Kampfkoloss", "JSF_Aggie" };
 
     internal static string InstallationReport(string dir)
     {

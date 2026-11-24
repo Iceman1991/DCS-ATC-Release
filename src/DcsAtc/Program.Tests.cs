@@ -217,6 +217,17 @@ static partial class Program
             if (on != ("Sentry 1-1", "Overlord11") || off != "Overlord11" || before != null || !roles.SequenceEqual(new[] { "AWACS", "Tanker", null }))
                 throw new Exception($"KI-Rufzeichen aus dem Unitnamen: {on}, aus {off}, vorher {before}, Stationen {string.Join(",", roles.Select(r => r ?? "-"))}");
         }
+        {   // forum (JSF_Aggie): AwacsMissionFreq=false -> DCS-ATC AWACS on Frequencies "AWACS", mission frequency ignored; tanker unchanged
+            var (am, ka, kt) = (Cfg.AwacsMissionFreq, Ops.AwacsFreq, Ops.TankerFreq);
+            (Ops.AwacsFreq, Ops.TankerFreq) = (new(), new());
+            Cfg.AwacsMissionFreq = true; FreqLine(new[] { "F", "AwTest", "155.0" });
+            var on = Ops.AwacsFreq["AwTest"];
+            Cfg.AwacsMissionFreq = false; FreqLine(new[] { "F", "AwTest", "155.0" }); FreqLine(new[] { "F", "TkTest", "156.0", "t" });
+            var (off, tk) = (Ops.AwacsFreq["AwTest"], Ops.TankerFreq["TkTest"]);
+            (Cfg.AwacsMissionFreq, Ops.AwacsFreq, Ops.TankerFreq) = (am, ka, kt);
+            if (on != 155.0 || off != Cfg.Frequencies.GetValueOrDefault("AWACS", 251.5) || tk != 156.0)
+                throw new Exception($"AwacsMissionFreq: an {on}, aus {off}, Tanker {tk}");
+        }
         var nest = "{\n  \"Frequencies\": { \"Tower\": 265.0, \"ATIS\": 263.5 },\n  \"Voices\": {\n    \"Tower\": \"ryan\",   // fest\n    \"ATIS\": \"amy\"\n  }\n}";   // Tower in both blocks: only the named one changes
         var nested = Settings.WithNested(Settings.WithNested(nest, "Voices", new[] { ("Tower", "\"alan|joe\"") }, ""), "Frequencies", new[] { ("Tower", "251.5"), ("Range", "267.5") }, "");
         if (!nested.Contains("\"Range\": 267.5, \"Tower\": 251.5, \"ATIS\": 263.5 }") || !nested.Contains("\"Tower\": \"alan|joe\",   // fest") || Settings.WithNested(nest, "Voices", Array.Empty<(string, string)>(), "") != nest ||

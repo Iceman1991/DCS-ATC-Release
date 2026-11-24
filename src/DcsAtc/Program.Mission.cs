@@ -49,6 +49,14 @@ static partial class Program
         return Ops.ParseRange(p.Length > 4 ? string.Join(";", p[4..]) : "Range", gen, D(1), D(2), D(3));
     }
 
+    /// F;group;freq[;t]: AWACS (or tanker "t") frequency of the mission; AwacsMissionFreq=false: AWACS stays on Frequencies "AWACS" (key kept for callsign recognition)
+    internal static void FreqLine(string[] p)
+    {
+        var f = double.Parse(p[2], CultureInfo.InvariantCulture);
+        if (p.Length > 3 && p[3] == "t") Ops.TankerFreq[p[1]] = f;
+        else Ops.AwacsFreq[p[1]] = Cfg.AwacsMissionFreq ? f : Cfg.Frequencies.GetValueOrDefault("AWACS", 251.5);
+    }
+
     static readonly HashSet<string> JtacSeen = new();
     static void ReadState()
     {
@@ -87,7 +95,7 @@ static partial class Program
                         Ops.Beacons[p[1]] = p[2];
                         if (p.Length > 3 && p[3] != "") Ops.Tracks[p[1]] = p[3];
                         break;
-                    case "F" when p.Length >= 3: (p.Length > 3 && p[3] == "t" ? Ops.TankerFreq : Ops.AwacsFreq)[p[1]] = D(2); break;   // AWACS radio frequency (mission), "t": tanker (TP7)
+                    case "F" when p.Length >= 3: FreqLine(p); break;   // AWACS radio frequency (mission), "t": tanker (TP7)
                     case "C" when p.Length >= 12:   // C;unit;group;type;x;z;hdg;speed;side;freq;tacan;icls;wx;wz;pa;noTurn (carrier)
                         boats.Add(new(p[1], p[2], p[3], D(4), D(5), D(6), D(7), int.Parse(p[8]), D(9), p[10], p[11], p.Length > 13 ? D(12) : 0, p.Length > 13 ? D(13) : 0, p.Length > 14 ? D(14) : 0, p.Length > 15 && p[15] == "1"));
                         break;

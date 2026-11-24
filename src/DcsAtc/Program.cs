@@ -28,6 +28,7 @@ public class Config
     public List<CenterSector> CenterSectors { get; set; } = new();   // several Center sectors per map (nearest center point inside RadiusNm): Name, Freq, Lat/Lon (Caucasus only) or X/Z, RadiusNm, Side blue/red
     public bool AwacsBullseye { get; set; } = true;    // LK4: picture and situation updates to all as bullseye; false = everything BRAA from the player (fallback)
     public double AwacsNewGroupNm { get; set; } = 200;  // AWACS reports new groups (and picture clean) within this radius, 40-200 NM
+    public bool AwacsMissionFreq { get; set; } = true;  // forum (JSF_Aggie): false = DCS-ATC's AWACS stays on Frequencies "AWACS", whatever frequency the AWACS group has in the mission (DCS's own AWACS calls keep the mission frequency)
     public Dictionary<string, double> OnSpeedAoa { get; set; } = new();   // LSO: on-speed AoA in degrees per type prefix, added to the built-in table (Carrier.OnSpeedDefault) or replacing a value there (calibrate with the log "[LSO] AoA im Mittel")
     public string Modulation { get; set; } = "AM";
     public int Coalition { get; set; } = 2;   // SRS coalition for stations without their own (A133: airfields/AWACS/AI transmit with their side)
