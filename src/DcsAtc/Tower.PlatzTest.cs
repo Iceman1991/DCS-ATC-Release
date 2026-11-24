@@ -531,7 +531,7 @@ public partial class Tower
                     var ramp = new Ramp("Ramp North", rn.X, rn.Z, new(), new() { ["07"] = "RnTest" }, new(), new(), new(), new());
                     Telemetry K(double x, double z, double kt) => new(ku.Elev, 0, kt * Kt, e7.Hdg * Math.PI / 180, x, z, 0, 0, 760);
                     Tower W(double x, double z) { var w = new Tower(ku, "Enfield 1-1") { FieldWind = (-e7.Dx * 5, -e7.Dz * 5) }; w.Tick(K(x, z, 0), none, 0); (w.Phase, w.Runway, w.home) = (Phase.TaxiOut, "07", ramp); return w; }
-                    var rt = ku.Net.RouteTo((rn.X, rn.Z), hd, (x, z) => ku.OnRunway(x, z));
+                    var rt = ku.Net.RouteTo((rn.X, rn.Z), hd, ku.AlongRunway);
                     Chk(rt != null && rt.Lines.Count > 0 && rt.Dist(rn.X, rn.Z) < 100 && rt.Dist(hd.X, hd.Z) < 1, "Rollnetz Kutaisi: Korridor Rampe Nord - Warteplatz");
                     if (rt != null)
                     {
@@ -552,7 +552,7 @@ public partial class Tower
                         Chk(Enumerable.Range(2, 30).All(q => st.Tick(K(far.Item1, far.Item2, 2), none, q).Count == 0), "Rollnetz Kutaisi: Stillstand abseits des Rollwegs bleibt still");
                         // taxi guidance on the network: progressive along the shortest way -> silent (no left/right, no clock); backwards -> "wrong way, turn around" with the route after 8 s; "say again taxi" -> the route; 90 s stopped on the taxiway -> asked once
                         bool Rw(double x, double z) => ku.OnRunway(x, z);
-                        var pth = ku.Net.PathTo((rn.X, rn.Z), hd, ku.Net.Spread(hd, Rw)!, Rw);
+                        var pth = ku.Net.PathTo((rn.X, rn.Z), hd, ku.Net.Spread(hd, ku.AlongRunway)!, ku.AlongRunway);
                         Telemetry KH(double x, double z, double kt, (double X, double Z) to) => new(ku.Elev, 0, kt * Kt, Math.Atan2(to.Z - z, to.X - x), x, z, 0, 0, 760);
                         Chk(pth is { Count: > 5 }, $"Rollnetz Kutaisi: Weg Rampe Nord - Warteplatz ({pth?.Count} Punkte)");
                         if (pth is { Count: > 5 })
@@ -608,7 +608,7 @@ public partial class Tower
                 File.WriteAllBytes(rf, rb);
                 var net = Rollnetz.Read(rf);
                 Chk(net != null && net.Nodes.Length == 2 && net.Edges.Length == 1 && net.Edges.All(e => e.A >= 0 && e.B >= 0 && e.A < net.Nodes.Length && e.B < net.Nodes.Length), "Rollnetz: Kante mit Index >= 0x80000000 verworfen: " + net?.Edges.Length);
-                try { Chk(net?.RouteTo((5000, 5000), (5100, 5000), (x, z) => false) is { Lines.Count: 1 }, "Rollnetz: RouteTo über das Netz"); }
+                try { Chk(net?.RouteTo((5000, 5000), (5100, 5000), (a, b) => false) is { Lines.Count: 1 }, "Rollnetz: RouteTo über das Netz"); }
                 catch (Exception ex) { Chk(false, "Rollnetz: RouteTo wirft " + ex.GetType().Name); }
                 n += 2;
             }
@@ -620,7 +620,7 @@ public partial class Tower
             var rb = new byte[800];
             void W(int o, double v) => BitConverter.GetBytes(v).CopyTo(rb, o);
             void WU(int o, uint v) => BitConverter.GetBytes(v).CopyTo(rb, o);
-            void Edge(int p, double x, double z) { WU(p - 16, 0); WU(p - 12, 1); WU(p - 4, 2); W(p, x); W(p + 16, z); W(p + 24, x); W(p + 40, z); }
+            void Edge(int p, double x, double z) { WU(p - 16, 0); WU(p - 12, 1); WU(p - 4, 2); W(p, x); W(p + 16, z); W(p + 24, x + 100); W(p + 40, z); }   // #62: polyline as long as the 100 m between the nodes
             Edge(100, 10000, 14000);
             WU(166 - 16, 0); WU(166 - 12, 1); WU(166 - 4, 2);   // zero-filled block: valid a/b/n, points (0,0,0)
             for (int k = 0; k < 2; k++)
@@ -637,6 +637,72 @@ public partial class Tower
                 n++;
             }
             finally { File.Delete(rf); }
+        }
+
+        // Issue #62 (Andersen): a runway crossing of several short edges (both middle nodes on the runway) must stay passable, only edges ALONG the runway are skipped
+        if (all.FirstOrDefault(a => a.Name == "Kutaisi" && a.Charted) is { } k62)
+        {
+            var r62 = k62.End("07");
+            (double X, double Z) P(double s, double l) => (r62.CX + s * r62.Dx + l * r62.Dz, r62.CZ + s * r62.Dz - l * r62.Dx);
+            var nd = new List<(double X, double Z)>();
+            int N(double s, double l) { nd.Add(P(s, l)); return nd.Count - 1; }
+            var ed = new List<(int A, int B, (double X, double Z)[] Poly, double Len)>();
+            void E(int a, int b) => ed.Add((a, b, new[] { nd[a], nd[b] }, Dist(nd[a].X, nd[a].Z, nd[b].X, nd[b].Z)));
+            int nA = N(0, -60), nR1 = N(0, -4), nR2 = N(0, 4), nS = N(0, 60);        // crossing 1: middle piece 8 m across the runway
+            E(nA, nR1); E(nR1, nR2); E(nR2, nS);
+            int nA2 = N(100, -60), nR3 = N(100, -3), nR4 = N(100, 2), nS2 = N(100, 60);   // crossing 2: middle piece 5 m
+            E(nA2, nR3); E(nR3, nR4); E(nR4, nS2);
+            int nD1 = N(r62.Len / 2 + 200, -60), nD2 = N(r62.Len / 2 + 200, 60);      // detour around the runway end
+            E(nA, nD1); E(nD1, nD2); E(nD2, nS);
+            int nL1 = N(-600, -5), nL2 = N(-500, -5);                                   // along the runway, 100 m
+            E(nL1, nL2);
+            var net62 = new Rollnetz { Nodes = nd.ToArray(), Edges = ed.ToArray() };
+            var dS = net62.Spread(nd[nS], k62.AlongRunway, 1);
+            var dS2 = net62.Spread(nd[nS2], k62.AlongRunway, 1);
+            var dL = net62.Spread(nd[nL1], k62.AlongRunway, 1);
+            Chk(dS != null && dS[nA] < 200 && dS2 != null && dS2[nA2] < 200, $"Rollnetz #62: Bahnkreuzung aus mehreren Kanten bleibt befahrbar: {dS?[nA]:0} / {dS2?[nA2]:0} m");
+            var path62 = dS == null ? null : net62.PathTo(P(0, -55), nd[nS], dS, k62.AlongRunway, 20);
+            Chk(path62 != null && path62.Any(p => Math.Abs((p.X - r62.CX) * r62.Dz - (p.Z - r62.CZ) * r62.Dx) < 5) && path62.Max(p => Math.Abs((p.X - r62.CX) * r62.Dx + (p.Z - r62.CZ) * r62.Dz)) < 50,
+                "Rollnetz #62: Weg von Norden führt über die Bahn, nicht außen herum: " + path62?.Count);
+            Chk(dL != null && dL[nL2] > 1e9 && k62.AlongRunway(nd[nL1], nd[nL2]) && !k62.AlongRunway(nd[nR1], nd[nR2]) && !k62.AlongRunway(nd[nA], nd[nR1]), "Rollnetz #62: Kante längs der Bahn bleibt ausgelassen, Querstücke nicht");
+            n += 3;
+        }
+
+        // Issue #62 with the real nets (DCS needed): Sochi-Adler crossing, Batumi along-runway edge; Read drops edges shorter than half their node distance
+        foreach (var (fname, check) in new (string, Action<Airfield>)[] {
+            ("Sochi-Adler", f =>
+            {
+                var s = f.Net!; var a = s.Nodes.Length > 69 ? s.Nodes[55] : default; var b = s.Nodes.Length > 69 ? s.Nodes[69] : default;
+                if (Dist(a.X, a.Z, -163872, 462905) > 5 || Dist(b.X, b.Z, -163972, 463561) > 5) { Console.WriteLine("--   Rollnetz #62 Sochi: Netz weicht ab (Test übersprungen)"); return; }
+                var d = s.Spread(a, f.AlongRunway, 1);
+                Chk(d != null && d[69] < 2000, $"Rollnetz #62 Sochi-Adler: Stand 55 - Stand 69 über die Bahnkreuzung {d?[69]:0} m");
+                n++;
+            }),
+            ("Batumi", f =>
+            {
+                var s = f.Net!; var ok = s.Nodes.Length > 30 && s.Edges.Any(e => e.A == 27 && e.B == 28 || e.A == 28 && e.B == 27);
+                if (!ok) { Console.WriteLine("--   Rollnetz #62 Batumi: Netz weicht ab (Test übersprungen)"); return; }
+                var e2 = s.Edges.First(e => e.A == 27 && e.B == 28 || e.A == 28 && e.B == 27);
+                var d = s.Spread(s.Nodes[27], f.AlongRunway, 1);
+                Chk(f.AlongRunway(s.Nodes[27], s.Nodes[28]) && d != null && d[28] > e2.Len + 1, $"Rollnetz #62 Batumi: Kante 27-28 längs der Bahn bleibt ausgelassen: {d?[28]:0} m, Kante {e2.Len:0} m");
+                n++;
+            }) })
+            if (all.FirstOrDefault(a => a.Name == fname && a.Charted) is { } rf62)
+            {
+                Rollnetz.LoadAll(new[] { rf62 }, Program.DcsDir());
+                if (rf62.Net == null) Console.WriteLine($"--   Rollnetz #62 {fname}: DCS fehlt (Test übersprungen)");
+                else check(rf62);
+            }
+        if (all.FirstOrDefault(a => a.Name == "Kutaisi" && a.Charted) is { } kr62)
+        {
+            Rollnetz.LoadAll(new[] { kr62 }, Program.DcsDir());
+            if (kr62.Net == null) Console.WriteLine("--   Rollnetz #62 Read: DCS fehlt (Test übersprungen)");
+            else
+            {
+                var bad = kr62.Net.Edges.Count(e => { var d = Dist(kr62.Net.Nodes[e.A].X, kr62.Net.Nodes[e.A].Z, kr62.Net.Nodes[e.B].X, kr62.Net.Nodes[e.B].Z); return e.Len < 0.5 * d && d > 20; });
+                Chk(bad == 0, $"Rollnetz #62 Read: {bad} Kanten kürzer als die halbe Knotenentfernung (Fehllesung)");
+                n++;
+            }
         }
 
         if (err.Count > 0) throw new Exception("PlatzTest: " + string.Join(" | ", err));

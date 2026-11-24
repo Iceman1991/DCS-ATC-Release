@@ -98,6 +98,14 @@ public class Airfield
         double along = (x - e.CX) * e.Dx + (z - e.CZ) * e.Dz, lat = Math.Abs((x - e.CX) * e.Dz - (z - e.CZ) * e.Dx);
         return Math.Abs(along) < e.Len / 2 + beyond && lat < halfWidth;
     });
+    /// Issue #62: taxi edge that runs ALONG a runway (both nodes on its rectangle, longer than 10 m, within 30 deg of its axis). Crossing pieces (steep) and tiny pieces
+    /// (direction is noise) are no along-runway edges: a crossing often consists of several edges, dropping the short middle one would make the runway impassable.
+    public bool AlongRunway((double X, double Z) a, (double X, double Z) b) => Ends.Any(e =>
+    {
+        bool In((double X, double Z) p) => Math.Abs((p.X - e.CX) * e.Dx + (p.Z - e.CZ) * e.Dz) < e.Len / 2 + 50 && Math.Abs((p.X - e.CX) * e.Dz - (p.Z - e.CZ) * e.Dx) < 30;
+        double dx = b.X - a.X, dz = b.Z - a.Z, l = Math.Sqrt(dx * dx + dz * dz);
+        return l > 10 && In(a) && In(b) && Math.Abs(dx * e.Dz - dz * e.Dx) / l < 0.5;   // sin(30 deg) = 0.5, direction-insensitive
+    });
     public Ramp? RampAt(double x, double z) => Ramps.OrderBy(r => (r.X - x) * (r.X - x) + (r.Z - z) * (r.Z - z)).FirstOrDefault();
     public Dictionary<int, string> Stands = new();   // DCS stand name by Term_Index ("F125" as in the ME/kneeboard), from the hook
     /// DcsAtc-Stands.txt (DcsAtcHook.lua): "M;theatre", then "S;airdrome id;Term_Index;name". Other map = stale file, ignored.

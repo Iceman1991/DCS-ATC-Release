@@ -737,7 +737,7 @@ static partial class Program
         else
         {
             Rollnetz.LoadAll(all, DcsDir());
-            var rn = all.Where(f => f.Net != null).SelectMany(f => f.Holds.Select(h => (f, h.Key, d: f.Net!.EdgeDist(h.Value.X, h.Value.Z, (x, z) => f.OnRunway(x, z))))).ToList();
+            var rn = all.Where(f => f.Net != null).SelectMany(f => f.Holds.Select(h => (f, h.Key, d: f.Net!.EdgeDist(h.Value.X, h.Value.Z, f.AlongRunway)))).ToList();
             var far = rn.Where(x => x.d > Rollnetz.HoldTol).ToList();
             Console.WriteLine($"OK   Rollnetz: {all.Count(f => f.Net != null)} Plätze mit DCS-Rollnetz, {rn.Count - far.Count} von {rn.Count} Warteplätzen liegen höchstens {Rollnetz.HoldTol:0} m von einer Rollwegkante");
             if (far.Count > 0) Console.WriteLine("--   Rollnetz Hinweis (Warteplatz weit von der DCS-Rollwegkante, Daten prüfen): " + string.Join("; ", far.Select(x => $"{x.f.Name} {x.Key} {x.d:0} m")));

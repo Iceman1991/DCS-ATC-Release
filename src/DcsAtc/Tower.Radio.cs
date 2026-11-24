@@ -1331,6 +1331,7 @@ public partial class Tower
         var c = Cs();
         if (CrossBlock(traffic, x) is { } b) { (crossWait, crossRole) = (x, role); return $"{c}, hold short runway {RwSay(x)}, traffic {Describe(b, x)}."; }
         (crossOk, crossWait) = (x, null);
+        taxiSaid = taxiSaid?.Replace($", hold short runway {RwSay(x)}", "");   // issue #62: crossed now, a later "wrong way" must not repeat the hold short
         if (Phase == Phase.TaxiIn) return $"{c}, cross runway {RwSay(x)}, continue to {(parkNum > 0 ? $"parking spot {StandName(parkNum)}" : "parking")}.";   // LA06
         return $"{c}, cross runway {RwSay(x)}, hold short runway {RwSay(Runway)}" +
                (role == "Tower" || SameFreq("Tower") ? ", report ready for departure." : $", contact {Contact("Tower")} when ready for departure.");

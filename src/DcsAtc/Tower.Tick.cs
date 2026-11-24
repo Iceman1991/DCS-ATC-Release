@@ -1251,7 +1251,7 @@ public partial class Tower
     bool? NetBack(Telemetry t, (double X, double Z) goal)
     {
         if (F.Net is not { } net) return null;
-        bool Rwy(double x, double z) => F.OnRunway(x, z);
+        bool Rwy((double X, double Z) a, (double X, double Z) b) => F.AlongRunway(a, b);
         if (netDg == null || netGoal != goal) (netGoal, netDg) = (goal, net.Spread(goal, Rwy));
         if (netDg == null || net.PathTo((t.X, t.Z), goal, netDg, Rwy) is not { } path) return null;
         var (px, pz, s) = (t.X, t.Z, 0.0);   // point 30 m ahead along the way (the path starts at his position on the taxiway)
@@ -1271,7 +1271,7 @@ public partial class Tower
         if (Phase == Phase.TaxiOut && (!taxiRouteSet || taxiRouteRw != Runway))
         {
             (taxiRouteSet, taxiRouteRw, taxiStart, taxiOffSince) = (true, Runway, (t.X, t.Z), -1);
-            taxiRoute = CrossNext(t) == null ? net.RouteTo(taxiStart, hold, (x, z) => F.OnRunway(x, z)) : null;   // parallel runway on the way: the corridor would not lead across it
+            taxiRoute = CrossNext(t) == null ? net.RouteTo(taxiStart, hold, F.AlongRunway) : null;   // parallel runway on the way: the corridor would not lead across it
         }
         if (gkt <= 3) { taxiOffSince = -1; return null; }
         if (Phase == Phase.TaxiOut && taxiRoute is { } rt && Dist(t.X, t.Z, taxiStart.X, taxiStart.Z) > 80)

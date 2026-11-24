@@ -2069,6 +2069,8 @@ public partial class Tower
                       (clr6 ? x6 is [{ } t6x] && t6x.Text.Contains("cross runway zero three left, continue to parking") && c6.Count == 0
                             : c6.Any(m => m.Text.Contains("You are not cleared onto runway"))),
                       $"LA06 Einrollen über 03L (Freigabe {clr6}): " + $"{sg6} / {sg6b} / " + string.Join(" | ", r6.Concat(x6).Concat(c6).Select(m => m.Text)));
+                // issue #62: after the crossing clearance the repeated taxi route (wrong way, say again) no longer says "hold short runway zero three left"
+                Check((twLa6.taxiSaid?.Contains("hold short runway zero three left") == true) != clr6, $"#62 taxiSaid nach Kreuzen (Freigabe {clr6}): {twLa6.taxiSaid}");
             }
             // #45 (log Nordholz): single runway, landed on it, vacated to the side away from the parking position: the landing runway itself is crossed on the way to parking
             // (taxi clearance with hold short, radio wheel offers the crossing request, "request crossing runway" without number is the request); still rolling out on it: no crossing
