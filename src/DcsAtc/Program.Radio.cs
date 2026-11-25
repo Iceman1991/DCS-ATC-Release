@@ -536,6 +536,8 @@ static partial class Program
                 var calls = p.Ops.OnTranscript(opsRole, text, MeOf(p) with { Freq = src == "SRS" ? p.CalledOn : 0 }, TrafficFor(p), Fields.Where(f => !f.Off).ToList(), Now(), conf < MinConf && !(opsRole == "AWACS" && conf >= ExpConf && Ops.AwacsReport(Tower.Normalize(spoken))), Cfg.Frequencies.GetValueOrDefault("AWACS", 251.5), FieldWxOf);
                 if (p.Ops.Menu is { } mn && Cfg.CommsKey != 0 && MissionData && p == Host())   // basket/boom only via the DCS menu: "Intent to refuel" (mission looks it up in the list) or "Ready pre-contact"
                     TankerMenu(p, mn.Step, mn.Group);
+                else if (p.Ops.Menu is { } lm && MissionData)
+                    AiCmd($"LOUD;{lm.Group}");   // issue #45: other player / dedicated server presses the DCS menu himself, but a muted DCS tanker ignores it: only un-mute
                 p.Ops.Menu = null;
                 foreach (var cm in p.Ops.Cmds.ToList()) AiCmd(cm);   // J4/J6: MARK / LASE / LASEOFF
                 p.Ops.Cmds.Clear();

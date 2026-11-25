@@ -1775,6 +1775,14 @@ local function start()
 
   local function command(line)
     if line:match("^MENU;") then pcall(menuIndex, line) return end
+    local lg = line:match("^LOUD;(.+)$")   -- issue #45: tanker of another player (dedicated server) un-muted, he presses "Intent to refuel" himself
+    if lg then
+      pcall(function()
+        loud[lg] = timer.getTime() + 900
+        Group.getByName(lg):getController():setOption(SILENCE, false)
+      end)
+      return
+    end
     if line:match("^DRAW;") then draw(line) return end
     local wu, wt = line:match("^WHEEL;([^;]+);(.*)$")   -- VR: radio wheel as text to the player, empty = wheel closed
     if wu then

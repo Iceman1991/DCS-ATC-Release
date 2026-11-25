@@ -401,7 +401,11 @@ do local tk, t0 = find("ATC Texaco")[1]:getName(), T - 6   -- tanker menu: audib
   files["9-5b.cmd"] = "MENU;P1;tanker;" .. tk   -- already audible: M at once
   run(T + 1); assert(select(2, ev():gsub("M;P1;tanker;1;1", "")) == 2, "zweites MENU tanker bei hoerbarem Tanker nicht sofort: " .. ev())
   run(t0 + 300); assert(gSilent[tk] == false, "Tanker im 900-s-Fenster wieder stumm")
-  run(t0 + 1000); assert(gSilent[tk] == true, "Tanker nach dem Fenster nicht wieder stumm") end
+  run(t0 + 1000); assert(gSilent[tk] == true, "Tanker nach dem Fenster nicht wieder stumm")
+  files["9-5c.cmd"] = "LOUD;" .. tk   -- issue #45: another player / dedicated server presses the DCS menu himself, the app only un-mutes the tanker
+  run(T + 1); assert(gSilent[tk] == false and not ev():find("M;P1;tanker;1;1;", 1, true), "LOUD: Tanker nicht hoerbar")
+  run(T + 300); assert(gSilent[tk] == false, "LOUD: Tanker im 900-s-Fenster wieder stumm")
+  run(T + 1000); assert(gSilent[tk] == true, "LOUD: Tanker nach dem Fenster nicht wieder stumm") end
 assert(gSilent["Hornet CV"] == true and gSilent.P1 == nil, "R308: KI-Flug der Mission nicht stumm bzw. Spielergruppe stumm")
 assert(gNoWp["Hornet CV"] == true and gNoWp.P1 == nil, "R312: Wegpunktmeldung des KI-Flugs nicht verboten")
 assert(ev():find("M;P1;atc;0;Tag (Sonne 1", 1, true) and has("M;P1;atc;0;Platz 77 nicht in der Mission"), "Befeuerung am Tag / Platz unbekannt: " .. ev())

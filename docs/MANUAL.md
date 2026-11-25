@@ -2128,7 +2128,7 @@ DCS still only operates the basket or boom through its own F-menu tanker dialog.
 - DCS-ATC asks DCS which stage its tanker dialog is in and presses only what fits: *Intent to refuel* when there is no tanker dialog, *Ready pre-contact* when DCS waits for it and you have called "pre-contact", nothing from *cleared contact* on, because F1 would then be *Abort refuel*. If the DCS tanker does not answer *Intent to refuel* within about 25 seconds, DCS-ATC sends it once more. So after you slipped off the basket a further "pre-contact" call presses nothing; just plug in again. After a full tank DCS ends its dialog and a new "pre-contact" sends *Intent to refuel* again. Without the AI wingmen part of the mod (`DcsAtcWing.lua`) DCS-ATC can't ask and guesses from what it pressed before.
 - If the DCS radio menu is open when DCS-ATC wants to press it, DCS-ATC closes it first. If the main menu stays open afterwards because DCS missed a key, it closes it and presses the keys once more. If DCS shows its own dialog instead (or `DcsAtcWing.lua` is missing), nothing is pressed again.
 - With Easy Communication off, DCS-ATC doesn't press the menu either: send *Intent to refuel* and *Ready pre-contact* yourself with your radio's own menu key (or VAICOM).
-- **Other players** in multiplayer operate the DCS tanker menu themselves.
+- **Other players** in multiplayer (on a dedicated server: every player) operate the DCS tanker menu themselves: *Intent to refuel* after *"cleared to join"*, *Ready pre-contact* at pre-contact. DCS-ATC keeps the DCS tanker audible for them from *"cleared to join"* on for 15 minutes, otherwise it would ignore the menu. The same applies to you with `"CommsKey": 0`.
 
 #### Calls you can make
 

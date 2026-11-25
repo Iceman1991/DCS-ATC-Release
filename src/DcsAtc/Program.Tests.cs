@@ -1821,6 +1821,29 @@ static partial class Program
                 throw new Exception("Falsche Frequenz: " + string.Join(" || ", wr));
             Console.WriteLine("OK   Falsche Frequenz: \"Request startup\" auf Tanker 255.5 (AWACS/Träger ebenso) -> kein DCS-Tankermenü, kein \"say again\", Hinweis \"Kutaisi Ground: 263.0 / 134.0\"; unbekanntes \"request …\" -> \"say again\" ohne Tankermenü; \"request rejoin\" ohne Menüdruck (erst beim Join, TP6), zweiter Request -> \"continue\" (TP1)");
         }
+        {   // issue #45: dedicated server / no DCS key -> the player presses the DCS tanker menu himself, the app only un-mutes the (muted) tanker: LOUD instead of MENU
+            var (lCk, lAi, lSs, lSt, lAh, lPb) = (Cfg.CommsKey, Ai, SimSec, stateTime, AiHook, Pilots.ToList());
+            var lc = new List<string>();
+            try
+            {
+                var lp = new Pilot { Unit = "U7", Callsign = "Enfield 1-1", Id = 7, Type = "F-14B", Tel = new Telemetry(6700, 6000, 140, 0, kr.X, kr.Z - 2 * NM, 0, 0, 0) };
+                Pilots.Clear(); Pilots[lp.Unit] = lp;
+                (Cfg.CommsKey, SimSec, SimLog, Fields, AiHook) = (0, 6000, new(), new() { kr }, lc.Add);   // CommsKey 0: no TankerMenu even for the host
+                stateTime = Clock;
+                Ai = new() { new Traffic(77, "KC135MPRS", kr.X, kr.Z, 6700, 0, 140, "Aerial-1", "", true, 2) };
+                lp.CalledOn = 255.5;
+                foreach (var said in new[] { "Texaco, Enfield 1-1, request rejoin", "Texaco, Enfield 1-1, visual" })
+                    Request(lp, $"Tanker: {said}", "SRS", false, null, 0.84);
+            }
+            finally
+            {
+                (Cfg.CommsKey, Ai, SimSec, stateTime, AiHook, SimLog, Fields) = (lCk, lAi, lSs, lSt, lAh, null, new());
+                Pilots.Clear(); foreach (var kv in lPb) Pilots[kv.Key] = kv.Value;
+                while (SayQueue.TryTake(out _)) { }
+            }
+            if (lc.Count(c => c == "LOUD;Aerial-1") != 1 || lc.Any(c => c.StartsWith("MENU;"))) throw new Exception("Tanker LOUD (#45): " + string.Join(" | ", lc));
+            Console.WriteLine("OK   Tanker LOUD (#45): ohne TankerMenu (Dedicated Server, anderer Spieler, CommsKey 0) entstummt die App den DCS-Tanker per LOUD;Gruppe, kein MENU");
+        }
         // Frequency selects the airfield (radio wheel/F10, without via): without SRS the nearest; only Batumi tuned -> Batumi despite nearer Kobuleti; two tuned -> running flow (not parked/logged out), otherwise the nearest;
         // selecting an airfield overrides that; called on Batumi (SRS state still old) applies until tuned away from the airfield
         Airfield Fq(string name, double nm, double u, double v) { var a = Airfield.FromDcs(name, kut.X + nm * NM, kut.Z, 20, new[] { ("13", 0.0, kut.X + nm * NM, kut.Z, 2500.0) }); (a.Uhf, a.Vhf) = (u, v); return a; }
