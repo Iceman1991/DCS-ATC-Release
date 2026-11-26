@@ -1992,6 +1992,23 @@ static partial class Program
             if (lf.Count <= 10 || lf[0] != 261 || lf[1] != 132 || !lf.Contains(262) || !msg.Contains("\"freq\":261000000,") || !msg.Contains($"\"secFreq\":{lf[10] * 1e6},") || !msg.Contains($"\"secFreq\":{lf[^1] * 1e6},"))
                 throw new Exception($"A22 SRS-Abhören: {string.Join(",", lf)}");
             Console.WriteLine($"OK   SRS-Abhören (A22): aktiver Platz zuerst, {lf.Count} Frequenzen (über 10 als secFreq): {string.Join(",", lf)}");
+            // #65: ARC-182/ARC-210 are FM-only in 30-88 and 156-174 MHz -> SRS listen radios and ExternalAudio use FM there
+            {
+                var m65 = new SrsListener(5002, new List<double> { 251.0, 173.3, 40.0 }, _ => false, _ => { }).Message(3);
+                var rad = System.Text.Json.JsonDocument.Parse(m65).RootElement.GetProperty("Client").GetProperty("RadioInfo").GetProperty("radios");
+                int Mod(int i) => rad[i].GetProperty("modulation").GetInt32();
+                if (Mod(1) != 0 || Mod(2) != 1 || Mod(3) != 1 || Mod(4) != 3) throw new Exception($"#65 SRS-Modulation: {Mod(1)},{Mod(2)},{Mod(3)},{Mod(4)}");
+                if (Modulations(173.3, 0, null) != "FM" || Modulations(173.3, 251.0, null) != "FM,AM" || Modulations(251.0, 0, "FM") != "FM" || Modulations(251.0, 173.3, "FM") != "FM,FM" || Modulations(251.0, 0, null) != Cfg.Modulation)
+                    throw new Exception($"#65 ExternalAudio-Modulation: {Modulations(173.3, 0, null)} {Modulations(173.3, 251.0, null)} {Modulations(251.0, 0, "FM")}");
+                Console.WriteLine("OK   #65 SRS-Hörfunkgeräte: 251.0 AM, 173.3 und 40.0 FM; ExternalAudio 173.3 FM, 173.3+251.0 FM,AM, JTAC-FM bleibt");
+            }
+            // #63: short PTT press without speech -> Whisper hallucinates "You"/"Thanks for watching" -> must count as noise, real calls not
+            {
+                var bad = new[] { "[BLANK_AUDIO]", "You", " you.", "Thank you for watching!", "Thanks for watching." }.Where(t => !Noise(t))
+                    .Concat(new[] { "Thank you.", "Overlord, Reaper 3-1, picture" }.Where(Noise)).ToList();
+                if (bad.Count > 0) throw new Exception($"#63 Whisper-Stille: {string.Join(" | ", bad)}");
+                Console.WriteLine("OK   #63 Whisper-Stille: [BLANK_AUDIO], You, Thanks for watching = Rauschen; Thank you und echte Rufe nicht");
+            }
             // K4: SRS server with COALITION_AUDIO_SECURITY forwards voice only within the coalition -> listen as blue and (second connection) red
             var cs = new SrsListener(5002, lf, _ => false, _ => { });
             string F(int conn, string k) => System.Text.RegularExpressions.Regex.Match(cs.Message(3, conn), $"\"{k}\":\"?([^\",]*)").Groups[1].Value;

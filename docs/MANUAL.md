@@ -277,7 +277,7 @@ Whichever way you use, the controllers answer the same way: by voice over SRS on
 DCS-ATC listens on SRS. Tune a radio to a controller frequency, hold your normal **SRS push-to-talk** and speak. You don't need a separate key. Speech recognition runs offline on your CPU and takes a few seconds per call.
 
 - **Language:** English only.
-- **Modulation:** AM (`"Modulation": "AM"`).
+- **Modulation:** AM (`"Modulation": "AM"`). Frequencies from 30 to 88 MHz and from 156 to 174 MHz are always FM, like on the real radios (ARC-182, ARC-210), for example a range on 173.3.
 - **SRS is started for you.** DCS-ATC starts the SRS server and client if they are not running, and connects a client that isn't connected yet (see [Setting up SRS](#setting-up-srs)).
 - `"SrsListen": true` turns listening on. With `false`, only the push-to-talk key below works.
 
@@ -3048,7 +3048,7 @@ The file is in the installation folder: `%LOCALAPPDATA%\Programs\DCS-ATC\config.
 | `Pronunciation` | `{}` | How the voice says single words, e.g. `{ "Ramstein": "Rahm-shtine" }`. The voices are English, so a German name is written the way an English speaker would read it. Whole words only, upper and lower case do not matter; the radio text stays as written. |
 | `CenterNames` | `{}` | Center name per map, e.g. `{ "Nevada": "Seattle Center", "Caucasus:red": "Rostov Control" }`. Empty = built-in names (see [Center](#center)). |
 | `CenterSectors` | `[]` | Several Center sectors per map, e.g. `[{ "Name": "Rostov Control", "Freq": 269.0, "Lat": 47.2, "Lon": 39.7, "RadiusNm": 120, "Side": "red" }]`. `Lat`/`Lon` on every map, or `X`/`Z` in metres. `"Gci": true` makes the entry a GCI/CRC (radar controller like the AWACS) instead of a Center. The nearest centre point whose radius you are inside wins. |
-| `Modulation` | `"AM"` | Modulation of all DCS-ATC transmissions. |
+| `Modulation` | `"AM"` | Modulation of all DCS-ATC transmissions. 30-88 and 156-174 MHz are always FM. |
 | `Coalition` | `2` | SRS side (1 red, 2 blue) for stations without a side of their own. Airfields, AWACS, tankers and AI use their own side. |
 | `SrsPath` | `"C:\\Program Files\\DCS-SimpleRadio-Standalone"` | SRS folder. If it is wrong, DCS-ATC uses the registry entry or the running SRS. |
 | `SrsListen` | `true` | Hear all players' calls through SRS. With SRS connected, your own push-to-talk key is ignored. |

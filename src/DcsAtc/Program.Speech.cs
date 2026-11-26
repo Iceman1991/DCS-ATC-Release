@@ -435,7 +435,8 @@ static partial class Program
             var label = info ? "" : tx.Pilot || freq < 0 ? $"{tx.Station}: " : RadioLabel(tx.Station, freq);
             if (!info && !tx.Pilot && tx.Gid > 0) label = ">>> " + label;   // to me (own group): DCS text knows no colors
             var mod = tx.Role is "JTAC" or "FACA" && freq > 0 ? Ops.ModOn(freq) : null;   // JTAC on its own mission frequency: its modulation (FM) instead of Cfg.Modulation
-            var fm = mod != null && !mod.Equals(Cfg.Modulation, StringComparison.OrdinalIgnoreCase) ? " " + mod : "";
+            var eff = mod ?? (freq > 0 ? ModFor(freq) : Cfg.Modulation);   // effective modulation (Transmit decides per frequency when mod is null)
+            var fm = !eff.Equals(Cfg.Modulation, StringComparison.OrdinalIgnoreCase) ? " " + eff : "";
             if (!tx.Pilot) Log(info ? $"[INF] {tx.Text}" : $"[{tx.Role[..3].ToUpperInvariant()}] {tx.Station}{(freq > 0 ? $" ({freq:0.0##}{fm})" : "")}: {tx.Text}");
             double freq2 = tx.Freqs is { Length: > 1 } f2 ? f2[1] : 0;
             double airSec = 0;   // real length of the synthesized call (Aired: end of the transmission for the PAR rhythm)
@@ -645,14 +646,20 @@ static partial class Program
         static void Stop(Process p) { try { p.Kill(); } catch (Exception) { } }
     }
 
+    /// Real V/UHF radios (ARC-182/ARC-210) are FM-only in 30-88 and 156-174 MHz (issue #65); otherwise Cfg.Modulation.
+    internal static string ModFor(double mhz) => mhz is >= 30 and < 88 or >= 156 and <= 174 ? "FM" : Cfg.Modulation;
+
+    /// ExternalAudio --modulations value: explicit mod (JTAC/FACA) wins for both, otherwise per frequency.
+    internal static string Modulations(double freq, double freq2, string? mod) =>
+        (mod ?? ModFor(freq)) + (freq2 > 0 ? "," + (mod ?? ModFor(freq2)) : "");
+
     static void Transmit(string mp3, double freq, string name, double freq2 = 0, int side = 0, string? mod = null)   // side: SRS coalition (A133), 0 = Cfg.Coalition; mod: null = Cfg.Modulation
     {
-        mod ??= Cfg.Modulation;
         lock (OwnStations) OwnStations.Add(name.Replace(" ", ""));
         bool ic = freq < 0;   // Intercom: SRS delivers it if the unitId is the aircraft's
         Run(SrsFile(Cfg.SrsPath, "ExternalAudio", "DCS-SR-ExternalAudio.exe") ?? Path.Combine(Cfg.SrsPath, "ExternalAudio", "DCS-SR-ExternalAudio.exe"), null, new[] {
             $"--file={mp3}", $"--freqs={(ic ? "100" : freq.ToString("0.000", CultureInfo.InvariantCulture) + (freq2 > 0 ? "," + freq2.ToString("0.000", CultureInfo.InvariantCulture) : ""))}",
-            $"--modulations={(ic ? "INTERCOM" : mod + (freq2 > 0 ? "," + mod : ""))}", $"--coalition={(side > 0 ? side : Cfg.Coalition)}", $"--port={SrsPort}", "--name=" + name.Replace(" ", ""),
+            $"--modulations={(ic ? "INTERCOM" : Modulations(freq, freq2, mod))}", $"--coalition={(side > 0 ? side : Cfg.Coalition)}", $"--port={SrsPort}", "--name=" + name.Replace(" ", ""),
             "--volume=" + Cfg.Volume.ToString(CultureInfo.InvariantCulture),
             $"--unitId={(ic ? -freq : 100000)}" }.Concat(PosArgs(name, freq)).ToArray());   // 100000: SrsListener does not overhear own controllers; FI2: position
     }

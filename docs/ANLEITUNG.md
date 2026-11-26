@@ -279,7 +279,7 @@ Egal welcher Weg: Die Lotsen antworten gleich, per Stimme über SRS auf ihrer Fr
 DCS-ATC hört über SRS mit. Funkgerät auf eine Lotsenfrequenz rasten, die normale **SRS-Sprechtaste** halten und sprechen. Eine eigene Taste brauchst du nicht. Die Spracherkennung läuft offline auf deiner CPU und braucht ein paar Sekunden pro Spruch.
 
 - **Sprache:** nur Englisch.
-- **Modulation:** AM (`"Modulation": "AM"`).
+- **Modulation:** AM (`"Modulation": "AM"`). Frequenzen von 30 bis 88 MHz und von 156 bis 174 MHz sind immer FM, wie an den echten Funkgeräten (ARC-182, ARC-210), zum Beispiel eine Range auf 173.3.
 - **SRS wird für dich gestartet.** DCS-ATC startet SRS-Server und -Client, falls sie nicht laufen, und verbindet einen noch nicht verbundenen Client (siehe [SRS einrichten](#srs-einrichten)).
 - `"SrsListen": true` schaltet das Mithören ein. Mit `false` geht nur die Sprechtaste unten.
 
@@ -3051,7 +3051,7 @@ Die Datei liegt im Installationsordner: `%LOCALAPPDATA%\Programs\DCS-ATC\config.
 | `Pronunciation` | `{}` | Aussprache einzelner Wörter durch die Stimme, z. B. `{ "Ramstein": "Rahm-shtine" }`. Die Stimmen sind englisch, ein deutscher Name wird also so geschrieben, wie ihn ein Englischsprecher lesen würde. Nur ganze Wörter, Groß- und Kleinschreibung egal; der Funktext bleibt wie geschrieben. |
 | `CenterNames` | `{}` | Center-Name je Karte, z. B. `{ "Nevada": "Seattle Center", "Caucasus:red": "Rostov Control" }`. Leer = eingebaute Namen (siehe [Center](#center)). |
 | `CenterSectors` | `[]` | Mehrere Center-Sektoren je Karte, z. B. `[{ "Name": "Rostov Control", "Freq": 269.0, "Lat": 47.2, "Lon": 39.7, "RadiusNm": 120, "Side": "red" }]`. `Lat`/`Lon` auf jeder Karte, oder `X`/`Z` in Metern. `"Gci": true` macht den Eintrag zum GCI/CRC (Radarlotse wie das AWACS) statt zum Center. Der nächste Mittelpunkt, in dessen Radius du liegst, gilt. |
-| `Modulation` | `"AM"` | Modulation aller DCS-ATC-Sendungen. |
+| `Modulation` | `"AM"` | Modulation aller DCS-ATC-Sendungen. 30-88 und 156-174 MHz sind immer FM. |
 | `Coalition` | `2` | SRS-Seite (1 rot, 2 blau) für Stationen ohne eigene Seite. Plätze, AWACS, Tanker und KI nutzen ihre eigene Seite. |
 | `SrsPath` | `"C:\\Program Files\\DCS-SimpleRadio-Standalone"` | SRS-Ordner. Stimmt er nicht, nimmt DCS-ATC den Registry-Eintrag oder das laufende SRS. |
 | `SrsListen` | `true` | Sprüche aller Spieler über SRS hören. Mit SRS-Verbindung wird deine eigene Sprechtaste ignoriert. |

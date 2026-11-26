@@ -151,7 +151,7 @@ sealed class SrsListener
         var radios = Enumerable.Range(0, 11).Select(i => new Dictionary<string, object>
         {
             ["freq"] = i > 0 && i <= fq.Length ? fq[i - 1] * 1e6 : 1.0,
-            ["modulation"] = i > 0 && i <= fq.Length ? 0 : 3,   // AM, otherwise DISABLED
+            ["modulation"] = i > 0 && i <= fq.Length ? (Program.ModFor(fq[i - 1]) == "FM" ? 1 : 0) : 3,   // FM in the FM-only bands (#65), otherwise AM; unused radios DISABLED
             ["enc"] = false, ["encKey"] = 0, ["secFreq"] = i > 0 && i + 9 < fq.Length ? fq[i + 9] * 1e6 : 1.0, ["retransmit"] = false,   // A22: SRS server also forwards on secFreq (like Guard, without modulation check)
         }).ToArray();
         var msg = new Dictionary<string, object>

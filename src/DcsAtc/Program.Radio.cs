@@ -17,6 +17,13 @@ static partial class Program
     static bool IsOwnStation(string name) { lock (OwnStations) return OwnStations.Contains(name); }
 
     /// Radio call via SRS: sender via DCS unit ID (otherwise player name), called controller via the frequency.
+    /// Transcript without speech: empty, [BLANK_AUDIO]/(noise) only, or the Whisper silence hallucination "You" / "Thanks for watching" (#63).
+    internal static bool Noise(string text)
+    {
+        var t = Regex.Replace(text, @"\[[^\]]*\]|\([^)]*\)", "").Trim();
+        return t.Length < 2 || Regex.IsMatch(t, @"^\W*(you|thanks?(\s+you)?\s+for\s+watching)\W*$", RegexOptions.IgnoreCase);
+    }
+
     static void OnSrs(SrsListener.Transmission tx)
     {
         Pilot? p;   // A26/A141: sender first (R387: its tanker frequency decides the role; the Whisper prompt uses its call sign and airfield)
@@ -30,7 +37,7 @@ static partial class Program
         var (text, conf) = Transcribe(SaveWav(tx.Pcm), p, role: shared.Via != null ? null : role ?? "Tower", via: via ?? shared.Via);   // LF1: prompt of the frequency (shared: airfield plus AWACS/tanker)
         var who = p == null ? "Rufzeichen im Spruch" : !MissionData ? "Host" : tx.UnitId != 0 && p.Id == tx.UnitId ? "Unit-ID" : p.Name == tx.Name ? "SRS-Name" : "einziger Spieler";   // Debug log
         if (Environment.GetEnvironmentVariable("DCSATC_SRSDEBUG") == "1") Console.WriteLine($"OnSrs {role} unit {tx.UnitId} '{tx.Name}': {text} ({conf:0.00})");
-        if (Regex.Replace(text, @"\[[^\]]*\]|\([^)]*\)", "").Trim().Length < 2) { Trace("SRS", $"{tx.FreqMHz:0.000} MHz unit {tx.UnitId} '{tx.Name}' {tx.Pcm.Length / 16000.0:0.0} s: leer/Rauschen verworfen ({text})"); return; }   // [BLANK_AUDIO], noise
+        if (Noise(text)) { Trace("SRS", $"{tx.FreqMHz:0.000} MHz unit {tx.UnitId} '{tx.Name}' {tx.Pcm.Length / 16000.0:0.0} s: leer/Rauschen verworfen ({text})"); return; }   // [BLANK_AUDIO], noise
         lock (TowerLock)
         {
             // A26: sender unknown -> match the spoken call sign to a player (otherwise Request(null): "say again your callsign")
@@ -794,7 +801,7 @@ static partial class Program
 
     /// Forum (jojojung, "no log entries at all"): orders to the AI wingmen are spoken on the flight's own frequency (the group's frequency in the mission editor, where DCS
     /// voices the wingmen), which no controller has, so nobody listened there. Monitored now, for wingman orders only; a controller frequency stays what it is (other).
-    /// ponytail: AM only like every monitored frequency (Srs.cs); an FM flight frequency needs the modulation from the mission.
+    /// ponytail: AM except the FM bands via ModFor (30-88, 156-174 MHz, Srs.cs); an FM flight frequency outside them still needs the modulation from the mission.
     static double[] WingFq = Array.Empty<double>();
     internal static double[] WingFreqs(Pilot? host, IReadOnlyCollection<double> other) => host is not { Gid: > 0 } h ? Array.Empty<double>()
         : Flights.Units.Values.Where(u => u.Gid == h.Gid && u.Freq > 0).Select(u => u.Freq).Distinct().Where(f => !other.Any(o => Math.Abs(o - f) < 0.005)).ToArray();
