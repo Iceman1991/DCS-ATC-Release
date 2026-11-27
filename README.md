@@ -1,10 +1,10 @@
-# DCS-ATC (Alpha)
+# DCS-ATC (Beta)
 
 [![Downloads](https://img.shields.io/github/downloads/Iceman1991/DCS-ATC-Release/total?label=Downloads&color=2ea44f)](https://github.com/Iceman1991/DCS-ATC-Release/releases) [![Latest release](https://img.shields.io/github/v/release/Iceman1991/DCS-ATC-Release?label=Version)](https://github.com/Iceman1991/DCS-ATC-Release/releases/latest) [![License](https://img.shields.io/badge/License-GPL--3.0-blue)](LICENSE)
 
-Voice ATC for DCS World. You talk to Ground, Tower, Approach, ATIS, AWACS, tankers and JTACs over SRS in English and they answer with their own voices. By default Whisper recognises speech on your PC, and Piper generates the voices locally. If you set `AsrApiUrl`, DCS-ATC sends radio audio from the monitored frequencies to that service. The app also checks GitHub for updates at startup unless you turn off `UpdateCheck`. Works on any map in any mission, single player and multiplayer (host or dedicated server). So far only tested on Caucasus.
+Voice ATC for DCS World. You talk to Ground, Tower, Approach, ATIS, AWACS, tankers and JTACs over SRS in English and they answer with their own voices. By default Whisper recognises speech on your PC, and Piper generates the voices locally. If you set `AsrApiUrl`, DCS-ATC sends radio audio from the monitored frequencies to that service. The app also checks GitHub for updates at startup unless you turn off `UpdateCheck`. Works on any map in any mission, single player and multiplayer (host or dedicated server). Tested most on Caucasus, Afghanistan and Nevada.
 
-**Alpha:** early test version. Expect bugs (wrong or double calls, odd headings, hangs). Use at your own risk. Feedback and logs are welcome.
+**Beta:** the main features are done, bugs are still possible. Use at your own risk. Feedback and logs are welcome.
 
 The goal is to replace the built-in DCS radio (airfield ATC, AWACS, tankers, Supercarrier) with controllers you can actually talk to.
 
