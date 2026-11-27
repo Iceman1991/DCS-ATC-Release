@@ -61,7 +61,7 @@ public partial class Tower
                     var wd = New(At(f.X, f.Z, 0, e.Hdg), Phase.ClearedTakeoff);
                     wd.exitDir = x;
                     var td = wd.TakeoffClearance(At(e.ThrX, e.ThrZ, 0, e.Hdg), none);
-                    Chk(td.Contains($"exit via C R P {x}") && td.Contains($"not above {Alt(f.MaxFt)} until leaving the control zone") &&
+                    Chk(td.Contains($"exit via C R P {x}") && td.Contains($"not above {AltNum(f.MaxFt)} until leaving the control zone") &&
                         (!f.ExitNote.TryGetValue((rw, x), out var note) || td.Contains(SayChart(note))), $"{f.Name} {rw} Ausflug {x}: {td}");
                     n++;
                 }
@@ -98,7 +98,7 @@ public partial class Tower
             var tb = wb.TakeoffClearance(At(bat, bat.X, bat.Z, 0, 130), none);
             Chk(rk.Count == 1 && rk[0].Text.Contains("proceed to initial runway zero seven, 1500 feet") && wk.entry == "black sea", "Kobuleti black sea: " + J(rk));
             Chk(rn.Count == 1 && rn[0].Text.Contains("C R P north-east is not available for runway zero seven. Enter via C R P ") && !rn[0].Text.Contains("Enter via C R P north-east"), "Kobuleti north east (nur Ausflug): " + J(rn));
-            Chk(tb.Contains("after departure exit via C R P north, then three five four to the C R P, not above 3000 feet until leaving the control zone"), "Batumi 13 Ausflug north: " + tb);
+            Chk(tb.Contains("after departure exit via C R P north, then three five four to the C R P, not above 3000 until leaving the control zone"), "Batumi 13 Ausflug north: " + tb);
             n += 3;
         }
 
@@ -204,7 +204,7 @@ public partial class Tower
             var w = Fly(x);
             var r1 = w.OnTranscript("Kutaisi Approach, Enfield 11, inbound via mint", At(x), none, s);
             bool clr = r1.Count == 1 && r1[0].Role == "Approach" && r1[0].Text.Contains("cleared Mintt recovery runway two five, proceed direct Mintt") &&
-                       r1[0].Text.Contains("cross Mintt at or above 15000 feet, Gass Peak at or above 9000 feet, report Craig.") && w.navName == "Mintt";
+                       r1[0].Text.Contains("cross Mintt at or above 15000, Gass Peak at or above 9000, report Craig.") && w.navName == "Mintt";
             var (seen, msgs) = (new List<string> { w.navName }, new List<Msg>());
             for (; w.Phase == Phase.Inbound && x > c.X; x -= 385) { msgs.AddRange(w.Tick(At(x), none, s += 5)); if (seen[^1] != w.navName) seen.Add(w.navName); }
             var ho = msgs.FirstOrDefault(m => m.Role == "Approach");
@@ -257,7 +257,7 @@ public partial class Tower
             var rz = Hold().OnTranscript("Kutaisi Tower, Enfield 11, ready for departure, zulu departure", G0(), none, 10);
             var w = Hold(); w.Squawk = "4321";
             var r1 = w.OnTranscript("Kutaisi Tower, Enfield 11, ready for departure, tiki departure", G0(), none, 10);
-            bool clr = r1.Any(m => m.Text.Contains("after departure Tiki departure, proceed direct Alpha, cross Alpha at or below 3000 feet, Bravo at or above 6000 feet, then own navigation")) && w.navName == "Alpha";
+            bool clr = r1.Any(m => m.Text.Contains("after departure Tiki departure, proceed direct Alpha, cross Alpha at or below 3000, Bravo at or above 6000, then own navigation")) && w.navName == "Alpha";
             var seen = new List<string> { w.navName };
             double s = 12;
             var (start, msgs, ci) = (e.At(-e.Len, 0), new List<Msg>(), new List<Msg>());
@@ -336,13 +336,13 @@ public partial class Tower
             var rr3 = Hold().OnTranscript("Kutaisi Ground, Enfield 11, request clearance to Dogbone Range", G0(), none, 10);
             Ops.Ranges = rgSv;
             Chk(rr1.Any(m => m.Text.Contains("cleared to Three Lakes Range via the Tiki departure") && !m.Text.Contains("airport"))
-                && rr2.Any(m => m.Text.Contains("cleared to Three Lakes Range via radar vectors") && !m.Text.Contains("airport") && !m.Text.Contains("expect 14000 feet") && !m.Text.Contains("expect 15000 feet"))
+                && rr2.Any(m => m.Text.Contains("cleared to Three Lakes Range via radar vectors") && !m.Text.Contains("airport") && !m.Text.Contains("expect 14000") && !m.Text.Contains("expect 15000"))
                 && rr3.Any(m => m.Text.Contains("cleared to R-62A Dogbone Range via radar vectors")),
                 "#61: Clearance zu einer Range: " + J(rr1) + " / " + J(rr2) + " / " + J(rr3));
             // #31 (log Nellis): takeoff clearance after the IFR clearance names the departure only (no second list of fixes); VFR keeps the long form
             var rt = wc.OnTranscript("Kutaisi Tower, Enfield 11, ready for departure", G0(), none, 20);
             Chk(rt.Any(m => m.Text.Contains("after departure fly the Tiki departure, runway") && m.Text.Contains("cleared for takeoff") && !m.Text.Contains("cross")) && wc.navName == "Alpha"
-                && r1.Any(m => m.Text.Contains("proceed direct Alpha, cross Alpha at or below 3000 feet")),
+                && r1.Any(m => m.Text.Contains("proceed direct Alpha, cross Alpha at or below 3000")),
                 "#31 Takeoff-Freigabe nach Clearance kurz: " + J(rt));
             // #31: departure with a higher "at or above" fix: cleared altitude raised to the next 1000 ft, no "expect" below it, Departure says the same
             k.Departures["HIGH"] = new("HIGH", new[] { "25" }, "", new[] { ("ALPHA", pa.X, pa.Z, 4000.0, "at or above", 0.0), ("BRAVO", pb.X, pb.Z, 19200.0, "at or above", 0.0), ("CHARLIE", pb.X, pb.Z, 25000.0, "at or below", 0.0) });
@@ -361,7 +361,7 @@ public partial class Tower
                 var rm = Hold().OnTranscript("Kutaisi Ground, Enfield 11, request clearance, mute departure", G0(), none, 10);
                 var rmt = Hold().OnTranscript("Kutaisi Tower, Enfield 11, ready for departure, mute departure", G0(), none, 10);
                 Chk(rg.Any(m => m.Text.Contains("cleared to Bravo via the Zebra departure")) && !rg.Any(m => m.Text.Contains("Arc") || m.Text.Contains("ARC"))
-                    && rv.Any(m => m.Text.Contains("proceed direct Alpha, cross Bravo at or above 12000 feet, then own navigation")) && !rv.Any(m => m.Text.Contains("Arc") || m.Text.Contains("8000")),
+                    && rv.Any(m => m.Text.Contains("proceed direct Alpha, cross Bravo at or above 12000, then own navigation")) && !rv.Any(m => m.Text.Contains("Arc") || m.Text.Contains("8000")),
                     "#57 stiller Punkt nicht angesagt: " + J(rg) + " / " + J(rv));
                 Chk(rm.Any(m => m.Text.Contains("after departure fly the Mute departure")) && !rm.Any(m => m.Text.Contains("Two")) && rmt.Any(m => m.Text.Contains("after departure fly the Mute departure"))
                     && !rmt.Any(m => m.Text.Contains("proceed direct") || m.Text.Contains("Two")), "#57 nur stille Punkte: " + J(rm) + " / " + J(rmt));
@@ -491,7 +491,7 @@ public partial class Tower
                 var wkr = T(kr, "22", kr.Ramps[0], Phase.Away);
                 wkr.exitDir = "abinsk";
                 var tk = wkr.TakeoffClearance(G(kr, "22", (kr.X, kr.Z)), none);
-                Chk(tk.Contains("after departure exit via C R P abinsk, then zero four five, stay exactly on track, restricted area UR-R one five two, not above 2100 feet"), "Krymsk 22 Abinsk: " + tk);
+                Chk(tk.Contains("after departure exit via C R P abinsk, then zero four five, stay exactly on track, restricted area UR-R one five two, not above 2100"), "Krymsk 22 Abinsk: " + tk);
                 var sh = so.Ramps.First(q => q.Name == "SHELTERS");
                 var rs = T(so, "06", sh, Phase.Parked).OnTranscript(so.StationOf("Ground") + ", Enfield 11, request taxi", G(so, "06", (sh.X, sh.Z)), none, 5);
                 var r24 = T(so, "24", sh, Phase.Parked).OnTranscript(so.StationOf("Ground") + ", Enfield 11, request taxi", G(so, "24", (sh.X, sh.Z)), none, 5);

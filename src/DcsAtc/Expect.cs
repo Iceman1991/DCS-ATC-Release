@@ -205,7 +205,7 @@ static partial class Program
         flow = null;
         foreach (var (tx, want) in new[]
                  {
-                     ("Colt three two, I show you going around, confirm? Climb and maintain 2000 feet, join left hand downwind runway two five, report base.", "goaround"),   // #7
+                     ("Colt three two, I show you going around, confirm? Climb and maintain 2000, join left hand downwind runway two five, report base.", "goaround"),   // #7
                      ("Colt three two, report base.", "pattern"), ("Colt three two, negative, I show you on downwind, number one, report base.", "pattern"), ("Colt three two, report final.", "final"), ("Colt three two, report overhead.", "overhead"),   // #4/#2, Review l1: base in downwind
                      ("Colt three two, Kutaisi Approach, proceed to C R P north, report C R P north.", "crp"), ("Colt three two, report high key.", "highkey"), ("Colt three two, report low key.", "lowkey"),   // #3, R204
                  })

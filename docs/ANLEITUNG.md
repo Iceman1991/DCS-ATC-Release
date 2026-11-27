@@ -244,7 +244,7 @@ Tower: Enfield one one, runway two five, wind …, cleared to land.
 - **Andere Optionen.** Statt „full stop“ geht „touch and go“, „low approach“ oder „the option“ (Funkrad → Tower → „Base, touch and go“). Mit „then departure“ („final, low approach, then departure to the north“) geht es danach zu Departure statt in die nächste Runde. Aus der Platzrunde: „request departure“ (Funkrad → Tower → Closed / SFO → „Request departure“).
 - **Durchstarten.** Startest du durch, sag „going around“.
 
-Base oder Final musst du selbst melden; ohne diese Meldung gibt Tower nie eine Landefreigabe. Meldest du nicht, fragt Tower bei etwa 2,5 NM (oder im Queranflug) einmal nach: „Enfield one one, report final.“ Hast du innerhalb 0,8 NM oder unter 300 ft immer noch keine Landefreigabe, wirst du zum Durchstarten geschickt: „go around, no landing clearance, climb and maintain 2000 feet, join left hand downwind runway two five, report base.“ Das ist auch ein Verstoß im Debriefing.
+Base oder Final musst du selbst melden; ohne diese Meldung gibt Tower nie eine Landefreigabe. Meldest du nicht, fragt Tower bei etwa 2,5 NM (oder im Queranflug) einmal nach: „Enfield one one, report final.“ Hast du innerhalb 0,8 NM oder unter 300 ft immer noch keine Landefreigabe, wirst du zum Durchstarten geschickt: „go around, no landing clearance, climb and maintain 2000, join left hand downwind runway two five, report base.“ Das ist auch ein Verstoß im Debriefing.
 
 **9. Nach der Landung (Tower, dann Ground).** Tower sagt dir, wo du abrollst, etwa „Vacate left via Whiskey. Report vacated.“ Dann Ground rufen:
 
@@ -904,7 +904,7 @@ Als Anlassanfrage zählen: „request startup“, „start up“, „request eng
 #### IFR-Freigabe
 
 > **Du:** Kutaisi Ground, Enfield 1-1, request IFR clearance to Batumi.  
-> **Ground:** Enfield one one, Kutaisi Ground, cleared to Batumi airport via radar vectors, after departure fly runway heading, climb and maintain 3000 feet, expect flight level one five zero ten minutes after departure, departure Kutaisi Approach, squawk four two one six.  
+> **Ground:** Enfield one one, Kutaisi Ground, cleared to Batumi airport via radar vectors, after departure fly runway heading, climb and maintain 3000, expect flight level one five zero ten minutes after departure, departure Kutaisi Approach, squawk four two one six.  
 > **Du:** Cleared to Batumi, runway heading, 3000 feet, squawk 4216, Enfield 1-1.  
 > **Ground:** Enfield one one, readback correct.
 
@@ -961,7 +961,7 @@ Als Anlassanfrage zählen: „request startup“, „start up“, „request eng
 #### Startbereit
 
 > **Du:** Kutaisi Tower, Enfield 1-1, holding short runway 25, ready for departure.  
-> **Tower:** Enfield one one, after departure exit via C R P west, not above 2200 feet until leaving the control zone, runway two five, wind two four zero degrees, eight knots, cleared for takeoff.
+> **Tower:** Enfield one one, after departure exit via C R P west, not above 2200 until leaving the control zone, runway two five, wind two four zero degrees, eight knots, cleared for takeoff.
 
 Du kannst „ready“, „ready for departure“, „holding short“ oder „holding point“ sagen. Du musst innerhalb von 700 m vor der Schwelle oder auf einer Bahn sein.
 
@@ -969,12 +969,12 @@ Du kannst „ready“, „ready for departure“, „holding short“ oder „ho
 
 | Dein Plan | Teil nach dem Start |
 |---|---|
-| VFR, Platz mit Karte | „exit via C R P west, not above 2200 feet until leaving the control zone“. Der CRP ist der, den du genannt hast; ohne Angabe nimmt der Tower den Standard-CRP der Bahn (Kutaisi: Bahn 25 → West, 07 → Ost). Hinweise der Karte kommen dazu, etwa „stay exactly on track, restricted area UR-R one five two“ beim Ausflug Abinsk in Krymsk |
+| VFR, Platz mit Karte | „exit via C R P west, not above 2200 until leaving the control zone“. Der CRP ist der, den du genannt hast; ohne Angabe nimmt der Tower den Standard-CRP der Bahn (Kutaisi: Bahn 25 → West, 07 → Ost). Hinweise der Karte kommen dazu, etwa „stay exactly on track, restricted area UR-R one five two“ beim Ausflug Abinsk in Krymsk |
 | VFR mit Richtung, andere Plätze („request taxi, departure north“) | „leave the control zone northbound, not above …“ |
 | VFR ohne Richtung, andere Plätze | „own navigation, not above … until leaving the control zone“ |
-| IFR-Freigabe | „fly runway heading, climb and maintain 3000 feet“ |
+| IFR-Freigabe | „fly runway heading, climb and maintain 3000“ |
 | Platzrunde („ready for departure, closed pattern“) | „runway two five, wind …, cleared for takeoff, left closed traffic approved, report base.“ |
-| Übungsanflüge bei Instrumentenwetter („ready for departure, practice approach“) | „after departure fly runway heading, climb and maintain 3000 feet, …, cleared for takeoff“, nach dem Abheben „contact Approach“, nach „airborne, climbing“ Radarführung. Reines „closed pattern“: „closed traffic not approved, I F R conditions.“ |
+| Übungsanflüge bei Instrumentenwetter („ready for departure, practice approach“) | „after departure fly runway heading, climb and maintain 3000, …, cleared for takeoff“, nach dem Abheben „contact Approach“, nach „airborne, climbing“ Radarführung. Reines „closed pattern“: „closed traffic not approved, I F R conditions.“ |
 
 **Wenn Tower dich warten lässt**
 
@@ -1038,7 +1038,7 @@ Bei etwa 500 ft über dem Platz übergibt Tower an Departure (Approach oder die 
 
 Approach führt dich zum **Initial**: etwa 2 NM (4000 m) vor der Schwelle auf der verlängerten Mittellinie, in Platzrundenhöhe. Die Platzrundenhöhe ist Platzhöhe plus 1500 ft, auf 100 ft gerundet; in Kutaisi 2000 ft. Dann übergibt Approach an Tower:
 
-> **Approach:** Enfield one one, turn left heading two five zero, on course, 6 miles from initial, maintain 2000 feet, contact Kutaisi Tower, report initial for overhead break.  
+> **Approach:** Enfield one one, turn left heading two five zero, on course, 6 miles from initial, maintain 2000, contact Kutaisi Tower, report initial for overhead break.  
 > **Du:** Kutaisi Tower, Enfield 1-1, initial runway 25.  
 > **Tower:** Enfield one one, runway two five, cleared break left hand. Report final.  
 > **Du:** Enfield 1-1, base, gear down, full stop.  
@@ -1069,13 +1069,13 @@ Approach führt dich zum **Initial**: etwa 2 NM (4000 m) vor der Schwelle auf de
 #### Geradeaus-Anflug
 
 > **Du:** Kutaisi Approach, Enfield 1-1, request straight in.  
-> **Approach:** Enfield one one, Kutaisi Approach, straight in approach runway two five approved, QNH one zero one three. Fly heading two four zero for six mile final. Maintain 2500 feet. Contact Kutaisi Tower.  
+> **Approach:** Enfield one one, Kutaisi Approach, straight in approach runway two five approved, QNH one zero one three. Fly heading two four zero for six mile final. Maintain 2500. Contact Kutaisi Tower.  
 > **Du:** Kutaisi Tower, Enfield 1-1, four miles final, gear down.  
 > **Tower:** Enfield one one, runway two five, wind …, cleared to land.
 
 - **Führung:** innerhalb 8 NM, bei freiem Gelände und von der Anflugseite direkt auf einen 6-NM-Endanflug. Sonst Radarführung zum Endanflug, auch wenn du hinter oder neben der Bahn bist (etwa direkt nach dem Start): Approach behält dich dann, bis du im Endanflug bist, und übergibt dort an Tower.
 - **Höhe:** auf oder unter dem Gleitweg, aber nie unter der Geländefreiheit.
-- **ILS-Bahnen:** „maintain 2500 feet until established, cleared ILS approach runway two five, localizer …“
+- **ILS-Bahnen:** „maintain 2500 until established, cleared ILS approach runway two five, localizer …“
 - **„initial“ im Geradeaus-Anflug** bekommt „make straight in runway two five, report four miles final.“
 
 #### Platzrundentraining
@@ -1085,7 +1085,7 @@ Approach führt dich zum **Initial**: etwa 2 NM (4000 m) vor der Schwelle auf de
 | „touch and go“, „closed pattern“, „pattern work“, „circuits“, „practice“ (allein oder mit „ready“ bzw. „inbound“) | Touch-and-go-Runden: „cleared touch and go, left closed traffic approved, report base.“ Du gehst direkt wieder in den Gegenanflug; die Runden werden gezählt (Text: Platzrunde 2 (Touch-and-go), beenden mit Tower → final, full stop) |
 | „low approach“, „practice approach“, „practice ILS/TACAN/VOR/instrument“ | „cleared low approach“. Nach IFR- oder Geradeaus-Übung gibt Approach sofort neue Führung |
 | „the option“ | „cleared for the option“: Touch-and-go oder Full Stop, nach deiner Wahl |
-| „low pass“, „fly by“ | „cleared low pass, not below 500 feet, after the pass climb runway heading 3000 feet“. Danach keine Platzrunde. Von außerhalb der Platzrunde: „report five miles final runway two five“ |
+| „low pass“, „fly by“ | „cleared low pass, not below 500, after the pass fly runway heading, climb and maintain 3000“. Danach keine Platzrunde. Von außerhalb der Platzrunde: „report five miles final runway two five“ |
 | „full stop“ | Beendet das Training; der nächste Anflug ist eine Landung |
 
 #### Landefreigabe und Reihenfolge
@@ -1104,10 +1104,10 @@ Approach führt dich zum **Initial**: etwa 2 NM (4000 m) vor der Schwelle auf de
 
 | Lage | Lotse |
 |---|---|
-| Du: „going around“ / „go around“ (VFR) | „roger, climb and maintain 2000 feet, join left hand downwind runway two five, report base.“ (mit Platzrunden-Wunsch: „roger, left closed traffic approved, report base.“) |
-| Du: „going around“ / „missed approach“ (IFR oder geradeaus) | „roger, go around. Fly runway heading, climb and maintain 3000 feet, contact Kutaisi Approach.“ (siehe Fehlanflug unten) |
-| Bahn blockiert oder MAYDAY-Verkehr innerhalb 4 NM, und du bist innerhalb 0,8 NM | „go around, I say again, go around, traffic on runway, climb and maintain 2000 feet, join left hand downwind runway two five, report base.“ |
-| Durchstarten ohne Meldung mit Landefreigabe (300 m hinter der Schwelle, noch über 200 ft) | „I show you going around, confirm? Climb and maintain 2000 feet, join left hand downwind runway two five, report base.“ Die Landefreigabe ist aufgehoben, dazu ein Verstoß. IFR oder geradeaus: dieselbe Frage, dann der Fehlanflug. |
+| Du: „going around“ / „go around“ (VFR) | „roger, climb and maintain 2000, join left hand downwind runway two five, report base.“ (mit Platzrunden-Wunsch: „roger, left closed traffic approved, report base.“) |
+| Du: „going around“ / „missed approach“ (IFR oder geradeaus) | „roger, go around. Fly runway heading, climb and maintain 3000, contact Kutaisi Approach.“ (siehe Fehlanflug unten) |
+| Bahn blockiert oder MAYDAY-Verkehr innerhalb 4 NM, und du bist innerhalb 0,8 NM | „go around, I say again, go around, traffic on runway, climb and maintain 2000, join left hand downwind runway two five, report base.“ |
+| Durchstarten ohne Meldung mit Landefreigabe (300 m hinter der Schwelle, noch über 200 ft) | „I show you going around, confirm? Climb and maintain 2000, join left hand downwind runway two five, report base.“ Die Landefreigabe ist aufgehoben, dazu ein Verstoß. IFR oder geradeaus: dieselbe Frage, dann der Fehlanflug. |
 | Landung, nachdem Tower dich durchstarten ließ, oder ohne Freigabe | Verstoß im Debriefing |
 
 „Go around“ wird nur während eines Anflugs auf diesen Platz angenommen. Sonst kommt „say intentions.“
@@ -1117,7 +1117,7 @@ Approach führt dich zum **Initial**: etwa 2 NM (4000 m) vor der Schwelle auf de
 #### Check-in und Radarführung
 
 > **Du:** Kutaisi Approach, Enfield 1-1, 25 miles west, 8000 feet, inbound for landing, information Alpha.  
-> **Approach:** Enfield one one, Kutaisi Approach, identified, 25 miles west. Runway two five in use, wind two four zero degrees, eight knots, QNH one zero one three. Expect vectors to initial runway two five for overhead break. Turn left heading zero nine zero, 20 miles from initial, descend and maintain 5000 feet, speed 300 knots, downwind.
+> **Approach:** Enfield one one, Kutaisi Approach, identified, 25 miles west. Runway two five in use, wind two four zero degrees, eight knots, QNH one zero one three. Expect vectors to initial runway two five for overhead break. Turn left heading zero nine zero, 20 miles from initial, descend and maintain 5000, speed 300 knots, downwind.
 
 - **Check-in-Sprüche:** „inbound“, „landing“, „recovery“, „rejoin“, „full stop“, „with you“ oder Station und Rufzeichen.
 - **Innerhalb 4 NM um den Platz** antwortet stattdessen Tower: „runway two five, wind …, QNH …. Join left hand downwind, 2000 feet, report final.“
@@ -1126,17 +1126,17 @@ Approach führt dich zum **Initial**: etwa 2 NM (4000 m) vor der Schwelle auf de
   - Geradeaus oder IFR: auf den Endanflugkurs, mit Gate bei 10, 8, 6 oder 4 NM.
 - **Gelände:** der Plan nutzt die Geländekarte und sinkt dich nie unter die Mindestführungshöhe: Gelände plus 1000 ft, im Gebirge plus 2000 ft. Blockiert Gelände die aktive Bahn, kann der Plan die Gegenbahn (bis 10 kt Rückenwind) oder ein Circling nehmen: „Due to terrain, expect …“.
 - **Wann Approach spricht:** jeder Spruch gibt einen Kurs. Entfernung, Höhe, Fahrt und Abschnitt nur, wenn sie sich ändern. Sinkflüge kommen stufenweise entlang eines 2,5°-Profils. Ändert sich die Reihenfolge, sagt Approach „No traffic ahead, you are number one“ oder „You are number 2, 1 aircraft ahead“.
-- **Übergabe an Tower:** erst kurz vor dem Gate (bis 2 NM davor, höchstens 1000 ft über der Gate-Höhe) bzw. spätestens am Gate. Bist du schon weiter draußen auf der Mittellinie, behält dich Approach, gibt den Sinkflug weiter nach Profil („descend and maintain 4000 feet“, die Gate-Höhe erst, wenn das Profil an deiner Position dort ist) und übergibt nahe am Gate. Auf der Mittellinie bekommt VFR-Verkehr „on course, 6 miles from initial, maintain 2000 feet, contact Kutaisi Tower, report initial for overhead break.“ IFR-Verkehr bekommt die Anflugfreigabe (unten).
+- **Übergabe an Tower:** erst kurz vor dem Gate (bis 2 NM davor, höchstens 1000 ft über der Gate-Höhe) bzw. spätestens am Gate. Bist du schon weiter draußen auf der Mittellinie, behält dich Approach, gibt den Sinkflug weiter nach Profil („descend and maintain 4000“, die Gate-Höhe erst, wenn das Profil an deiner Position dort ist) und übergibt nahe am Gate. Auf der Mittellinie bekommt VFR-Verkehr „on course, 6 miles from initial, maintain 2000, contact Kutaisi Tower, report initial for overhead break.“ IFR-Verkehr bekommt die Anflugfreigabe (unten).
 - **CRPs:** Welche CRPs je Bahn gelten, steht in der Karte des Platzes (Kneeboard „ATC-3b-Platzrunden“). In Kutaisi gehen North und South immer, West nur für Bahn 07, East nur für Bahn 25. Fliegst du selbst einen an, melde ihn („C R P south“, auch mehrere Wörter wie „C R P black sea“). Approach schickt dich dann zum Initial oder Overhead und übergibt an Tower, etwa zwei Minuten vor dem CRP. Ein nicht erlaubter CRP bekommt „negative, C R P east is not available for runway zero seven. Enter via C R P …“. CRPs, die nur für den Ausflug gelten (etwa Abinsk bei Krymsk), werden beim Einflug nicht angenommen. In Anapa heißt der Einflug-CRP im Süden „south“, der Ausflug „exit south“. Plätze ohne Karte und andere Karten haben keine CRPs: „negative, no reporting points at Senaki Kolkhi“, dann Führung.
 
 #### Höhen- und Fahrtanweisungen
 
 - **Höhe:** „descend and maintain …“, „climb and maintain …“ oder „maintain …“ für die gleiche Höhe. Alle Höhen sind Höhenmesseranzeige mit dem QNH des Platzes.
-- **Fahrt:** nur innerhalb 25 NM.
+- **Fahrt:** nur innerhalb 25 NM, weiter draußen nur für die 250 kt unter 10.000 ft (mit der Sinkfreigabe genannt).
 
   | Flugzeug | Fahrt |
   |---|---|
-  | Jets | VFR 300 kt. Geradeaus nach Reststrecke: 300 kt, unter 20 NM 250 kt, unter 10 NM 200 kt |
+  | Jets | VFR 300 kt. Geradeaus nach Reststrecke: 300 kt, unter 20 NM 250 kt, unter 10 NM 200 kt. Höchstens 250 kt unter 10.000 ft |
   | Propeller und Warbirds | 200 / 170 / 140 kt |
   | A-10, L-39, C-101 | 250 / 200 / 160 kt |
   | Hubschrauber | Keine Fahrtvorgaben |
@@ -1165,7 +1165,7 @@ Approach führt dich zum **Initial**: etwa 2 NM (4000 m) vor der Schwelle auf de
 |---|---|
 | „request direct“ | Nur, wenn du Nummer eins bist, das Gelände frei ist und du nicht zu hoch bist: „direct approved, turn left heading …“. Sonst „unable, …“ |
 | „request heading 270“ unter Führung | „unable, …“ (Führung läuft weiter) |
-| „request higher“ / „request lower“ / „request 6000 feet“ / „request flight level 200“ | „climb/descend and maintain …“. Höher unter Radarführung: weit draußen (mehr als 25 NM Weg bis zum Gate) in einem Block genehmigt – bist du schon darüber, deine jetzige Höhe („maintain 14000 feet“), sonst bis FL200 (Props 10 000 ft), aber nur so hoch, dass du das Gate noch auf dem normalen Profil erreichst; die Höhe bleibt, bis das Profil den Sinkflug braucht, der kommt dann als „descend at pilot's discretion, maintain …“. Näher dran: „unable higher, expect lower shortly, maintain …“ (Verkehr: „unable higher, traffic, maintain …“); auf „höher“ kommt nie „descend“. „request descent at pilot's discretion“: „descend at pilot's discretion, maintain …“ (bis 1000 ft über die Gate-Höhe); bis 10 NM vor dem Gate sinkst du, wann du willst, ohne Mahnung. Oder „unable, minimum altitude …“ / „unable, traffic“. Im Holding: „unable, maintain … in the hold, I will call you.“ Nach der Übergabe an Tower: „negative, continue as cleared.“ |
+| „request higher“ / „request lower“ / „request 6000 feet“ / „request flight level 200“ | „climb/descend and maintain …“. Höher unter Radarführung: weit draußen (mehr als 25 NM Weg bis zum Gate) in einem Block genehmigt – bist du schon darüber, deine jetzige Höhe („maintain 14000“), sonst bis FL200 (Props 10 000 ft), aber nur so hoch, dass du das Gate noch auf dem normalen Profil erreichst; die Höhe bleibt, bis das Profil den Sinkflug braucht, der kommt dann als „descend at pilot's discretion, maintain …“. Näher dran: „unable higher, expect lower shortly, maintain …“ (Verkehr: „unable higher, traffic, maintain …“); auf „höher“ kommt nie „descend“. „request descent at pilot's discretion“: „descend at pilot's discretion, maintain …“ (bis 1000 ft über die Gate-Höhe); bis 10 NM vor dem Gate sinkst du, wann du willst, ohne Mahnung. Oder „unable, minimum altitude …“ / „unable, traffic“. Im Holding: „unable, maintain … in the hold, I will call you.“ Nach der Übergabe an Tower: „negative, continue as cleared.“ |
 | „request runway 07“ | „runway zero seven approved.“ Der Plan wird neu gebaut |
 | „VFR“, „cancel IFR“, „visual recovery“ (VFR-Wetter) | „roger“ (mit „cancel IFR“: „roger, I F R cancelled“), dann „Expect vectors to initial …“ |
 | „request straight in“ unter Führung | „roger, straight in approach approved.“ Der Plan wird neu gebaut |
@@ -1174,7 +1174,7 @@ Approach führt dich zum **Initial**: etwa 2 NM (4000 m) vor der Schwelle auf de
 
 **ILS** (die Bahn hat in den Kartendaten einen Localizer):
 
-> **Approach:** Enfield one one, 12 miles from touchdown, maintain 3000 feet until established, cleared ILS approach runway two five, QNH one zero one three, contact Kutaisi Tower.
+> **Approach:** Enfield one one, 12 miles from touchdown, maintain 3000 until established, cleared ILS approach runway two five, QNH one zero one three, contact Kutaisi Tower.
 
 - **Die Freigabe kommt mit der letzten Kurve zur Mittellinie** (ILS und PAR). Die Kurve ist höchstens 30° und trifft die Mittellinie mindestens 2 NM vor dem Gate. Näher am Gate gilt höchstens 20°, und nur bei einer Wolkenuntergrenze mindestens 500 ft über der Mindestführungshöhe und 3 Meilen Sicht. Bist du schon nahe der Mittellinie, bekommst du eine Kurve von 10 bis 30° darauf, nie einen Parallelkurs.
 
@@ -1220,22 +1220,22 @@ Approach schickt dich ins Holding, wenn eines davon zutrifft:
 - Spieler kommen hintereinander und du bist nicht der nächste.
 - Ein anderes Flugzeug hat MAYDAY erklärt.
 
-> **Approach:** Enfield one one, Kutaisi Approach, identified, 30 miles west. Runway two five in use, … Fly heading zero eight five, descend and maintain 5000 feet, speed 230 knots, hold on the two six zero radial, 15 DME, 14 miles to go, I will call you there. Expected approach time three five, you are number 3.  
-> *(am Fix)* **Approach:** Enfield one one, hold on the two six zero radial, 15 DME, orbit left hand, maintain 5000 feet, speed 230 knots.  
+> **Approach:** Enfield one one, Kutaisi Approach, identified, 30 miles west. Runway two five in use, … Fly heading zero eight five, descend and maintain 5000, speed 230 knots, hold on the two six zero radial, 15 DME, 14 miles to go, I will call you there. Expected approach time three five, you are number 3.  
+> *(am Fix)* **Approach:** Enfield one one, hold on the two six zero radial, 15 DME, orbit left hand, maintain 5000, speed 230 knots.  
 > *(später)* **Approach:** Enfield one one, leave the hold, turn right heading …
 
 - **Holding-Fix:** 15 NM vom Platz, abseits von End- und Abflugweg, mit niedrigem Gelände. Als TACAN-Radial/DME, wenn der Platz TACAN hat. Sonst „hold at present position“ oder „… miles to the holding point“.
-- **Höhe:** die unterste Stufe ist die Zonengrenze, auf volle 1000 ft aufgerundet, plus 1000 ft je Platz in der Reihenfolge. Zwei Flugzeuge nahe beieinander bekommen nie dieselbe Höhe. Verlassen Vordermänner das Holding, wirst du herabgestuft: „maintain 4000 feet, you are number 2.“
+- **Höhe:** die unterste Stufe ist die Zonengrenze, auf volle 1000 ft aufgerundet, plus 1000 ft je Platz in der Reihenfolge. Zwei Flugzeuge nahe beieinander bekommen nie dieselbe Höhe. Verlassen Vordermänner das Holding, wirst du herabgestuft: „maintain 4000, you are number 2.“
 - **Fahrt:** 230 kt, Propeller 200 kt, Hubschrauber keine.
 - **Erwartete Anflugzeit:** einmal als Minute der Missionsuhr („expected approach time three five“). Erneut nur bei einer Änderung um 5 min oder mehr („revised expected approach time …“). Ohne Missionsuhr: „expect approach in 6 minutes“.
-- **Prüfungen im Holding:** driftest du ab oder bist mehr als 30 kt neben der Fahrt, kommt eine Kurs- bzw. Fahrterinnerung. Mehr als 500 ft neben der Höhe: „check altitude, maintain 5000 feet.“
+- **Prüfungen im Holding:** driftest du ab oder bist mehr als 30 kt neben der Fahrt, kommt eine Kurs- bzw. Fahrterinnerung. Mehr als 500 ft neben der Höhe: „check altitude, maintain 5000.“
 - **Holding verlassen:** bist du dran, wirst du innerhalb 2 min mit einem Kurs grob Richtung Anflug entlassen.
 
 #### Staffelung
 
 Approach und Departure halten dich von anderem Verkehr fern, Spieler wie KI. Die Teile an einer Stelle:
 
-- **Höhen:** Du bekommst nur eine Höhe, die frei ist: auf dem Weg dorthin kein Verkehr innerhalb 3 NM und 1000 ft und kein Konflikt in den nächsten 60 s. Sonst bleibst du, wo du bist, bis der Verkehr durch ist. Unter Radarführung kommt der nächste Sinkschritt später; auf eine Anfrage hörst du „unable higher, traffic, maintain 5000 feet.“
+- **Höhen:** Du bekommst nur eine Höhe, die frei ist: auf dem Weg dorthin kein Verkehr innerhalb 3 NM und 1000 ft und kein Konflikt in den nächsten 60 s. Sonst bleibst du, wo du bist, bis der Verkehr durch ist. Unter Radarführung kommt der nächste Sinkschritt später; auf eine Anfrage hörst du „unable higher, traffic, maintain 5000.“
 - **Warteschleife:** Der Stapel ist mit 1000 ft je Flugzeug gestaffelt. Die nächsttiefere Höhe bekommst du, wenn der Vordermann sie verlassen hat.
 - **Endanflug:** 3 NM hinter dem Vordermann, 5 NM hinter einem Heavy. Kommst du zu nah: „reduce speed to 170 knots for spacing.“ In der Platzrunde: „extend downwind, number two“, und „go around“, wenn die Bahn nicht rechtzeitig frei ist.
 - **Reihenfolge:** Ab zwei Flugzeugen in der Platzrunde warten Anflüge in der Warteschleife mit erwarteter Anflugzeit.
@@ -1247,7 +1247,7 @@ Approach und Departure halten dich von anderem Verkehr fern, Spieler wie KI. Die
 | Wann | Spruch |
 |---|---|
 | Erstanruf, Radarführung | „Traffic, Viper, 3 miles south of the field, 1500 feet.“ |
-| Konflikt innerhalb 60 s (näher als 1,5 NM und 700 ft) unter Führung oder im Anflug | „traffic alert, traffic 2 o'clock, 3 miles, same altitude. Turn right heading one two zero immediately, climb and maintain 5000 feet.“ Die nächsten 30 s keine anderen Anweisungen. Die Ausweichhöhe gilt nur vorübergehend: danach geht Approach zurück auf deine Vektorhöhe (oder deine aktuelle Höhe, wenn du inzwischen tiefer bist) |
+| Konflikt innerhalb 60 s (näher als 1,5 NM und 700 ft) unter Führung oder im Anflug | „traffic alert, traffic 2 o'clock, 3 miles, same altitude. Turn right heading one two zero immediately, climb and maintain 5000.“ Die nächsten 30 s keine anderen Anweisungen. Die Ausweichhöhe gilt nur vorübergehend: danach geht Approach zurück auf deine Vektorhöhe (oder deine aktuelle Höhe, wenn du inzwischen tiefer bist) |
 | KI-Abflug steigt in deinen Weg | „turn right heading …, traffic 11 o'clock, 4 miles, departing aircraft, climbing through 3000 feet.“ |
 | In der Platzrunde: Verkehr ohne Kontakt zum Tower, innerhalb 30 s näher als 0,5 NM | „traffic 2 o'clock, 1 mile, FA-18C, 1500 feet, no contact with Tower.“ |
 
@@ -1267,12 +1267,12 @@ Einmal je Flug. Mit „terrain in sight“ quittierst du („roger“); danach k
 
 Im IFR- oder Geradeaus-Anflug wird ein Durchstarten in zwei Schritten zum Fehlanflug:
 
-> **Tower:** Enfield one one, roger, go around. Fly runway heading, climb and maintain 3000 feet, contact Kutaisi Approach.  
+> **Tower:** Enfield one one, roger, go around. Fly runway heading, climb and maintain 3000, contact Kutaisi Approach.  
 > **Du:** Kutaisi Approach, Enfield 1-1, missed approach.  
-> **Approach:** Enfield one one, Kutaisi Approach, identified. Turn right heading three four zero, climb and maintain 3000 feet, … Say intentions.
+> **Approach:** Enfield one one, Kutaisi Approach, identified. Turn right heading three four zero, climb and maintain 3000, … Say intentions.
 
 - **Fehlanflughöhe:** Zonengrenze oder Gelände 10 NM voraus, auf volle Tausender gerundet.
-- **Ohne Check-in:** Approach führt dich nicht ohne deinen Check-in. Nach 45 s erinnert Tower: „contact Kutaisi Approach now“. 60 s später: „no contact with Kutaisi Approach, continue runway heading, maintain 3000 feet, contact Kutaisi Approach now“, dazu ein Verstoß. Ein später Check-in bekommt trotzdem noch Führung (siehe [Meldepflicht](#meldepflicht)).
+- **Ohne Check-in:** Approach führt dich nicht ohne deinen Check-in. Nach 45 s erinnert Tower: „contact Kutaisi Approach now“. 60 s später: „no contact with Kutaisi Approach, continue runway heading, maintain 3000, contact Kutaisi Approach now“, dazu ein Verstoß. Ein später Check-in bekommt trotzdem noch Führung (siehe [Meldepflicht](#meldepflicht)).
 - **Übungsanflüge** (Low Approach oder Touch-and-go unter IFR oder geradeaus) gehen ohne „say intentions“ direkt wieder in die Führung. Jeder Anflug wird gezählt (Text: Anflug 2 (Low Approach), beenden mit Approach → full stop).
 
 #### Anflug abbrechen
@@ -1340,13 +1340,13 @@ Das Center ist ein eigenes Modul („Center“ im Setup und im Einstellungsfenst
 #### Zonendurchflug
 
 > **Du:** Kutaisi Approach, Enfield 1-1, 12 miles west, 3000 feet, request zone transit, eastbound.  
-> **Approach:** Enfield one one, Kutaisi Approach, cleared to cross the Kutaisi control zone overhead, eastbound, not below 3500 feet, QNH …, runway two five in use, report clear of the zone.  
+> **Approach:** Enfield one one, Kutaisi Approach, cleared to cross the Kutaisi control zone overhead, eastbound, not below 3500, QNH …, runway two five in use, report clear of the zone.  
 > **Du:** Enfield 1-1, clear of the zone.  
 > **Approach:** Enfield one one, frequency change approved.
 
 - **Sprüche:** „transit“, „crossing“, „cross the …“, „overflight“, „pass through“. Innerhalb 5 NM antwortet Tower.
 - **Durchflughöhe:** 1000 ft über der Platzrunde und über dem Gelände in der Zone, auf 500 ft aufgerundet.
-- **Darunter:** „check altitude, not below 3500 feet, pattern traffic below.“
+- **Darunter:** „check altitude, not below 3500, pattern traffic below.“
 - **Spieler in der Platzrunde** hören: „traffic, Viper crossing overhead eastbound, 3500 feet.“
 - **Voller Platz:** „remain outside the control zone, expect transit in 4 minutes.“
 - **Keine Meldung:** 1 NM hinter dem Zonenrand: „I show you clear of the zone, frequency change approved.“
@@ -1502,7 +1502,7 @@ Ein Fluglehrer fliegt auf dem Bordfunk mit und prüft drei Platzrunden, einen An
 | **Tower-Check-in nach „contact Tower“** („…Tower, Enfield 1-1, initial / overhead / four mile final“) | Nur wenn Tower eine eigene Frequenz hat: nach 60 s oder innerhalb 5 NM vom Platz sagt Approach „contact Kutaisi Tower now, <Frequenz>“ (auf gemeinsamer Frequenz gelten die Aufforderungen oben) | Keine Landefreigabe; es gilt die Regel zur Landemeldung oben |
 | **Durchstarten:** „…, going around“ | „I show you going around, confirm?“ | Landefreigabe aufgehoben, „…, report base“, dazu ein Verstoß |
 | **Departure-Check-in:** „…Departure, Enfield 1-1, airborne, passing 2000“ | 60 s nach der Übergabe oder am Zonenrand, Tower: „contact Kutaisi Approach now“ (eigene Departure-Frequenz: „contact Kutaisi Departure now, <Frequenz>“) | 60 s später: „no contact with Kutaisi Approach, radar service not provided“. IFR: Verstoß. VFR: „…, squawk 7000, frequency change approved“ |
-| **Check-in nach Fehlanflug:** „…Approach, missed approach, climbing 3000“ | Nach 45 s, Tower: „contact Kutaisi Approach now“ | 60 s später: „no contact with Kutaisi Approach, continue runway heading, maintain 3000 feet, …“, keine Führung bis zu deinem Check-in, dazu ein Verstoß |
+| **Check-in nach Fehlanflug:** „…Approach, missed approach, climbing 3000“ | Nach 45 s, Tower: „contact Kutaisi Approach now“ | 60 s später: „no contact with Kutaisi Approach, continue runway heading, maintain 3000, …“, keine Führung bis zu deinem Check-in, dazu ein Verstoß |
 | **Verlassen der Kontrollzone** (nach „report leaving the control zone“): „…, leaving the control zone“ | Am Rand oder am Ausflug-CRP: „report leaving the control zone“ | 1 NM draußen: „I show you clear of the zone, radar service terminated, resume own navigation, squawk 7000, …“, dazu ein Verstoß |
 | **Durchflug beendet:** „…, clear of the zone“ | 0,5 NM draußen: „report clear of the zone“ | 1 NM draußen: „I show you clear of the zone, frequency change approved“, dazu ein Verstoß |
 | **Rollen zum Parkplatz:** „…Ground, runway vacated, request taxi to parking“ | „contact Kutaisi Ground“ (30 s nach dem Abrollen) | Schneller als 5 kt und mehr als 150 m von der Bahn ohne Freigabe: „hold position, you are not cleared to taxi. Request taxi.“, dazu ein Verstoß |

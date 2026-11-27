@@ -57,7 +57,7 @@ public partial class Tower
         if (stayPattern && Ifr)   // R253: practice approaches in IMC as radar pattern (FAA JO 7110.65 4-8-11): runway heading and altitude, after liftoff "contact Approach" (tick), vectors after check-in
         {
             nav = null; wantStraight = true; goFt = ClimbFt(Runway);
-            return $"{c}, after departure fly runway heading, climb and maintain {Alt(goFt)}, {clr}.";
+            return $"{c}, after departure fly runway heading, climb and maintain {AltNum(goFt)}, {clr}.";
         }
         if (stayPattern)
         {
@@ -72,7 +72,7 @@ public partial class Tower
             nav = null;
             double to = climbFt > 0 ? climbFt : depClr ? Cruise : 0;
             if (depClr) depFt = cruiseFt = to;   // no "check altitude" below it
-            var top = to > 0 ? $" to {Alt(to)}" : "";
+            var top = to > 0 ? $" to {AltNum(to)}" : "";
             return climbOut == "tactical" ? $"{c}, after departure spiral climb overhead, remain within 3 miles, unrestricted{top}, then own navigation, {clr}"
                                           : $"{c}, after departure unrestricted climb{top}, own navigation, {clr}";
         }
@@ -83,28 +83,28 @@ public partial class Tower
             if (depClr && depSaid == dr) return $"{c}, after departure fly the {CrpSay(dr.Name)} departure, {clr}";   // #31 (log Nellis): Ground already cleared it by name, no second reading of the fixes
             var cross = CrossTxt(dr);
             return $"{c}, after departure {(sp != null ? $"{CrpSay(dr.Name)} departure, proceed direct {sp}" : $"fly the {CrpSay(dr.Name)} departure")}{(cross != "" ? ", cross " + cross : "")}, " +
-                   $"then {(depClr ? $"climb and maintain {Alt(depFt)}" : "own navigation")}, {clr}";
+                   $"then {(depClr ? $"climb and maintain {AltNum(depFt)}" : "own navigation")}, {clr}";
         }
         if (depClr)
         {
             nav = null;
-            return $"{c}, after departure fly runway heading, climb and maintain {Alt(depFt)}, {clr}";
+            return $"{c}, after departure fly runway heading, climb and maintain {AltNum(depFt)}, {clr}";
         }
         bool exitCh = F.Charted && ExitChart(Runway);
         if (!exitCh && exitDir != null)   // A92: without map (or without exit in the chart) departure direction instead of CRP
         {
             nav = null;
-            return $"{c}, after departure leave the control zone {exitDir}bound, not above {Alt(MaxFt)}, {clr}";
+            return $"{c}, after departure leave the control zone {exitDir}bound, not above {AltNum(MaxFt)}, {clr}";
         }
         if (!exitCh || exitDir == null)
         {
             nav = null;
-            return $"{c}, after departure own navigation, not above {Alt(MaxFt)} until leaving the control zone, {clr}";
+            return $"{c}, after departure own navigation, not above {AltNum(MaxFt)} until leaving the control zone, {clr}";
         }
         nav = Crp[exitDir];
         navName = CrpSay(exitDir!);
         var xn = F.ExitNote.TryGetValue((Runway, exitDir), out var note) ? ", " + SayChart(note) : "";   // K24: hint of the chart ("then 354 to the C R P")
-        return $"{c}, after departure exit via {CrpSay(exitDir!)}{xn}, not above {Alt(MaxFt)} until leaving the control zone, {clr}";
+        return $"{c}, after departure exit via {CrpSay(exitDir!)}{xn}, not above {AltNum(MaxFt)} until leaving the control zone, {clr}";
     }
 
     /// Takeoff clearance, otherwise wait: emergency / landing traffic up to 4 NM -> hold short, runway occupied -> line up and wait (only behind a rolling aircraft with no approach traffic within 6 NM, A10),
@@ -164,7 +164,7 @@ public partial class Tower
         "touch and go" => "cleared touch and go" + Closed(),
         "the option" => "cleared for the option" + Closed(),
         "low approach" => "cleared low approach" + Closed(),
-        "low pass" => $"cleared low pass, not below {Alt(Math.Ceiling((FieldElev / Ft + 500) / 100) * 100)}, after the pass fly runway heading, climb and maintain {Alt(TransitFt)}",   // R326: pattern altitude + 500 ft (FAA JO 7110.65 3-10-10)   // A47 (ICAO Doc 4444 Ch. 12)
+        "low pass" => $"cleared low pass, not below {AltNum(Math.Ceiling((FieldElev / Ft + 500) / 100) * 100)}, after the pass fly runway heading, climb and maintain {AltNum(TransitFt)}",   // R326: pattern altitude + 500 ft (FAA JO 7110.65 3-10-10)   // A47 (ICAO Doc 4444 Ch. 12)
         _ => "cleared to land",
     };
     string Closed() => stayPattern && !Ifr && !wantStraight ? $", {Hand(Runway).Split(' ')[0]} closed traffic approved, report base"
@@ -372,7 +372,7 @@ public partial class Tower
     List<Msg> GoAround(string c, string head)
     {
         Phase = Phase.Pattern; PatternReset();
-        return Say($"{c}, {head}, climb and maintain {Alt(PatternFt)}, join {Hand(Runway)} downwind runway {RwSay(Runway)}, report base.");
+        return Say($"{c}, {head}, climb and maintain {AltNum(PatternFt)}, join {Hand(Runway)} downwind runway {RwSay(Runway)}, report base.");
     }
     /// LA13 (log Nellis): after "check runway" still on final of the other runway under 3 NM: traffic or tailwind over 10 kt -> go around into the pattern of the runway in use,
     /// otherwise landing clearance for the runway he is lined up with, with the tailwind (the runway in the clearance counts, FAA JO 7110.65 3-10-5).

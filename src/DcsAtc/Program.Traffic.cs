@@ -292,7 +292,7 @@ static partial class Program
                 aiStackFt[g.Key] = stack;
                 Holds["ai:" + g.Key] = (a.X, a.Z, stack);
                 aiStage[g.Key] = "inbound";
-                Chat("Approach", "", $"{cs}, {(aiSent.ContainsKey("RESUME;" + g.Key) ? "cancel approach clearance, " : "")}hold at present position, {(a.AltMsl / 0.3048 > stack + 300 ? "descend and " : a.AltMsl / 0.3048 < stack - 300 ? "climb and " : "")}maintain {stack:0} feet, speed {Tower.HoldKt} knots, number {pos + 1}, expect approach in {Math.Max(1, pos * 2 - 1)} minutes.",
+                Chat("Approach", "", $"{cs}, {(aiSent.ContainsKey("RESUME;" + g.Key) ? "cancel approach clearance, " : "")}hold at present position, {(a.AltMsl / 0.3048 > stack + 300 ? "descend and " : a.AltMsl / 0.3048 < stack - 300 ? "climb and " : "")}maintain {stack:0}, speed {Tower.HoldKt} knots, number {pos + 1}, expect approach in {Math.Max(1, pos * 2 - 1)} minutes.",
                      $"Holding, {stack:0} feet, {cs}.");
             }
             else if (flag == "arr-hold" && !wait && Once("RESUME;" + g.Key))
@@ -306,7 +306,7 @@ static partial class Program
                 AiCmd($"STACK;{g.Key};{stack:0}");   // Predecessor out: one level lower
                 aiStackFt[g.Key] = stack;
                 Holds["ai:" + g.Key] = (hp.X, hp.Z, stack);
-                Chat("Approach", "", $"{cs}, descend and maintain {stack:0} feet, number {pos + 1}.", $"Down to {stack:0}, {cs}.");
+                Chat("Approach", "", $"{cs}, descend and maintain {stack:0}, number {pos + 1}.", $"Down to {stack:0}, {cs}.");
             }
             else if (flag == "arr" && a.InAir && stage == "" && (pos >= 0 || a.Heli))   // only in the sequence (holding or approach); helicopters outside it
             {

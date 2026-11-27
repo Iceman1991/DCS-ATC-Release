@@ -357,7 +357,7 @@ public partial class Tower
             Dist(t.X, t.Z, CX, CZ) < CtrM && now - lastAltWarn > 90 && now - lastVecSaid > 30 && now - handoffAt > 60)   // after handoff (with descent) allow 60 s
         {
             lastAltWarn = now;
-            return Say(ifrDep ? $"{c}, check altitude, maintain {Alt(depFt)}." : $"{c}, check altitude, pattern altitude {Alt(PatternFt)}.");
+            return Say(ifrDep ? $"{c}, check altitude, maintain {AltNum(depFt)}." : $"{c}, check altitude, pattern altitude {Alt(PatternFt)}.");
         }
 
         // R7 · Reporting obligation #10: VFR departure after "report leaving the control zone": the pilot reports himself. 0.5 NM outside the zone (issue #1: not right at the edge)
@@ -373,7 +373,7 @@ public partial class Tower
         // 60 s later violation; he continues flying runway heading and altitude (no vectors), a later check-in still gets them (missAt remains)
         if (missAt >= 0 && (ground || Phase != Phase.Inbound || holding)) missAt = -1;
         else if (missAt >= 0 && Overdue(now - missAt > 45, true, 60, now, () => { role = "Tower"; return Say($"{c}, {ContactNow("Approach")}.", "Tower"); },
-                     () => { role = "Tower"; return Dev($"{c}, no contact with {F.StationOf("Approach")}, continue runway heading, maintain {Alt(missFt)}, {ContactNow("Approach")}.",
+                     () => { role = "Tower"; return Dev($"{c}, no contact with {F.StationOf("Approach")}, continue runway heading, maintain {AltNum(missFt)}, {ContactNow("Approach")}.",
                                                        $"kein Check-in bei Approach nach dem Fehlanflug {F.Name}", $"no check-in with approach after missed approach {F.Name}", "Tower", fac: "Approach", by: "Tower"); }) is { } om) return om;
 
         // MAYDAY of another within 15 NM: whoever is not already on short final leaves radar vectoring or pattern and holds (runway free)
@@ -571,7 +571,7 @@ public partial class Tower
                     transitFt = null; Released = true;
                     return Note(Say($"{c}, I show you clear of the zone, frequency change approved.", transitBy), $"keine Meldung „clear of the zone“ (Durchflug {F.Name})", $"no report \"clear of the zone\" (transit {F.Name})");
                 }) is { } xm) return xm;
-            if (td < CtrM && IndFt(t) < tf - 300 && t.Vs < 2.5 && now - lastAltWarn > 60) { lastAltWarn = now; return Say($"{c}, check altitude, not below {Alt(tf)}, pattern traffic below.", transitBy); }
+            if (td < CtrM && IndFt(t) < tf - 300 && t.Vs < 2.5 && now - lastAltWarn > 60) { lastAltWarn = now; return Say($"{c}, check altitude, not below {AltNum(tf)}, pattern traffic below.", transitBy); }
         }
 
         if (Phase != Phase.Away || Dist(t.X, t.Z, CX, CZ) > CtrM + NM) intr = 0;
@@ -600,7 +600,7 @@ public partial class Tower
                 lastGa = now;
                 if (Ifr || wantStraight) return Note(Missed(t, now, "I show you going around, confirm?"), $"Durchstarten ohne Meldung {F.Name} {rw}", $"go-around without report {F.Name} {rw}");
                 Phase = Phase.Pattern; PatternReset();
-                return Note(Say($"{c}, I show you going around, confirm? Climb and maintain {Alt(PatternFt)}, join {Hand(rw)} downwind runway {RwSay(rw)}, report base."),
+                return Note(Say($"{c}, I show you going around, confirm? Climb and maintain {AltNum(PatternFt)}, join {Hand(rw)} downwind runway {RwSay(rw)}, report base."),
                             $"Durchstarten ohne Meldung {F.Name} {rw}", $"go-around without report {F.Name} {rw}");
             }
             var other = F.Ends.Select(e => e.Name).FirstOrDefault(e => HdgDiff(LandHdg(e), LandHdg(rw)) > 10 && OnFinal(t.X, t.Z, t.Hdg, t.Agl, e, 5 * NM));   // Parallel runway: Aligned
@@ -934,11 +934,11 @@ public partial class Tower
     string AirRc(Telemetry? t)
     {
         if (climbOut != null) return $"{Rc}{(t != null ? $", {Where(t)}" : "")}. {(climbOut == "tactical" ? "Continue spiral climb as cleared, then resume" : "Unrestricted climb approved, resume")} own navigation.";
-        if (DRt is { } dr && nav != null && t != null) return $"{Rc}, {Where(t)}. Continue {CrpSay(dr.Name)} departure{(zoneReport ? ", report leaving the control zone" : depClr ? $", then climb and maintain {Alt(Cruise)}" : "")}.";   // charts.jsonc departure being flown
+        if (DRt is { } dr && nav != null && t != null) return $"{Rc}, {Where(t)}. Continue {CrpSay(dr.Name)} departure{(zoneReport ? ", report leaving the control zone" : depClr ? $", then climb and maintain {AltNum(Cruise)}" : "")}.";   // charts.jsonc departure being flown
         if (zoneReport && t != null) return $"{Rc}, {Where(t)}. Continue as cleared, report leaving the control zone.";   // R7: VFR still in the zone
         if (depClr && t != null && (dest != null ? (dest.X, dest.Z) : toRange != null ? (toRange.X, toRange.Z) : exitDir != null && Crp.TryGetValue(exitDir, out var xp) ? xp : ((double, double)?)null) is { } dg)
-            return $"{Rc}, {Where(t)}. {Cap(Steer(t, dg, dest?.Name.Replace('-', ' ') ?? toRange?.Name ?? CrpSay(exitDir!)))}, climb and maintain {Alt(Cruise)}.";
-        return depClr ? $"{Rc}{(t != null ? $", {Where(t)}" : "")}. Climb and maintain {Alt(Cruise)}, resume own navigation."
+            return $"{Rc}, {Where(t)}. {Cap(Steer(t, dg, dest?.Name.Replace('-', ' ') ?? toRange?.Name ?? CrpSay(exitDir!)))}, climb and maintain {AltNum(Cruise)}.";
+        return depClr ? $"{Rc}{(t != null ? $", {Where(t)}" : "")}. Climb and maintain {AltNum(Cruise)}, resume own navigation."
                       : $"{Rc}{(t != null ? $", {Where(t)}" : "")}. Resume own navigation, maintain VFR.";   // Visual: do not prescribe an altitude
     }
 
@@ -1156,7 +1156,7 @@ public partial class Tower
         if (early) return Say($"{Cs()}, {hdg}, traffic {(clock == 0 ? 12 : clock)} o'clock, " +
                               $"{MilesTxt(Dist(t.X, t.Z, a.X, a.Z))}, departing aircraft, climbing through {Alt(Math.Round(itFt / 100) * 100)}.", "Approach");
         // R214: attention word before the callsign, "advise you turn … and climb/descend … immediately" (FAA JO 7110.65 2-1-6 b)
-        var vert = ft is { } g ? $" and {(g > myFt ? "climb" : "descend")}{(ctl ? $" to {Alt(g)}" : "")}" : "";
+        var vert = ft is { } g ? $" and {(g > myFt ? "climb" : "descend")}{(ctl ? $" to {AltNum(g)}" : "")}" : "";
         return Say($"Traffic alert, {Cs()}, {(clock == 0 ? 12 : clock)} o'clock, {MilesTxt(Dist(t.X, t.Z, a.X, a.Z))}, {Dir8(a.Hdg * 180 / Math.PI)}bound, {alt}, " +
                    $"advise you {hdg}{vert} immediately.", "Approach");
     }
@@ -1410,7 +1410,7 @@ public partial class Tower
         if (why == "" && PatternCount(traffic) > 0) why = "traffic in the pattern";
         var go = LandingCues(t) && OnFinal(t.X, t.Z, t.Hdg, t.Agl, Runway, CtrM) ? Unknown ? ", identify yourself and state your intentions" : ", say intentions"
                : (Unknown ? ", identify yourself" : "") + (why == "" ? "" : ", " + why) + (away is { } aw ? $", {(HdgDiff(aw, hdg) < 15 ? "fly" : $"turn {Lr(aw)}")} {HdgSay(aw, 10)}{(why.Contains("runway") ? " immediately" : "")}, remain clear of the control zone"
-                                                              : $", climb and maintain at or above {Alt(Math.Floor((PatternFt + 1500) / 1000) * 1000 + 1000)}");
+                                                              : $", climb and maintain at or above {AltNum(Math.Floor((PatternFt + 1500) / 1000) * 1000 + 1000)}");
         return Say($"{c}, you are entering the {zone} control zone{(Unknown ? "" : $" without clearance, {Where(t)}")}{go}.", "Tower");   // Review l7: no radio-menu hint (in reality only the call)
     }
     /// N51b: conflict with airfield traffic at (x, z) in ft (displayed) on heading hdg (true °): final of the active runway (to the zone boundary, ±1.5 NM, ±1000 ft around the 3° glidepath

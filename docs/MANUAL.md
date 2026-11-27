@@ -242,7 +242,7 @@ Tower: Enfield one one, runway two five, wind …, cleared to land.
 - **Other options.** Say "touch and go", "low approach" or "the option" instead of "full stop" (Radio wheel → Tower → "Base, touch and go"). Add "then departure" ("final, low approach, then departure to the north") to go to Departure afterwards instead of the next circuit. From the pattern: "request departure" (Radio wheel → Tower → Closed / SFO → "Request departure").
 - **Going around.** If you go around, say "going around".
 
-You must report base or final yourself; Tower never clears you to land without that call. If you don't call, Tower asks once at about 2.5 NM (or on base): "Enfield one one, report final." If you still have no landing clearance inside 0.8 NM or below 300 ft, you are sent around: "go around, no landing clearance, climb and maintain 2000 feet, join left hand downwind runway two five, report base." This is also a deviation in the debriefing.
+You must report base or final yourself; Tower never clears you to land without that call. If you don't call, Tower asks once at about 2.5 NM (or on base): "Enfield one one, report final." If you still have no landing clearance inside 0.8 NM or below 300 ft, you are sent around: "go around, no landing clearance, climb and maintain 2000, join left hand downwind runway two five, report base." This is also a deviation in the debriefing.
 
 **9. After landing (Tower, then Ground).** Tower tells you where to vacate, for example "Vacate left via Whiskey. Report vacated." Then call Ground:
 
@@ -902,7 +902,7 @@ These phrases count as a start-up request: "request startup", "start up", "reque
 #### IFR clearance
 
 > **You:** Kutaisi Ground, Enfield 1-1, request IFR clearance to Batumi.  
-> **Ground:** Enfield one one, Kutaisi Ground, cleared to Batumi airport via radar vectors, after departure fly runway heading, climb and maintain 3000 feet, expect flight level one five zero ten minutes after departure, departure Kutaisi Approach, squawk four two one six.  
+> **Ground:** Enfield one one, Kutaisi Ground, cleared to Batumi airport via radar vectors, after departure fly runway heading, climb and maintain 3000, expect flight level one five zero ten minutes after departure, departure Kutaisi Approach, squawk four two one six.  
 > **You:** Cleared to Batumi, runway heading, 3000 feet, squawk 4216, Enfield 1-1.  
 > **Ground:** Enfield one one, readback correct.
 
@@ -959,7 +959,7 @@ These phrases count as a start-up request: "request startup", "start up", "reque
 #### Ready for departure
 
 > **You:** Kutaisi Tower, Enfield 1-1, holding short runway 25, ready for departure.  
-> **Tower:** Enfield one one, after departure exit via C R P west, not above 2200 feet until leaving the control zone, runway two five, wind two four zero degrees, eight knots, cleared for takeoff.
+> **Tower:** Enfield one one, after departure exit via C R P west, not above 2200 until leaving the control zone, runway two five, wind two four zero degrees, eight knots, cleared for takeoff.
 
 You can say "ready", "ready for departure", "holding short" or "holding point". You must be within 700 m of the threshold, or on a runway.
 
@@ -967,12 +967,12 @@ You can say "ready", "ready for departure", "holding short" or "holding point". 
 
 | Your plan | After-departure part |
 |---|---|
-| VFR, airfield with a chart | "exit via C R P west, not above 2200 feet until leaving the control zone". The CRP is the one you named; without one, Tower takes the standard CRP of the runway (Kutaisi: runway 25 → west, 07 → east). Chart hints are added, for example "stay exactly on track, restricted area UR-R one five two" for the Abinsk exit at Krymsk |
+| VFR, airfield with a chart | "exit via C R P west, not above 2200 until leaving the control zone". The CRP is the one you named; without one, Tower takes the standard CRP of the runway (Kutaisi: runway 25 → west, 07 → east). Chart hints are added, for example "stay exactly on track, restricted area UR-R one five two" for the Abinsk exit at Krymsk |
 | VFR with direction, other airfields ("request taxi, departure north") | "leave the control zone northbound, not above …" |
 | VFR without direction, other airfields | "own navigation, not above … until leaving the control zone" |
-| IFR clearance | "fly runway heading, climb and maintain 3000 feet" |
+| IFR clearance | "fly runway heading, climb and maintain 3000" |
 | Closed pattern ("ready for departure, closed pattern") | "runway two five, wind …, cleared for takeoff, left closed traffic approved, report base." |
-| Practice approaches in instrument conditions ("ready for departure, practice approach") | "after departure fly runway heading, climb and maintain 3000 feet, …, cleared for takeoff", after liftoff "contact Approach", after "airborne, climbing" radar vectors. A plain "closed pattern": "closed traffic not approved, I F R conditions." |
+| Practice approaches in instrument conditions ("ready for departure, practice approach") | "after departure fly runway heading, climb and maintain 3000, …, cleared for takeoff", after liftoff "contact Approach", after "airborne, climbing" radar vectors. A plain "closed pattern": "closed traffic not approved, I F R conditions." |
 
 **When Tower holds you**
 
@@ -1036,7 +1036,7 @@ At about 500 ft above the airfield, Tower hands you to Departure (Approach, or t
 
 Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the threshold on the extended centreline, at pattern altitude. Pattern altitude is the airfield elevation plus 1,500 ft, rounded to 100 ft; at Kutaisi it is 2,000 ft. Approach then hands you to Tower:
 
-> **Approach:** Enfield one one, turn left heading two five zero, on course, 6 miles from initial, maintain 2000 feet, contact Kutaisi Tower, report initial for overhead break.  
+> **Approach:** Enfield one one, turn left heading two five zero, on course, 6 miles from initial, maintain 2000, contact Kutaisi Tower, report initial for overhead break.  
 > **You:** Kutaisi Tower, Enfield 1-1, initial runway 25.  
 > **Tower:** Enfield one one, runway two five, cleared break left hand. Report final.  
 > **You:** Enfield 1-1, base, gear down, full stop.  
@@ -1067,13 +1067,13 @@ Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the t
 #### Straight-in
 
 > **You:** Kutaisi Approach, Enfield 1-1, request straight in.  
-> **Approach:** Enfield one one, Kutaisi Approach, straight in approach runway two five approved, QNH one zero one three. Fly heading two four zero for six mile final. Maintain 2500 feet. Contact Kutaisi Tower.  
+> **Approach:** Enfield one one, Kutaisi Approach, straight in approach runway two five approved, QNH one zero one three. Fly heading two four zero for six mile final. Maintain 2500. Contact Kutaisi Tower.  
 > **You:** Kutaisi Tower, Enfield 1-1, four miles final, gear down.  
 > **Tower:** Enfield one one, runway two five, wind …, cleared to land.
 
 - **How you are routed:** within 8 NM, if the terrain is clear and you come from the approach side, you go direct to a 6-mile final. Otherwise Approach gives you radar vectors to final, also when you are behind or beside the runway (for example right after takeoff): Approach then keeps you until you are on final and hands you to Tower there.
 - **Altitude:** on or below the glide path, but never below terrain clearance.
-- **ILS runways:** "maintain 2500 feet until established, cleared ILS approach runway two five, localizer …"
+- **ILS runways:** "maintain 2500 until established, cleared ILS approach runway two five, localizer …"
 - **Calling "initial" on a straight-in** gets "make straight in runway two five, report four miles final."
 
 #### Pattern work
@@ -1083,7 +1083,7 @@ Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the t
 | "touch and go", "closed pattern", "pattern work", "circuits", "practice" (alone, or with "ready" or "inbound") | Touch-and-go circuits: "cleared touch and go, left closed traffic approved, report base." You go straight back to downwind; circuits are counted ("Pattern 2 (touch and go). To end: Tower → final, full stop.") |
 | "low approach", "practice approach", "practice ILS/TACAN/VOR/instrument" | "cleared low approach". After IFR or straight-in practice, Approach gives you new vectors at once |
 | "the option" | "cleared for the option": touch-and-go or full stop, your choice |
-| "low pass", "fly by" | "cleared low pass, not below 500 feet, after the pass climb runway heading 3000 feet". No pattern afterwards. From outside the pattern: "report five miles final runway two five" |
+| "low pass", "fly by" | "cleared low pass, not below 500, after the pass climb and maintain 3000". No pattern afterwards. From outside the pattern: "report five miles final runway two five" |
 | "full stop" | Ends pattern work; the next approach is a landing |
 
 #### Landing clearance and sequence
@@ -1102,10 +1102,10 @@ Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the t
 
 | Situation | Controller |
 |---|---|
-| You: "going around" / "go around" (VFR) | "roger, climb and maintain 2000 feet, join left hand downwind runway two five, report base." (with pattern work: "roger, left closed traffic approved, report base.") |
-| You: "going around" / "missed approach" (IFR or straight-in) | "roger, go around. Fly runway heading, climb and maintain 3000 feet, contact Kutaisi Approach." (see Missed approach below) |
-| Runway blocked or MAYDAY traffic inside 4 NM, and you are inside 0.8 NM | "go around, I say again, go around, traffic on runway, climb and maintain 2000 feet, join left hand downwind runway two five, report base." |
-| Going around without a call while you hold a landing clearance (300 m past the threshold, still above 200 ft) | "I show you going around, confirm? Climb and maintain 2000 feet, join left hand downwind runway two five, report base." The landing clearance is cancelled, plus a deviation. IFR or straight-in: the same question, then the missed approach. |
+| You: "going around" / "go around" (VFR) | "roger, climb and maintain 2000, join left hand downwind runway two five, report base." (with pattern work: "roger, left closed traffic approved, report base.") |
+| You: "going around" / "missed approach" (IFR or straight-in) | "roger, go around. Fly runway heading, climb and maintain 3000, contact Kutaisi Approach." (see Missed approach below) |
+| Runway blocked or MAYDAY traffic inside 4 NM, and you are inside 0.8 NM | "go around, I say again, go around, traffic on runway, climb and maintain 2000, join left hand downwind runway two five, report base." |
+| Going around without a call while you hold a landing clearance (300 m past the threshold, still above 200 ft) | "I show you going around, confirm? Climb and maintain 2000, join left hand downwind runway two five, report base." The landing clearance is cancelled, plus a deviation. IFR or straight-in: the same question, then the missed approach. |
 | Landing after Tower sent you around, or without a clearance | Deviation in the debriefing |
 
 "Go around" is accepted only during an approach to this airfield. Otherwise you get: "say intentions."
@@ -1115,7 +1115,7 @@ Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the t
 #### Check-in and radar vectors
 
 > **You:** Kutaisi Approach, Enfield 1-1, 25 miles west, 8000 feet, inbound for landing, information Alpha.  
-> **Approach:** Enfield one one, Kutaisi Approach, identified, 25 miles west. Runway two five in use, wind two four zero degrees, eight knots, QNH one zero one three. Expect vectors to initial runway two five for overhead break. Turn left heading zero nine zero, 20 miles from initial, descend and maintain 5000 feet, speed 300 knots, downwind.
+> **Approach:** Enfield one one, Kutaisi Approach, identified, 25 miles west. Runway two five in use, wind two four zero degrees, eight knots, QNH one zero one three. Expect vectors to initial runway two five for overhead break. Turn left heading zero nine zero, 20 miles from initial, descend and maintain 5000, speed 300 knots, downwind.
 
 - **Check-in phrases:** "inbound", "landing", "recovery", "rejoin", "full stop", "with you", or the station and your callsign.
 - **Within 4 NM of the airfield,** Tower answers instead: "runway two five, wind …, QNH …. Join left hand downwind, 2000 feet, report final."
@@ -1124,17 +1124,17 @@ Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the t
   - Straight-in or IFR: to the final approach course, with a gate at 10, 8, 6 or 4 NM.
 - **Terrain:** the plan uses the terrain map and never descends you below the minimum vectoring altitude: terrain plus 1,000 ft, or plus 2,000 ft in mountains. If terrain blocks the active runway, the plan may use the opposite runway (up to 10 kt tailwind) or a circling approach: "Due to terrain, expect …".
 - **When Approach talks:** every call gives a heading. Distance, altitude, speed and leg are mentioned only when they change. Descents come in steps along a 2.5° profile. When the sequence changes, Approach says "No traffic ahead, you are number one" or "You are number 2, 1 aircraft ahead".
-- **Handoff to Tower:** only shortly before the gate (within 2 NM of it, at most 1,000 ft above the gate altitude) or at the gate at the latest. If you join the centreline farther out, Approach keeps you, steps you down along the profile ("descend and maintain 4000 feet", the gate altitude only once the profile at your position gets there) and hands you off near the gate. VFR traffic gets "on course, 6 miles from initial, maintain 2000 feet, contact Kutaisi Tower, report initial for overhead break." IFR traffic gets the approach clearance (below).
+- **Handoff to Tower:** only shortly before the gate (within 2 NM of it, at most 1,000 ft above the gate altitude) or at the gate at the latest. If you join the centreline farther out, Approach keeps you, steps you down along the profile ("descend and maintain 4000", the gate altitude only once the profile at your position gets there) and hands you off near the gate. VFR traffic gets "on course, 6 miles from initial, maintain 2000, contact Kutaisi Tower, report initial for overhead break." IFR traffic gets the approach clearance (below).
 - **CRPs:** The chart of each airfield says which CRPs apply to which runway (kneeboard page "ATC-3b-Platzrunden"). At Kutaisi, North and South are always allowed, West only for runway 07 and East only for runway 25. If you fly to one yourself, report it ("C R P south", also with several words such as "C R P black sea"). Approach then sends you to initial or overhead and hands you to Tower about two minutes before the CRP. A CRP that isn't allowed gets "negative, C R P east is not available for runway zero seven. Enter via C R P …". CRPs that are for departures only (for example Abinsk at Krymsk) are not accepted on arrival. At Anapa the southern arrival CRP is called "south" and the departure CRP "exit south". Airfields without a chart and other maps have no CRPs: "negative, no reporting points at Senaki Kolkhi", followed by vectors.
 
 #### Altitude and speed instructions
 
 - **Altitude:** "descend and maintain …", "climb and maintain …", or "maintain …" for the same altitude. All altitudes are what your altimeter reads when set to the airfield QNH.
-- **Speed:** given only within 25 NM.
+- **Speed:** given only within 25 NM, farther out only for the 250 kt limit below 10,000 ft (named with the descent clearance).
 
   | Aircraft | Speeds |
   |---|---|
-  | Jets | VFR 300 kt. Straight-in, by remaining track: 300 kt, below 20 NM 250 kt, below 10 NM 200 kt |
+  | Jets | VFR 300 kt. Straight-in, by remaining track: 300 kt, below 20 NM 250 kt, below 10 NM 200 kt. At most 250 kt below 10,000 ft |
   | Props and warbirds | 200 / 170 / 140 kt |
   | A-10, L-39, C-101 | 250 / 200 / 160 kt |
   | Helicopters | No speed assignments |
@@ -1163,7 +1163,7 @@ Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the t
 |---|---|
 | "request direct" | Approved only if you are number one, the terrain is clear and you are not too high: "direct approved, turn left heading …". Otherwise "unable, …" |
 | "request heading 270" under vectors | "unable, …" (vectors continue) |
-| "request higher" / "request lower" / "request 6000 feet" / "request flight level 200" | "climb/descend and maintain …". Higher under radar vectors: far out (more than 25 NM track to the gate) approved in one block – if you are already above, your present altitude ("maintain 14000 feet"), otherwise up to FL200 (props 10,000 ft), but only as high as still lets you make the gate on the normal profile; the altitude stays until the profile needs the descent, which then comes as "descend at pilot's discretion, maintain …". Closer in: "unable higher, expect lower shortly, maintain …" (traffic: "unable higher, traffic, maintain …"); a request for higher never gets "descend". "request descent at pilot's discretion": "descend at pilot's discretion, maintain …" (down to 1,000 ft above the gate altitude); until 10 NM before the gate you descend when you like, no reminders. Or "unable, minimum altitude …" / "unable, traffic". In the hold: "unable, maintain … in the hold, I will call you." Once you have been handed to Tower: "negative, continue as cleared." |
+| "request higher" / "request lower" / "request 6000 feet" / "request flight level 200" | "climb/descend and maintain …". Higher under radar vectors: far out (more than 25 NM track to the gate) approved in one block – if you are already above, your present altitude ("maintain 14000"), otherwise up to FL200 (props 10,000 ft), but only as high as still lets you make the gate on the normal profile; the altitude stays until the profile needs the descent, which then comes as "descend at pilot's discretion, maintain …". Closer in: "unable higher, expect lower shortly, maintain …" (traffic: "unable higher, traffic, maintain …"); a request for higher never gets "descend". "request descent at pilot's discretion": "descend at pilot's discretion, maintain …" (down to 1,000 ft above the gate altitude); until 10 NM before the gate you descend when you like, no reminders. Or "unable, minimum altitude …" / "unable, traffic". In the hold: "unable, maintain … in the hold, I will call you." Once you have been handed to Tower: "negative, continue as cleared." |
 | "request runway 07" | "runway zero seven approved." The plan is rebuilt |
 | "VFR", "cancel IFR", "visual recovery" (VFR weather) | "roger" (with "cancel IFR": "roger, I F R cancelled"), then "Expect vectors to initial …" |
 | "request straight in" while being vectored | "roger, straight in approach approved." The plan is rebuilt |
@@ -1172,7 +1172,7 @@ Approach vectors you to the **initial point**: about 2 NM (4,000 m) before the t
 
 **ILS** (the runway has a localizer in the map data):
 
-> **Approach:** Enfield one one, 12 miles from touchdown, maintain 3000 feet until established, cleared ILS approach runway two five, QNH one zero one three, contact Kutaisi Tower.
+> **Approach:** Enfield one one, 12 miles from touchdown, maintain 3000 until established, cleared ILS approach runway two five, QNH one zero one three, contact Kutaisi Tower.
 
 - **The clearance comes with the last turn toward the centreline** (ILS and PAR). The turn is at most 30° and meets the centreline at least 2 NM before the gate. Closer to the gate, the limit is 20°, and only with a ceiling at least 500 ft above the minimum vectoring altitude and 3 miles visibility. If you are already close to the centreline, you get a turn of 10 to 30° onto it, never a parallel heading.
 
@@ -1218,22 +1218,22 @@ Approach puts you in a hold if any of these apply:
 - Players arrive in sequence and you are not next.
 - Another aircraft has declared MAYDAY.
 
-> **Approach:** Enfield one one, Kutaisi Approach, identified, 30 miles west. Runway two five in use, … Fly heading zero eight five, descend and maintain 5000 feet, speed 230 knots, hold on the two six zero radial, 15 DME, 14 miles to go, I will call you there. Expected approach time three five, you are number 3.  
-> *(at the fix)* **Approach:** Enfield one one, hold on the two six zero radial, 15 DME, orbit left hand, maintain 5000 feet, speed 230 knots.  
+> **Approach:** Enfield one one, Kutaisi Approach, identified, 30 miles west. Runway two five in use, … Fly heading zero eight five, descend and maintain 5000, speed 230 knots, hold on the two six zero radial, 15 DME, 14 miles to go, I will call you there. Expected approach time three five, you are number 3.  
+> *(at the fix)* **Approach:** Enfield one one, hold on the two six zero radial, 15 DME, orbit left hand, maintain 5000, speed 230 knots.  
 > *(later)* **Approach:** Enfield one one, leave the hold, turn right heading …
 
 - **Holding fix:** 15 NM from the airfield, away from the final and departure paths, chosen for low terrain. It is given as a TACAN radial/DME if the airfield has TACAN. Otherwise you get "hold at present position" or "… miles to the holding point".
-- **Altitude:** the lowest level is the zone limit rounded up to the next 1,000 ft, plus 1,000 ft per place in the sequence. Two aircraft near each other never get the same level. You are stepped down as aircraft ahead leave: "maintain 4000 feet, you are number 2."
+- **Altitude:** the lowest level is the zone limit rounded up to the next 1,000 ft, plus 1,000 ft per place in the sequence. Two aircraft near each other never get the same level. You are stepped down as aircraft ahead leave: "maintain 4000, you are number 2."
 - **Speed:** 230 kt, 200 kt for props, none for helicopters.
 - **Expected approach time:** given once as the minute of the mission clock ("expected approach time three five"). It is repeated only if it changes by 5 min or more ("revised expected approach time …"). Without a mission clock: "expect approach in 6 minutes".
-- **Checks in the hold:** if you drift off, or are more than 30 kt off speed, you get a heading or speed reminder. More than 500 ft off altitude gets "check altitude, maintain 5000 feet."
+- **Checks in the hold:** if you drift off, or are more than 30 kt off speed, you get a heading or speed reminder. More than 500 ft off altitude gets "check altitude, maintain 5000."
 - **Leaving the hold:** when it's your turn, you are released with a heading that points roughly toward the approach, within 2 min.
 
 #### Separation
 
 Approach and Departure keep you apart from other traffic, players and AI alike. The pieces in one place:
 
-- **Altitudes:** you only get an altitude that is free: no traffic within 3 NM and 1000 ft on the way there, and no conflict in the next 60 s. Otherwise you stay where you are until the traffic has passed. Under vectors the next descent step comes later; on a request you hear "unable higher, traffic, maintain 5000 feet."
+- **Altitudes:** you only get an altitude that is free: no traffic within 3 NM and 1000 ft on the way there, and no conflict in the next 60 s. Otherwise you stay where you are until the traffic has passed. Under vectors the next descent step comes later; on a request you hear "unable higher, traffic, maintain 5000."
 - **Holding:** the stack is separated by 1000 ft per aircraft. You get the next lower level when the aircraft ahead has left it.
 - **Final:** 3 NM behind the aircraft ahead, 5 NM behind a heavy. If you get too close: "reduce speed to 170 knots for spacing." In the pattern: "extend downwind, number two", and "go around" if the runway is not free in time.
 - **Sequence:** from two aircraft in the pattern on, arrivals wait in the hold with an expected approach time.
@@ -1245,7 +1245,7 @@ Approach and Departure keep you apart from other traffic, players and AI alike. 
 | When | Call |
 |---|---|
 | First contact, vectors | "Traffic, Viper, 3 miles south of the field, 1500 feet." |
-| Conflict within 60 s (closer than 1.5 NM and 700 ft) under vectors or on approach | "traffic alert, traffic 2 o'clock, 3 miles, same altitude. Turn right heading one two zero immediately, climb and maintain 5000 feet." No other instructions for the next 30 s. The avoidance altitude is temporary: afterwards Approach returns to your vector altitude (or your present altitude if you have descended below it meanwhile) |
+| Conflict within 60 s (closer than 1.5 NM and 700 ft) under vectors or on approach | "traffic alert, traffic 2 o'clock, 3 miles, same altitude. Turn right heading one two zero immediately, climb and maintain 5000." No other instructions for the next 30 s. The avoidance altitude is temporary: afterwards Approach returns to your vector altitude (or your present altitude if you have descended below it meanwhile) |
 | AI departure climbing into your path | "turn right heading …, traffic 11 o'clock, 4 miles, departing aircraft, climbing through 3000 feet." |
 | In the pattern: traffic not talking to Tower, closer than 0.5 NM within 30 s | "traffic 2 o'clock, 1 mile, FA-18C, 1500 feet, no contact with Tower." |
 
@@ -1265,12 +1265,12 @@ It is said once per flight. Say "terrain in sight" to acknowledge it ("roger"); 
 
 On an IFR or straight-in approach, a go-around becomes a missed approach in two steps:
 
-> **Tower:** Enfield one one, roger, go around. Fly runway heading, climb and maintain 3000 feet, contact Kutaisi Approach.  
+> **Tower:** Enfield one one, roger, go around. Fly runway heading, climb and maintain 3000, contact Kutaisi Approach.  
 > **You:** Kutaisi Approach, Enfield 1-1, missed approach.  
-> **Approach:** Enfield one one, Kutaisi Approach, identified. Turn right heading three four zero, climb and maintain 3000 feet, … Say intentions.
+> **Approach:** Enfield one one, Kutaisi Approach, identified. Turn right heading three four zero, climb and maintain 3000, … Say intentions.
 
 - **Missed-approach altitude:** the zone limit or the terrain 10 NM ahead, rounded to full thousands.
-- **No check-in:** Approach doesn't vector you without your check-in. After 45 s Tower reminds you: "contact Kutaisi Approach now". 60 s later: "no contact with Kutaisi Approach, continue runway heading, maintain 3000 feet, contact Kutaisi Approach now", plus a deviation. A late check-in still gets you vectors (see [Mandatory reports](#mandatory-reports)).
+- **No check-in:** Approach doesn't vector you without your check-in. After 45 s Tower reminds you: "contact Kutaisi Approach now". 60 s later: "no contact with Kutaisi Approach, continue runway heading, maintain 3000, contact Kutaisi Approach now", plus a deviation. A late check-in still gets you vectors (see [Mandatory reports](#mandatory-reports)).
 - **Practice approaches** (low approach or touch and go under IFR or straight-in) go straight back into vectors, without "say intentions". Each approach is counted ("Approach 2 (low approach). To end: Approach → full stop.").
 
 #### Cancel approach
@@ -1338,13 +1338,13 @@ The Center is a module of its own ("Center" in setup and in the settings window,
 #### Zone transit
 
 > **You:** Kutaisi Approach, Enfield 1-1, 12 miles west, 3000 feet, request zone transit, eastbound.  
-> **Approach:** Enfield one one, Kutaisi Approach, cleared to cross the Kutaisi control zone overhead, eastbound, not below 3500 feet, QNH …, runway two five in use, report clear of the zone.  
+> **Approach:** Enfield one one, Kutaisi Approach, cleared to cross the Kutaisi control zone overhead, eastbound, not below 3500, QNH …, runway two five in use, report clear of the zone.  
 > **You:** Enfield 1-1, clear of the zone.  
 > **Approach:** Enfield one one, frequency change approved.
 
 - **Phrases:** "transit", "crossing", "cross the …", "overflight", "pass through". Within 5 NM, Tower answers.
 - **Transit altitude:** 1,000 ft above the pattern and above the terrain in the zone, rounded up to 500 ft.
-- **Below it:** "check altitude, not below 3500 feet, pattern traffic below."
+- **Below it:** "check altitude, not below 3500, pattern traffic below."
 - **Players in the pattern** are told: "traffic, Viper crossing overhead eastbound, 3500 feet."
 - **Busy airfield:** "remain outside the control zone, expect transit in 4 minutes."
 - **No report:** 1 NM past the zone edge: "I show you clear of the zone, frequency change approved."
@@ -1500,7 +1500,7 @@ An instructor rides along on the intercom and checks three patterns, an approach
 | **Tower check-in after "contact Tower"** ("…Tower, Enfield 1-1, initial / overhead / four mile final") | Only if Tower has its own frequency: after 60 s, or within 5 NM of the field, Approach says "contact Kutaisi Tower now, <freq>" (on a shared frequency the prompts above apply) | No landing clearance; the landing-call rule above applies |
 | **Going around:** "…, going around" | "I show you going around, confirm?" | Landing clearance cancelled, "…, report base", plus a deviation |
 | **Departure check-in:** "…Departure, Enfield 1-1, airborne, passing 2000" | 60 s after the handoff or at the zone edge, Tower: "contact Kutaisi Approach now" (own Departure frequency: "contact Kutaisi Departure now, <freq>") | 60 s later: "no contact with Kutaisi Approach, radar service not provided". IFR: deviation. VFR: "…, squawk 7000, frequency change approved" |
-| **Missed-approach check-in:** "…Approach, missed approach, climbing 3000" | After 45 s, Tower: "contact Kutaisi Approach now" | 60 s later: "no contact with Kutaisi Approach, continue runway heading, maintain 3000 feet, …", no vectors until you check in, plus a deviation |
+| **Missed-approach check-in:** "…Approach, missed approach, climbing 3000" | After 45 s, Tower: "contact Kutaisi Approach now" | 60 s later: "no contact with Kutaisi Approach, continue runway heading, maintain 3000, …", no vectors until you check in, plus a deviation |
 | **Leaving the control zone** (after "report leaving the control zone"): "…, leaving the control zone" | At the edge or the exit CRP: "report leaving the control zone" | 1 NM outside: "I show you clear of the zone, radar service terminated, resume own navigation, squawk 7000, …", plus a deviation |
 | **Transit complete:** "…, clear of the zone" | 0.5 NM outside: "report clear of the zone" | 1 NM outside: "I show you clear of the zone, frequency change approved", plus a deviation |
 | **Taxi to parking:** "…Ground, runway vacated, request taxi to parking" | "contact Kutaisi Ground" (30 s after vacating) | Faster than 5 kt and more than 150 m from the runway without clearance: "hold position, you are not cleared to taxi. Request taxi.", plus a deviation |

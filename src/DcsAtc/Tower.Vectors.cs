@@ -31,7 +31,7 @@ public partial class Tower
     string OnTheGo(string rw)
     {
         goFt = option is "low approach" or "touch and go" or "the option" ? ClimbFt(rw) : 0;
-        return goFt > 0 ? $", on the go fly runway heading, climb and maintain {Alt(goFt)}" : "";
+        return goFt > 0 ? $", on the go fly runway heading, climb and maintain {AltNum(goFt)}" : "";
     }
     double HandSign(string rw) => Hand(rw) == "left hand" ? 1 : -1;
 
@@ -325,7 +325,7 @@ public partial class Tower
         // "maintain … until established" and the approach clearance in the same call (FAA JO 7110.65 5-9-1, 5-9-2)
         var p = Proc(rw);
         bool clr = ClrOk(t, brg, true);
-        if (clr) { tail = $", maintain {Alt(vecFt)}{Until(p)}, cleared {p} approach runway {RwSay(rw)}" + OnTheGo(rw); apprClr = true; altFree = false; }
+        if (clr) { tail = $", maintain {AltNum(vecFt)}{Until(p)}, cleared {p} approach runway {RwSay(rw)}" + OnTheGo(rw); apprClr = true; altFree = false; }
         var tailSaid = vecWhy != null && vec.Count > 0 ? ", " + vecWhy : tail;   // R222: led through the approach line / replanned: reason instead of first-contact wording (vecMemLeg remains the plan leg)
         vecWhy = null;
         bool newLeg = tail != vecMemLeg;
@@ -400,22 +400,24 @@ public partial class Tower
             vecHdg = cutB;
             var p = Proc(rw);
             apprClr = true; lastAltFt = vecFt; vecMemFt = vecFt;
-            return $"{TurnTo(t, vecHdg)}, maintain {Alt(vecFt)}{Until(p)}, cleared {p} approach runway {RwSay(rw)}" + OnTheGo(rw);
+            return $"{TurnTo(t, vecHdg)}, maintain {AltNum(vecFt)}{Until(p)}, cleared {p} approach runway {RwSay(rw)}" + OnTheGo(rw);
         }
         return $"{TurnTo(t, vecHdg)}, join the extended centerline runway {RwSay(rw)}, {AltTo(t, vecFt)}";
     }
 
     /// Prescribed speed: holding (also AI orbit, DcsAtcMission.lua), radar vectoring to initial or downwind/base/turn-in.
     public const int HoldKt = 230;
-    /// Target speed under radar vectoring (from 25 NM): visual 300 kt; straight-in by flight path to the threshold 300, below 20 NM 250, below 10 NM 200 kt
+    /// Target speed under radar vectoring (from 25 NM), farther out only the 250 kt limit: visual 300 kt; straight-in by flight path to the threshold 300, below 20 NM 250, below 10 NM 200 kt
     /// (do not brake right at the start of a long downwind: 25 NM straight-line there are often 35 NM of path).
     /// Slow types get lower values or 0 (= no speed instruction, no speed reminder); jets as above.
+    /// Never more than 250 kt while the aircraft or its assigned altitude is below 10,000 ft (14 CFR 91.117(a), SERA.6001); the Tight reduction applies after that.
     int VecKt(Telemetry t)
     {
-        if (spdFree || altFree || Emergency || Dist(t.X, t.Z, CX, CZ) > 25 * NM) return 0;   // VFR far out (altitude at his discretion): speed too, the restriction comes with the descent; forum 0.13: emergency flies its own speed (bent flaps: "increase speed to 300 knots")
+        if (spdFree || altFree || Emergency || Dist(t.X, t.Z, CX, CZ) > 25 * NM && Math.Min(IndFt(t), vecFt) >= 10000) return 0;   // VFR far out (altitude at his discretion): speed too, the restriction comes with the descent; forum 0.13: emergency flies its own speed (bent flaps: "increase speed to 300 knots")
         int tier = !vecFinal || Path(t).R > 20 * NM ? 0 : Path(t).R > 10 * NM ? 1 : 2;
         if (fromHold) tier = Math.Max(tier, 1);   // R319: from holding do not accelerate to 300 kt (FAA JO 7110.65 5-7-1)
         int kt = (Slow ?? new[] { 300, 250, 200 })[tier];
+        if (Math.Min(IndFt(t), vecFt) < 10000) kt = Math.Min(kt, 250);   // YouTube (Saguanay): 14 CFR 91.117(a) / SERA.6001: at most 250 KIAS below 10,000 ft MSL (current or assigned altitude, so no 300 first and 250 a minute later)
         return Tight(t) ? (int)Math.Round(kt * 0.85 / 10) * 10 : kt;   // R46: too close behind the preceding traffic: 15 % slower (200 -> 170 kt)
     }
     int[]? Slow => SlowTypes.FirstOrDefault(s => Regex.IsMatch(AcType, s.Rx)).Kts;
@@ -537,7 +539,7 @@ public partial class Tower
     }
 
     /// Descent instruction; emergency: at own discretion (FAA JO 7110.65 4-5-7).
-    string Descend(double ft, Telemetry? t = null) => Emergency || t != null && Pd(t) ? $"descend at pilot's discretion, maintain {Alt(ft)}" : $"descend and maintain {Alt(ft)}";
+    string Descend(double ft, Telemetry? t = null) => Emergency || t != null && Pd(t) ? $"descend at pilot's discretion, maintain {AltNum(ft)}" : $"descend and maintain {AltNum(ft)}";
     /// R303: descent at own discretion requested or stayed high on request ("request higher"): up to 10 NM remaining path before the gate "at pilot's discretion",
     /// no "descend" reminders as long as he is above; afterwards normal (AIM 4-4-10, FAA JO 7110.65 4-5-7 e).
     bool pdDescent;
@@ -692,7 +694,7 @@ public partial class Tower
         {
             if (Ignored("alt", -dAlt, 200)) return Kick(t);
             lastVecSaid = now;
-            return Say($"{c}, check altitude, climb and maintain {Alt(vecFt)}.", "Approach");
+            return Say($"{c}, check altitude, climb and maintain {AltNum(vecFt)}.", "Approach");
         }
         if (now - lastVecSaid >= 30 && highOff && dAlt > 1000)
         {
@@ -701,9 +703,9 @@ public partial class Tower
             // R302 (FAA JO 7110.65 5-2-17, P/CG EXPEDITE): "expedite" only if traffic at his altitude demands it; climbed unasked: first "verify altitude",
             // then "climb not authorized"; not yet down (not descending): repeat the descent clearance
             lastAltFt = vecFt;
-            return Say($"{c}, " + (!LevelFree(t, traffic, ft) ? $"expedite descent, maintain {Alt(vecFt)}"
+            return Say($"{c}, " + (!LevelFree(t, traffic, ft) ? $"expedite descent, maintain {AltNum(vecFt)}"
                                  : reachedFt != vecFt ? Descend(vecFt)
-                                 : highTold++ == 0 ? $"verify altitude, maintain {Alt(vecFt)}" : $"climb not authorized, descend and maintain {Alt(vecFt)}") + ".", "Approach");
+                                 : highTold++ == 0 ? $"verify altitude, maintain {AltNum(vecFt)}" : $"climb not authorized, descend and maintain {AltNum(vecFt)}") + ".", "Approach");
         }
         // new heading needed (wind/offset, through the centreline), not mid-turn and not shortly before (the turn corrects too); before the descent, the call includes it
         // R306: when turning in only if he misses the centreline – the turn-in point (VecBrg) slides along close to it and gets flatter (300 -> 285 -> 270), the given heading stays
@@ -721,9 +723,11 @@ public partial class Tower
             // too late for the clearance with the vector, he is about to fly through the centreline (or is on it): the turn onto final (with the clearance when allowed) goes out with the step, not a descent alone
             if (!apprClr && (crossing || sd <= IndFt(t) && ClrCut(t) is var (cutB, _) && ClrOk(t, cutB)))
                 return Say($"{c}, {JoinTurn(t)}.", "Approach");
-            var say = sd > IndFt(t) ? $"climb and maintain {Alt(sd)}" : Descend(sd, t);   // Holding on the path: above it (StepDown)
+            var say = sd > IndFt(t) ? $"climb and maintain {AltNum(sd)}" : Descend(sd, t);   // Holding on the path: above it (StepDown)
             lastAltFt = sd;
             vecMemFt = vecFt;   // R315: the next vector call does not repeat this altitude
+            // YouTube (Saguanay): the descent that starts the 250 kt limit (below 10,000 ft) carries the speed, not a vector call 100 s later
+            if (VecKt(t) is > 0 and var nk && nk != vecMemKt && t.Ias / Kt > nk + 30 && SpdSay(t, nk, now, true) is { } ns) { say += ", " + ns; vecMemKt = nk; }
             return Say($"{c}, {say}.", "Approach");
         }
         if (now - lastVecSaid >= 30 && spdOff && Math.Abs(dKt) > 60 && SpdSay(t, VecKt(t), now) is { } spd)
@@ -760,7 +764,7 @@ public partial class Tower
         bool told = practice && goFt > 0;
         (missAt, missFt, lastGa) = (now, told ? goFt : Math.Max(ClimbFt(Runway), Math.Ceiling(IndFt(t) / 1000) * 1000), now);
         goFt = 0; dueAt = -1;   // Reporting duty: check-in with Approach due from now (#9)
-        return Say(told ? $"{Cs()}, contact {Contact("Approach")}." : $"{Cs()}, {pre} Fly runway heading, climb and maintain {Alt(missFt)}, contact {Contact("Approach")}.", "Tower");
+        return Say(told ? $"{Cs()}, contact {Contact("Approach")}." : $"{Cs()}, {pre} Fly runway heading, climb and maintain {AltNum(missFt)}, contact {Contact("Approach")}.", "Tower");
     }
     double dueAt = -1;   // Reporting duty (#8–#12): since when reminded of the mandatory report, -1 = not yet, MaxValue = consequence drawn
     /// Reporting duty (MELDEPFLICHT-PLAN #8–#12, "Check-in überfällig"): check-in or mandatory report missing. due: remind once (warn); afterwards, as soon as late
@@ -876,7 +880,7 @@ public partial class Tower
             // R220: position before heading, "until established on the localizer" (FAA JO 7110.65 5-9-4); R271: PAR without lost-comm instruction here – it comes with the talk-down setup (ParSetup, first call to Tower); R217: practice approach with climb-out
             double fb = Proc(rw) == "P A R" ? FinalBrg(t, rw) : LandHdg(rw);   // PAR: converging, wind corrected (the plain runway heading diverges from an offset in a crosswind)
             return Say($"{c}, {MilesTxt(Dist(t.X, t.Z, thr.X, thr.Z))} from touchdown, {(HdgDiff(t.Hdg * 180 / Math.PI, fb) > 5 ? TurnTo(t, fb) + ", " : "")}" +
-                       (Proc(rw) is var p && p != "" && !wantVisual ? $"{(HdgDiff(t.Hdg * 180 / Math.PI, fb) > 5 || Math.Abs(AL(t.X, t.Z, rw).L) > 0.3 * NM ? $"maintain {Alt(vecFt)}{Until(p)}, " : "")}cleared {p} approach runway {RwSay(rw)}" : $"on course, {(wantVisual ? "cleared visual approach" : "proceed straight in")} runway {RwSay(rw)}") + OnTheGo(rw) + (Dist(t.X, t.Z, thr.X, thr.Z) < 9 * NM || AheadR >= 0 ? ", reduce to final approach speed, " : ", ") +   // R46: with preceding traffic also at the 10 NM gate (otherwise he catches up with the speed from radar vectoring)
+                       (Proc(rw) is var p && p != "" && !wantVisual ? $"{(HdgDiff(t.Hdg * 180 / Math.PI, fb) > 5 || Math.Abs(AL(t.X, t.Z, rw).L) > 0.3 * NM ? $"maintain {AltNum(vecFt)}{Until(p)}, " : "")}cleared {p} approach runway {RwSay(rw)}" : $"on course, {(wantVisual ? "cleared visual approach" : "proceed straight in")} runway {RwSay(rw)}") + OnTheGo(rw) + (Dist(t.X, t.Z, thr.X, thr.Z) < 9 * NM || AheadR >= 0 ? ", reduce to final approach speed, " : ", ") +   // R46: with preceding traffic also at the 10 NM gate (otherwise he catches up with the speed from radar vectoring)
                        $"{Qnh(t)}, contact {Contact("Tower")}.", "Approach");   // R314: "report four mile final" is given by the tower (first call), not Approach
         }
         // Visual: to initial or overhead (reciprocal), never lower than 500 ft above terrain on the rest of the path
@@ -889,8 +893,8 @@ public partial class Tower
         {
             nav = null; navName = "circle";
             return Say($"{c}, {MilesTxt(d)} from the field, {(HdgDiff(t.Hdg * 180 / Math.PI, LandHdg(vrw)) > 5 ? TurnTo(t, LandHdg(vrw)) + ", " : "")}" +
-                       (CircleIfr ? $"maintain {Alt(ft)}{Until(Proc(vrw))}, cleared {Proc(vrw)} approach runway {RwSay(vrw)}, circle to runway {RwSay(rw)}"
-                                  : $"on course, maintain {Alt(ft)}, expect {Hand(rw)} downwind runway {RwSay(rw)}") +   // Review R212: without procedure no approach clearance to the reciprocal runway, the tower gives the pattern
+                       (CircleIfr ? $"maintain {AltNum(ft)}{Until(Proc(vrw))}, cleared {Proc(vrw)} approach runway {RwSay(vrw)}, circle to runway {RwSay(rw)}"
+                                  : $"on course, maintain {AltNum(ft)}, expect {Hand(rw)} downwind runway {RwSay(rw)}") +   // Review R212: without procedure no approach clearance to the reciprocal runway, the tower gives the pattern
                        $", {Qnh(t)}, contact {Contact("Tower")}.", "Approach");
         }
         return Say($"{c}, " + (direct ? $"proceed direct initial runway {RwSay(rw)}, {MilesTxt(d)}, "

@@ -415,7 +415,7 @@ public partial class Tower
                 var lim = toRange != null ? toRange.Name : !string.IsNullOrEmpty(lastFix) ? CrpSay(lastFix) : null;   // #61: the range replaces the last fix
                 return Say($"{hdr}, {rwAck}cleared " + (lim != null && dpq != null ? $"to {lim} via the {CrpSay(dpq.Name)} departure, " :
                            $"{(toRange != null ? $"to {toRange.Name}" : dest != null ? $"to {dest.Name.Replace('-', ' ')} airport" : "out of the control zone")} via radar vectors, " +
-                           $"after departure {(dpq != null ? $"fly the {CrpSay(dpq.Name)} departure" : "fly runway heading")}, ") + $"climb and maintain {Alt(depFt)}, {(cruiseFt > depFt ? $"expect {Alt(cruiseFt)} ten minutes after departure, " : "")}" +
+                           $"after departure {(dpq != null ? $"fly the {CrpSay(dpq.Name)} departure" : "fly runway heading")}, ") + $"climb and maintain {AltNum(depFt)}, {(cruiseFt > depFt ? $"expect {AltNum(cruiseFt)} ten minutes after departure, " : "")}" +
                            $"{(F.Own.ContainsKey("Departure") ? $"departure frequency {FreqSay(FreqOf(F, "Departure"))}" : $"departure {Contact("Approach")}")}, squawk {Digits(TakeSquawk())}.");   // own departure frequency (AirfieldFrequencies): the one in the clearance
             }
 
@@ -425,7 +425,7 @@ public partial class Tower
                 if (Hostile(af)) return Neg($"{c}, unable clearance to {af.Name.Replace('-', ' ')}, say alternate destination.");
                 (dest, altAsk, cruiseFt) = (af, false, 0);
                 var an = af.Name.Replace('-', ' ');
-                return Say($"{c}, cleared to {an} airport{(t != null ? $", {Steer(t, (af.X, af.Z), an)}" : "")}, climb and maintain {Alt(Cruise)}.", "Approach");
+                return Say($"{c}, cleared to {an} airport{(t != null ? $", {Steer(t, (af.X, af.Z), an)}" : "")}, climb and maintain {AltNum(Cruise)}.", "Approach");
             }
 
             case "taxi":
@@ -609,7 +609,7 @@ public partial class Tower
                 if (transitFt == null) { transitIn = false; TransitTold.Clear(); dueAt = -1; }   // repeated clearance (readback with callsign): no traffic info again, entry stays
                 (transitFt, transitBy) = (TransitFt, role);
                 transitDir = Regex.Match(n, @"\b((?:north|south)?(?:east|west)?)bound\b") is { Success: true } bm && bm.Groups[1].Value != "" ? bm.Groups[1].Value : Dir8(t.Hdg * 180 / Math.PI);
-                return Say($"{hdr}, cleared to cross the {F.Name.Replace('-', ' ')} control zone overhead, {transitDir}bound, not below {Alt(transitFt.Value)}, {Qnh(t)}, " +
+                return Say($"{hdr}, cleared to cross the {F.Name.Replace('-', ' ')} control zone overhead, {transitDir}bound, not below {AltNum(transitFt.Value)}, {Qnh(t)}, " +
                            $"runway {RwSay(rw)} in use, report clear of the zone.");
             }
 
@@ -872,7 +872,7 @@ public partial class Tower
                 }
                 entry = AssignEntry(t, rw, dir); crpAsked = crpWaved = false;
                 Phase = Phase.Inbound;
-                return Say(info + $"Enter via {CrpSay(entry!)}{SteerTo(t, Crp[entry], CrpSay(entry!))}, not above {Alt(MaxFt)}, report {CrpSay(entry!)}.{TrafficNote(traffic, rw)}");
+                return Say(info + $"Enter via {CrpSay(entry!)}{SteerTo(t, Crp[entry], CrpSay(entry!))}, not above {AltNum(MaxFt)}, report {CrpSay(entry!)}.{TrafficNote(traffic, rw)}");
             }
 
             case "runway":   // "request runway 31" (request checked above)
@@ -897,7 +897,7 @@ public partial class Tower
             case "altitude":   // "request higher / lower", "request flight level 200", "request 6000 feet"
             {
                 if (t == null) return Say($"{c}, say altitude.");
-                if (holding) return Neg($"{c}, unable, maintain {Alt(holdFt)} in the hold, {OneOf("I will call you", "I will advise")}.");
+                if (holding) return Neg($"{c}, unable, maintain {AltNum(holdFt)} in the hold, {OneOf("I will call you", "I will advise")}.");
                 if (Phase is Phase.Entering or Phase.Initial or Phase.Pattern or Phase.ClearedLand) return Neg($"{c}, negative, continue as cleared.");
                 bool vectors = Phase == Phase.Inbound && vec != null, up = Has(n, "higher", "climb"), pdAsk = Has(n, "discretion");
                 double cur = IndFt(t), floor = vectors ? Math.Max(PathMva(t), GateFt) : F.MvaFt(t.X, t.Z);
@@ -910,7 +910,7 @@ public partial class Tower
                     if (depClr && to is { } d) depFt = cruiseFt = d;
                     climbOut = "free";
                     if (Phase == Phase.Departing) { Phase = Phase.Away; nav = null; }   // released from the control zone
-                    return Say($"{c}, unrestricted climb approved{(to is { } a ? $" to {Alt(a)}" : "")}, resume own navigation.");
+                    return Say($"{c}, unrestricted climb approved{(to is { } a ? $" to {AltNum(a)}" : "")}, resume own navigation.");
                 }
                 if (vectors && !pdAsk && (up && slot == null || slot > vecFt + 300))   // R303: higher under radar vectoring (radio wheel "request higher" or with number)
                 {
@@ -919,8 +919,8 @@ public partial class Tower
                     // with 15 NM margin hits the gate; the altitude is held (StepDown only when the profile needs it), then descent at own discretion
                     double toGate = Math.Max(0, Path(t).R - gate) / NM, lim = GateFt + (toGate - 15) * 265;
                     double w = slot ?? (cur > vecFt + 300 ? Math.Round(cur / 1000) * 1000 + (Math.Round(cur / 1000) * 1000 < cur - 300 ? 1000 : 0) : Math.Min(Slow != null ? 10000 : 20000, Math.Floor(lim / 1000) * 1000));
-                    if (toGate < 25 || w > lim || w <= vecFt) return Neg($"{c}, unable higher, expect lower shortly, maintain {Alt(vecFt)}.");
-                    if (!LevelFree(t, traffic, w)) return Neg($"{c}, unable higher, traffic, maintain {Alt(vecFt)}.");
+                    if (toGate < 25 || w > lim || w <= vecFt) return Neg($"{c}, unable higher, expect lower shortly, maintain {AltNum(vecFt)}.");
+                    if (!LevelFree(t, traffic, w)) return Neg($"{c}, unable higher, traffic, maintain {AltNum(vecFt)}.");
                     vecFt = lastAltFt = w; lastVecSaid = now; pdDescent = true; altFree = false;
                     keepHighR = gate + ((w - GateFt) / 265 + 5) * NM;   // up to here (remaining distance) no descent by profile
                     return Say($"{c}, {(Math.Abs(w - cur) <= 300 ? "maintain" : "climb and maintain")} {Alt(w)}.");
@@ -928,12 +928,12 @@ public partial class Tower
                 if (vectors && pdAsk && (slot == null || slot < cur - 300))   // R303: "request descent at pilot's discretion" (FAA JO 7110.65 4-5-7 e, AIM 4-4-10)
                 {
                     double w = Math.Max(slot ?? Math.Max(floor, GateFt + 1000), floor);   // without number: up to 1000 ft above the gate altitude (R305: no gate altitude before)
-                    if (w < cur - 300 && !LevelFree(t, traffic, w)) return Neg($"{c}, unable, traffic, maintain {Alt(vecFt)}.");
+                    if (w < cur - 300 && !LevelFree(t, traffic, w)) return Neg($"{c}, unable, traffic, maintain {AltNum(vecFt)}.");
                     vecFt = lastAltFt = w; lastVecSaid = now; pdDescent = true; keepHighR = 0; altFree = false;
-                    return Say($"{c}, {(w < cur - 300 ? $"descend at pilot's discretion, maintain {Alt(w)}" : $"maintain {Alt(w)}")}.");
+                    return Say($"{c}, {(w < cur - 300 ? $"descend at pilot's discretion, maintain {AltNum(w)}" : $"maintain {AltNum(w)}")}.");
                 }
                 double want = slot ?? (vectors ? (up ? vecFt + 1000 : Math.Max(vecFt - 1000, floor)) : Math.Round(cur / 1000) * 1000 + (up ? 2000 : -2000));
-                var keep = vectors ? $"maintain {Alt(vecFt)}" : "maintain present altitude";
+                var keep = vectors ? $"maintain {AltNum(vecFt)}" : "maintain present altitude";
                 if (want < floor) return Neg($"{c}, unable, minimum altitude {Alt(floor)}, {keep}.");
                 if (!LevelFree(t, traffic, want)) return Neg($"{c}, unable, traffic, {keep}.");
                 if (vectors) { vecFt = want; lastVecSaid = now; altFree = false; if (want > cur) stepAfter = now + 120; }   // higher: 2 min, then descent by profile again
@@ -968,7 +968,7 @@ public partial class Tower
             case "unable":   // A28: pilot cannot comply with an instruction (terrain, weather, fuel): acknowledge and ask for intentions
                 if (addressed == null && Chatter(n)) return new();   // A140: "Two, unable" is flight radio
                 if (ground) return Say($"{c}, roger, hold position.");
-                return Say($"{c}, roger, {(Phase == Phase.Inbound && vec != null ? $"maintain {Alt(vecFt)}, " : "")}say intentions.");
+                return Say($"{c}, roger, {(Phase == Phase.Inbound && vec != null ? $"maintain {AltNum(vecFt)}, " : "")}say intentions.");
             case "weather":
                 return Say($"{hdr}, {Wind(t)}, {Qnh(t)}, runway {RwSay(rw)} in use.");
             case "bye":

@@ -10,8 +10,8 @@ class SimPilot
     const double NM = 1852, Ft = 0.3048, Kt = 0.514444;
     public const int React = 3;
     static readonly string Dw = string.Join("|", Tower.DigitWords), RwW = $@"((?:{Dw}) (?:{Dw})(?: left| right| center)?)";
-    static readonly Regex HdgRe = new($@"heading ((?:{Dw}) (?:{Dw}) (?:{Dw}))"), FtRe = new(@"(?<!above )\b(\d{3,5}) feet(?! above| below)"),
-        FlRe = new($@"flight level ((?:{Dw})(?: (?:{Dw})){{1,2}})"), KtRe = new(@"speed (\d+) knots"),
+    static readonly Regex HdgRe = new($@"heading ((?:{Dw}) (?:{Dw}) (?:{Dw}))"), FtRe = new(@"(?<!above )\b(?<n>\d{3,5}) feet(?! above| below)|(?<=\b(?:maintain|not below|expect|to|at) )(?<n>\d{3,5})\b(?! feet| knots)"),   // altitude with "feet" or, after an assignment word, without (FAA JO 7110.65 4-5-7)
+        FlRe = new($@"flight level ((?:{Dw})(?: (?:{Dw})){{1,2}})"), KtRe = new(@"speed (?:to )?(\d+) knots"),
         IcptRe = new($@"(?:intercept|join) (?:the extended centerline|the localizer|final approach course) runway {RwW}"),
         RwRe = new($@"runway {RwW}"), JoinRe = new($@"join (left|right) hand downwind(?: runway {RwW})?", RegexOptions.IgnoreCase), CircRe = new($@"circle to runway {RwW}, (left|right) traffic");
     readonly Airfield F;
@@ -61,7 +61,7 @@ class SimPilot
         var fm = FtRe.Match(alt);
         var lm = FlRe.Match(alt);
         if (lm.Success && (!fm.Success || lm.Index < fm.Index)) tAlt = Num(lm.Groups[1].Value) * 100 * Ft;
-        else if (fm.Success) tAlt = int.Parse(fm.Groups[1].Value) * Ft;
+        else if (fm.Success) tAlt = int.Parse(fm.Groups["n"].Value) * Ft;
         if (KtRe.Match(s) is { Success: true } k) tIas = int.Parse(k.Groups[1].Value) * Kt;
         if (s.Contains("final approach speed")) tIas = 140 * Kt;
         if (!fixedTrack && Mode == "hdg" && Regex.Match(s, $@"until established[^,]*, cleared (?:ILS|P A R) approach {RwRe}") is { Success: true } ce && Tower.HdgDiff(tHdg, F.End(RwOf(ce.Groups[1].Value)).Hdg) >= 10)
@@ -220,7 +220,7 @@ public partial class Tower
         int sec = 0;
         void Hear(List<Msg> ms)
         {
-            foreach (var m in ms.Where(m => m.Role != "Info")) { o.Add((sec, p.AL(e).A / NM, m.Role, m.Text)); p.Hear(m.Text, sec); }
+            foreach (var m in ms.Where(m => m.Role != "Info")) { o.Add((sec, p.AL(e).A / NM, m.Role, m.Text)); p.Hear(m.Text, sec); tw.Aired(sec, m.Text, m.Role); }   // on air at once: PAR talk-down keeps its 5 s rhythm (else 20 s, the last call before the threshold depends on the speed)
         }
         tw.Tick(p.Tel(), none, 0);
         sec = 1;
@@ -237,7 +237,7 @@ public partial class Tower
 
     static readonly string[] Bad = { "check runway", "check altitude", "low altitude alert", "expedite", "wrong side", "negative", "not following", "go around", "too low", "unable", "say again", "pattern is south", "verify heading" };   // R271: "no transmissions" is allowed now: the PAR setup call carries the lost-comm instruction
 
-    static (bool Ok, string Info, List<string> Log) SimRun(Airfield f, string rw, bool ifr, double dir, bool strict)
+    internal static (bool Ok, string Info, List<string> Log) SimRun(Airfield f, string rw, bool ifr, double dir, bool strict)
     {
         var e = f.End(rw);
         var wind = (X: -e.Dx * 5, Z: -e.Dz * 5);   // 10 kt headwind: DCS (and the AI) land on rw
@@ -277,9 +277,9 @@ public partial class Tower
                     // R353: approach clearance with the intercept vector, at most one call in between
                     if (Regex.IsMatch(m.Text, @"cleared (ILS|P A R) approach")) { if (sinceIcpt > 1) errs.Add($"Freigabe {sinceIcpt} Ansagen nach dem Eindrehvektor @{sec}s"); sinceIcpt = -1; }
                     else if (m.Text.Contains("intercept") && tw.Proc(tw.Runway) != "P A R") sinceIcpt = 0;   // PAR: the clearance comes once with the final turn-on / handoff (8 NM or more), not with the first intercept vector
-                    else if (sinceIcpt >= 0 && !Regex.IsMatch(m.Text, @"^[^,]+, (descend|climb) and maintain [^,]+\.$")) sinceIcpt++;   // profile descent alone (R305, long final) does not count
+                    else if (sinceIcpt >= 0 && !Regex.IsMatch(m.Text, @"^[^,]+, (descend|climb) and maintain [^,]+(, (reduce|increase) speed to \d+ knots)?\.$")) sinceIcpt++;   // profile descent alone (R305, long final; with the speed of the 250 kt limit) does not count
                     // R355: no other altitude shortly before the handoff
-                    if (Regex.Match(m.Text, @"maintain (flight level [a-z ]+?|\d+ feet)\b") is { Success: true } am)
+                    if (Regex.Match(m.Text, @"maintain (flight level [a-z ]+?|\d+)\b") is { Success: true } am)
                     {
                         if (m.Text.Contains("contact") && m.Text.Contains("Tower") && alts.LastOrDefault(x => sec - x.S <= 10 && x.A != am.Groups[1].Value) is { A: { } oa }) errs.Add($"{oa} und {am.Groups[1].Value} vor der Übergabe @{sec}s");
                         alts.Add((sec, am.Groups[1].Value));

@@ -838,11 +838,11 @@ static partial class Program
                 throw new Exception("Verfahrens-Editor: Eintrag der Seite wird nicht gelesen");
             // #31 (LtJaeger): "above" + "below" on one fix = between: parsed, spoken, kneeboard row
             var bt = ed.Departures["FLEX"];
-            if (bt.Pts[1] != ("ECHO", 11.0, 12.0, 5000.0, "between", 7000.0) || !Tower.CrossTxt(bt).EndsWith("Echo between 5000 and 7000 feet") || !Kneeboard.RouteLines(new[] { ed }).Any(l => l.Contains("ECHO 5000-7000")))
+            if (bt.Pts[1] != ("ECHO", 11.0, 12.0, 5000.0, "between", 7000.0) || !Tower.CrossTxt(bt).EndsWith("Echo between 5000 and 7000") || !Kneeboard.RouteLines(new[] { ed }).Any(l => l.Contains("ECHO 5000-7000")))
                 throw new Exception("Hoehe between: " + Tower.CrossTxt(bt));
             // #57 (LtJaeger): "silent": true = flown, not spoken; the name gets a "_" prefix, the kneeboard lists it without
             var mu = ed.Departures["MUTE"];
-            if (mu.Pts[1].Fix != "_FOXTROT" || Tower.CrossTxt(mu) != "Delta at 3000 feet" || !Kneeboard.RouteLines(new[] { ed }).Any(l => l.Contains("FOXTROT 6000")) || Kneeboard.RouteLines(new[] { ed }).Any(l => l.Contains("_FOXTROT")))
+            if (mu.Pts[1].Fix != "_FOXTROT" || Tower.CrossTxt(mu) != "Delta at 3000" || !Kneeboard.RouteLines(new[] { ed }).Any(l => l.Contains("FOXTROT 6000")) || Kneeboard.RouteLines(new[] { ed }).Any(l => l.Contains("_FOXTROT")))
                 throw new Exception($"silent: {mu.Pts[1].Fix} / {Tower.CrossTxt(mu)}");
             File.WriteAllText(ownF, """{ "Banias": { "crp": { "TEST": [1, 2] }, "rwy": { "09": { "entry": { "TEST": { "via": "initial" } }, "exit": { "TEST": {} } } }, "departures": { "FLEX": { "rwy": ["09"], "pts": [ { "fix": "ECHO", "pos": [11, 12], "above": 7000, "below": 5000 } ] } } } }""");
             if (OwnChart(ownF) != null) throw new Exception("Hoehe between: above > below nicht erkannt");   // OwnChart reports format errors and drops the file

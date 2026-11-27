@@ -190,7 +190,7 @@ public partial class Tower
         else if (!parBegun)
         {
             if (dev >= -10) { parBegun = true; call = $"{c}, {(gp == 0 ? "on glidepath" : $"{(gp == 2 ? "well" : "slightly")} {above} glidepath")}, begin descent, {Course()}."; }
-            else if (vecFt > 0 && IndFt(t) < vecFt - 200) call = $"{c}, check altitude, maintain {Alt(vecFt)}, {Course()}.";   // descended before "begin descent": back to the cleared altitude ("maintain" in the approach clearance)
+            else if (vecFt > 0 && IndFt(t) < vecFt - 200) call = $"{c}, check altitude, maintain {AltNum(vecFt)}, {Course()}.";   // descended before "begin descent": back to the cleared altitude ("maintain" in the approach clearance)
             else
             {
                 double aGp = (t.AltMsl - FieldElev - 15) / tan3;   // distance where the path meets the current altitude
@@ -320,6 +320,8 @@ public partial class Tower
         : t.AltMsl / Ft;
 
     static string Alt(double ft) => ft >= 18000 ? $"flight level {Digits(Math.Round(ft / 100).ToString("0"))}" : $"{ft:0} feet";
+    /// Altitude after an assignment verb or restriction: no "feet" (FAA JO 7110.65 4-5-7, "descend and maintain four thousand"); flight level as usual.
+    static string AltNum(double ft) => ft >= 18000 ? Alt(ft) : $"{ft:0}";
     /// R130: "climb/descend and maintain" only for a new altitude; same altitude as last time or Mode-C tolerance ±300 ft: "maintain". dev: deviation (check altitude, immediately) names the direction.
     double lastAltFt = -1;
     string AltTo(Telemetry? t, double ft, bool dev = false)
@@ -327,8 +329,8 @@ public partial class Tower
         bool same = !dev && ft == lastAltFt;
         lastAltFt = ft;
         if ((Emergency || t != null && Pd(t)) && !dev && t != null && IndFt(t) - ft > 300) return Descend(ft, t);   // R292: emergency on top: also in repeats at own discretion
-        return t == null || same || Math.Abs(IndFt(t) - ft) <= (dev ? 200 : 300) ? $"maintain {Alt(ft)}"
-            : $"{(IndFt(t) < ft ? "climb" : "descend")} and maintain {Alt(ft)}";
+        return t == null || same || Math.Abs(IndFt(t) - ft) <= (dev ? 200 : 300) ? $"maintain {AltNum(ft)}"
+            : $"{(IndFt(t) < ft ? "climb" : "descend")} and maintain {AltNum(ft)}";
     }
     internal static string Cap(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
 
