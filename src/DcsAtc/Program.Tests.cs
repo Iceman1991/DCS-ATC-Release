@@ -922,7 +922,12 @@ static partial class Program
             Pilots.Clear(); var one = Pilots["U1"] = new Pilot { Id = 1, Callsign = "Enfield 1-1" }; stateTime = Clock;
             SrsListener.Transmission Sx(uint unit) => new(Array.Empty<short>(), 251, unit, "x");
             var (x99, x0, x1, xf) = (PilotFor(Sx(99)), PilotFor(Sx(0)), PilotFor(Sx(1)), ByCallsign("Kutaisi Tower, Colt 2-1, inbound"));
+            // Forum (Killg0re NL, 2026-11-28): MOOSE message from ExternalAudio unit 1000 naming a player is no player call; a unit-0 client is still found by call sign
+            Pilots["U2"] = new Pilot { Id = 16780546, Callsign = "Springfield 1-1" };
+            var (sc1000, scPilot, sc0) = (IsScriptSender(new(Array.Empty<short>(), 250.4, 1000, "CAS Kabul")), IsScriptSender(new(Array.Empty<short>(), 250.4, 16780546, "Springfield")), IsScriptSender(new(Array.Empty<short>(), 250.4, 0, "Springfield")));
+            var byCs = ByCallsign("Springfield 1-1, request taxi");
             Pilots.Clear(); foreach (var kv in pb358) Pilots[kv.Key] = kv.Value; stateTime = st358;
+            if (!sc1000 || scPilot || sc0 || byCs?.Callsign != "Springfield 1-1") throw new Exception($"Forum Killg0re: Skript-Sender unit 1000 ignoriert={sc1000}, Spieler={scPilot}, unit 0={sc0}, Rufzeichen={byCs?.Callsign}");
             if (x99 != null || xf != null || x0 != one || x1 != one) throw new Exception($"R358: einziger Spieler nur ohne Unit-ID: {x99?.Callsign} {xf?.Callsign} {x0?.Callsign} {x1?.Callsign}");
         }
         var ch = Channels[999] = new Chan();   // without sender thread

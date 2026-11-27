@@ -1,8 +1,8 @@
-DCS-ATC 0.23.30 ALPHA – talking air traffic control for DCS World (all maps, tested on Caucasus)
+DCS-ATC 0.90.0 BETA – talking air traffic control for DCS World (all maps, tested on Caucasus)
 ========================================================================
 
-!! ALPHA VERSION !!
-  Early test version: there will be bugs (wrong or duplicate radio calls, odd headings, hangs).
+!! BETA VERSION !!
+  The main features are done, bugs are still possible (wrong or duplicate radio calls, odd headings).
   Use at your own risk, no warranty. Best back up Saved Games\DCS\Scripts first.
   Please report bugs with time, airfield, a short description and the files atc-log.txt and atc-debug.txt
   (in the installation folder: %LOCALAPPDATA%\Programs\DCS-ATC).

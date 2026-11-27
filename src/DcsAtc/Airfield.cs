@@ -63,6 +63,36 @@ public class Airfield
     public string Icao = "";   // #32: chart "icao" (built in for the Caucasus), destination by ICAO code ("request IFR clearance to Echo Tango Mike November")
     public bool RampOnly;   // forum (Lt_Jaeger): chart "ground": { "ramp_only": true }: after landing Ground names only the ramp here, no stand (all airfields: config AssignParkingSpot false)
     public Rollnetz? Net;                     // DCS taxi network (Rollnetz.LoadAll, from the user's DCS installation), null = none
+    public Rollnetz? TaxiNet;                 // Developer request 2026-11-27: network of every airfield (also uncharted ones), only for RunwayTaxi; Net stays charted-only
+    readonly Dictionary<(string, int, int), bool> rwyTaxiMemo = new();
+    readonly Dictionary<string, bool> rwyTaxiField = new();
+    /// Developer request 2026-11-27: the way from the apron to the departure holding point of rw leads over the runway itself (no taxiway): chart "backtrack", or in the DCS network
+    /// the holding point (named, else the threshold) cannot be reached without the runway edges but can with them. false: unknown / without network.
+    /// Only on a field where the MAJORITY of the apron has that problem (RunwayTaxiField): one odd apron of a field with taxiways (Bagram) does not make the field a runway-taxi field.
+    public bool RunwayTaxi(string rw, double x, double z) => Backtrack.Contains(rw) || RunwayTaxiField(rw) && OverRunway(rw, x, z);
+    bool OverRunway(string rw, double x, double z)
+    {
+        if (TaxiNet is not { } n || !Ends.Any(e => e.Name == rw)) return false;
+        var key = (rw, (int)Math.Round(x / 50), (int)Math.Round(z / 50));
+        if (rwyTaxiMemo.TryGetValue(key, out var r)) return r;
+        var e = End(rw);
+        var to = RampAt(x, z) is { } rp && rp.Hold.TryGetValue(rw, out var hn) && Holds.TryGetValue(hn, out var h) ? (h.X, h.Z) : (e.ThrX, e.ThrZ);
+        return rwyTaxiMemo[key] = n.RouteTo((x, z), to, AlongStrip(rw), 200) == null && n.RouteTo((x, z), to, (_, _) => false, 200) != null;
+    }
+    /// Field level: the MAJORITY of the apron (every DCS parking spot, else the charted ramps) has no taxiway to the holding point of rw.
+    public bool RunwayTaxiField(string rw)
+    {
+        if (Backtrack.Contains(rw)) return true;
+        if (rwyTaxiField.TryGetValue(rw, out var r)) return r;
+        var ps = (Spots.Count > 0 ? Spots.Select(s => (s.X, s.Z)) : Ramps.Select(q => (q.X, q.Z))).ToList();   // every parking spot, memoized per runway
+        return rwyTaxiField[rw] = ps.Count > 0 && ps.Count(p => OverRunway(rw, p.X, p.Z)) * 2 > ps.Count;
+    }
+    /// Taxi edge along the strip of rw (rw and its opposite end only): other runways (parallel, crossing) may serve as taxiway, that is not "taxiing on the runway" of rw.
+    public Func<(double X, double Z), (double X, double Z), bool> AlongStrip(string rw)
+    {
+        var strip = Ends.Where(e => e.Name == rw || e.Name == Opposite(rw)).ToList();
+        return (a, b) => strip.Any(e => AlongRunway(e, a, b));
+    }
     public Dictionary<string, (double X, double Z, string[] Rwy)> Holds = new();   // Named holding points (map)
     public Dictionary<string, string> HandOf = new();                          // Runway -> "right hand"/"left hand" (map)
     public Dictionary<string, List<(string Crp, string Via, (double X, double Z)? Wp)>> Entry = new();   // Runway -> entry CRPs (last = default without position), via "overhead"/"initial", Wp = knee point on the way to the initial
@@ -100,12 +130,13 @@ public class Airfield
     });
     /// Issue #62: taxi edge that runs ALONG a runway (both nodes on its rectangle, longer than 10 m, within 30 deg of its axis). Crossing pieces (steep) and tiny pieces
     /// (direction is noise) are no along-runway edges: a crossing often consists of several edges, dropping the short middle one would make the runway impassable.
-    public bool AlongRunway((double X, double Z) a, (double X, double Z) b) => Ends.Any(e =>
+    public bool AlongRunway((double X, double Z) a, (double X, double Z) b) => Ends.Any(e => AlongRunway(e, a, b));
+    static bool AlongRunway(RwyEnd e, (double X, double Z) a, (double X, double Z) b)
     {
         bool In((double X, double Z) p) => Math.Abs((p.X - e.CX) * e.Dx + (p.Z - e.CZ) * e.Dz) < e.Len / 2 + 50 && Math.Abs((p.X - e.CX) * e.Dz - (p.Z - e.CZ) * e.Dx) < 30;
         double dx = b.X - a.X, dz = b.Z - a.Z, l = Math.Sqrt(dx * dx + dz * dz);
         return l > 10 && In(a) && In(b) && Math.Abs(dx * e.Dz - dz * e.Dx) / l < 0.5;   // sin(30 deg) = 0.5, direction-insensitive
-    });
+    }
     public Ramp? RampAt(double x, double z) => Ramps.OrderBy(r => (r.X - x) * (r.X - x) + (r.Z - z) * (r.Z - z)).FirstOrDefault();
     public Dictionary<int, string> Stands = new();   // DCS stand name by Term_Index ("F125" as in the ME/kneeboard), from the hook
     /// DcsAtc-Stands.txt (DcsAtcHook.lua): "M;theatre", then "S;airdrome id;Term_Index;name". Other map = stale file, ignored.

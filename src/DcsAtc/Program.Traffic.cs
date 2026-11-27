@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
@@ -150,6 +150,23 @@ static partial class Program
                             : pilots.FirstOrDefault(p => "p:" + p.Unit == k)?.Tel is { } pt ? (pt.X, pt.Z) : null;
 
     static bool Chatter => Cfg.AiChatter && On("ai");
+    /// Developer request 2026-11-27: flights on the runway route of a field without taxiway (RunwayTaxi): players on the ground taxiing out / holding / cleared for takeoff, AI after START until airborne.
+    /// All = every such flight (one at a time), On = those within 300 m of the runway (they enter or occupy it). exceptGroup: the AI asking itself.
+    static (int All, int On) RwyTaxiFlights(Airfield f, string rw, Pilot? me, string? exceptGroup, List<Pilot> pilots)
+    {
+        var e = f.End(rw);
+        double Lat(double x, double z) => Math.Abs((x - e.CX) * e.Dz - (z - e.CZ) * e.Dx);
+        bool Strip(double x, double z) => Math.Abs((x - e.CX) * e.Dx + (z - e.CZ) * e.Dz) < e.Len / 2 + 100 && Lat(x, z) < 45;
+        // only flights whose own way to the holding point leads over the runway (on the runway itself: by the majority of the apron); "on" = on the runway or at its edge (100 m), not merely near
+        bool Tx(double x, double z) => f.RunwayTaxi(rw, x, z) || Strip(x, z) && f.RunwayTaxiField(rw);
+        bool Near(double x, double z) => Math.Abs((x - e.CX) * e.Dx + (z - e.CZ) * e.Dz) < e.Len / 2 + 100 && Lat(x, z) < 100;
+        var fl = pilots.Where(o => o != me && o.Active?.F == f && o.Tel is { Agl: < 15 } && o.Active.Phase is Phase.TaxiOut or Phase.HoldShort or Phase.ClearedTakeoff).Select(o => (o.Tel!.X, o.Tel.Z)).ToList();
+        fl.AddRange(Ai.Where(a => a.Group != exceptGroup && !a.InAir && !a.Heli && a.Flag.StartsWith("dep-go") && (a.Flag.Split(':', 2) is [_, var n] ? n : "Kutaisi") == f.Name &&
+                                  (aiStage.GetValueOrDefault(a.Group) is "taxi" or "ready" || aiStage.GetValueOrDefault(a.Group, "") == "" && a.Speed > 2)).Select(a => (a.X, a.Z)));
+        fl = fl.Where(p => Tx(p.Item1, p.Item2)).ToList();
+        return (fl.Count, fl.Count(p => Near(p.Item1, p.Item2)));
+    }
+
     static void ControlAi(List<Pilot> pilots, List<Tx> outq)
     {
         if (!MissionData || !On("atc")) return;   // without atc: the AI flies the DCS ATC
@@ -200,17 +217,23 @@ static partial class Program
             bool arrNear = herePl.Any(p => p.Active!.Phase is Phase.Inbound or Phase.Entering or Phase.Initial && p.Active.HoldInfo == null && Dist(p.Tel!.X, p.Tel.Z, fld.X, fld.Z) < 12 * NM);   // Player is being vectored in: AI departure waits (climb would cross otherwise)
             var rws = Tower.RwSay(rw);
             var thr = fld.End(rw);
+            // Developer request 2026-11-27: field without taxiway (the way to the holding point leads over the runway): nobody starts to taxi while the runway is busy (taxiing, takeoff, landing within 4 NM / rollout)
+            // or while another flight is on the route or waits for it; taxiing flights near the runway also block landing clearances
+            bool rwyTx = !a.Heli && flag == "dep" && fld.RunwayTaxi(rw, a.X, a.Z);   // per position: this flight's own way from its spot
+            var (txAll, txOn) = a.Heli ? (0, 0) : RwyTaxiFlights(fld, rw, null, g.Key, pilots);   // counts only flights on a runway-taxi route (per flight)
+            bool txBusy = rwyTx && (rwyBusy || txAll > 0 || here.Any(t => t.TaxiHeld || t.Phase == Phase.ClearedLand) || herePl.Any(p => p.Active!.OnFinalWithin(p.Tel!, 4 * NM)) ||
+                                    Ai.Any(o => o.Group != g.Key && o.InAir && FieldOf(o) == fld.Name && aiStage.GetValueOrDefault(o.Group) is "final" or "final-wait" && Dist(o.X, o.Z, fld.X, fld.Z) < 5 * NM));
             // R338: a player's landing clearance blocks the AI landing only if he is down or ahead of it; the reason is in the call (FAA JO 7110.65 3-8-1, 3-10-6)
             double Al(double x, double z) => -((x - thr.ThrX) * thr.Dx + (z - thr.ThrZ) * thr.Dz);
             var leadPl = herePl.Where(p => p.Active!.Phase == Phase.ClearedLand && p.Tel!.Agl >= 15 && Al(p.Tel.X, p.Tel.Z) < Al(a.X, a.Z)).MaxBy(p => Al(p.Tel!.X, p.Tel.Z));
             bool depNow = aiDep || here.Any(t => t.Phase == Phase.ClearedTakeoff);
-            bool rwyBusyArr = emergency || !a.Heli && (depNow || luaw || leadPl != null || blocked || herePl.Any(p => p.Active!.Phase == Phase.ClearedLand && p.Tel!.Agl < 15));
+            bool rwyBusyArr = emergency || !a.Heli && (depNow || luaw || leadPl != null || blocked || txOn > 0 || herePl.Any(p => p.Active!.Phase == Phase.ClearedLand && p.Tel!.Agl < 15));
             string busyWhy = leadPl != null ? $"number two, follow the {Ops.TypeSay(leadPl.Type)} on {Math.Max(1, (int)Math.Round(Al(leadPl.Tel!.X, leadPl.Tel.Z) / NM))} mile final, continue"
                            : $"continue approach, {(emergency ? "emergency in progress" : depNow ? $"traffic departing runway {rws}" : "traffic on runway")}";
             var m = Regex.Match(AiCallsign.GetValueOrDefault(g.Key, ""), @"^([A-Za-z]+)\s*(\d)\s*-?\s*(\d)");
             var cs = m.Success ? Tower.SpokenCallsign($"{m.Groups[1].Value} {m.Groups[2].Value}-{m.Groups[3].Value}") : a.Type.Split('_')[0] + " flight";
             var stage = aiStage.GetValueOrDefault(g.Key, "");
-            if (flag == "arr" && stage == "gone") stage = aiStage[g.Key] = "";   // mission AI back from its departure: approach calls anew
+            if (flag == "arr" && stage is "gone" or "checked" or "released") stage = aiStage[g.Key] = "";   // mission AI back from its departure: approach calls anew
             var rwTo = a.Heli ? "" : $" runway {rws}";   // helicopter: no runway in the calls (R347)
             string landClr = $"{cs}{(a.Heli ? "" : $", runway {rws}")}, cleared to land.", landRb = $"Cleared to land{rwTo}, {cs}.";
             // Like real radio: audible to players ≤ 50 NM who have the airfield frequency tuned in SRS (frequency unknown: players at this airfield)
@@ -252,7 +275,7 @@ static partial class Program
                     Chat("Approach", $"{fld.StationOf("Approach")}, {cs}, minimum fuel.",
                          $"{cs}, {OneOf("roger", "copy")} minimum fuel, you are number {pos + 1}.", $"Number {pos + 1}, {cs}.");
             }
-            if (flag == "dep" && !rwyBusy && !contra && !arrNear && (Clock - lastAiStart.GetValueOrDefault(fld.Name)).TotalSeconds > 120 && Once("START;" + g.Key))
+            if (flag == "dep" && !rwyBusy && !txBusy && !contra && !arrNear && (Clock - lastAiStart.GetValueOrDefault(fld.Name)).TotalSeconds > 120 && Once("START;" + g.Key))
             {
                 lastAiStart[fld.Name] = Clock;
                 AiCmd($"START;{g.Key}");
@@ -285,6 +308,21 @@ static partial class Program
             {
                 aiStage[g.Key] = "gone";
                 Chat("Tower", "", $"{cs}, contact departure, good day.", OneOf($"Good day, {cs}.", $"Contact departure, {cs}."));
+            }
+            // Developer request 2026-11-27: after the Tower handover the AI checks in with Departure like a player ("airborne, climbing" -> radar contact), once per flight; silent with chatter off
+            else if (flag == "dep-go" && a.InAir && stage == "gone")
+            {
+                aiStage[g.Key] = "checked";
+                if (Chatter)
+                    Chat("Departure", $"{fld.StationOf("Departure")}, {cs}, airborne, climbing.",
+                         $"{cs}, {fld.StationOf("Departure")}, radar contact. Resume own navigation, maintain VFR.", $"Resume own navigation, {cs}.");
+            }
+            // Developer request 2026-11-27: leaving the area (15 NM, like the player's departure sign-off) -> radar service terminated, once
+            else if (flag == "dep-go" && a.InAir && stage == "checked" && Dist(a.X, a.Z, fld.X, fld.Z) > 15 * NM)
+            {
+                aiStage[g.Key] = "released";
+                if (Chatter)
+                    Chat("Departure", "", $"{cs}, radar service terminated, frequency change approved.", $"Good day, {cs}.");
             }
             else if (flag == "arr" && wait && !a.Mission && (stage == "" || emergency || contra && !aiSent.ContainsKey("RESUME;" + g.Key)) && a.InAir && Dist(a.X, a.Z, fld.X, fld.Z) > 8 * NM && Once("WAIT;" + g.Key))   // cleared: not into holding again
             {
@@ -578,6 +616,33 @@ static partial class Program
                     || !l1.Contains("radar contact.") || hq || !l2.Contains("cleared to land.") || l2.Contains("runway") || !l3.Contains("request air taxi to parking") || !r1.Contains("inbound for landing"))
                     throw new Exception($"Missions-KI: \"{m0}\" / \"{m1}\" / \"{m2}\" / \"{h1}\" / \"{h2}\" / \"{a1}\" / \"{l1}\" / \"{l2}\" / \"{l3}\" / \"{r1}\" / {string.Join(",", cmds)}");
                 Console.WriteLine($"OK   Missions-KI funkt ohne START/WAIT (\"{m1}\"), Hubschrauber: \"{h2}\" / \"{l2}\"");
+            }
+
+            // Developer request 2026-11-27: AI departure after liftoff: Tower handover, Departure check-in + radar contact, later radar service terminated; each once; silent without chatter / out of earshot
+            {
+                string Dp() { var s = string.Join(" | ", outq.Where(t => t.Role == "Departure").Select(t => (t.Pilot ? "P:" : "A:") + t.Text)); outq.Clear(); return s; }
+                var oldChat = Cfg.AiChatter;
+                aiStage.Clear(); aiSent.Clear(); outq.Clear();
+                Player(Phase.Parked, rw);
+                aiStage["DEP7"] = "ready";
+                Ai = new() { Plane("DEP7", "dep-go:Kutaisi", e.At(9000, 0), true, 150, 1500) };
+                Run(); var d0 = Dp();   // 5 km away: Tower "contact departure"
+                Run(); var d1 = Dp();   // check-in
+                Run(); var d2 = Dp();   // still close: nothing
+                Ai = new() { Plane("DEP7", "dep-go:Kutaisi", e.At(30000, 0), true, 150, 3000) };
+                Run(); var d3 = Dp();   // 15 NM: sign-off
+                Run(); var d4 = Dp();   // once
+                Cfg.AiChatter = false;
+                aiStage["DEP8"] = "gone"; aiStage["DEP9"] = "checked";
+                Ai = new() { Plane("DEP8", "dep-go:Kutaisi", e.At(9000, 0), true, 150, 1500), Plane("DEP9", "dep-go:Kutaisi", e.At(30000, 0), true, 150, 3000) };
+                Run(); var d5 = Dp();
+                Cfg.AiChatter = oldChat;
+                aiStage["DEP10"] = "gone"; pl.Active = null; pl.Tel = pl.Tel! with { X = pl.Tel.X + 100 * NM };
+                Ai = new() { Plane("DEP10", "dep-go:Kutaisi", e.At(9000, 0), true, 150, 1500) };
+                Run(); var d6 = Dp();
+                if (d0 != "" || !d1.Contains("airborne, climbing") || !d1.Contains("radar contact") || !d1.Contains("P:Kutaisi Departure") || d2 != "" || !d3.Contains("radar service terminated, frequency change approved") || d4 != "" || d5 != "" || d6 != "" || aiStage["DEP7"] != "released")
+                    throw new Exception($"KI-Abflug Departure: \"{d0}\" / \"{d1}\" / \"{d2}\" / \"{d3}\" / \"{d4}\" / \"{d5}\" / \"{d6}\" / {aiStage["DEP7"]}");
+                Console.WriteLine($"OK   KI-Abflug: Departure-Anmeldung \"{d1}\", Freigabe \"{d3}\", je einmal, still ohne Chatter / außer Hörweite");
             }
 
             // Carrier into the wind: mission does not turn (land ahead) -> Marshal states the BRC being steered, after 5 min new CVTURN; leg finished (ship stationary) likewise

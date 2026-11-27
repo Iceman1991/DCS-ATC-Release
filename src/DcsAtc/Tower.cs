@@ -120,6 +120,12 @@ public partial class Tower
     bool needWx;                        // R126: initial rejection was the first contact, wind and QNH only come with the break clearance
     public bool LineUp => lineUp;       // "line up and wait" (Program: AI waits, A9/A10)
     public int RunwayClaimed;           // A9: others with takeoff clearance or LUAW before the takeoff roll (player) or AI with takeoff clearance on the ground (Program)
+    // Developer request 2026-11-27: airfield where taxiing leads over the runway (no taxiway): nobody gets a taxi clearance while the runway is busy, the request is held and called back
+    public int RwyTaxiAhead;            // others taxiing/lined up/departing on such a route (players on the ground, AI after start) or waiting for it longer than me (Program)
+    public int RwyTaxiOn;               // of them: within 300 m of the runway (they enter or occupy it), blocks landing clearances there too (Program)
+    string? taxiHeldTxt; double taxiHeldAt = -1;
+    public bool TaxiHeld => taxiHeldTxt != null;
+    public double TaxiHeldAt => taxiHeldAt;
     public double HoldSince => holdSince;
     public int HoldAhead;               // R341: other players holding short who reported ready earlier (Program; departure order by report time)
     public bool Heli;                   // R347: helicopter (mission category, Program); also by type without mission data

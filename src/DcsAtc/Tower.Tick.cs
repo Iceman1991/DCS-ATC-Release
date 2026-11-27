@@ -71,6 +71,13 @@ public partial class Tower
         if (Phase is Phase.Parked or Phase.Away) Runway = wantRw ?? WindRunway(t, Phase == Phase.Parked);
         var rw = Runway;
 
+        // Developer request 2026-11-27: held taxi request (runway route, runway busy): as soon as it is free the normal taxi clearance, one flight at a time
+        if (taxiHeldTxt != null)
+        {
+            if (!ground || Phase is not (Phase.Parked or Phase.StartupApproved)) taxiHeldTxt = null;
+            else if (RwyTaxiWhy(t, traffic) == null) { var txt = taxiHeldTxt; taxiHeldTxt = null; lastIntent = ""; return Heard(txt, t, traffic, now, true); }
+        }
+
         // Runway occupied (also other takeoff clearance, A9) or opposite traffic on final: never, not even after 3 min. A10: on the runway (LUAW) with approach at 2.5-6 NM "immediate",
         // the 180-s exception only with approach over 2.5 NM. R110: only after a request (holdSince >= 0), never after spawn/reset on the runway (-1) or rejected takeoff (-2, R100)
         // R205: heavy in takeoff roll/departure on the active runway (up to 500 ft): 2-min interval counts from the last time
@@ -1331,6 +1338,7 @@ public partial class Tower
         exitDir = entry = null;
         vec = null; missAt = -1; zoneReport = false;
         stoppedSince = -1;
+        taxiHeldTxt = null;
         lineUp = stayPattern = holding = graded = called = wentAround = false; heliArr = 0;
         devTold.Clear(); devPend = false; special = null; intr = 0; transitFt = null;
         Emergency = false;

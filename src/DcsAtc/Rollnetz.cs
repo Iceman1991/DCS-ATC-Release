@@ -107,14 +107,18 @@ public sealed class Rollnetz
     /// Without DCS installation or file: silently no network.
     public static void LoadAll(IEnumerable<Airfield> fields, string dcsDir)
     {
-        var charted = fields.Where(f => f.Charted).ToList();
+        var all = fields.ToList();   // Developer request 2026-11-27: TaxiNet for every airfield (runway-taxi detection), Net only for charted ones as before
         var dir = Path.Combine(Airfield.TerrainDir(dcsDir, Airfield.Theatre), "AirfieldsTaxiways");
-        if (charted.Count == 0 || !Directory.Exists(dir)) return;
+        if (all.Count == 0 || !Directory.Exists(dir)) return;
         var nets = new List<Rollnetz>();
         try { foreach (var file in Directory.EnumerateFiles(dir, "*.rn4")) if (Read(file) is { } n) nets.Add(n); }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
-        foreach (var f in charted)
-            f.Net = nets.Select(n => (n, s: n.Score(f))).Where(x => x.s >= 2).OrderByDescending(x => x.s).Select(x => x.n).FirstOrDefault();
+        foreach (var f in all)
+        {
+            var net = nets.Select(n => (n, s: n.Score(f))).Where(x => x.s >= 2).OrderByDescending(x => x.s).Select(x => x.n).FirstOrDefault();
+            f.TaxiNet = net;
+            if (f.Charted) f.Net = net;
+        }
     }
 
     /// Stands (within 1 m of a node) plus runway ends (within 5 m of a node) of the airfield found in this network.

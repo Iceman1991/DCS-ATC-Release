@@ -431,6 +431,14 @@ public partial class Tower
             case "taxi":
             {
                 if (VfrBlocked) return Neg(VfrUnable(hdr));
+                // Developer request 2026-11-27: taxi route over the runway (no taxiway): no clearance while the runway is busy, request kept and called back by the tick (TickCore)
+                if (Phase is Phase.Parked or Phase.StartupApproved && RwyTaxiWhy(t, traffic) is { } hold)
+                {
+                    if (taxiHeldTxt == null) taxiHeldAt = now;
+                    taxiHeldTxt = text;
+                    return Say($"{hdr}, hold position, {hold}, I'll call you.", "Ground");
+                }
+                taxiHeldTxt = null;
                 if (t != null && OnRwyWait && OnRunwayPos(t.X, t.Z))   // LA04: no taxi clearance on the runway (TaxiOut there is a runway incursion)
                     return Say(Phase == Phase.ClearedTakeoff ? $"{c}, runway {RwSay(rw)}, {Wind(t)}, cleared for takeoff." : $"{c}, you are on runway {RwSay(rw)}, report ready for departure.", "Tower");
                 bool first = Phase == Phase.Parked;   // First call: check ATIS identifier, "request startup and taxi" answers both; A33: QNH only here and only without reported ATIS, not again after "start up approved"

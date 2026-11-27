@@ -89,9 +89,18 @@ public partial class Tower
 
     // ======================================================================= Traffic
     /// Runway occupied: traffic on the active runway (A8) or another takeoff clearance before the takeoff roll (A9).
-    bool TrafficOnRunway(IReadOnlyList<Traffic> traffic) => RunwayClaimed > 0 || RwyTraffic(traffic) != null;
+    bool TrafficOnRunway(IReadOnlyList<Traffic> traffic) => RunwayClaimed > 0 || RwyTaxiOn > 0 || RwyTraffic(traffic) != null;
     Traffic? RwyTraffic(IReadOnlyList<Traffic> traffic) => traffic.FirstOrDefault(a => Blocks(F, Runway, a.X, a.Z, a.AltMsl - FieldElev, a.Hdg, a.Speed));
-    string BusyWhy(IReadOnlyList<Traffic> traffic) => RwyTraffic(traffic) == null ? $"traffic departing runway {RwSay(Runway)}" : "traffic on runway";
+    string BusyWhy(IReadOnlyList<Traffic> traffic) => RwyTraffic(traffic) == null && RwyTaxiOn == 0 ? $"traffic departing runway {RwSay(Runway)}" : "traffic on runway";
+
+    /// Developer request 2026-11-27: why a taxi clearance must wait (runway occupied, landing within 4 NM, other flight ahead on the runway route), null = free or taxiway field.
+    string? RwyTaxiWhy(Telemetry? t, IReadOnlyList<Traffic> traffic)
+    {
+        if (t == null || !F.RunwayTaxi(Runway, t.X, t.Z)) return null;
+        if (TrafficOnRunway(traffic)) return BusyWhy(traffic);
+        if (TrafficOnFinal(traffic, Runway, 4 * NM) || TrafficOnFinal(traffic, Airfield.Opposite(Runway), 4 * NM)) return "traffic landing";
+        return RwyTaxiAhead > 0 ? "traffic taxiing to the runway" : null;
+    }
 
     /// A8: occupies only runway rw including reciprocal: on the ground taxiing up to 100 m beyond the ends (45 m lateral), between the thresholds (30 m) also stationary.
     /// Airborne or in direction rw more than 6000 ft past the threshold (takeoff roll, rollout) counts as clear (FAA JO 7110.65 3-10-3). hdg in radians, speed m/s.

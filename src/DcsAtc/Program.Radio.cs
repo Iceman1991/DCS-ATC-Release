@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
@@ -27,7 +27,9 @@ static partial class Program
     static void OnSrs(SrsListener.Transmission tx)
     {
         Pilot? p;   // A26/A141: sender first (R387: its tanker frequency decides the role; the Whisper prompt uses its call sign and airfield)
-        lock (TowerLock) p = PilotFor(tx);
+        bool script;
+        lock (TowerLock) { p = PilotFor(tx); script = p == null && IsScriptSender(tx); }
+        if (script) { Trace("SRS", $"{tx.FreqMHz:0.000} MHz unit {tx.UnitId} '{tx.Name}': Skript-Sender (MOOSE/ExternalAudio) ignoriert, nicht transkribiert"); return; }   // Forum (Killg0re NL, 2026-11-28)
         var role = SrsRole(p, tx.FreqMHz);
         Airfield? via = null;   // airfield frequency: this airfield, controller by content (Ground/Tower/Approach) or the one with its own frequency
         (Airfield? Via, string? Role) shared = (null, null);   // station frequency an airfield also uses (Krasnodar 251.0 = AWACS 251.0): the call decides, otherwise ask
@@ -106,6 +108,10 @@ static partial class Program
         ?? (Ops.Ranges.Any(z => z.Freq > 0 && Math.Abs(z.Freq - mhz) < 0.01) ? "Range" : null)   // #56: own frequency of a range zone
         ?? (Carrier.Boats.Any(b => b.Freq > 0 && Math.Abs(b.Freq - mhz) < 0.01) ? "Carrier" : null)   // mission carrier
         ?? (Carrier.Boats.Count + Carrier.RadarShips.Count > 0 && Carrier.StationFreqs.Values.Any(f => Math.Abs(f - mhz) < 0.01) ? "Carrier" : null);   // #13: own carrier station frequency, #18 Red Crown
+
+    /// Forum (Killg0re NL, 2026-11-28): script transmitter (MOOSE, DCS-SR-ExternalAudio default unit 1000, e.g. task controller 'CAS Kabul') is no pilot; its text must not
+    /// fall back to the call sign in the speech. Unit 100000 (own senders) is dropped earlier in SrsListener. Under TowerLock; a real player with unit id 1000 stays.
+    static bool IsScriptSender(SrsListener.Transmission tx) => tx.UnitId == 1000 && !Pilots.Values.Any(x => x.Id == 1000);
 
     /// Sender of an SRS call (under TowerLock). R358: the only player only for an SRS client without unit (otherwise slot change, spectator, second client: call sign, A26)
     static Pilot? PilotFor(SrsListener.Transmission tx) =>
@@ -960,6 +966,13 @@ static partial class Program
         bool queued = tw.Phase == Phase.HoldShort && tw.HoldSince >= 0;
         tw.HoldAhead = pilots.Count(o => o != p && o.Active?.F == tw.F && o.Active.Phase == Phase.HoldShort && !o.Active.LineUp && o.Active.HoldSince >= 0
                                          && (!queued || o.Active.HoldSince < tw.HoldSince || o.Active.HoldSince == tw.HoldSince && string.CompareOrdinal(o.Unit, p.Unit) < 0));
+        // Developer request 2026-11-27: runway route (no taxiway): flights taxiing/departing on it, plus others waiting for the clearance longer than me
+        (tw.RwyTaxiAhead, tw.RwyTaxiOn) = (0, 0);
+        if (tw.F.Ends.Count > 0)
+        {
+            (tw.RwyTaxiAhead, tw.RwyTaxiOn) = RwyTaxiFlights(tw.F, tw.Runway, p, null, pilots);
+            tw.RwyTaxiAhead += pilots.Count(o => o != p && o.Active?.F == tw.F && o.Active.TaxiHeld && (!tw.TaxiHeld || o.Active.TaxiHeldAt < tw.TaxiHeldAt || o.Active.TaxiHeldAt == tw.TaxiHeldAt && string.CompareOrdinal(o.Unit, p.Unit) < 0));
+        }
         if (p.FlightSize > 1) tw.SetCallsign(p.Callsign);
         tw.CallsignFixed = MissionData || Cfg.MyCallsign != "";   // call sign from the slot or the settings: not from numbers in the radio call
         tw.AtisLetter = Atis.TryGetValue(tw.F.Name, out var a) && a.Text != "" ? a.Letter.ToString() : "";
