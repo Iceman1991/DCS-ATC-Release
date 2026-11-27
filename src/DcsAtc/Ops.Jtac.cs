@@ -16,6 +16,7 @@ partial class Ops
     static readonly Dictionary<string, (string Role, string Mark, int Delay)> CasKind = new() { ["jtac"] = ("JTAC", "smoke_red", 30), ["faca"] = ("FACA", "wp", 0) };   // J6: voice/role, mark command, delay in s
 
     // cas: 0 off, 1 checked in, 2 9-line given, 3 readback ok, 4 IN (continue), 5 cleared hot, 6 off / BDA
+    readonly HashSet<string> casDead = new();   // victim units already counted for the BDA
     int cas, casType, casHoldAlt, casFmt, casKills, casTotal, casSide;   // casFmt: 0 by aircraft type, 1 MGRS, 2 lat/long
     string casL = "", casLcs = "", casCs = "", casG = "", casNoun = "", casEl4 = "", casLoc6 = "", casRb4 = "", casMarkTxt = "", casOrd = "";   // casOrd: ordnance from the check-in, "|"-separated
     bool casHold, casTally, casLaser, casDanger;
@@ -97,7 +98,7 @@ partial class Ops
     void CasEnd()
     {
         if (casLaser) Cmds.Add($"LASEOFF;{casL}");
-        casAll.Remove(this);
+        casAll.Remove(this); casDead.Clear();
         (cas, casL, casLcs, casG, casHold, casTally, casLaser, casKills, casTotal, casMarkAt, casGone, casFmt, casOffAt, casPlay) = (0, "", "", "", false, false, false, 0, 0, 0, -1, 0, 0, 0);
     }
 
@@ -245,7 +246,7 @@ partial class Ops
 
     List<Call> CheckIn(Leader l, Me me, string n, double now)
     {
-        casAll.Remove(this);
+        casAll.Remove(this); casDead.Clear();
         (cas, casL, casLcs, casSide, casAt, casG, casTally, casKills, casTotal, casLaser) = (1, l.Id, l.Cs, me.Coalition, now, "", false, 0, 0, false);
         var pt = PlayOf(n);   // check-in: "4 GBU-12, 2 Mavericks, playtime 30" -> the JTAC confirms, picks the weapon in the 9-line, watches the playtime
         (casOrd, casPlay) = (OrdOf(n), pt > 0 ? now + pt * 60 : 0);
@@ -405,7 +406,13 @@ partial class Ops
     {
         if (cas == 0 || e.Length < 3 || Leaders.FirstOrDefault(x => x.Id == casL) is not { } l) return;
         var me = new Me(casCs, null, "", casSide);
-        if (e[1] == "spotlost" && e[2] == casL && casLaser) { casLaser = false; casOut.Add(C(l, me, "lost the target, laser off")); return; }
+        if (e[1] == "spotlost" && e[2] == casL && casLaser)
+        {
+            casLaser = false;
+            // Own log 2026-11-27 (JTAC test): spot lost right after the target died is no "lost the target"; the BDA follows
+            if (!(casKills > 0 && now - casKillAt < 10)) casOut.Add(C(l, me, "lost the target, laser off"));
+            return;
+        }
         if (e[1] is not ("kill" or "hit") || e.Length < 6 || cas < 4) return;
         bool friendly = e.Length > 8 && e[8] == casSide.ToString() || Leaders.Any(x => x.Id == e[5] && x.Side == casSide);
         if (friendly && e[2] == unit)
@@ -413,7 +420,10 @@ partial class Ops
             (cas, casKills) = (3, 0);
             casOut.Add(C(l, me, "check fire, check fire, check fire, abort, abort, abort"));
         }
-        else if (e[1] == "kill" && !friendly && e[5] == casG && e.Length > 7 && e[7] != "1") { casKills++; casKillAt = now; }
+        else if (!friendly && e[5] == casG && (e[1] == "kill" ? e.Length > 7 && e[7] != "1"
+                 // Own log 2026-11-27 (JTAC test): DCS may send only "hit" for a kill; hit life (index 7) <= 0 = destroyed
+                 : e.Length > 7 && double.TryParse(e[7], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var life) && life <= 0)
+                 && casDead.Add(e[4])) { casKills++; casKillAt = now; }   // each victim unit counts once (hit then kill)
     }
 
     /// Every second: hold release, waiting target, BDA after kills, mark splash, leader lost (J10).
@@ -567,6 +577,22 @@ partial class Ops
         check(off.EndsWith("stand by for BDA") && early7 == 0 && bda7.Contains("good hits, one tank destroyed"), "R417: off vor Einschlag -> BDA erst nach dem Kill -> " + off + " / " + early7 + " / " + bda7);
         var idle = o7.JtacTick(m7, 700);
         check(o7.Cas == 0 && idle.Count == 1 && idle[0].Role == "Info", "R418: 10 Minuten ohne Funk -> Kontakt endet");
+        {   // Own log 2026-11-27 (JTAC test): DCS sent only "hit" (life <= 0) for the destroyed target, then spotlost -> BDA, not "lost the target"
+            var (mK, oK) = (Mk("Enfield 6-1", "F-16C_50", 3000), new Ops());
+            Cleared(oK, mK, 80); Say(oK, mK, "JTAC: ten seconds", 85);
+            oK.JtacTick(mK, 86); var tk0 = Targets; Targets = new();   // target gone from the mission state
+            oK.OnCasEvent(new[] { "X", "hit", "Colt 1-1", "Colt 1-1 (F-16 CAS)", "T-1-1", "T-1", "GBU_12", "1.00" }, "U10", 90);
+            oK.OnCasEvent(new[] { "X", "hit", "Colt 1-1", "Colt 1-1 (F-16 CAS)", "T-1-1", "T-1", "GBU_12", "-72.49" }, "U10", 90);
+            oK.OnCasEvent(new[] { "X", "hit", "Colt 1-1", "Colt 1-1 (F-16 CAS)", "T-1-1", "T-1", "GBU_12", "-72.49" }, "U10", 90.1);
+            oK.OnCasEvent(new[] { "X", "kill", "Colt 1-1", "Colt 1-1 (F-16 CAS)", "T-1-1", "T-1", "T-72B", "0", "1" }, "U10", 90.2);
+            oK.OnCasEvent(new[] { "X", "spotlost", "JTAC-1" }, "U10", 90.8);
+            var kt = new List<string>();
+            for (int s = 91; s <= 110; s++) kt.AddRange(oK.JtacTick(mK, s).Select(c => c.Text));
+            var kj = string.Join(" | ", kt);
+            check(!kj.Contains("lost the target") && !kj.Contains("no longer observed, stand by") && kj.Contains("one tank destroyed") && oK.Cas == 6 && !kj.Contains("two tanks"),
+                  "JTAC: Ziel nur per hit (Leben <= 0) zerstoert, spotlost danach -> BDA statt 'lost the target', einmal gezaehlt -> " + kj);
+            Targets = tk0; oK.Leave();
+        }
         var (m8, o8, m9, o9) = (Mk("Enfield 8-1", "FA-18C_hornet", 3000), new Ops(), Mk("Enfield 9-1", "FA-18C_hornet", 4000), new Ops());
         Say(o8, m8, "JTAC: checking in", 710); Say(o9, m9, "JTAC: checking in", 711);
         Say(o8, m8, "JTAC: ready to copy", 712);

@@ -155,10 +155,15 @@ local LOAD = {
                               [4] = "{F1243568-8EF0-49D4-9CB5-4DA90D92BC1D}", [5] = "{F1243568-8EF0-49D4-9CB5-4DA90D92BC1D}", [6] = "{5F26DBC2-FB43-4153-92DE-6BBCE26CB0FF}" }), chaff = 0, flare = 0, gun = 100 },
   none = { pylons = {}, chaff = 0, flare = 0, gun = 100 },
   hornetCAS = { pylons = pyl({ [1] = AIM9M, [2] = GBU12, [3] = GBU12, [5] = FPU8A, [7] = GBU12, [8] = GBU12, [9] = AIM9M }), chaff = 60, flare = 30, gun = 100 },   -- J: JTAC test, laser bombs on the JTAC spot
+  tomcatCAS = { pylons = {   -- F-14B(U) (type F-14BU): wingtip AIM-9M (1, 10), BRU-32 GBU-12 on belly stations 5 and 7, laser code 1688 set on the bomb
+      [1] = { CLSID = "{LAU-138 wtip - AIM-9M}" }, [10] = { CLSID = "{LAU-138 wtip - AIM-9M}" },
+      [5] = { CLSID = "{BRU-32 GBU-12}", settings = { laser_code = 1688, NFP_PRESID = "Paveway_II", NFP_PRESVER = 2, NFP_fuze_type_tail = "FMU139CB_LD", ["01_prfx_arm_delay_ctrl_FMU139CB_LD"] = 4, ["01_prfx_function_delay_ctrl_FMU139CB_LD"] = 0 } },
+      [7] = { CLSID = "{BRU-32 GBU-12}", settings = { laser_code = 1688, NFP_PRESID = "Paveway_II", NFP_PRESVER = 2, NFP_fuze_type_tail = "FMU139CB_LD", ["01_prfx_arm_delay_ctrl_FMU139CB_LD"] = 4, ["01_prfx_function_delay_ctrl_FMU139CB_LD"] = 0 } } },
+    chaff = 140, flare = 60, gun = 100, ammo_type = 1 },
   viperCAS = { pylons = pyl({ [1] = AIM120C, [2] = AIM9M, [3] = GBU12, [4] = "{F376DBEE-4CAE-41BA-ADD9-B2910AC95DEC}", [6] = "{F376DBEE-4CAE-41BA-ADD9-B2910AC95DEC}", [7] = GBU12, [8] = AIM9M, [9] = AIM120C }), chaff = 60, flare = 60, gun = 100 },
 }
 local FUELMAX = { ["FA-18C_hornet"] = 4900, ["F-16C_50"] = 3249, ["F-15C"] = 6103, ["E-2C"] = 5624, ["E-3A"] = 65000, ["KC-135"] = 90700, ["KC135MPRS"] = 90700,
-                  ["S-3B Tanker"] = 7813, ["MiG-29S"] = 3493, ["Su-27"] = 5590.18, ["Su-25"] = 2835, ["MiG-31"] = 15500, ["MQ-9 Reaper"] = 1300 }
+                  ["S-3B Tanker"] = 7813, ["MiG-29S"] = 3493, ["Su-27"] = 5590.18, ["Su-25"] = 2835, ["MiG-31"] = 15500, ["MQ-9 Reaper"] = 1300, ["F-14BU"] = 7348 }
 local CS = { Enfield = 1, Springfield = 2, Uzi = 3, Colt = 4, Dodge = 5, Ford = 6, Chevy = 7, Pontiac = 8, Texaco = 1, Arco = 2, Shell = 3, Overlord = 1, Magic = 2 }
 
 -- Radio presets of the players (channel 1..n, rest like the template)
@@ -348,7 +353,7 @@ end
 -- Check (after packing, on the unpacked .miz)
 local KNOWN = { ["FA-18C_hornet"] = 1, ["F-16C_50"] = 1, ["F-15C"] = 1, ["E-2C"] = 1, ["E-3A"] = 1, ["KC-135"] = 1, ["KC135MPRS"] = 1, ["S-3B Tanker"] = 1,
                 ["MiG-29S"] = 1, ["Su-27"] = 1, ["Su-25"] = 1, ["MiG-31"] = 1, Stennis = 1, TICONDEROG = 1, PERRY = 1, ["M-113"] = 1, Hummer = 1,
-                ["T-72B"] = 1, ["BTR-80"] = 1, ["ZSU-23-4 Shilka"] = 1, ["MQ-9 Reaper"] = 1 }
+                ["T-72B"] = 1, ["BTR-80"] = 1, ["ZSU-23-4 Shilka"] = 1, ["MQ-9 Reaper"] = 1, ["F-14BU"] = 1 }
 local FIELD = {}   -- DCS airfield frequencies Caucasus (whole MHz UHF 250-270, VHF 121-141) and DCS-ATC controllers
 for f = 250, 270 do FIELD[f * 10] = true end
 for f = 121, 141 do FIELD[f * 10] = true end
@@ -826,6 +831,7 @@ Ground (9 km north of Senaki):
 Slots:
 - Enfield 1-1  Hornet airborne 15 NM south-west, 12000 ft, 4x GBU-12, COMM1 133.5 (JTAC), preset 2 135.5 (FAC(A)) (lat/long in line 6)
 - Colt 1-1     F-16C airborne 15 NM south, 12000 ft, 2x GBU-12, VHF preset 1 133.5, preset 2 135.5 (lat/long)
+- Springfield 1-1  F-14B(U) airborne 15 NM south-east, 12000 ft, 2x GBU-12, ARC-182 preset 1 133.5 (JTAC), preset 2 135.5 (FAC(A)) (needs a LANTIRN or a buddy lase: the JTAC lases 1688; the RIO/Jester handles LANTIRN)
 - Uzi 1-1      Hornet cold at Kutaisi stand 24 (rearm as you like, e.g. Litening/Mavericks)
 
 Flow:
@@ -848,6 +854,7 @@ Boden (9 km nördlich Senaki):
 Slots:
 - Enfield 1-1  Hornet in der Luft, 15 NM südwestlich, 12000 ft, 4x GBU-12, COMM1 133.5 (JTAC), Preset 2 135.5 (FAC(A)) (Lat/Long in Zeile 6)
 - Colt 1-1     F-16C in der Luft, 15 NM südlich, 12000 ft, 2x GBU-12, VHF-Preset 1 133.5, Preset 2 135.5 (Lat/Long)
+- Springfield 1-1  F-14B(U) in der Luft, 15 NM südöstlich, 12000 ft, 2x GBU-12, ARC-182 Preset 1 133.5 (JTAC), Preset 2 135.5 (FAC(A)) (braucht LANTIRN oder Buddy-Lasing: der JTAC lasert 1688; LANTIRN bedient der RIO/Jester)
 - Uzi 1-1      Hornet kalt in Kutaisi Stand 24 (Bewaffnung frei, z. B. Litening/Mavericks)
 
 Ablauf:
@@ -867,6 +874,7 @@ Ablauf:
     points = function() return { wp(off(tgt, 200, 8), 15000 * FT, 70), wp(tgt, 15000 * FT, 70, { tasks = { T.cmd("SetInvisible", { value = true }), T.orbit(15000 * FT, 70, "Circle") } }) } end })
   slot(m, { name = "Enfield 1-1 (Hornet CAS)", cs = "Enfield", type = "FA-18C_hornet", p = off(tgt, 225, 15), alt = 12000 * FT, spd = 300 * KT * 1.2, to = tgt, load = "hornetCAS", freq = 133.5, uhf = { 133.5, 135.5, 251.5, 263.0, 261.0 } })
   slot(m, { name = "Colt 1-1 (F-16 CAS)", cs = "Colt", type = "F-16C_50", p = off(tgt, 180, 15), alt = 12000 * FT, spd = 300 * KT * 1.2, to = tgt, load = "viperCAS", freq = 251.5, uhf = UHF_LAND, vhf = { 133.5, 135.5, 134.0, 132.0 } })
+  slot(m, { name = "Springfield 1-1 (F-14B(U) CAS)", cs = "Springfield", type = "F-14BU", p = off(tgt, 135, 15), alt = 12000 * FT, spd = 300 * KT * 1.2, to = tgt, load = "tomcatCAS", freq = 251.5, uhf = UHF_LAND, vhf = { 133.5, 135.5, 134.0, 132.0 } })
   slot(m, { name = "Uzi 1-1 (Hornet Kutaisi)", cs = "Uzi", type = "FA-18C_hornet", stand = "24", to = tgt, load = "hornetCAS", freq = 263.0, uhf = { 263.0, 133.5, 135.5, 251.5 } })
   return m
 end }
