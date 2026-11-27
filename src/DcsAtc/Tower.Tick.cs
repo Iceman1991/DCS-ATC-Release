@@ -143,7 +143,8 @@ public partial class Tower
             if (along && Phase != Phase.TaxiIn && kt > (Phase == Phase.HoldShort && lineUp ? 40 : 30) && !rejecting && now - lastAbort > 20)   // R105: without lineUp from 30 kt (on the runway only the Tower speaks, no "reduce taxi speed")
             {
                 lastAbort = lastIncursion = now;   // LA03: no "not cleared onto runway" right after it
-                return Dev($"{c}, stop immediately, I say again, stop immediately! You are not cleared for takeoff.", $"Start ohne Freigabe {F.Name} {hitRw}", $"takeoff without clearance {F.Name} {hitRw}", "Tower");
+                var toRw = HdgDiff(t.Hdg * 180 / Math.PI, F.End(hitRw).Hdg) > 90 ? Airfield.Opposite(hitRw) : hitRw;   // Own log (Bagram 2026-11-27): the active runway may be the opposite end; name the takeoff direction, same key as the liftoff below (once per takeoff)
+                return Dev($"{c}, stop immediately, I say again, stop immediately! You are not cleared for takeoff.", $"Start ohne Freigabe {F.Name} {toRw}", $"takeoff without clearance {F.Name} {toRw}", "Tower");
             }
             if ((kt <= 40 || !along) && !(Phase == Phase.HoldShort && lineUp) && now - lastIncursion > 45)
             {
@@ -935,7 +936,7 @@ public partial class Tower
     {
         if (climbOut != null) return $"{Rc}{(t != null ? $", {Where(t)}" : "")}. {(climbOut == "tactical" ? "Continue spiral climb as cleared, then resume" : "Unrestricted climb approved, resume")} own navigation.";
         if (DRt is { } dr && nav != null && t != null) return $"{Rc}, {Where(t)}. Continue {CrpSay(dr.Name)} departure{(zoneReport ? ", report leaving the control zone" : depClr ? $", then climb and maintain {AltNum(Cruise)}" : "")}.";   // charts.jsonc departure being flown
-        if (zoneReport && t != null) return $"{Rc}, {Where(t)}. Continue as cleared, report leaving the control zone.";   // R7: VFR still in the zone
+        if (zoneReport && t != null) return $"{Rc}, {Where(t)}. {(devTold.Any(k => k.StartsWith("takeoff without clearance")) ? "Report" : "Continue as cleared, report")} leaving the control zone.";   // R7: VFR still in the zone; Own log (Bagram 2026-11-27): no "as cleared" after a departure without clearance
         if (depClr && t != null && (dest != null ? (dest.X, dest.Z) : toRange != null ? (toRange.X, toRange.Z) : exitDir != null && Crp.TryGetValue(exitDir, out var xp) ? xp : ((double, double)?)null) is { } dg)
             return $"{Rc}, {Where(t)}. {Cap(Steer(t, dg, dest?.Name.Replace('-', ' ') ?? toRange?.Name ?? CrpSay(exitDir!)))}, climb and maintain {AltNum(Cruise)}.";
         return depClr ? $"{Rc}{(t != null ? $", {Where(t)}" : "")}. Climb and maintain {AltNum(Cruise)}, resume own navigation."

@@ -118,7 +118,8 @@ public partial class Tower
             var (a, l) = AL(t.X, t.Z, r);
             double s0 = Math.Abs(l) > 0.5 * NM ? Math.Sign(l) : HandSign(rw) * (r == rw ? 1 : -1), bestCost = double.MaxValue;
             (string, double, bool, List<(double X, double Z)>)? pick = null;
-            foreach (var g in final && !over ? (Proc(r) == "P A R" && !wantVisual ? new[] { 10 * NM, 8 * NM } : new[] { 10 * NM, 8 * NM, 6 * NM, 4 * NM }) : new[] { Ini(rw) + 4 * NM })   // PAR: long clean final, gate at least 8 NM (glidepath from below 6-7 NM out, FAA JO 7110.65 5-9-1)
+            double fin = (FinalInterceptNm > 0 ? FinalInterceptNm + 1 : 0) * NM;   // Issue #45 (Guardian): configured minimum, 0 = unchanged (gate 1 NM beyond it, the handover comes up to 1 NM before the gate)
+            foreach (var g in (final && !over ? (Proc(r) == "P A R" && !wantVisual ? new[] { 10 * NM, 8 * NM } : new[] { 10 * NM, 8 * NM, 6 * NM, 4 * NM }) : new[] { Ini(rw) + 4 * NM }).Select(x => fin > 0 ? Math.Max(x, final && !over ? fin : Ini(rw) + fin) : x).Distinct())   // PAR: long clean final, gate at least 8 NM (glidepath from below 6-7 NM out, FAA JO 7110.65 5-9-1)
             {
                 double gmin = final && !over ? g : Math.Min(g, Ini(rw) + NM);
                 var cands = (from s in new[] { s0, -s0 } from e in AheadR >= 0 ? new[] { 6 * NM, 3 * NM, 10 * NM } : new[] { 6 * NM, 3 * NM }   // R46: behind the preceding traffic also a longer downwind

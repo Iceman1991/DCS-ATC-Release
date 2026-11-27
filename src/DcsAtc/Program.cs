@@ -61,6 +61,7 @@ public class Config
     public Dictionary<string, List<string>> Notams { get; set; } = new();   // FI5: own NOTAMs per airfield ("Kutaisi": ["ILS 25 unserviceable", "runway 07 closed", free text read as written])
     public bool AssignParkingSpot { get; set; } = true;   // forum (Lt_Jaeger): false = after landing Ground names only the ramp from charts.jsonc ("taxi to Ramp West via …"), no stand
     public bool IffCheck { get; set; } = false;      // FI1 (issue #2): controllers check the transponder from SRS (code, ident, 7600, AWACS "parrot sour"); 7700 is always noticed
+    public double FinalInterceptNm { get; set; } = 0;  // Issue #45 (Guardian): Approach intercepts the final / hands over to Tower at least this many NM out (straight-in: from touchdown, visual/overhead: from initial); 0 = default (10/8 NM resp. 4 NM from initial)
     public bool AirspaceWatch { get; set; } = true;    // monitor control zones (N2) and announce violations ("possible pilot deviation") and into the debrief (N4); off: safety warnings only
     public bool DebugLog { get; set; } = true;         // atc-debug.txt for bug reports (speech recognition, airfield selection, phases, telemetry every 10 s), at most 2 × 20 MB
     public bool AsrGpu { get; set; } = true;           // GPU1: speech recognition on a dedicated graphics card (Vulkan), CPU without one or if it fails; false = always CPU
@@ -1153,6 +1154,7 @@ static partial class Program
         Ops.Vectors = Cfg.TankerVectors;
         (Ops.Keypad, Ops.MarkOffsetM) = (Cfg.JtacKeypad, Math.Clamp(Cfg.JtacMarkOffsetM, 0, 500));
         Tower.Watch = Cfg.AirspaceWatch && On("atc");
+        Tower.FinalInterceptNm = Math.Clamp(Cfg.FinalInterceptNm, 0, 30);
         Tower.IffCheck = Cfg.IffCheck;
         Tower.ParkSpot = Cfg.AssignParkingSpot;
         (Flights.Mode, Flights.RadiusNm, Flights.OwnWingmen) = (Cfg.AiFlightComms, Cfg.AiFlightRadiusNm, Cfg.AiOwnWingmen);

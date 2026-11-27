@@ -1079,6 +1079,7 @@ public partial class Tower
             if (Has(n, "cancel ifr", "cancelling ifr", "vfr", "visual approach", "visual recovery")) return "visual";
             if (Has(n, FieldSight) && !Has(n, "report", "request", "inbound", "landing", "final", "initial", "overhead")) return "fieldinsight";   // R115: reply to "report field in sight" (airfield/runway in sight); after cancel/flight following/visual ("field in sight, cancel IFR" stays a sign-off)
             if (Has(n, "leaving frequency", "leaving your frequency")) return "ffoff";   // itself requires "report leaving frequency"
+            if (Phase == Phase.Departing && Has(n, "takeoff", "take off") && !Has(n, "ready", "request", "cleared")) return "airborne";   // Issue #45 (Guardian log): after handover "takeoff" on Departure is the check-in, not a Tower call
             if (Has(n, "ready", "takeoff", "take off")) return "airborne_ready";
             if (Has(n, @"(?:request|requesting) (?:left |right )?closed\b", @"closed traffic\b") && !Has(n, "approved")) return "closed";   // R202: closed pull-up ("request closed")
             if (Has(n, "high key")) return "highkey";   // R204: SFO reporting points

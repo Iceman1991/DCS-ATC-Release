@@ -1237,7 +1237,7 @@ partial class Ops
         cs = c;
         var l = Line(tk.A.Group);
         if (Has(n, "complete", "departing", "thank", "good day", "leaving", "abort") && tank == 0 && was == tk.A.Group && now - byeAt < 60) return new();   // LA16 (log): readbacks after "cleared to depart" ("… thanks") get no second clearance
-        if (Has(n, "complete", "departing", "thank", "good day", "leaving", "abort"))   // #5 (issue): "abort" ends the refueling like "complete"
+        if (Has(n, "complete", "departing", "leaving", "abort") || (tank > 0 || was == tk.A.Group) && Has(n, "thank", "good day"))   // #5 (issue): "abort" ends the refueling like "complete"; Issue #45 (Guardian log): "thank you" is a farewell only after contact, not in a first call
         {
             bool first = l.FirstOrDefault(o => o.tank >= 2) == this;   // had the spot (e.g. after a deliberate partial amount, OnRefuel tank 3): the next one moves up (A66/A128)
             tank = 0; afterFull = false; OffLine();
@@ -1274,7 +1274,7 @@ partial class Ops
             var order = ahead.Count > 1 ? $" {ahead[0].cs} first, then {string.Join(", then ", ahead.Skip(1).Select(o => o.cs))}." : "";
             return T($"{c}, {tk.Name}, {neg}cleared to join, left observation, number {Pos(l)}.{order}{astern}");
         }
-        if (Has(n, "pre contact", "precontact", "in position", "ready for contact", "stabilized", "ready to refuel") && !Has(n, "observation"))   // K1: "stabilized (left) observation" is the observation report
+        if (Has(n, "pre contact", "precontact", "in position", "ready for contact", "ready to contact", "stabilized", "ready to refuel") && !Has(n, "observation"))   // K1: "stabilized (left) observation" is the observation report
         {
             if (far) return Far();
             if (tank < 2) return Join("negative, not cleared pre-contact, ");   // R287 (ATP-56(C)): pre-contact only after "cleared to join"
@@ -1298,6 +1298,7 @@ partial class Ops
             tank = 2; disc = false; afterFull = false;
             return T(Pos(l) > 1 ? $"{c}, {tk.Name}, stabilize left observation, number {Pos(l)}." : $"{c}, {tk.Name}, cleared pre-contact.");
         }
+        if (tank == 2 && Has(n, "join", "rejoin")) return Join("");   // Issue #45 (Guardian log): "request rejoin" after the join clearance repeats it (with the position hint), no "say again"
         // Only a real request starts the rendezvous; chatter with the tanker (fuel state etc.) does not reset contact
         if (tank >= 2 || !Has(n, "join", "rejoin", "rendezvous", "refuel", "fuel", "tank", "gas", "check in", "checking in", "aar", "a a r", "texaco", "shell", "arco"))
             return new() { new("Tanker", tk.Name, $"{c}, {tk.Name}, say again.") };
@@ -2029,6 +2030,21 @@ partial class Ops
         // Forum 0.15: callsign alone (or with "Texaco" in contact) acknowledges, no "say again"; without contact "Texaco, Enfield 1-1" is still answered
         var akT = new[] { "Enfield 1-1", "roger, Enfield 1-1", "Texaco, Enfield 1-1", "Enfield 1-1, okay" }.Where(s => obT.OnTranscript("Tanker", s, meN, air, f, 1).Count > 0).ToList();
         check(akT.Count == 0 && new Ops().OnTranscript("Tanker", "Texaco, Enfield 1-1", meN, air, f, 0).Count == 1, "Tanker: Quittung mit Rufzeichen -> still: " + string.Join(", ", akT));
+        {   // Issue #45 (Guardian log): vague first call is no departure; "request rejoin" after the join clearance repeats it; "ready to contact" = pre-contact
+            var t45s = line.ToDictionary(k => k.Key, k => k.Value.ToList()); line.Clear();   // own tanker line, restored below
+            var t45a = new Ops().OnTranscript("Tanker", "Texaco, Enfield 1-1. Request. Thank you.", meN, air, f, 0);
+            check(t45a.Count == 1 && !t45a[0].Text.Contains("depart"), "Issue #45: erster vager Ruf 'Request. Thank you.' -> " + string.Join(" | ", t45a.Select(x => x.Text)));
+            var t45d = string.Join(" | ", new Ops().OnTranscript("Tanker", "Texaco, Enfield 1-1, request rejoin, thanks", meN, air, f, 0).Select(x => x.Text));
+            var t45e = string.Join(" | ", new Ops().OnTranscript("Tanker", "Texaco, Enfield 1-1, checking in for fuel, thank you", meN, air, f, 0).Select(x => x.Text));
+            check(t45d.Contains("Expect the join") && t45e.Contains("Expect the join"), "Issue #45: Anfrage mit 'thanks' am Ende beim ersten Ruf -> " + t45d + " | " + t45e);
+            var t45o = new Ops(); t45o.OnTranscript("Tanker", "Texaco, Enfield 1-1, request rejoin", meN, air, f, 0);
+            t45o.OnTranscript("Tanker", "Texaco, Enfield 1-1, visual", meN, air, f, 1);
+            var t45b = string.Join(" | ", t45o.OnTranscript("Tanker", "Texaco, Enfield 1-1. Request rejoin.", meN, air, f, 2).Select(x => x.Text));
+            check(t45b.Contains("cleared to join") && !t45b.Contains("say again"), "Issue #45: 'request rejoin' nach Join-Freigabe wiederholt sie -> " + t45b);
+            var t45c = string.Join(" | ", t45o.OnTranscript("Tanker", "Texaco, Enfield 1-1. Ready to contact.", meN, air, f, 3).Select(x => x.Text));
+            check(t45c.Contains("cleared contact"), "Issue #45: 'ready to contact' wie pre-contact -> " + t45c);
+            line.Clear(); foreach (var kv in t45s) line[kv.Key] = kv.Value;
+        }
         // Forum 0.15: the tanker gives no join vectors by itself (only AWACS or "request vector")
         Vectors = false;
         check(obT.TankVec(meN, air, 100) == null && obT.TankVec(meN, air, 200) == null, "Tanker vektoriert nicht von selbst (TankerVectors aus)");

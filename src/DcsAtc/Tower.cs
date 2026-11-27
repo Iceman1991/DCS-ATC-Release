@@ -225,6 +225,7 @@ public partial class Tower
     public static bool IfrAt(Airfield f) => ForceIfr || Sky is { } s && (s.VisM < 5000 || s.Ceil && s.BaseM - f.Elev < 1500 * Ft);
     public bool Ifr => IfrAt(F);
     public static bool Watch = true;    // Config.AirspaceWatch (Program): announce violations and put them in the debriefing (N4)
+    public static double FinalInterceptNm;   // Config.FinalInterceptNm (Program): Issue #45 (Guardian): intercept/handover at least this far out (final: from threshold, visual: from initial); 0 = default
     public int Rejected { get; private set; }   // rejected radio calls (debriefing)
     int? holdFor;                       // taxi traffic: stopped because of this traffic (Id), waits for "continue taxi" (R106)
     double holdAt, holdDist;            // ... since when and last distance to it (distance must grow)

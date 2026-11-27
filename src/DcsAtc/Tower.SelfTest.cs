@@ -110,6 +110,15 @@ public partial class Tower
         r = twD.OnTranscript("Kutaisi Approach, Enfield 11, airborne, passing 2000", At(dx, dz, 600, LandHdg("25"), 250), none, 20);
         // R7: VFR in the zone: departure clearance remains valid, sign-off at the zone edge with "resume own navigation" (before, directly "resume own navigation, maintain VFR")
         Check(r[0].Role == "Approach" && r[0].Text.EndsWith("radar contact, 1 mile west of the field. Continue as cleared, report leaving the control zone.") && twD.Phase == Phase.Away, "R7 Airborne-Meldung in der Zone: " + r[0]);
+        {   // Issue #45 (Guardian log): after handover "takeoff" on Departure is the check-in, never "contact Tower"
+            var w45 = new Tower("Enfield 1-1");
+            w45.Tick(parked, none, 0);
+            w45.OnTranscript("Enfield 11 request startup", parked, none, 1); w45.OnTranscript("Enfield 11 request taxi", parked, none, 2); w45.OnTranscript("Enfield 11 ready for departure", hold, none, 3);
+            w45.Tick(At(dx, dz, 120, LandHdg("25"), 180), none, 10);
+            w45.Tick(At(dx, dz, 250, LandHdg("25"), 200), none, 11);
+            var r45 = w45.OnTranscript("Kutaisi, Enfield 11, takeoff", At(dx, dz, 600, LandHdg("25"), 250), none, 20);
+            Check(r45.Count > 0 && r45[0].Role == "Approach" && !r45[0].Text.Contains("contact Kutaisi Tower"), "Issue45 Departure: takeoff nach Übergabe ist Anmeldung: " + (r45.FirstOrDefault()?.Text ?? "nichts"));
+        }
         {   // LA19 (log Kandahar): "say again" and in the same second "contact Approach now" from the tick -> the reminder waits until 5 s after the transmission
             var w19 = new Tower("Enfield 1-1");
             w19.Tick(parked, none, 0);
@@ -2249,11 +2258,19 @@ public partial class Tower
                   r[1].Role == "Info" && r[1].Text == L("Verstoß: Start ohne Freigabe Kutaisi 25 (14:02)", "Deviation: takeoff without clearance Kutaisi 25 (14:02)"), "N4 Start ohne Freigabe: " + string.Join(" | ", r));
             r = twN4.Tick(At(CX, CZ + 2 * NM, 900, 254, 120), none, 5).Concat(twN4.Tick(At(CX, CZ + 3 * NM, 1200, 254, 120), none, 12)).ToList();   // R247: advisory separate, 10 s later in departure
             Check(r.Count(m => m.Text.StartsWith("Enfield one one, possible pilot deviation, advise you contact Kutaisi Tower at D S N three one four, ")) == 1 && r.Last().Role == "Approach", "R247 Hinweis im Abflug (nach Übergabe von Approach): " + string.Join(" | ", r));
+            var n4c = twN4.OnTranscript("Kutaisi Approach, Enfield 11, airborne, passing 4000", At(CX, CZ + 3 * NM, 1200, 254, 120), none, 20);
+            for (int tq = 21; tq < 45; tq++) n4c = n4c.Concat(twN4.Tick(At(CX, CZ + 3 * NM, 1200, 254, 120), none, tq)).ToList();
+            Check(n4c.Any(m => m.Role == "Approach" && m.Text.EndsWith("field. Report leaving the control zone.")) && !n4c.Any(m => m.Text.Contains("as cleared")), "Own log (Bagram): nach Start ohne Freigabe kein 'Continue as cleared': " + string.Join(" | ", n4c.Select(m => m.Text)));
             var twV2 = new Tower("Enfield 1-1");   // Takeoff roll and liftoff: one violation
             twV2.Tick(parked, none, 0);
             int n1 = twV2.Tick(At(CX, CZ, 0, 254, 60), none, 1).Count;
             r = twV2.Tick(At(CX, CZ, 150, 254, 80), none, 2);
             Check(n1 == 2 && r.Count == 1 && !r[0].Contains("deviation"), "N4 Startlauf + Abheben nur einmal: " + string.Join(" | ", r));
+            var twV4x = new Tower("Enfield 1-1");   // Own log (Bagram 2026-11-27): active runway opposite to the takeoff direction: one violation, runway by heading
+            twV4x.Tick(parked, none, 0); twV4x.wantRw = "07";
+            var v4a = twV4x.Tick(At(CX, CZ, 0, 254, 60), none, 1); var v4b = twV4x.Tick(At(CX, CZ, 150, 254, 80), none, 2);
+            var v4i = v4a.Concat(v4b).Where(m => m.Role == "Info").ToList();
+            Check(v4i.Count == 1 && v4i[0].Text.Contains(" 25 "), "N4 Startlauf gegen aktive Bahn: Bahn nach Startrichtung, nur ein Verstoß: " + string.Join(" | ", v4a.Concat(v4b).Select(m => m.Text)));
             var twV3 = new Tower("Enfield 1-1");   // Landing in the pattern without landing clearance
             twV3.Tick(At(CX, CZ, 300, 254, 140 * Kt), none, 0);
             twV3.Phase = Phase.Pattern;
@@ -4836,6 +4853,41 @@ public partial class Tower
             hs = tu.VecCall(new(2100 * Ft, 2100 * Ft - ku.Elev, 128, (tu.LandHdg("25") + 30) * Math.PI / 180, ux, uz, 0, 0, 760), 10);
             Check(hs.Contains("climb and maintain") && tu.vecFt >= 2300, "Eindrehen über einem Hügel neben dem Endanflug: climb: " + hs);
             ForceIfr = false;
+        }
+
+        // --- Issue #45 (Guardian): FinalInterceptNm: handover to the Tower at least that far out (final: from the threshold, visual: from initial); 0 = as before
+        {
+            var icSen = Airfield.FromDcs("Senaki-Kolkhi", -281903.1, 648379.1, 13.2, new[] { ("27", 1.48864, -281782.5, 647279.5, 2212.0) });
+            (double A, string Nav) IcRun(double nm, bool ifr)
+            {
+                Tower.FinalInterceptNm = nm; ForceIfr = ifr;
+                var tf = new Tower(icSen, "Enfield 1-1");
+                double fx = icSen.X - 26.9 * NM, fz = icSen.Z - 26.9 * NM, fh = 45, fAlt = 3000 * Ft, fT = 45;
+                Telemetry FT(double vs = 0) => new(fAlt, fAlt - icSen.Elev, 155, fh * Math.PI / 180, fx, fz, 0, 0, 760, vs);
+                tf.Tick(FT(), none, 0);
+                tf.OnTranscript("Senaki Approach, Enfield 1-1, inbound for landing", FT(), none, 1);
+                fT = tf.vecHdg;
+                for (int s = 2; s < 2400 && tf.Phase == Phase.Inbound; s++)
+                {
+                    if (tf.vec is { Count: 0 } && tf.AL(fx, fz, tf.vrw) is var (icA, icL) && Math.Abs(icL) < NM) { var q = tf.Pt(tf.vrw, icA - 1.5 * NM, 0); fT = Bearing(fx, fz, q.X, q.Z); }
+                    fh = (fh + Math.Clamp(((fT - fh) % 360 + 540) % 360 - 180, -2.1, 2.1) + 360) % 360;
+                    fx += 155 * Math.Cos(fh * Math.PI / 180); fz += 155 * Math.Sin(fh * Math.PI / 180);
+                    double a0 = fAlt, want = tf.vecFt * Ft;
+                    fAlt = want > fAlt ? Math.Min(fAlt + 15, want) : Math.Max(fAlt - 15, want);
+                    var m = tf.Tick(FT(fAlt - a0), none, s);
+                    if (m.Count > 0 && tf.vec != null) fT = tf.vecHdg;
+                }
+                return (tf.AL(fx, fz, tf.vrw).A, tf.navName);
+            }
+            try
+            {
+                var icIfr0 = IcRun(0, true); var icVis0 = IcRun(0, false);
+                var icIfr15 = IcRun(15, true); var icVis15 = IcRun(15, false);
+                Check(Math.Abs(icIfr0.A / NM - 7.5) < 0.3 && Math.Abs((icVis0.A - InitialDist) / NM - 3.3) < 0.3, $"FinalInterceptNm 0: Übergabe wie bisher: Final {icIfr0.A / NM:0.0} NM, Initial {(icVis0.A - InitialDist) / NM:0.0} NM");
+                Check(icIfr15.Nav == "six mile final" && icIfr15.A >= 15 * NM && icVis15.A >= InitialDist + 15 * NM,
+                      $"FinalInterceptNm 15: Übergabe Final {icIfr15.A / NM:0.0} NM (>= 15), Initial {(icVis15.A - InitialDist) / NM:0.0} NM (>= 15)");
+            }
+            finally { Tower.FinalInterceptNm = 0; ForceIfr = false; }
         }
 
         // --- Senaki 27 (without map): holding 8 NM southeast, as number 2 out only with spacing, radar vectoring without reversal turns
