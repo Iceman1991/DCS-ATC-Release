@@ -170,10 +170,13 @@ static partial class Program
     /// Pilot voice slightly different per player/AI flight (pitch) so they can be told apart.
     static string PilotVoiceFor(string key)
     {
-        var model = Cfg.PilotVoice.Split('@')[0];
+        var model = SafeVoice(Cfg.PilotVoice).Split('@')[0];   // PilotVoice "" = my menu calls are silent, AI pilots still need a real voice (oz555, 0.23.21)
         double[] pitch = { 1.0, 0.92, 1.08, 0.96, 1.04 };
         return FormattableString.Invariant($"{model}@{pitch[key.Sum(ch => ch) % pitch.Length]}");
     }
+
+    /// A voice whose model part is empty ("", "@0.92") never reaches piper (exit -1073740791, call lost): default voice instead, pitch kept.
+    internal static string SafeVoice(string? voice) => (voice ?? "").Split('@')[0] == "" ? "en_US-joe-medium" + (voice ?? "") : voice!;
 
     /// "a|b" in Voices: per station (e.g. "Senaki Tower") one of them fixed, airfields alternate.
     /// If the model is missing (install without en_GB-alan), only those present apply, otherwise ryan: better another voice than a mute AWACS.

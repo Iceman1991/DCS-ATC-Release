@@ -644,7 +644,7 @@ static partial class Program
         var awacs = Cfg.Voices.GetValueOrDefault("AWACS", "").Split('|').Select(M).ToList();
         int Used(string m) => Cfg.Voices.Values.Count(v => v.Split('|').Select(M).Contains(m)) + (M(Cfg.PilotVoice) == m ? 10 : 0);
         return new[] { "en_US-ljspeech-medium", "en_US-bryce-medium", "en_US-ryan-medium", "en_US-joe-medium" }
-               .Where(m => !awacs.Contains(m) && has(m)).OrderBy(Used).DefaultIfEmpty(Cfg.PilotVoice).ToArray();
+               .Where(m => !awacs.Contains(m) && has(m)).OrderBy(Used).DefaultIfEmpty(SafeVoice(Cfg.PilotVoice)).ToArray();
     }
     static string AiVoiceFor(string unit)
     {

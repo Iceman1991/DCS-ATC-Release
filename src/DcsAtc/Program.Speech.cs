@@ -587,6 +587,7 @@ static partial class Program
 
     static double Synth(string text,string voice, string mp3, bool pilot = false, bool stress = false, double pace = 1)
     {
+        if (!voice.StartsWith("el:")) voice = SafeVoice(voice);   // every path ends here: no empty model for piper
         var key = FormattableString.Invariant($"{text}|{voice}|{pilot}|{stress}|{pace}|{Cfg.SpeechRate}|{Cfg.ElevenLabsSpeed}|{Cfg.RadioFx}|{RadioStyle(Cfg.RadioFxStyle)}");
         lock (SynthCache)
             if (SynthCache.TryGetValue(key, out var hit) && File.Exists(hit.Mp3))

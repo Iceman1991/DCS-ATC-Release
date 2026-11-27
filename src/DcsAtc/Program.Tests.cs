@@ -968,6 +968,14 @@ static partial class Program
             || new Config().Voices.Values.Append("random").Append("a@1.1|b@0.9").Any(v => Settings.VoiceText(Settings.VoiceParts(v)) != v))
             throw new Exception("Stimmen: random / Hin- und Rueckweg");
         (aiVoices, Flights.Units) = (keepVoices, keepUnits); aiSlot.Clear();
+        var keepPilot = Cfg.PilotVoice; Cfg.PilotVoice = "";   // oz555 (0.23.21): PilotVoice "" gave "@0.92" -> piper crashed, AI flight calls silent
+        try
+        {
+            string e1 = PilotVoiceFor("Texaco11"), e2 = PilotVoiceFor("Viper21"), e3 = AiPool(_ => false)[0];
+            if (e1.Split('@')[0] == "" || e2.Split('@')[0] == "" || e3 == "" || SafeVoice("@0.92") != "en_US-joe-medium@0.92" || SafeVoice("") != "en_US-joe-medium" || SafeVoice("en_US-ryan-medium@1.04") != "en_US-ryan-medium@1.04")
+                throw new Exception($"Stimme leer: Pilot '{e1}' '{e2}', KI-Pool '{e3}'");
+        }
+        finally { Cfg.PilotVoice = keepPilot; }
         Tx ki(string t, string role = "Tower", int prio = 2) => new(t, role, "Kutaisi Tower", 0, Prio: prio);   // A134: display duration in the .out line
         int d1 = ShowSec(ki("Enfield one one, cleared to land."), ""), d2 = ShowSec(ki(new string('x', 100)), ""), d3 = ShowSec(ki(new string('x', 52), "Flight", 1), ""),
             d4 = ShowSec(ki("Enfield one one, roger.", "Tower", 1), "Kutaisi Tower (265.0): "), d5 = ShowSec(ki(new string('x', 400), "Tower", 1), "");

@@ -296,7 +296,7 @@ sealed class Wheel : Form
             w.hookProc = w.Hook;
             w.hook = SetWindowsHookEx(13 /*WH_KEYBOARD_LL*/, w.hookProc, GetModuleHandle(null), 0);
             var timer = new System.Windows.Forms.Timer { Interval = 30 };
-            timer.Tick += (_, _) => { if (w.Visible && !DcsInFront()) w.Close2(); w.PollJoystick(); };   // tabbed out: wheel closed
+            timer.Tick += (_, _) => { if (w.Visible && !DcsInFront()) w.Close2($"Timer, Vordergrund nicht DCS: {FgName()}"); w.PollJoystick(); };   // tabbed out: wheel closed
             timer.Start();
             Application.Run(new ApplicationContext());   // message loop for hook and overlay
         }) { IsBackground = true };
@@ -374,7 +374,7 @@ sealed class Wheel : Form
     }
     public static Action<double> SaveSize = _ => { };   // Program writes config.jsonc
 
-    void Close2() { Hide(); items = Top; InGame(""); Web = null; ToGame(null, 0); }
+    void Close2(string? cause = null) { if (cause != null && Visible) Program.Trace("RAD", $"Funkrad zu: {cause}"); Hide(); items = Top; InGame(""); Web = null; ToGame(null, 0); }
     /// #30: the wheel as a window in the game (WheelInGame "window"): DCS's own GUI from the hook (DcsAtcHook.lua), so the headset shows it too.
     /// PNG named by its content in %TEMP%\DcsAtc-Wheel (same wheel = same file, DCS loads each picture once), show.txt names the file and
     /// the size as a fraction of the screen height; no show.txt = closed.
@@ -461,7 +461,7 @@ sealed class Wheel : Form
             Render();
             return;
         }
-        Close2();
+        Close2($"Auswahl {i + 1} {it.Label}");
         if (it.Text == "settings") { AllowSetForegroundWindow(-1); Process.Start(new ProcessStartInfo(Environment.ProcessPath!, "--settings") { UseShellExecute = false, CreateNoWindow = true }); return; }   // Settings window (own process, the app takes over on saving)
         if (it.Text != null) Task.Run(() => send(it.Text));
     }
@@ -469,13 +469,13 @@ sealed class Wheel : Form
     void Suggested()
     {
         if (sug is not { } s) return;
-        Close2();
+        Close2($"Vorschlag {s.Role}");
         Task.Run(() => send($"{s.Role}: {s.Text}"));
     }
 
     void Back()
     {
-        if (items == top) { Close2(); return; }
+        if (items == top) { Close2("Zurück (Backspace) auf oberster Ebene"); return; }
         var up = All.FirstOrDefault(p => p.Sub?.Any(s => s.Sub != null && s.Label == title) == true);   // Platz wählen -> Allgemein, otherwise top level
         var ps = up != null ? Vis(Mod(up.Sub!), Fits()) : null;   // R307: as when entering
         (items, title, mark) = ps != null ? (ps, up!.Label, Math.Max(0, Array.FindIndex(ps, s => s.Label == title))) : (Top, Field, 0);
@@ -663,19 +663,29 @@ sealed class Wheel : Form
         {
             int vk = Marshal.ReadInt32(l);
             bool keyDown = w == 0x100 || w == 0x104, keyUp = w == 0x101 || w == 0x105;
-            if (keyDown && OnKey(vk)) { swallowed.Add(vk); return 1; }
+            if (keyDown && OnKey(vk, l)) { swallowed.Add(vk); return 1; }
             if (keyUp && vk == 0x2C && Visible) { swallowed.Remove(vk); BeginInvoke(Shot); return 1; }   // Print: on release (arrives reliably, once per press), after the hook (which must return quickly)
             if (keyUp && swallowed.Remove(vk)) return 1;
         }
         return CallNextHookEx(hook, code, w, l);
     }
 
-    bool OnKey(int vk)
+    static string FgName()
+    {
+        GetWindowThreadProcessId(GetForegroundWindow(), out int pid);
+        try { return Process.GetProcessById(pid).ProcessName; } catch (ArgumentException) { return "?"; }
+    }
+
+    bool OnKey(int vk, IntPtr l)
     {
         if (vk == cfg.WheelKey)
         {
             if (swallowed.Contains(vk)) return true;          // key repeat
             if (!Visible && !DcsInFront()) return false;      // type normally in other programs
+            // Flash diagnosis: scan code, flags (0x10 = injected, 0x02 = injected from lower integrity level), foreground process; text built after the hook returned
+            int scan = Marshal.ReadInt32(l, 4), flags = Marshal.ReadInt32(l, 8);
+            string what = Visible ? "zu" : "auf";
+            Task.Run(() => Program.Trace("RAD", $"Funkrad-Taste vk 0x{vk:X2} scan 0x{scan:X2} flags 0x{flags:X2} {((flags & 0x12) != 0 ? "INJIZIERT" : "echt")}: {what}, Vordergrund {FgName()}"));
             if (Visible) Close2(); else Open();
             return true;
         }
@@ -684,7 +694,7 @@ sealed class Wheel : Form
         if (vk is >= 0x61 and <= 0x69) { Choose(vk - 0x61); return true; }   // Numpad 1–9
         if (vk is 0x30 or 0x60 or 0x0D) { Suggested(); return true; }        // 0 / Enter
         if (vk == 0x08) { Back(); return true; }
-        if (vk == 0x1B) { Close2(); return true; }
+        if (vk == 0x1B) { Close2("Escape"); return true; }
         if (vk == 0x2C) return true;   // Print: screenshot on release (hook), do not open Windows Snipping Tool
         if (vk is 0xBB or 0x6B or 0xBD or 0x6D)   // + / - : size
         {
