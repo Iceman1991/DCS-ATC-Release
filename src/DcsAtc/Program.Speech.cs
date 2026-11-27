@@ -539,25 +539,55 @@ static partial class Program
         return (spec[..at], Math.Clamp(ok ? s : Cfg.ElevenLabsSpeed, 0.5, 2.0));
     }
 
-    /// Radio effect graph. Normal: narrow band from RadioFxBand (two stages each, 24 dB/octave), presence +3 dB at 1.5 kHz, compressor ratio RadioFxRatio. A bad band (or ratio) falls back to the default so ffmpeg never gets nonsense.
+    /// Radio sound styles for RadioFxStyle (the settings window lists them in this order).
+    internal static readonly string[] RadioStyles = { "classic", "realistic", "strong", "extreme" };
+
+    /// RadioFxStyle (case-insensitive, unknown = realistic) -> style name.
+    internal static string RadioStyle(string? s) => RadioStyles.FirstOrDefault(x => x.Equals(s?.Trim(), StringComparison.OrdinalIgnoreCase)) ?? "realistic";
+
+    /// Radio effect graph by RadioFxStyle. A bad band (or ratio) falls back to the default so ffmpeg never gets nonsense. classic = clear band (RadioFxBand, ratio), pink hiss, quiet squelch tail; realistic = speech clipper (compressor, +10 dB, tanh) BEFORE the band, presence +4 dB at 1.3 kHz, white noise and squelch bursts at start and end, combat keeps its overdriven voice; strong/extreme (normal only, fixed settings) = harder clipping, noise ducked by the voice, extreme with grit, crackle and fading. Combat stays realistic for strong/extreme.
     internal static string RadioGraph(string pre, bool stress)
     {
+        var style = RadioStyle(Cfg.RadioFxStyle);
+        if (!stress && style == "strong")
+            return $"[0:a]{pre}aresample=48000,highpass=f=200,acompressor=threshold=0.125:ratio=8:makeup=1.5,volume=16dB," + @"aeval=exprs='if(gt(val(0)\,0)\,tanh(1.5*val(0))\,0.8*tanh(2.5*val(0)))'" +
+                   ",asoftclip=type=hard:oversample=4,highpass=f=350:p=2,highpass=f=350:p=2,lowpass=f=2600:p=2,lowpass=f=2600:p=2,equalizer=f=1200:t=q:w=1.5:g=6,loudnorm=I=-22:TP=-7:LRA=7,aresample=48000,asplit[v][sc];" +
+                   "anoisesrc=r=48000:c=white:a=0.06,highpass=f=350,lowpass=f=2800[n0];[n0][sc]sidechaincompress=threshold=0.03:ratio=3:attack=5:release=200[n];[v][n]amix=inputs=2:duration=first:normalize=0[m];" + StrongBursts;
+        if (!stress && style == "extreme")
+            return $"[0:a]{pre}aresample=48000,highpass=f=200,acompressor=threshold=0.125:ratio=10:makeup=1.5,volume=22dB," + @"aeval=exprs='if(gt(val(0)\,0)\,tanh(1.5*val(0))\,0.8*tanh(2.5*val(0)))'" +
+                   ",asoftclip=type=hard:oversample=4,acrusher=bits=7:mix=0.25:mode=log:aa=1,highpass=f=400:p=2,highpass=f=400:p=2,lowpass=f=2400:p=2,lowpass=f=2400:p=2,equalizer=f=1100:t=q:w=1.5:g=7,loudnorm=I=-22:TP=-7:LRA=7,aresample=48000,tremolo=f=0.5:d=0.15,asplit[v][sc];" +
+                   "anoisesrc=r=48000:c=white:a=0.08,highpass=f=400,lowpass=f=2600[n0];anoisesrc=r=48000:c=velvet:a=0.2:density=0.0002,lowpass=f=2500[k];[n0][k]amix=inputs=2:normalize=0[nn];[nn][sc]sidechaincompress=threshold=0.03:ratio=3:attack=5:release=200[n];[v][n]amix=inputs=2:duration=first:normalize=0[m];" + StrongBursts;
         var b = Cfg.RadioFxBand;
         var (lo, hi) = b is { Length: 2 } && b[0] is >= 100 and <= 1000 && b[1] is >= 1500 and <= 5000 && b[0] < b[1] ? (b[0], b[1]) : (300, 2700);
         var ratio = Cfg.RadioFxRatio is >= 1 and <= 20 ? Cfg.RadioFxRatio : 6;
-        var band = FormattableString.Invariant($"highpass=f={lo:0.##}:p=2,highpass=f={lo:0.##}:p=2,lowpass=f={hi:0.##}:p=2,lowpass=f={hi:0.##}:p=2,equalizer=f=1500:t=q:w=1:g=3,");
-        return $"[0:a]{pre}aresample=48000," + (stress ? "volume=6dB,asoftclip=type=tanh,highpass=f=400,lowpass=f=2800," : band) +   // Combat: mask microphone, overdriven
-               FormattableString.Invariant($"acompressor=threshold=0.125:ratio={(stress ? 3 : ratio):0.##}:makeup=1.5,") +
+        if (style == "classic")   // the sound before RadioFxStyle
+        {
+            var cband = FormattableString.Invariant($"highpass=f={lo:0.##}:p=2,highpass=f={lo:0.##}:p=2,lowpass=f={hi:0.##}:p=2,lowpass=f={hi:0.##}:p=2,equalizer=f=1500:t=q:w=1:g=3,");
+            return $"[0:a]{pre}aresample=48000," + (stress ? "volume=6dB,asoftclip=type=tanh,highpass=f=400,lowpass=f=2800," : cband) +
+                   FormattableString.Invariant($"acompressor=threshold=0.125:ratio={(stress ? 3 : ratio):0.##}:makeup=1.5,") +
+                   "loudnorm=I=-22:TP=-7:LRA=7,aresample=48000[v];" +
+                   "anoisesrc=r=48000:c=pink:a=0.008[n];[v][n]amix=inputs=2:duration=first:normalize=0[m];" +
+                   "anoisesrc=r=48000:c=pink:a=0.03:d=0.1,highpass=f=500,lowpass=f=3000,afade=t=out:d=0.1[sq];" +
+                   "[m][sq]concat=n=2:v=0:a=1,alimiter=limit=0.5:level=disabled[out]";
+        }
+        var (nlo, nhi) = stress ? (400d, 2800d) : (lo, hi);   // band of noise and bursts
+        var voice = stress
+            ? "volume=6dB,asoftclip=type=tanh,highpass=f=400,lowpass=f=2800," + FormattableString.Invariant($"acompressor=threshold=0.125:ratio=3:makeup=1.5,")   // Combat: mask microphone, overdriven
+            : FormattableString.Invariant($"highpass=f=200,acompressor=threshold=0.125:ratio={ratio:0.##}:makeup=1.5,volume=10dB,asoftclip=type=tanh:oversample=4,highpass=f={lo:0.##}:p=2,highpass=f={lo:0.##}:p=2,lowpass=f={hi:0.##}:p=2,lowpass=f={hi:0.##}:p=2,equalizer=f=1300:t=q:w=1.5:g=4,");
+        var nb = FormattableString.Invariant($"highpass=f={nlo:0.##},lowpass=f={nhi:0.##}");
+        return $"[0:a]{pre}aresample=48000," + voice +
                "loudnorm=I=-22:TP=-7:LRA=7,aresample=48000[v];" +   // all voices equally loud
-
-               "anoisesrc=r=48000:c=pink:a=0.008[n];[v][n]amix=inputs=2:duration=first:normalize=0[m];" +
-               "anoisesrc=r=48000:c=pink:a=0.03:d=0.1,highpass=f=500,lowpass=f=3000,afade=t=out:d=0.1[sq];" +   // quiet squelch tail instead of a bang
-               "[m][sq]concat=n=2:v=0:a=1,alimiter=limit=0.5:level=disabled[out]";                              // hard-limit peaks
+               $"anoisesrc=r=48000:c=white:a=0.03,{nb}[n];[v][n]amix=inputs=2:duration=first:normalize=0[m];" +
+               $"anoisesrc=r=48000:c=white:a=0.12:d=0.09,{nb},afade=t=out:st=0.03:d=0.06[s0];" +
+               $"anoisesrc=r=48000:c=white:a=0.12:d=0.16,{nb},afade=t=out:st=0.04:d=0.12[s1];" +
+               "[s0][m][s1]concat=n=3:v=0:a=1,alimiter=limit=0.5:level=disabled[out]";   // hard-limit peaks
     }
+
+    const string StrongBursts = "anoisesrc=r=48000:c=white:a=0.12:d=0.09,highpass=f=300,lowpass=f=3000,afade=t=out:st=0.03:d=0.06[s0];anoisesrc=r=48000:c=white:a=0.12:d=0.16,highpass=f=300,lowpass=f=3000,afade=t=out:st=0.04:d=0.12[s1];[s0][m][s1]concat=n=3:v=0:a=1,alimiter=limit=0.5:level=disabled[out]";
 
     static double Synth(string text,string voice, string mp3, bool pilot = false, bool stress = false, double pace = 1)
     {
-        var key = FormattableString.Invariant($"{text}|{voice}|{pilot}|{stress}|{pace}|{Cfg.SpeechRate}|{Cfg.ElevenLabsSpeed}");
+        var key = FormattableString.Invariant($"{text}|{voice}|{pilot}|{stress}|{pace}|{Cfg.SpeechRate}|{Cfg.ElevenLabsSpeed}|{Cfg.RadioFx}|{RadioStyle(Cfg.RadioFxStyle)}");
         lock (SynthCache)
             if (SynthCache.TryGetValue(key, out var hit) && File.Exists(hit.Mp3))
                 try { File.Copy(hit.Mp3, mp3, true); return hit.Sec; } catch (IOException) { }

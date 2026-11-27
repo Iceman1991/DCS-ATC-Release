@@ -44,7 +44,8 @@ public class Config
     public Dictionary<string, string> ElevenVoices { get; set; } = new();   // role -> ElevenLabs voice_id ("id1|id2": one per station), "" or missing = Piper voice from Voices; fallback on errors/quota
     public string PilotVoice { get; set; } = "en_US-joe-medium";   // speaks your menu/wheel requests, "" = off
     public double ElevenLabsSpeed { get; set; } = 1.1;   // ElevenLabs speaking rate (own, independent of SpeechRate): 1 = ElevenLabs normal, larger = faster; above 1.2 the rest is done by ffmpeg atempo
-    public bool RadioFx { get; set; } = true;          // Radio sound: bandpass, noise, squelch
+    public bool RadioFx { get; set; } = true;          // Radio sound on/off (style: RadioFxStyle)
+    public string RadioFxStyle { get; set; } = "realistic";   // radio sound: classic | realistic | strong | extreme; unknown = realistic
     public double[] RadioFxBand { get; set; } = { 300, 2700 };   // radio effect band in Hz [low cut 100-1000, high cut 1500-5000], two filter stages each; invalid = default
     public double RadioFxRatio { get; set; } = 6;      // radio effect compressor ratio (1 = off, higher = harder)
     public bool HintText { get; set; } = true;         // #27: notes of DCS-ATC (hints, errors, landing grade, deviations, "ATC: now ...") as text in the game; false = only in atc-log.txt and the debriefing
@@ -983,7 +984,7 @@ static partial class Program
         (Cfg.MyCallsign, Cfg.Volume, Cfg.SpeechRate, Cfg.ReplyPause, Cfg.RadioFx, Cfg.RadioText, Cfg.PilotVoice, Cfg.AiChatter, Cfg.AiFlightComms, Cfg.Atis, Cfg.AltimeterUnit, Cfg.WheelInGame, Cfg.AirspaceWatch, Cfg.RunwayLights, Cfg.CallsignFromUnit, Cfg.CallsignFromPlayer, Cfg.WheelFixed) =   // R392: RunwayLights is read per call (line ~995), applies immediately
             (n.MyCallsign, n.Volume, n.SpeechRate, n.ReplyPause, n.RadioFx, n.RadioText, n.PilotVoice, n.AiChatter, n.AiFlightComms, n.Atis, n.AltimeterUnit, n.WheelInGame, n.AirspaceWatch, n.RunwayLights, n.CallsignFromUnit, n.CallsignFromPlayer, n.WheelFixed);
         Cfg.HintText = n.HintText;
-        (Cfg.RadioFxBand, Cfg.RadioFxRatio) = (n.RadioFxBand, n.RadioFxRatio);
+        (Cfg.RadioFxBand, Cfg.RadioFxRatio, Cfg.RadioFxStyle) = (n.RadioFxBand, n.RadioFxRatio, n.RadioFxStyle);
         if (Cfg.ElevenLabsKey != n.ElevenLabsKey || !Cfg.ElevenVoices.OrderBy(x => x.Key).SequenceEqual(n.ElevenVoices.OrderBy(x => x.Key))) { ElevenLabs.Disabled = false; ElevenLabs.Remaining = -1; if (n.ElevenLabsKey != "") { Cfg.ElevenLabsKey = n.ElevenLabsKey; _ = Task.Run(ElevenLabs.LogQuota); } }   // new key or voices: try again, quota read first
         (Cfg.ElevenLabsKey, Cfg.ElevenVoices, Cfg.ElevenLabsSpeed) = (n.ElevenLabsKey, n.ElevenVoices, n.ElevenLabsSpeed);
         (Cfg.IffCheck, Cfg.StationPositions) = (n.IffCheck, n.StationPositions);   // Tower.IffCheck is set by LoadConfig, StationPositions is read per transmission

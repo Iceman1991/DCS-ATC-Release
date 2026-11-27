@@ -693,7 +693,8 @@ So funktionieren die Werte:
 
 | Einstellung | Standard | Bedeutung |
 |---|---|---|
-| `"RadioFx"` | `true` | Funkklang: schmaler Bandpass (300–2700 Hz, je zwei Filterstufen) mit leichter Präsenzanhebung, harter Kompressor, leises Rauschen, Squelch-Ende. Im Gefecht kommen Sprüche schneller und klingen wie ein übersteuertes Maskenmikrofon. |
+| `"RadioFx"` | `true` | Funkklang an/aus. Im Gefecht kommen Sprüche schneller und klingen wie ein übersteuertes Maskenmikrofon. |
+| `"RadioFxStyle"` | `"realistic"` | `"realistic"`: Kompressor und leicht übersteuerte Stimme wie der Sprachbegrenzer im Funkgerät, danach schmaler Bandpass (300–2700 Hz, je zwei Filterstufen) mit nasaler Anhebung bei 1,3 kHz, Rauschen im Band, kurzes Squelch-Rauschen am Anfang und Ende. `"classic"`: der klare Klang bis 0.23.29 (Bandpass, leises Rauschen, Squelch-Ende). `"strong"`: hart begrenzt, nasaler, schmaleres Band, das Rauschen wird leiser, während der Lotse spricht. `"extreme"`: wie strong, dazu Körnung, Knacken und leichtes Fading. Strong und extreme haben ein eigenes Band. |
 | `"RadioText"` | `true` | Funksprüche auch als DCS-Text im Bild. Zahlen stehen dort als Ziffern (heading 045, 251.5, Enfield 1-1), die Stimme spricht sie weiter Ziffer für Ziffer. `false` = nur Stimme; Hinweise von DCS-ATC kommen weiter als Text. |
 | `"Volume"` | `0.6` | Lautstärke der Lotsen in SRS (0–1). Senken, wenn die Stimmen zu laut sind. |
 | `"ElevenLabsSpeed"` | `1.1` | Standard-Tempo der ElevenLabs-Stimmen ohne eigenes Tempo, unabhängig von `SpeechRate`: 1 = ElevenLabs-Normal, größer = schneller. Nur in der Config; das Tempo je Rolle steht in der Stimmentabelle (0,80 bis 1,50) und wird als `"id@1.3"` in `ElevenVoices` gespeichert. |
@@ -2957,7 +2958,7 @@ Links wählst du die Seite: Allgemein, Stimmen, Funk & Verkehr, AWACS, Frequenze
 | **Lautstärke Lotsen** | 0–100 %, in 5er-Schritten | `Volume` |
 | **Sprechtempo** (1 = normal, größer = langsamer) | 0,70–1,50 | `SpeechRate` |
 | **Pause zwischen Funksprüchen** | 0–5 s | `ReplyPause` |
-| **Funkklang (Rauschen, Squelch)** | an/aus | `RadioFx` |
+| **Funkklang** | aus / klassisch / realistisch / stark / extrem | `RadioFx`, `RadioFxStyle` |
 | **Funksprüche auch als Text im Spiel** | an/aus | `RadioText` |
 | **Hinweise von DCS-ATC als Text im Spiel** | an/aus. Aus: Hinweise, Fehlermeldungen, Landebewertung und Verstöße erscheinen nicht mehr im Bild (für VR ohne Text im Sichtfeld). Sie stehen weiter in `atc-log.txt` und im Debriefing. | `HintText` |
 | **Pilotenstimme (spricht eigene Anfragen vor)** | Stimme wählen oder *aus*. Aus setzt die Pilotenstimme auf leer. | `PilotVoice` |
@@ -3069,7 +3070,8 @@ Eigene Frequenzen je Platz und Lotse stehen nicht in `config.jsonc`, sondern in 
 | `PilotVoice` | `"en_US-joe-medium"` | Spricht deine Rad- und F10-Anfragen vor der Antwort. `""` = aus. |
 | `ElevenLabsKey` | `""` | Dein eigener ElevenLabs-API-Schlüssel (Rechte Text to Speech, Voices lesen, User lesen). Leer = nur Piper. Wird aus Diagnose-Zip und Logs entfernt. |
 | `ElevenVoices` | `{}` | Rolle → ElevenLabs-Stimmen-ID, etwa `{"Tower": "idA\|idB"}`. Mit `\|` behält jede Station eine. Fehlt die Rolle, gilt die Piper-Stimme aus `Voices`. |
-| `RadioFx` | `true` | Funkklang: schmaler Bandpass, Kompressor, leichtes Rauschen, Squelch-Ende. |
+| `RadioFx` | `true` | Funkklang an/aus. |
+| `RadioFxStyle` | `"realistic"` | Funkklang: `classic`, `realistic`, `strong`, `extreme`. |
 | `RadioFxBand` | `[300, 2700]` | Band des Funkklangs in Hz `[untere, obere Grenze]`, je zwei Filterstufen. Untere 100–1000, obere 1500–5000, sonst gilt der Standard. Breiter = klarer, schmaler = mehr Funkgerät. |
 | `RadioFxRatio` | `6` | Kompressor-Verhältnis des Funkklangs (1 = aus, höher = härter). Gefechtssprüche bleiben bei 1:3. |
 | `RadioText` | `true` | Funksprüche auch als DCS-Text im Bild. `false` = nur Stimme. |

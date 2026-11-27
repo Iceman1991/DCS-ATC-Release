@@ -344,7 +344,10 @@ static class Settings
         Row(L("Sprechtempo (1 = normal, größer = langsamer)", "Speech pace (1 = normal, higher = slower)"), rate);
         var pause = new Slider(0, 5, 0.5, cfg.ReplyPause, "0.0' s'");
         Row(L("Pause zwischen Funksprüchen", "Pause between calls"), pause);
-        var fx = Check(L("Funkklang (Rauschen, Squelch)", "Radio effect (noise, squelch)"), cfg.RadioFx);
+        var fx = Combo(new[] { L("aus", "off"), L("klassisch (klar, leises Rauschen)", "classic (clear, quiet static)"), L("realistisch (leicht verzerrt, Standard)", "realistic (slightly distorted, default)"),
+                               L("stark (hart begrenzt, nasal)", "strong (hard clipped, nasal)"), L("extrem (Körnung, Knacken, Fading)", "extreme (grit, crackle, fading)") },
+                      cfg.RadioFx ? 1 + Array.IndexOf(Program.RadioStyles, Program.RadioStyle(cfg.RadioFxStyle)) : 0);
+        Row(L("Funkklang", "Radio effect"), fx);
         var rtx = Check(L("Funksprüche auch als Text im Spiel", "Radio calls also as text in the game"), cfg.RadioText);
         var htx = Check(L("Hinweise von DCS-ATC als Text im Spiel (Fehler, Landebewertung, Verstöße)", "Notes from DCS-ATC as text in the game (errors, landing grade, deviations)"), cfg.HintText);
         var mdir = Path.Combine(Path.GetDirectoryName(Program.ConfigPath)!, "models");
@@ -778,7 +781,7 @@ static class Settings
             var set = new (string Key, string Value, string After)[]
             {
                 ("MyCallsign", J(call!), "Callsign"), ("CallsignFromUnit", J(unitCs.Checked), "MyCallsign"), ("CallsignFromPlayer", J(playerCs.Checked), "CallsignFromUnit"), ("WheelFixed", J(wfix.Checked), "WheelSize"),("Volume", D(vol.Value / 100), "RadioFx"), ("SpeechRate", D(rate.Value), "Volume"),
-                ("ReplyPause", D(pause.Value), "SpeechRate"), ("RadioFx", J(fx.Checked), "PilotVoice"), ("RadioText", J(rtx.Checked), "RadioFx"), ("HintText", J(htx.Checked), "RadioText"),
+                ("ReplyPause", D(pause.Value), "SpeechRate"), ("RadioFx", J(fx.SelectedIndex > 0), "PilotVoice"), ("RadioFxStyle", J(fx.SelectedIndex > 0 ? Program.RadioStyles[fx.SelectedIndex - 1] : Program.RadioStyle(cfg.RadioFxStyle)), "RadioFx"), ("RadioText", J(rtx.Checked), "RadioFx"), ("HintText", J(htx.Checked), "RadioText"),
                 ("PilotVoice", J(pv.SelectedIndex == 0 ? "" : known[pv.SelectedIndex - 1] == pilot ? cfg.PilotVoice : known[pv.SelectedIndex - 1]), "Voices"),   // same model: its "@pitch" stays
                 ("AiChatter", J(chat.Checked), "ReplyPause"), ("AwacsBullseye", J(bull.Checked), "Coalition"), ("AwacsNewGroupNm", D(awNm.Value), "AwacsBullseye"), ("Atis", J(atis.Checked), "AiChatter"), ("RunwayLights", J(lights[light.SelectedIndex]), "Atis"), ("AltimeterUnit", J(units[unit.SelectedIndex]), "RunwayLights"), ("AiFlightComms", J(modes[combat.SelectedIndex]), "Volume"), ("IffCheck", J(iffc.Checked), "AirspaceWatch"), ("StationPositions", J(spos.Checked), "IffCheck"), ("RandomNotams", J(notam.Checked), "StationPositions"),("AirspaceWatch", J(watch.Checked), "RunwayLights"), ("DebugLog", J(dbg.Checked), "AirspaceWatch"),
                 ("WheelInGame", J(ingames[ingame.SelectedIndex]), "WheelSize"), ("MicName", J(mic.SelectedIndex == 0 ? "" : mics[mic.SelectedIndex - 1]), "WheelSize"), ("SrsPath", J(srs.Text.Trim()), "DebugLog"),

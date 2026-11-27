@@ -691,7 +691,8 @@ How the voice values work:
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `"RadioFx"` | `true` | Radio sound: narrow band-pass (300–2700 Hz, two filter stages each) with a slight presence boost, hard compressor, quiet static, squelch tail. In combat, calls are faster and sound like an overdriven mask microphone. |
+| `"RadioFx"` | `true` | Radio sound on/off. In combat, calls are faster and sound like an overdriven mask microphone. |
+| `"RadioFxStyle"` | `"realistic"` | `"realistic"`: compressor and a slightly overdriven voice like a radio's speech clipper, then a narrow band-pass (300–2700 Hz, two filter stages each) with a nasal boost at 1.3 kHz, static within the band, a short squelch burst at the start and end. `"classic"`: the clean sound up to 0.23.29 (band-pass, quiet static, squelch tail). `"strong"`: hard clipped, more nasal, narrower band, the static drops while the controller talks. `"extreme"`: like strong plus grit, crackle and slight fading. Strong and extreme use their own band. |
 | `"RadioText"` | `true` | Radio calls also as DCS text on screen. Numbers show as digits there (heading 045, 251.5, Enfield 1-1), the voice still says them digit by digit. `false` = speech only; notes from DCS-ATC still appear as text. |
 | `"Volume"` | `0.6` | Controller volume in SRS (0–1). Lower it if the voices are too loud. |
 | `"ElevenLabsSpeed"` | `1.1` | Default speech pace of the ElevenLabs voices without their own speed, independent of `SpeechRate`: 1 = ElevenLabs normal, higher = faster. Config only; the speed per role is set in the voice table (0.80 to 1.50) and stored as `"id@1.3"` in `ElevenVoices`. |
@@ -2954,7 +2955,7 @@ Pick the page on the left: General, Voices, Radio & traffic, AWACS, Frequencies,
 | **Controller volume** | 0–100 %, steps of 5 | `Volume` |
 | **Speech pace** (1 = normal, higher = slower) | 0.70–1.50 | `SpeechRate` |
 | **Pause between calls** | 0–5 s | `ReplyPause` |
-| **Radio effect (noise, squelch)** | on/off | `RadioFx` |
+| **Radio effect** | off / classic / realistic / strong / extreme | `RadioFx`, `RadioFxStyle` |
 | **Radio calls also as text in the game** | on/off | `RadioText` |
 | **Notes from DCS-ATC as text in the game** | on/off. Off: hints, error notes, landing grade and deviations no longer appear on screen (for VR without text in view). They stay in `atc-log.txt` and in the debriefing. | `HintText` |
 | **Pilot voice (speaks your wheel requests)** | Pick a voice or *off*. Off sets the pilot voice to empty. | `PilotVoice` |
@@ -3066,7 +3067,8 @@ Own frequencies per airfield and controller are not in `config.jsonc` but in the
 | `PilotVoice` | `"en_US-joe-medium"` | Speaks your wheel and F10 requests before the answer. `""` = off. |
 | `ElevenLabsKey` | `""` | Your own ElevenLabs API key (permissions Text to Speech, Voices read, User read). Empty = Piper only. Removed from the diagnostics zip and the logs. |
 | `ElevenVoices` | `{}` | Role → ElevenLabs voice ID, for example `{"Tower": "idA\|idB"}`. With `\|` each station keeps one. A missing role uses the Piper voice from `Voices`. |
-| `RadioFx` | `true` | Radio sound: narrow band-pass, compressor, light noise, squelch tail. |
+| `RadioFx` | `true` | Radio sound on/off. |
+| `RadioFxStyle` | `"realistic"` | Radio sound: `classic`, `realistic`, `strong`, `extreme`. |
 | `RadioFxBand` | `[300, 2700]` | Band of the radio sound in Hz `[low cut, high cut]`, two filter stages each. Low cut 100–1000, high cut 1500–5000, otherwise the default applies. Wider = clearer, narrower = more radio. |
 | `RadioFxRatio` | `6` | Compressor ratio of the radio sound (1 = off, higher = harder). Combat calls stay at 1:3. |
 | `RadioText` | `true` | Radio calls also as DCS text on screen. `false` = speech only. |

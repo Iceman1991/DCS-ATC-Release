@@ -154,10 +154,11 @@ static partial class Program
     /// Self-test: radio effect graph: narrow two-stage band, presence boost, compressor ratio from the config, bad band -> default, ffmpeg accepts it.
     static void RadioGraphTest()
     {
-        var (band, ratio) = (Cfg.RadioFxBand, Cfg.RadioFxRatio);
+        var (band, ratio, style) = (Cfg.RadioFxBand, Cfg.RadioFxRatio, Cfg.RadioFxStyle);
         try
         {
-            string Chain(int lo, int hi) => $"highpass=f={lo}:p=2,highpass=f={lo}:p=2,lowpass=f={hi}:p=2,lowpass=f={hi}:p=2,equalizer=f=1500:t=q:w=1:g=3";
+            Cfg.RadioFxStyle = "realistic";
+            string Chain(int lo, int hi) => $"asoftclip=type=tanh:oversample=4,highpass=f={lo}:p=2,highpass=f={lo}:p=2,lowpass=f={hi}:p=2,lowpass=f={hi}:p=2,equalizer=f=1300:t=q:w=1.5:g=4";
             (Cfg.RadioFxBand, Cfg.RadioFxRatio) = (new double[] { 300, 2700 }, 6);
             var def = RadioGraph("", false);
             Cfg.RadioFxBand = new double[] { 400, 3000 };
@@ -166,17 +167,24 @@ static partial class Program
             var badOk = bad.All(b => { Cfg.RadioFxBand = b; return RadioGraph("", false).Contains(Chain(300, 2700)); });
             var stress = RadioGraph("", true);
             if (!def.Contains(Chain(300, 2700)) || !def.Contains("ratio=6") || !own.Contains(Chain(400, 3000)) || !badOk
-                || !stress.Contains("highpass=f=400,lowpass=f=2800,") || stress.Contains("equalizer"))
+                || !stress.Contains("highpass=f=400,lowpass=f=2800,") || stress.Contains("equalizer")
+                || !def.Contains("[s0][m][s1]concat=n=3") || !stress.Contains("[s0][m][s1]concat=n=3"))
                 throw new Exception($"Funkklang-Graph: {def} | {own} | ungültig ok {badOk} | {stress}");
             Cfg.RadioFxBand = new double[] { 300, 2700 };
             var o = Path.Combine(Path.GetTempPath(), "dcsatc-fx.mp3");   // the string must be valid for ffmpeg: 1 s test tone through both graphs
-            foreach (var s in new[] { false, true })
-                if (Run(Ffmpeg, null, "-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=f=440:d=1", "-filter_complex", RadioGraph("", s), "-map", "[out]", "-ac", "1", o).exit != 0)
-                    throw new Exception("ffmpeg lehnt den Funkklang-Graph ab (Stress " + s + "): " + RadioGraph("", s));
+            string G(string st, bool s) { Cfg.RadioFxStyle = st; return RadioGraph("", s); }
+            if (!G("classic", false).Contains("equalizer=f=1500:t=q:w=1:g=3") || !G("classic", false).Contains("c=pink") || !G("strong", false).Contains("asoftclip=type=hard") || !G("strong", false).Contains("sidechaincompress")
+                || !G("extreme", false).Contains("acrusher") || !G("extreme", false).Contains("c=velvet") || G("foo", false) != G("realistic", false) || G("EXTREME", false) != G("extreme", false)
+                || G("strong", true) != G("realistic", true) || G("extreme", true) != G("realistic", true) || !G("strong", false).Contains(@"tanh(1.5*val(0))\,0.8*tanh"))
+                throw new Exception("Funkklang-Stile: Graph passt nicht zum Stil");
+            foreach (var st in RadioStyles)
+                foreach (var s in new[] { false, true })
+                    if (Run(Ffmpeg, null, "-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=f=440:d=1", "-filter_complex", G(st, s), "-map", "[out]", "-ac", "1", o).exit != 0)
+                        throw new Exception($"ffmpeg lehnt den Funkklang-Graph ab ({st}, Stress {s}): {G(st, s)}");
             File.Delete(o);
         }
-        finally { (Cfg.RadioFxBand, Cfg.RadioFxRatio) = (band, ratio); }
-        Console.WriteLine("OK   Funkklang: Band 300-2700 Hz zweistufig, Präsenz +3 dB bei 1,5 kHz, Kompressor 1:6, RadioFxBand/RadioFxRatio einstellbar, ungültiges Band -> Standard, Gefecht unverändert, ffmpeg nimmt den Graph an");
+        finally { (Cfg.RadioFxBand, Cfg.RadioFxRatio, Cfg.RadioFxStyle) = (band, ratio, style); }
+        Console.WriteLine("OK   Funkklang: Übersteuerung (Soft-Clip) vor dem Band 300-2700 Hz zweistufig, Präsenz +4 dB bei 1,3 kHz, Kompressor 1:6, weißes Rauschen mit Squelch-Bursts, RadioFxBand/RadioFxRatio einstellbar, ungültiges Band -> Standard, Gefecht unverändert, Stile klassisch/realistisch/stark/extrem (unbekannt -> realistisch), ffmpeg nimmt alle Graphen an");
     }
 
     /// Self-test: settings window writes config.jsonc (comments stay, missing keys added), callsign normalized.
