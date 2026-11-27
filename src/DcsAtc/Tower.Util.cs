@@ -374,7 +374,11 @@ public partial class Tower
         s = Regex.Replace(s, @"[^a-z0-9 ]", " ");
         s = Regex.Replace(s, @"\bmay +day\b", "mayday");     // R360: transcription splits the word
         s = Regex.Replace(s, @"\bdark +star\b", "darkstar");   // AWACS callsign as transcribed
+        s = Regex.Replace(s, @"\b(?:leading|living|giving|losing|leaning)(?= (?:(?:your|the) )?control (?:zone|tone)\b| your control$)", "leaving");   // Issue #49 (Guardian log): "leading control zone" as transcribed
+        s = Regex.Replace(s, @"\bcontrol tone\b", "control zone");
+        s = Regex.Replace(s, @"\b(?:report|reporting|repotting) (?:in )?israel\b", "report initial");   // Issue #49 (logs): "report initial" as transcribed
         s = Regex.Replace(s, @"\bsee you again\b", "say again");   // "say again" as transcribed (log); "see you at 10" (carrier) stays
+        s = Regex.Replace(s, @"\bstay again\b", "say again");   // Issue #49 (oz555 log 2026-11-21): "say again" as transcribed
         s = Regex.Replace(s, @"\bclear(?= +(?:to|the|for) +(?:land|take ?off)\b)", "cleared");   // #23: readback "clear to land"/"clear the land" as transcribed
         return string.Join(" ", s.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                                  .Select(w => Words.TryGetValue(w, out var d) ? d : w));

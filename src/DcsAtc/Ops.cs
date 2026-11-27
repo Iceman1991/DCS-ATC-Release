@@ -125,10 +125,12 @@ partial class Ops
     static string Blank(string n, string? own) => own == null ? n : Regex.Replace(n, $@"\b{Regex.Replace(Normalize(own), @"(?<=\d) (?=\d)", " ?")}\b", " ");
     /// R393: "say again" without a station (own call sign blanked): repeats the last call of the controller that spoke last (Program.Request)
     /// #49: a call that only withdraws the previous one ("Disregard", "Correction, Victory 9-1", "Showtime, Victory 9-1, disregard") gets no reply and no "say again" (Program.Request, all controllers)
-    public static bool Disregard(string n, string? own = null) => Regex.IsMatch(Regex.Replace(Blank(n, own), @"\s+", " ").Trim(), @"^(?:\w+ ){0,3}?(?:disregard|correction)(?: that| last transmission| my last transmission)?$");
+    public static bool Disregard(string n, string? own = null) => Regex.IsMatch(Regex.Replace(Blank(n, own), @"\s+", " ").Trim(), @"^(?:\w+ ){0,3}?(?:disregard|correction|cancel (?:that|(?:the|my) last (?:request|call|transmission)))(?: that| last transmission| my last transmission)?$");
     /// #49 (log Nellis: "Victory 9-1, Judy." 0.62 and "Victory 9-1. Defending." 0.57 were asked back, the same words at 0.70/0.85 were accepted): a tactical report to the AWACS
     /// is a closed phrase that triggers nothing dangerous, so a weak recognition (Program: from ExpConf) is not asked back
-    public static bool AwacsReport(string n) => Has(n, "judy", "defending", "defensive", "commit", "targeting", "targeted", "engaged", "engaging");
+    /// Issue #49 (oz555 logs 2026-11-17/23): the same for harmless requests and reports ("Request bogey dope" 0.64, "Check in" 0.64, "Victory 9-1 switching" ...)
+    public static bool AwacsReport(string n) => Has(n, "judy", "defending", "defensive", "commit", "targeting", "targeted", "engaged", "engaging",
+        "bogey dope", "check in", "checking in", "checking out", "switching", "pushing", "resetting", "on station", "frequency change");
     public static bool BareSayAgain(string n, string? own = null) => Regex.IsMatch(Blank(n, own).Trim(), @"^(?:say again|say again please)$");
     /// Forum (Abr): the name of a mission AWACS/tanker is a station too, also an own one from the unit name ("Sentry 1-1", CallsignFromUnit)
     static bool Named(Dictionary<string, double> groups, string n) =>
@@ -678,7 +680,9 @@ partial class Ops
             return new() { A($"{c}, {awName}, {sig}, {ef.Name.Replace('-', ' ')} bears {Brg(Bearing(t!.X, t.Z, ef.X, ef.Z))}, {Miles(Dist(t.X, t.Z, ef.X, ef.Z))}, " +
                              $"contact {ef.StationOf("Approach")} {FreqSay(ef.FreqsOf("Approach") is { } af ? af.FirstOrDefault(x => x >= 200, af[0]) : Freqs.GetValueOrDefault("Approach", 266.5))}.") };
         }
-        bool toTanker = last?.Contains("nearest tanker") == true && Has(n, "pushing", "switching", "frequency change", "contacting");   // i49 (log): after the tanker vector, the switch to the tanker is the frequency change, not a new request
+        // i49 (log): after the tanker vector, the switch to the tanker is the frequency change, not a new request; Issue #49 (log 2026-11-17, thread): "switching" / "pushing Nellis control" at any time leaves the frequency
+        bool toTanker = last?.Contains("nearest tanker") == true && Has(n, "pushing", "switching", "frequency change", "contacting")
+                        || Has(n, "switching", "frequency change") || Has(n, "pushing", "contacting") && Has(n, "tower", "ground", "approach", "departure", "control", "center", "centre");
         if (toTanker || Has(n, "check out", "checking out"))
         {
             awacsIn = onStation = false; awId = -1; Abm.Release(side, Flight(me));   // no more calls by itself; LK9: no longer planned
@@ -703,6 +707,8 @@ partial class Ops
             return new() { A($"{c}, {awName}, {OneOf("copy", "roger")}, {Nm(sg2)}.") };
         }
         if (Has(n, "on station")) onStation = true;   // LK5: CAP tasking (DCA): only then does the AWACS give "commit"
+        // Issue #49 (thread LtJaeger): "resetting", "20 minutes time on station" and "on station" after the check-in are reports, a short copy (no second picture, no "say again")
+        if (Has(n, "resetting", "time on station", "minutes on station") || wasIn && Has(n, "on station") && !Has(n, "check in", "checking in", "picture")) return new() { A($"{c}, {awName}, copy.") };
         if (Has(n, "rtb", "off station", "bingo", "winchester")) { onStation = false; Abm.Release(side, Flight(me)); }   // LD16: winchester releases
         // declare: spoken position before the locked target (tighter: 3 NM, ±5000 ft); R371: an aircraft there that the AWACS does not detect -> clean, with or without altitude; detected, unidentified -> bogey (Fill)
         if (Has(n, "declare") && t != null && (DeclarePos(n, t, me.Coalition) ?? LockPos(t)) is { } q)
@@ -816,11 +822,15 @@ partial class Ops
             return new();
         }
         if (Has(n, "winchester", "rtb", "tally", "commit", "targeted", "engaged", "engaging")) return new() { A($"{c}, {awName} copies.") };
+        if (Has(n, "thank you", "thanks")) { (awacsIn, radarContact) = (wasIn, wasRc); return new(); }   // Issue #49 (oz555 log 2026-11-21): "Bogey, thank you" is an acknowledgement, no reply
         // callsign only: not checked in -> check-in, otherwise callback without picture
         if (Has(n, "overlord", "awacs", "magic", "moscow", "darkstar", "wizard", "focus") || n.Contains(awName.ToLowerInvariant()))
             return new() { A(wasIn ? $"{c}, {awName}, go ahead." : $"{c}, {awName}, {PictureCall(groups, t, me, now, true)}.") };
         (awacsIn, radarContact) = (wasIn, wasRc);   // "say again" is not a check-in
-        return new() { A($"{c}, {awName}, say again.") };
+        var keep = last;   // Issue #49 (oz555 log 2026-11-21): his own "say again" is not the call to repeat (a later "say again" would repeat "say again")
+        var sa = A($"{c}, {awName}, say again.");
+        last = keep;
+        return new() { sa };
     }
 
     /// picture clean (by itself or after "splash"): forget what was reported, every group is new again afterward (AW-P3).

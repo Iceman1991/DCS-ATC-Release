@@ -16,7 +16,7 @@ public partial class Tower
     }
     /// Low confidence on a bare acknowledgement or "say again": the phrase is clear anyway -> process normally instead of asking back ("Copied." -> "say again")
     /// #23 (log 12.11.): also with the station in front ("Nellis Approach, say again." 0.62 was answered with "say again")
-    public bool Plain(string text) => Normalize(text) is var n && (AckOnly(n) || Ops.BareSayAgain(Regex.Replace(n, StationRx, " "), callsign));
+    public bool Plain(string text) => Normalize(text) is var n && (AckOnly(n, true) || AckGarbled(n) || Ops.BareSayAgain(Regex.Replace(n, StationRx, " "), callsign));
     string StationRx => @"\b(?:ground|tower|approach|departure|radar|" + string.Join("|", $"{F.Name}-{F.Callsign}".ToLowerInvariant().Split('-', ' ', StringSplitOptions.RemoveEmptyEntries).Select(Regex.Escape)) + @")\b";
     /// #23 (log 12.11.: "Taxi via Alpha, Vulture 1-1." 0.61 after the taxi clearance to parking -> "say again"): a readback of the controller's last
     /// transmission without a request in it needs no action, so a weak recognition (Program: from 0.50) is not asked back.
@@ -1011,8 +1011,11 @@ public partial class Tower
     /// Forum 0.9.7: acknowledgement without readback of a controller transmission: only the own callsign (AIM 4-2-3) and/or "approved", "starting up", "rolling", "taxiing", "lining up" …
     /// station: the station name may stand in front ("Kutaisi Departure, Enfield 1-1"); forum 0.15: "okay"/"thanks" are acknowledgements too
     bool AckOnly(string n, bool station = false) => last != null &&
-        Regex.Replace(NoCs(n), @"\b(?:roger|copy|copied|wilco|affirm(?:ative)?|approved|understood|okay|ok|thanks|thank you|starting(?: up| engines?)?|rolling|taxiing|lining up|switching(?: over)?|push(?:ing)?(?: (?:to )?(?:ground|tower|approach|departure|radar))?"
+        Regex.Replace(NoCs(n), @"\b(?:roger|copy|copied|wilco|affirm(?:ative)?|approved|understood|got it|okay|ok|thanks|thank you|starting(?: up| engines?)?|rolling|taxiing|lining up|switching(?: over)?|push(?:ing)?(?: (?:to )?(?:ground|tower|approach|departure|radar))?"
             + (station ? "|ground|tower|approach|departure|radar|" + string.Join("|", $"{F.Name}-{F.Callsign}".ToLowerInvariant().Split('-', ' ', StringSplitOptions.RemoveEmptyEntries).Select(Regex.Escape)) : "") + @")\b", " ").Trim() == "";
+    /// Issue #49 (Guardian/Ascot logs): "And 511, copy." / "Enfield 2-1 copy." at weak recognition: an ack word plus only a garbled callsign (word + digits, "and", digits) is still an ack
+    bool AckGarbled(string n) => last != null && Regex.IsMatch(n, @"\b(?:roger|copy|copied|wilco|got it|understood)\b") &&
+        Regex.Replace(Regex.Replace(n, @"\b(?:roger|copy|copied|wilco|got it|understood|and|ground|tower|approach|departure|radar)\b|\b[a-z]{3,} \d(?: ?\d)?\b|\b\d+\b", " "), @"\s+", " ").Trim() == "";
     /// Transmission without the own callsign (also misheard)
     string NoCs(string n) => Regex.Replace(n, @"\b([a-z]{3,}) \d(?: ?\d)?\b", m => !NotCallsign.Contains(m.Groups[1].Value) && (SameCallsign(m.Value, callsign) || Digits(m.Value) == Digits(callsign)) ? " " : m.Value);
 
@@ -1064,9 +1067,10 @@ public partial class Tower
         else
         {
             if (altAsk && Named(n) != null) return "alternate";   // N40: reply to "say alternate destination"
+            if (Phase is Phase.Away or Phase.Departing && Regex.IsMatch(n, @"\b(?:request|requesting) (?:a )?(?:radio )?(?:change of )?frequency(?: change)?\b") && !Has(n, "center", "centre", "radar", "london")) return "ffoff";   // Issue #49 (Guardian log): "request change of frequency" after leaving the zone = sign-off request
             if (Addressed(n) == "Center" && (!Center || !Has(n, "request", "requesting")) && !Has(n, "leaving frequency", "leaving your frequency", "cancel", "terminat")
                 && (Has(n, "check", "with you", "request", "requesting", "level", "angels", "climbing", "descending", "passing", "maintaining", "radar", "flight following", "en ?route", "squawk") || AltSlot(n) != null)) return "centercheck";   // LA12 (log): check-in only with content ("Center: Clear." is none)   // Center: check-in (with request: the request follows), IFR/climbing in it is no clearance or takeoff
-            if (zoneReport && Has(n, "(?:leaving|left) (?:the )?(?:control )?zone", "clear of (?:the )?(?:control )?zone", @"(?:leav|left|clear)\w* (?:\w+ )?(?:the )?control(?:s on| zone)")) return "leavezone";   // R7; LA20 (log): "clearing control zone", "leave in control zone", "leaving controls on"; issue #1: "left (the) control zone"
+            if (zoneReport && Has(n, "(?:leaving|left) (?:the )?(?:control )?zone", "clear of (?:the )?(?:control )?zone", @"(?:leav|left|clear)\w* (?:\w+ )?(?:the )?control(?:s on| zone|$)")) return "leavezone";   // R7; LA20 (log): "clearing control zone", "leave in control zone", "leaving controls on"; issue #1: "left (the) control zone"
             if (Has(n, "clearance", "ifr to") && !Has(n, "approach clearance", "landing") && ClrDest(n) != null) return "clearance";   // R113: pop-up IFR to another airfield, no landing here
             if (Has(n, "cancel approach", "cancel the approach", "cancel landing", "cancel inbound", "abort approach", "abort landing",
                     "leave the pattern", "leaving the pattern", "cancel my approach")) return "cancelapproach";

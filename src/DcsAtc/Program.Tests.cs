@@ -1961,6 +1961,24 @@ static partial class Program
         var j49 = new[] { Said49("AWACS: Victory 9-1, Judy.", 0.62), Said49("AWACS: Victory 9-1. Defending.", 0.57) };
         var j49b = Said49("AWACS: Victory 9-1. Defending.", 0.9);   // reference: same call, sure recognition
         var u49 = Said49("AWACS: Victory 9-1, request picture.", 0.62);
+        // #49 (oz555 logs 2026-11-17/21/23, issue thread): harmless AWACS calls must not get "say again": weak "bogey dope"/"check in", thanks, "stay again" (Whisper for "say again"), leaving the frequency, resetting, time on station
+        var rep49 = Said49("AWACS: Victory 9-1, request picture.");   // sure recognition: something to repeat
+        var w49 = new[] { Said49("AWACS: Request Bogey dope.", 0.64), Said49("AWACS: Check in.", 0.64), Said49("AWACS: Showtime, Overlord 3-1. Checking in.", 0.63) };
+        var th49 = Said49("AWACS: Bogey, thank you.", 0.87);
+        var gb49 = Said49("AWACS: Victory 9-1, wibble wobble.");   // not understood -> "say again", which is not the call to repeat
+        var st49 = Said49("AWACS: Stay again.", 0.86);
+        var lv49 = new[] { Said49("AWACS: Victory 9-1 switching.", 0.83), Said49("AWACS: Showtime, Victory 9-1, pushing Nellis control.", 0.9) };
+        Said49("AWACS: Victory 9-1, checking in.");   // checked in again after leaving
+        var rs49 = new[] { Said49("AWACS: Victory 9-1, resetting.", 0.9), Said49("AWACS: Victory 9-1, 20 minutes time on station.", 0.9), Said49("AWACS: Victory 9-1, on station.", 0.9) };
+        string J49(List<string> l) => string.Join(" | ", l);
+        bool NoAsk(List<string> l) => l.Count == 1 && !l[0].Contains("say again");
+        foreach (var (nm, l) in new[] { ("bogey dope 0.64", w49[0]), ("check in 0.64", w49[1]), ("checking in 0.63", w49[2]) })
+            if (!NoAsk(l)) throw new Exception($"#49 weak harmless call '{nm}' still asked back: {J49(l)}");
+        if (th49.Count != 0) throw new Exception("#49 'Bogey, thank you' got a reply: " + J49(th49));
+        if (!gb49.Any(s => s.Contains("say again")) || J49(st49) != J49(w49[2])) throw new Exception($"#49 'Stay again' does not repeat the last call: {J49(st49)} | expected {J49(w49[2])}");
+        if (lv49.Any(l => !(NoAsk(l) && l[0].Contains("checking out")))) throw new Exception("#49 leaving the frequency (switching / pushing Nellis control): " + string.Join(" || ", lv49.Select(J49)));
+        if (rs49.Any(l => !(NoAsk(l) && l[0].EndsWith("copy.")))) throw new Exception("#49 resetting / time on station / on station not copied: " + string.Join(" || ", rs49.Select(J49)));
+        Console.WriteLine("OK   #49: schwach erkannt 'bogey dope'/'check in' beantwortet, 'thank you' still, 'stay again' wiederholt den letzten Spruch (auch nach eigenem say again), switching/pushing Nellis control jederzeit verabschiedet, resetting/time on station -> copy");
         Ops.Gci.Remove(2);
         while (SayQueue.TryTake(out _)) { }
         if (d49.Any(l => l.Count > 0) || j49[0].Any(s => s.Contains("say again")) || string.Join("|", j49[1]) != string.Join("|", j49b) || !u49.Any(s => s.Contains("say again")))

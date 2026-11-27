@@ -319,6 +319,39 @@ public partial class Tower
             Check(sgR7?.Text == "leaving the control zone" && lz.Count == 1 && lz[0].Role == "Approach" && lz[0].Text == "Enfield one one, roger, resume own navigation, squawk 7000, frequency change approved. Good day." && lz2.Count == 0,
                   "R7 leaving the control zone: " + string.Join(" | ", lz.Concat(lz2)));
         }
+        {   // Issue #49 (Guardian/Enfield logs): truncated/misheard zone report, frequency request after leaving, weak acks, Whisper mishearings
+            foreach (var call in new[] { "Kutaisi Approach, Enfield 11, leaving the control", "Kutaisi Approach, Enfield 11, leading control zone", "Kutaisi Approach, Enfield 11, request change of frequency" })
+            {
+                var t49 = new Tower("Enfield 1-1");
+                t49.Tick(parked, none, 0);
+                t49.OnTranscript("Enfield 11 request taxi", parked, none, 2);
+                t49.OnTranscript("Enfield 11 ready for departure", hold, none, 3);
+                t49.Tick(At(dx, dz, 120, LandHdg("25"), 180), none, 10);
+                t49.Tick(At(dx, dz, 250, LandHdg("25"), 200), none, 11);
+                t49.OnTranscript("Kutaisi Approach, Enfield 11, airborne, passing 2000", At(dx, dz, 600, LandHdg("25"), 250), none, 20);
+                var r49 = t49.OnTranscript(call, At(CX - 8 * NM, CZ, 600, 270, 250), none, 28);
+                Check(r49.Count == 1 && r49[0].Text.Contains("frequency change approved"), "Issue #49 sign-off '" + call + "': " + string.Join(" | ", r49.Select(m => m.Text)));
+            }
+            {   // "losing control" must not become a zone sign-off
+                var tl = new Tower("Enfield 1-1");
+                tl.Tick(parked, none, 0);
+                tl.OnTranscript("Enfield 11 request taxi", parked, none, 2);
+                tl.OnTranscript("Enfield 11 ready for departure", hold, none, 3);
+                tl.Tick(At(dx, dz, 120, LandHdg("25"), 180), none, 10);
+                tl.Tick(At(dx, dz, 250, LandHdg("25"), 200), none, 11);
+                tl.OnTranscript("Kutaisi Approach, Enfield 11, airborne, passing 2000", At(dx, dz, 600, LandHdg("25"), 250), none, 20);
+                var rl = tl.OnTranscript("Kutaisi Approach, Enfield 11, losing control", At(CX - 8 * NM, CZ, 600, 270, 250), none, 28);
+                Check(!rl.Any(m => m.Text.Contains("frequency change approved")), "Issue #49 'losing control' is no zone sign-off: " + string.Join(" | ", rl.Select(m => m.Text)));
+            }
+            var tp = new Tower("Enfield 1-1");
+            tp.Tick(parked, none, 0);
+            tp.OnTranscript("Enfield 11 request taxi", parked, none, 2);
+            foreach (var ack in new[] { "Kutaisi Ground: Copy.", "Tower: Copy.", "Got it.", "And 511, copy.", "Enfield 2-1 copy." })
+                Check(tp.Plain(ack), "Issue #49 weak ack is plain: " + ack);
+            Check(!tp.Plain("Enfield 1-1 request taxi") && !tp.Plain("Kutaisi Ground, Enfield 1-1, request start-up"), "Issue #49 request is not plain");
+            Check(Tower.Normalize("Report in Israel.") == "report initial" && Tower.Normalize("Repotting Israel.") == "report initial", "Issue #49 report initial mishearing: " + Tower.Normalize("Report in Israel."));
+            Check(Ops.Disregard(Tower.Normalize("Cancel the last request.")) && Ops.Disregard(Tower.Normalize("Kutaisi Approach, cancel my last request.")) && !Ops.Disregard(Tower.Normalize("Cancel landing.")), "Issue #49 cancel last request withdraws the call");
+        }
 
         // A5 · R40: first call to Departure ("Kutaisi Approach, Enfield 1-1", "…, with you") and "airborne" below 100 m = check-in, not a landing announcement
         foreach (var (call, agl) in new[] { ("Kutaisi Approach, Enfield 1-1", 250.0), ("Approach, Enfield 1-1, with you", 250.0),
