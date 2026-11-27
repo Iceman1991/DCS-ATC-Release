@@ -145,14 +145,28 @@ static class ElevenLabs
     }
 
     /// Start: one log line with the remaining characters (asynchronous), key problems are noted too.
-    internal static async Task LogQuota()
+    internal static int FirstRetryMs = 30_000, RetryMs = 120_000;   // the selftest makes them short
+
+    /// Start: read the quota; a transient failure (timeout, network, 5xx) is retried after 30 s, then every 2 minutes until one read works.
+    internal static async Task QuotaLoop()
     {
-        try { var q = await GetQuota(Program.Cfg.ElevenLabsKey); Program.Log(QuotaText(q, true)); Apply(q); }
+        var key = Program.Cfg.ElevenLabsKey;
+        for (int i = 0; await LogQuota(); i++)
+        {
+            await Task.Delay(i == 0 ? FirstRetryMs : RetryMs);
+            if (Program.Cfg.ElevenLabsKey != key || Remaining >= 0) return;   // key changed (a new loop runs) or another read already worked
+        }
+    }
+
+    /// One read. true = transient failure, try again later (never for a rejected or invalid key).
+    internal static async Task<bool> LogQuota()
+    {
+        try { var q = await GetQuota(Program.Cfg.ElevenLabsKey); Program.Log(QuotaText(q, true)); Apply(q); return false; }
         catch (HttpRequestException e) when (e.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
-        { Remaining = -1; Program.Log("ElevenLabs: key rejected or without the permission User (read), Piper voices only"); }
+        { Remaining = -1; Program.Log("ElevenLabs: key rejected or without the permission User (read), Piper voices only"); return false; }
         catch (HttpRequestException e) when (e.StatusCode == HttpStatusCode.BadRequest)
-        { Remaining = -1; Program.Log($"ElevenLabs: invalid key ({e.Message}), Piper voices only"); }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException) { Remaining = -1; Program.Trace("FEHLER", $"ElevenLabs Kontingent: {e.GetType().Name}: {e.Message}"); }
+        { Remaining = -1; Program.Log($"ElevenLabs: invalid key ({e.Message}), Piper voices only"); return false; }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException) { Remaining = -1; Program.Trace("FEHLER", $"ElevenLabs Kontingent: {e.GetType().Name}: {e.Message}"); return true; }
     }
 
     static string L(string de, string en) => Ui.L(de, en);
@@ -168,7 +182,7 @@ static class ElevenLabs
         var reqs = new List<string>();
         var srv = new Thread(() =>
         {
-            for (int n = 0; n < 9; n++)
+            for (int n = 0; n < 12; n++)
             {
                 using var c = l.AcceptTcpClient();
                 var s = c.GetStream();
@@ -195,9 +209,12 @@ static class ElevenLabs
                     5 => """{"character_count":1944,"character_limit":10000,"next_character_count_reset_unix":1796428800}"""u8.ToArray(),
                     6 => new byte[22050 * 2],
                     7 => """{"character_count":9990,"character_limit":10000,"next_character_count_reset_unix":1796428800}"""u8.ToArray(),   // 10 left
+                    9 => """{"detail":{"status":"invalid_api_key"}}"""u8.ToArray(),   // start read with a rejected key: not retried
+                    10 => """{"detail":"busy"}"""u8.ToArray(),   // start read hiccup (503): retried
+                    11 => """{"character_count":1000,"character_limit":10000,"next_character_count_reset_unix":1796428800}"""u8.ToArray(),
                     _ => """{"detail":{"type":"authentication_error","code":"invalid_api_key","message":"API key must start with 'sk_'.","status":"invalid_api_key_prefix","param":"api_key"}}"""u8.ToArray(),
                 };
-                s.Write(Encoding.ASCII.GetBytes($"HTTP/1.1 {(n is 1 or 4 ? "401 Unauthorized" : n == 8 ? "400 Bad Request" : "200 OK")}\r\nContent-Type: application/json\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n"));
+                s.Write(Encoding.ASCII.GetBytes($"HTTP/1.1 {(n is 1 or 4 or 9 ? "401 Unauthorized" : n == 8 ? "400 Bad Request" : n == 10 ? "503 Service Unavailable" : "200 OK")}\r\nContent-Type: application/json\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n"));
                 s.Write(body);
             }
         }) { IsBackground = true };
@@ -277,7 +294,15 @@ static class ElevenLabs
             catch (HttpRequestException e) when (e.StatusCode == HttpStatusCode.BadRequest) { badKey = e.Message; }
             if (badKey == null || !badKey.Contains("API key must start with 'sk_'"))
                 throw new Exception($"ElevenLabs 400: Grund fehlt: {badKey}");
-            if (!srv.Join(3000) || !unk || !known || !tooLong || !pv || !paid || !low || !lowPiper)
+            // start read: rejected key -> one request, no retry; 503 hiccup -> retried (short delay here) -> usable again
+            (FirstRetryMs, RetryMs, Disabled, Remaining) = (50, 50, false, -1);
+            QuotaLoop().GetAwaiter().GetResult();   // request 9: 401
+            bool noRetry = reqs.Count == 10 && Remaining == -1;
+            QuotaLoop().GetAwaiter().GetResult();   // requests 10 (503) and 11 (200)
+            bool retried = reqs.Count == 12 && Remaining == 9000 && Usable;
+            (FirstRetryMs, RetryMs) = (30_000, 120_000);
+            if (!noRetry || !retried) throw new Exception($"ElevenLabs Start-Wiederholung: 401 ohne Wiederholung {noRetry}, nach 503 wieder nutzbar {retried}, Anfragen {reqs.Count}, Rest {Remaining}");
+            if (!srv.Join(3000) || !unk|| !known || !tooLong || !pv || !paid || !low || !lowPiper)
                 throw new Exception($"ElevenLabs Kontingent-Stopp: unbekannt {unk}, bekannt {known}, zu lang {tooLong}, Probe {pv}, Abzug {paid}, knapp {low}, Piper {lowPiper}, Anfragen {reqs.Count}");
         }
         finally

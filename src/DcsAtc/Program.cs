@@ -251,7 +251,7 @@ static partial class Program
             Console.ReadKey(true);
             return 1;
         }
-        if (Cfg.ElevenLabsKey != "") _ = Task.Run(ElevenLabs.LogQuota);   // remaining characters, asynchronous
+        if (Cfg.ElevenLabsKey != "") _ = Task.Run(ElevenLabs.QuotaLoop);   // remaining characters, asynchronous
         new Thread(() =>   // in the background: GitHub may be slow or unreachable
             {
                 Update.Clean();
@@ -986,7 +986,7 @@ static partial class Program
             (n.MyCallsign, n.Volume, n.SpeechRate, n.ReplyPause, n.RadioFx, n.RadioText, n.PilotVoice, n.AiChatter, n.AiFlightComms, n.Atis, n.AltimeterUnit, n.WheelInGame, n.AirspaceWatch, n.RunwayLights, n.CallsignFromUnit, n.CallsignFromPlayer, n.WheelFixed);
         Cfg.HintText = n.HintText;
         (Cfg.RadioFxBand, Cfg.RadioFxRatio, Cfg.RadioFxStyle) = (n.RadioFxBand, n.RadioFxRatio, n.RadioFxStyle);
-        if (Cfg.ElevenLabsKey != n.ElevenLabsKey || !Cfg.ElevenVoices.OrderBy(x => x.Key).SequenceEqual(n.ElevenVoices.OrderBy(x => x.Key))) { ElevenLabs.Disabled = false; ElevenLabs.Remaining = -1; if (n.ElevenLabsKey != "") { Cfg.ElevenLabsKey = n.ElevenLabsKey; _ = Task.Run(ElevenLabs.LogQuota); } }   // new key or voices: try again, quota read first
+        if (Cfg.ElevenLabsKey != n.ElevenLabsKey || !Cfg.ElevenVoices.OrderBy(x => x.Key).SequenceEqual(n.ElevenVoices.OrderBy(x => x.Key))) { ElevenLabs.Disabled = false; ElevenLabs.Remaining = -1; if (n.ElevenLabsKey != "") { Cfg.ElevenLabsKey = n.ElevenLabsKey; _ = Task.Run(ElevenLabs.QuotaLoop); } }   // new key or voices: try again, quota read first
         (Cfg.ElevenLabsKey, Cfg.ElevenVoices, Cfg.ElevenLabsSpeed) = (n.ElevenLabsKey, n.ElevenVoices, n.ElevenLabsSpeed);
         (Cfg.IffCheck, Cfg.StationPositions) = (n.IffCheck, n.StationPositions);   // Tower.IffCheck is set by LoadConfig, StationPositions is read per transmission
         (Cfg.RandomNotams, Cfg.Notams) = (n.RandomNotams, n.Notams);
