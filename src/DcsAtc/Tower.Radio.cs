@@ -494,7 +494,13 @@ public partial class Tower
             }
 
             case "cross":   // Forum 0.9.7: at the parallel runway holding point (also "ready for departure" there): no takeoff clearance, crossing of the parallel runway, holding point of the assigned one
-                return Say(Cross(CrossAhead(t!)!, traffic));
+            {
+                if (CrossPick(t!, n) is not { } cxr) return Say($"{c}, say again which runway.");
+                if (cxr == crossOk && Has(n, "cross") && !Has(n, "request")) return new();   // readback "crossing runway X": no second clearance
+                var cxs = Cross(cxr, traffic);
+                crossAsked = crossWait != null;   // requested: the clearance comes when free, wherever the aircraft is
+                return Say(cxs);
+            }
 
             case "rto":   // R100: takeoff clearance expired; HoldShort with lineUp (no "not cleared onto runway" when vacating), holdSince -2 (no auto-clearance, reporting obligation #14)
                 Phase = Phase.HoldShort; lineUp = true; holdSince = -2; rejecting = true;   // R267: vacate and to Ground as after landing, not "report ready for departure" (FAA JO 7110.65 3-10-9)
@@ -1055,6 +1061,7 @@ public partial class Tower
         {
             if (Has(n, "clearance", "ifr to") && !Has(n, "takeoff", "take off", "landing")) return "clearance";
             if (Has(n, "progressive") && (Phase == Phase.TaxiOut || Phase == Phase.TaxiIn && taxiInTold)) return "progressive";   // N26: otherwise part of the taxi request (taxi/taxiin)
+            if (lastTel != null && (Phase == Phase.TaxiOut || Phase == Phase.TaxiIn && taxiInTold) && !Has(n, "taxi") && (Has(n, "crossing") || Has(n, "request") && Has(n, "cross"))) return "cross";   // own log (Bagram): "request crossing runway 21 left" at any time during taxi
             if (Phase == Phase.TaxiIn && taxiInTold && lastTel is { } it && CrossIn(it) is { } ix && NearRwy(it, ix) && Has(n, "cross", "hold(?:ing)? short")) return "cross";   // LA06: holding short of a runway on the way to parking
             // #28 (log Nellis): "at parking, shutting down" after landing is the report that he is parked (also off a DCS stand), not a taxi request
             if (Phase is Phase.TaxiIn or Phase.Parked && taxiInTold && Has(n, "shutting down", "shut ?down", "engines? (?:off|shut)", "parked", "in (?:the )?(?:chocks|blocks)", "(?:shutting|chatting) down", "at (?:the )?(?:parking|ramp|apron|stand|spot)") && !Has(n, "request")) return "shutdown";
@@ -1335,21 +1342,36 @@ public partial class Tower
     string? CrossAhead(Telemetry t) => Phase == Phase.TaxiIn ? CrossIn(t) : CrossNext(t);
 
     /// Forum 0.9.7 (FAA JO 7110.65 3-7-2): crossing parallel runway x only clear if nobody is taxiing/standing on it and nobody approaches it within 2 NM (both directions).
-    Traffic? CrossBlock(IReadOnlyList<Traffic> traffic, string x) =>
-        traffic.FirstOrDefault(a => Blocks(F, x, a.X, a.Z, a.AltMsl - FieldElev, a.Hdg, a.Speed)) ?? FinalTraffic(traffic, x, 2 * NM).Concat(FinalTraffic(traffic, Airfield.Opposite(x), 2 * NM)).FirstOrDefault();
+    /// The assigned runway itself: also the takeoff clearances / line-up / taxiing flights on its route that other players and AI hold (RunwayClaimed, RwyTaxiOn, as for the takeoff clearance).
+    string? CrossBlock(IReadOnlyList<Traffic> traffic, string x) =>
+        (traffic.FirstOrDefault(a => Blocks(F, x, a.X, a.Z, a.AltMsl - FieldElev, a.Hdg, a.Speed)) ?? FinalTraffic(traffic, x, 2 * NM).Concat(FinalTraffic(traffic, Airfield.Opposite(x), 2 * NM)).FirstOrDefault()) is { } b ? $"traffic {Describe(b, x)}"
+        : (x == Runway || x == Airfield.Opposite(Runway)) && (RunwayClaimed > 0 || RwyTaxiOn > 0) ? BusyWhy(traffic) : null;
+
+    /// Runway to cross on request: named in the call (either direction), otherwise the one ahead, otherwise the nearest centreline within 400 m lateral and its length.
+    string? CrossPick(Telemetry t, string n)
+    {
+        double Lat(RwyEnd e) => Math.Abs((t.X - e.CX) * e.Dz - (t.Z - e.CZ) * e.Dx);
+        string side = RwySide(n);
+        if (Has(n, "cross") && RwySlot(n) is { } ws && F.Ends.Where(e => e.Name == ws + side || side == "" && e.Name.StartsWith(ws)).MinBy(Lat) is { } named) return named.Name;
+        return CrossAhead(t) ?? F.Ends.Where(e => HdgDiff(e.Hdg, F.End(Runway).Hdg) < 90 && Lat(e) < 400 && Math.Abs((t.X - e.CX) * e.Dx + (t.Z - e.CZ) * e.Dz) < e.Len / 2).MinBy(Lat)?.Name;
+    }
 
     /// Clearance to cross, then holding point of the assigned runway; runway occupied: hold, the clearance comes by itself (tick).
     string Cross(string x, IReadOnlyList<Traffic> traffic)
     {
         var c = Cs();
-        if (CrossBlock(traffic, x) is { } b) { (crossWait, crossRole) = (x, role); return $"{c}, hold short runway {RwSay(x)}, traffic {Describe(b, x)}."; }
+        if (CrossBlock(traffic, x) is { } b) { (crossWait, crossRole) = (x, role); return $"{c}, hold short runway {RwSay(x)}, {b}."; }
         (crossOk, crossWait) = (x, null);
+        crossOn = lastTel is { } lt && F.End(x) is var ce && Math.Abs((lt.X - ce.CX) * ce.Dx + (lt.Z - ce.CZ) * ce.Dz) < ce.Len / 2 + 50 && Math.Abs((lt.X - ce.CX) * ce.Dz - (lt.Z - ce.CZ) * ce.Dx) < 30;   // already on the strip
         taxiSaid = taxiSaid?.Replace($", hold short runway {RwSay(x)}", "");   // issue #62: crossed now, a later "wrong way" must not repeat the hold short
         if (Phase == Phase.TaxiIn) return $"{c}, cross runway {RwSay(x)}, continue to {(parkNum > 0 ? $"parking spot {StandName(parkNum)}" : "parking")}.";   // LA06
+        if (x == Runway || x == Airfield.Opposite(Runway)) return $"{c}, cross runway {RwSay(x)}, continue to holding point runway {RwSay(Runway)}.";   // own log (Bagram): the way to the holding point leads across the assigned runway
         return $"{c}, cross runway {RwSay(x)}, hold short runway {RwSay(Runway)}" +
                (role == "Tower" || SameFreq("Tower") ? ", report ready for departure." : $", contact {Contact("Tower")} when ready for departure.");
     }
     string? crossOk, crossWait;   // may be crossed / waiting to cross
+    bool crossAsked;   // waiting on request (not only at the holding point of a parallel runway)
+    bool crossOn;   // on the strip (30 m lateral, as the runway-entry check) since the crossing clearance: crossOk of the assigned runway ends 45 m (Blocks) clear of it
     string crossRole = "Ground";   // whoever said "hold short" releases the crossing
     /// At the holding point of runway x or on it: up to 250 m lateral of the centerline, longitudinally up to 300 m beyond the ends
     bool NearRwy(Telemetry t, string x) => F.End(x) is var o && Math.Abs((t.X - o.CX) * o.Dz - (t.Z - o.CZ) * o.Dx) < 250 && Math.Abs((t.X - o.CX) * o.Dx + (t.Z - o.CZ) * o.Dz) < o.Len / 2 + 300;

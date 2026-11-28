@@ -204,7 +204,7 @@ local function start()
     { "Ground", nil, {
       { "Request startup", "Ground: request startup" }, { "IFR clearance", "Ground: request IFR clearance", ifr = true },
       { "Request taxi", "Ground: request taxi" }, { "Vacated, taxi to parking", "Ground: runway vacated, request taxi to parking" },
-      { "Progressive taxi", "Ground: request progressive taxi" }, { "Say again taxi", "Ground: say again taxi route" }, { "Hot brakes", "Ground: hot brakes" } } },   -- R251/R297
+      { "Progressive taxi", "Ground: request progressive taxi" }, { "Say again taxi", "Ground: say again taxi route" }, { "Request runway crossing", "Ground: request runway crossing" }, { "Hot brakes", "Ground: hot brakes" } } },   -- R251/R297
     { "Tower", nil, {
       { "Ready for departure", "Tower: ready for departure" }, { "Ready, closed pattern", "Tower: ready for departure, closed pattern" },
       { "Initial", "Tower: initial" }, { "Overhead", "Tower: overhead" }, { "Base, gear down", "Tower: base, gear down" },

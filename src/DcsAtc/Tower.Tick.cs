@@ -141,7 +141,15 @@ public partial class Tower
         // Runway entered without clearance / takeoff roll without clearance; after "line up and wait" he may stand (hold position until 40 kt dropped), not taxi
         if (kt <= 40) rejecting = false;
         // Forum 0.9.7: waits at the holding point of the parallel runway, which is now free -> clear to cross (like the takeoff clearance after "hold short")
-        if (ground && Phase is Phase.TaxiOut or Phase.TaxiIn && crossWait is { } cw && CrossAhead(t) == cw && CrossBlock(traffic, cw) == null) { role = crossRole; return Say(Cross(cw, traffic)); }
+        if (ground && Phase is Phase.TaxiOut or Phase.TaxiIn && crossWait is { } cw && (CrossAhead(t) == cw || crossAsked) && CrossBlock(traffic, cw) == null) { role = crossRole; return Say(Cross(cw, traffic)); }
+        // The crossing of the assigned runway was one clearance: ends on the far side (clear of the runway strip), later entering needs line-up/takeoff clearance again
+        if (ground && crossOk is { } cox && (cox == Runway || cox == Airfield.Opposite(Runway)))
+        {
+            var ce = F.End(cox);
+            double cl = Math.Abs((t.X - ce.CX) * ce.Dz - (t.Z - ce.CZ) * ce.Dx);
+            if (cl < 30 && Math.Abs((t.X - ce.CX) * ce.Dx + (t.Z - ce.CZ) * ce.Dz) < ce.Len / 2 + 50) crossOn = true;
+            else if (crossOn && cl > 45) (crossOk, crossOn) = (null, false);   // either side: turning back uses the clearance up too
+        }
         if (ground && RunwayAt(t.X, t.Z, t.Hdg * 180 / Math.PI, rw) is { } hitRw && !(Phase is Phase.TaxiOut or Phase.TaxiIn && Gs(t) / Kt <= 40 && crossOk is { } co && (hitRw == co || hitRw == Airfield.Opposite(co)))   // cleared to cross (LA03: up to 40 kt ground speed)
             && (Phase is Phase.Parked or Phase.StartupApproved or Phase.TaxiOut or Phase.HoldShort || Phase == Phase.TaxiIn && vacatedAt > landedAt && !Landed(hitRw)))   // LA06: taxiing in after vacating, another runway (the landing runway as before: wrong-side exits, loops at its end)
         {

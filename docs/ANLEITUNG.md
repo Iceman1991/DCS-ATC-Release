@@ -175,6 +175,7 @@ Ground: Enfield one one, Kutaisi Ground, taxi to holding point runway two five v
 
 - **Erkannte Formulierungen.** „request taxi“, „ready to taxi“ und „request startup and taxi“ gehen alle. Letzteres gibt Anlassen und Rollen zusammen frei.
 - **Progressive Taxi.** Während du rollst, wiederholt „request progressive taxi“ die Rollroute. „Say again taxi“ macht dasselbe.
+- **Bahnquerung.** Führt dein Weg über eine Bahn, frag vorher: „request crossing runway two one left“ (ohne Bahnnamen wird die nächste genommen). Ground prüft Bahn, Endanflug und Abflüge und antwortet „cross runway two one left, continue to holding point runway two one left“ oder „hold short runway two one left, traffic ...“. Nach einem „hold short“ kommt die Freigabe von selbst, sobald die Bahn frei ist. Sie gilt für eine Querung. Ohne sie gibt das Rollen auf die Bahn „not cleared onto runway“.
 
 **5. Start (Tower).** Am Rollhalt:
 
@@ -492,6 +493,7 @@ Jede Ebene zeigt höchstens 9 Einträge.
 | Vacated, taxi to parking | `runway vacated, request taxi to parking` | Am Boden nach der Landung |
 | Progressive taxi | `request progressive taxi` | Am Boden |
 | Say again taxi | `say again taxi route` | Beim Rollen |
+| Request runway crossing | `request runway crossing` | Beim Rollen |
 | Hot brakes | `hot brakes` | Am Boden |
 
 Die IFR-Liste zeigt nahe Plätze; Träger und dein aktueller Platz stehen nicht darin.
@@ -618,7 +620,7 @@ In jeder Mission mit DCS-ATC bekommt jede Spielergruppe **F10 Andere → DCS-ATC
 
 | Untermenü | Einträge |
 |---|---|
-| Ground | Request startup · Request taxi · Runway vacated, taxi to parking · Progressive taxi · Say again taxi · Hot brakes · IFR clearance → *Nächster in Abflugrichtung* / bis zu 8 eigene oder neutrale Plätze, nächster zuerst |
+| Ground | Request startup · Request taxi · Runway vacated, taxi to parking · Progressive taxi · Say again taxi · Request runway crossing · Hot brakes · IFR clearance → *Nächster in Abflugrichtung* / bis zu 8 eigene oder neutrale Plätze, nächster zuerst |
 | Tower | Ready for departure · Ready, closed pattern · Initial · Overhead · Base, gear down · Final, gear down, full stop · Base, touch and go · Going around · Closed / SFO → Request closed · Request SFO · High key · Low key, gear down · Ready, practice approach · Ready, unrestricted climb · Ready, tactical departure |
 | Approach | Airborne (nach Start) · Inbound for landing · Inbound, pattern work · Request ILS / straight in · Flight following · Abmelden (cancel approach) · Verkehr → Traffic in sight / Negative contact · C R P · Mehr → Fahrt melden / Say again / Request higher |
 | Range (nur wenn die Mission eine Range hat) | Check in · IP inbound · In hot · Off safe · Check out · Check out, hung ordnance |
@@ -1525,6 +1527,7 @@ Schlüsselwörter werden überall im Spruch erkannt. Beginne mit „<Platz> <Lot
 | „request startup and taxi“ | Ground | Beides auf einmal |
 | „request progressive taxi“ | Ground, beim Rollen | Richtungsangaben zum Rollhalt bzw. Parkplatz |
 | „say again taxi route“ | Ground, beim Rollen | Wiederholt die Rollroute |
+| „request crossing runway two one left“ | Ground, beim Rollen | Freigabe zum Queren dieser Bahn, oder „hold short“, bis sie frei ist |
 | „request IFR clearance (to Batumi)“, „clearance“, „IFR to“ | Ground (in der Luft: Approach) | IFR-Freigabe mit Squawk; Code zurücklesen → „readback correct“ |
 | „ready“, „ready for departure“, „holding short“ (+ „closed pattern“) | Tower | Startfreigabe, line up and wait oder hold short |
 | „abort“, „rejecting“, „stopping“, „cancel takeoff“ | Tower, mit Freigabe oder aufgerollt | Freigabe aufgehoben, „vacate …, report ready for departure“ |

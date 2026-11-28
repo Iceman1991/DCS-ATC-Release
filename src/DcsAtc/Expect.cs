@@ -59,6 +59,7 @@ static partial class Program
             "Ground: request taxi" => gnd && ph is null or Phase.Parked or Phase.StartupApproved or Phase.TaxiOut,
             "Ground: request IFR clearance" or "Tower: ready for departure" or "Tower: ready for departure, closed pattern" or "Tower: ready for departure, practice approach"
                 or "Tower: ready for departure, request unrestricted climb" or "Tower: ready for departure, request tactical departure" => gnd && before,
+            "Ground: request runway crossing" => gnd && ph is Phase.TaxiOut or Phase.TaxiIn,
             "Ground: runway vacated, request taxi to parking" => gnd && (!before && ph != Phase.ClearedTakeoff || ph == Phase.HoldShort && a!.HoldSince == -2),   // after landing or rejected takeoff; LA26: not while cleared for takeoff
             "minimum fuel" => air,   // LA26 (log: on the ground "stand by" + "you are on the ground. Say request.")
             "Tower: high key" or "Tower: low key, gear down" => air && (a?.Sfo == true || ask.Contains(" key") || flow.Contains(" key")),   // after "request S F O"

@@ -2086,6 +2086,12 @@ public partial class Tower
             tn2.Tick(nh03L, none, 100);
             var n6 = tn2.OnTranscript("Ground: ready for departure", nh03L, none, 101);
             Check(n6 is [{ } t6] && t6.Text.Contains("cross runway zero three left, hold short runway zero three right") && tn2.Phase == Phase.TaxiOut, "Forum 0.9.7 'ready for departure' am Haltepunkt der Parallelbahn: " + string.Join(" | ", n6.Select(m => m.Text)));
+            var tn2b = new Tower(nel, "Enfield 1-1");   // the runway named in a "ready" call is the departure runway, not the one to cross
+            tn2b.Tick(np, none, 0);
+            tn2b.OnTranscript("Nellis Ground, Enfield 1-1, request taxi, runway 03 right", np, none, 1);
+            tn2b.Tick(nh03L, none, 100);
+            var n6b = tn2b.OnTranscript("Nellis Tower, Enfield 1-1, ready for departure runway zero three right", nh03L, none, 101);
+            Check(n6b is [{ } t6b] && t6b.Text.Contains("cross runway zero three left, hold short runway zero three right"), "Parallelbahn: 'ready for departure runway 03 right' kreuzt 03L: " + string.Join(" | ", n6b.Select(m => m.Text)));
             // LA03 (log Nellis 14.10.): crossing with clearance at 36 kt, heading 51° off the runway -> no deviation; rolling along the runway without clearance -> exactly one call
             var tn3 = new Tower(nel, "Enfield 1-1");
             tn3.Tick(np, none, 0);
@@ -2155,6 +2161,70 @@ public partial class Tower
                 Check(sr1?.Text.Contains("crossing") != true, "#45 Ausrollen auf der Landebahn: kein Kreuzen angeboten: " + sr1);
                 Check(r1 is [{ } t1r] && t1r.Text.Contains("hold short runway zero three") && sg1 is ("Ground", "holding short runway zero three, request crossing") && x1 is [{ } t1x] && t1x.Text.Contains("cross runway zero three, continue to parking"),
                       "#45 Landebahn nach dem Verlassen kreuzen (einzige Bahn): " + $"{sg1} / " + string.Join(" | ", r1.Concat(x1).Select(m => m.Text)));
+            }
+        }
+        {   // Own log (Bagram 2026-11-28, map Afghanistan): parked beside 21L away from the taxiway, the way leads across the assigned runway: crossing on request
+            double hb = 206 * Math.PI / 180, dbx = Math.Cos(hb), dbz = Math.Sin(hb);
+            var c0b = (X: 125093 - 25 * dbz, Z: 272298 + 25 * dbx);   // centreline foot of the logged point with 25 m lateral
+            var c21 = (X: c0b.X - 270 * dbx, Z: c0b.Z - 270 * dbz);     // the logged points lie 270 m along the runway from its centre
+            var c21r = (X: c21.X - 300 * dbz, Z: c21.Z + 300 * dbx);    // 21R 300 m to the right
+            var bag = Airfield.FromDcs("Bagram", c21.X, c21.Z, 1490, new[] { ("21", -hb, c21.X, c21.Z, 3000.0), ("21", -hb, c21r.X, c21r.Z, 3000.0) });
+            Telemetry BT((double X, double Z) p, double kt = 0) => new(bag.Elev, 0, kt * Kt, 296 * Math.PI / 180, p.X, p.Z, 0, 0, 760);
+            var (bpk, bp2, bp3, bp4, bp5, bp6) = (BT((125104, 272462)), BT((125046, 272403), 11), BT((125069, 272348), 11), BT((125093, 272298), 11), BT((125120, 272243), 11), BT((125150, 272200), 11));
+            var e21 = bag.End("21L");
+            Traffic BTr(double along, double lat, double agl, double spd, bool air) { var p = e21.At(along, lat); return new(9, "F-16C_50", p.X, p.Z, bag.Elev + agl, hb, spd, InAir: air); }
+            Tower BTaxi()
+            {
+                var tb = new Tower(bag, "Dagger 1-1");
+                tb.Tick(bpk, none, 0);
+                tb.OnTranscript("Bagram Ground, Dagger 1-1, request startup", bpk, none, 1);
+                tb.OnTranscript("Bagram Ground, Dagger 1-1, request taxi, runway 21 left", bpk, none, 20);
+                return tb;
+            }
+            string BRun(Tower tb, double t0, params Telemetry[] pts) => string.Join(" | ", pts.SelectMany((p, i) => tb.Tick(p, none, t0 + i)).Where(m => m.Role != "Info").Select(m => m.Text));
+            string BSay(Tower tb, Telemetry p, string call, params Traffic[] tr) => string.Join(" | ", tb.OnTranscript("Bagram Ground, Dagger 1-1, " + call, p, tr, 100).Select(m => m.Text));
+            // without request: as before, the violation
+            var tb0 = BTaxi();
+            var bo0 = BRun(tb0, 101, bp2, bp3, bp4, bp5);
+            Check(bo0.Contains("not cleared onto runway"), "Bagram: Querung ohne Anfrage bleibt Verstoss: " + bo0);
+            // request, free: clearance, crossing at 11 kt without call and violation
+            var tb1 = BTaxi();
+            var bq1 = BSay(tb1, bp2, "request crossing runway two one left");
+            var bo1 = BRun(tb1, 101, bp3, bp4, bp5, bp6);
+            Check(bq1.Contains("cross runway two one left") && bq1.Contains("holding point") && !bq1.Contains("hold short") && bo1 == "" && tb1.Phase == Phase.TaxiOut && tb1.Rejected == 0,
+                  $"Bagram: Anfrage -> Freigabe, Querung ohne Meldung: {bq1} / {bo1}");
+            // one crossing only: entering the runway again is a violation
+            var bo1b = BRun(tb1, 110, BT(e21.At(-270, -60), 11), BT(e21.At(-270, -25), 11), BT(e21.At(-270, 0), 11));
+            Check(bo1b.Contains("not cleared onto runway"), "Bagram: nach der Querung erneut auf die Bahn -> Verstoss: " + bo1b);
+            // request already on the strip (25 m): crossing to the far side ends the clearance too
+            var tb2 = BTaxi();
+            var bq2 = BSay(tb2, bp4, "request crossing runway two one left");
+            var bo2 = BRun(tb2, 101, bp5, bp6);
+            var bo2b = BRun(tb2, 110, BT(e21.At(-270, -60), 11), BT(e21.At(-270, -25), 11), BT(e21.At(-270, 0), 11));
+            Check(bq2.Contains("cross runway two one left") && bo2 == "" && bo2b.Contains("not cleared onto runway"), $"Bagram: Anfrage bei 25 m, danach erneut auf die Bahn -> Verstoss: {bq2} / {bo2} / {bo2b}");
+            // readback "crossing ..." is silent, with "request" the clearance is repeated
+            var tb3 = BTaxi();
+            BSay(tb3, bp2, "request crossing runway two one left");
+            var bq3 = BSay(tb3, bp2, "crossing runway two one left");
+            var bq3b = BSay(tb3, bp2, "request crossing runway two one left");
+            Check(bq3 == "" && bq3b.Contains("cross runway two one left"), $"Bagram: Readback 'crossing' still, mit 'request' wiederholt: {bq3} / {bq3b}");
+            // name variants, no name = the runway beside the aircraft
+            foreach (var call in new[] { "request to cross runway 21 left", "request cross the runway", "request runway crossing", "crossing runway 21L", "requesting crossing" })
+            {
+                var tbv = BTaxi();
+                var bv = BSay(tbv, bp2, call);
+                Check(bv.Contains("cross runway two one left"), $"Bagram: \"{call}\" -> {bv}");
+            }
+            // blocked: final, on the runway, takeoff clearance of another flight; free -> clearance by itself
+            foreach (var (why, trf, claim) in new[] { ("final", BTr(1.5 * NM, 0, 120, 75, true), 0), ("on the runway", BTr(-270, 0, 0, 5, false), 0), ("takeoff clearance", BTr(-270, 0, 0, 0, false), 1) })
+            {
+                var tbb = BTaxi();
+                tbb.RunwayClaimed = claim;
+                var bb = BSay(tbb, bp2, "request crossing runway two one left", claim == 1 ? Array.Empty<Traffic>() : new[] { trf });
+                var bw = string.Join(" | ", tbb.Tick(bp2 with { Ias = 0 }, claim == 1 ? none : new[] { trf }, 101).Select(m => m.Text));
+                tbb.RunwayClaimed = 0;
+                var bf = string.Join(" | ", tbb.Tick(bp2 with { Ias = 0 }, none, 130).Select(m => m.Text));
+                Check(bb.Contains("hold short runway two one left, traffic") && bw == "" && bf.Contains("cross runway two one left"), $"Bagram: Anfrage bei Verkehr ({why}) -> warten, dann von selbst frei: {bb} / {bw} / {bf}");
             }
         }
         // --- A2: Unintelligible -> ask again without overwriting the last call, "say again" repeats the taxi clearance

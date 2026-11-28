@@ -173,6 +173,7 @@ Ground: Enfield one one, Kutaisi Ground, taxi to holding point runway two five v
 
 - **Accepted phrasing.** "request taxi", "ready to taxi" and "request startup and taxi" all work. The last one approves start-up and taxi together.
 - **Progressive taxi.** Once you are taxiing, say "request progressive taxi" to hear the route again. "Say again taxi" does the same.
+- **Runway crossing.** If your way leads across a runway, ask first: "request crossing runway two one left" (without a runway name the nearest one is taken). Ground checks the runway, final and departures and answers "cross runway two one left, continue to holding point runway two one left" or "hold short runway two one left, traffic ...". After a "hold short" the clearance follows by itself once the runway is free. It is good for one crossing. Without it, taxiing onto the runway gives "not cleared onto runway".
 
 **5. Take-off (Tower).** At the holding point:
 
@@ -490,6 +491,7 @@ Each level shows at most 9 entries.
 | Vacated, taxi to parking | `runway vacated, request taxi to parking` | On the ground after landing |
 | Progressive taxi | `request progressive taxi` | On the ground |
 | Say again taxi | `say again taxi route` | While taxiing |
+| Request runway crossing | `request runway crossing` | While taxiing |
 | Hot brakes | `hot brakes` | On the ground |
 
 The IFR clearance list shows nearby airfields; carriers and your current airfield are not listed.
@@ -616,7 +618,7 @@ In every mission with DCS-ATC, each player group gets **F10 Other → DCS-ATC**.
 
 | Submenu | Entries |
 |---|---|
-| Ground | Request startup · Request taxi · Runway vacated, taxi to parking · Progressive taxi · Say again taxi · Hot brakes · IFR clearance → *Next in departure direction* / up to 8 friendly or neutral airfields, nearest first |
+| Ground | Request startup · Request taxi · Runway vacated, taxi to parking · Progressive taxi · Say again taxi · Request runway crossing · Hot brakes · IFR clearance → *Next in departure direction* / up to 8 friendly or neutral airfields, nearest first |
 | Tower | Ready for departure · Ready, closed pattern · Initial · Overhead · Base, gear down · Final, gear down, full stop · Base, touch and go · Going around · Closed / SFO → Request closed · Request SFO · High key · Low key, gear down · Ready, practice approach · Ready, unrestricted climb · Ready, tactical departure |
 | Approach | Airborne (after takeoff) · Inbound for landing · Inbound, pattern work · Request ILS / straight in · Flight following · Cancel approach · Traffic → Traffic in sight / Negative contact · C R P · More → Report airspeed / Say again / Request higher |
 | Range (only if the mission has a range) | Check in · IP inbound · In hot · Off safe · Check out · Check out, hung ordnance |
@@ -1523,6 +1525,7 @@ Keywords are recognised anywhere in your call. Start with "<Airfield> <Controlle
 | "request startup and taxi" | Ground | Both at once |
 | "request progressive taxi" | Ground, while taxiing | Directions to the holding point or to parking |
 | "say again taxi route" | Ground, while taxiing | Repeats the taxi route |
+| "request crossing runway two one left" | Ground, while taxiing | Clearance to cross that runway, or "hold short" until it is free |
 | "request IFR clearance (to Batumi)", "clearance", "IFR to" | Ground (in the air: Approach) | IFR clearance with squawk; read back the code → "readback correct" |
 | "ready", "ready for departure", "holding short" (+ "closed pattern") | Tower | Takeoff clearance, line up and wait, or hold short |
 | "abort", "rejecting", "stopping", "cancel takeoff" | Tower, when cleared or lined up | Clearance cancelled, "vacate …, report ready for departure" |
