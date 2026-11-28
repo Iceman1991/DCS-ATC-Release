@@ -21,7 +21,7 @@ static partial class Program
     internal static bool Noise(string text)
     {
         var t = Regex.Replace(text, @"\[[^\]]*\]|\([^)]*\)", "").Trim();
-        return t.Length < 2 || Regex.IsMatch(t, @"^\W*(you|thanks?(\s+you)?\s+for\s+watching)\W*$", RegexOptions.IgnoreCase);
+        return t.Length < 2 || Regex.IsMatch(t, @"^\W*(you|thanks?(\s+you)?\s+for\s+watching)\W*$|^\W*sub(s|titles|titled)\s+by\b|www\.", RegexOptions.IgnoreCase);   // also subtitle-credit hallucinations ("Subs by www.zeoranger.co.uk")
     }
 
     static void OnSrs(SrsListener.Transmission tx)

@@ -674,6 +674,8 @@ static partial class Program
             Console.WriteLine($"OK   Projektion {map}: Mittelmeridian {q.Lon0}°, max. {q.Err:F1} m");
         }
         var th = Airfield.Theatre;
+        if (!File.Exists(Path.Combine(Airfield.TerrainDir(DcsDir(), "Syria"), "Beacons.lua"))) Console.WriteLine("SKIP Ll2Xz Syria: Karte nicht installiert");
+        else
         try
         {
             Airfield.Theatre = "Syria";
@@ -787,6 +789,7 @@ static partial class Program
         var th = Airfield.Theatre;
         try
         {
+            if (!File.Exists(Path.Combine(Airfield.TerrainDir(DcsDir(), "Syria"), "Beacons.lua"))) { Console.WriteLine("SKIP charts.jsonc auf Syrien (Kontrollzone, Routen, F10-Karte, Editor): Karte nicht installiert"); return; }   // last block of ChartTest; finally resets
             Airfield.Theatre = "Syria";
             File.WriteAllText(ownF, "{ \"Banias\": { \"ctr_top_ft\": 3500, \"crp\": { \"north\": \"35°18.000'N 035°57.475'E\" } } }");
             Airfield.OwnChart = OwnChart(ownF);
@@ -2043,10 +2046,22 @@ static partial class Program
             }
             // #63: short PTT press without speech -> Whisper hallucinates "You"/"Thanks for watching" -> must count as noise, real calls not
             {
-                var bad = new[] { "[BLANK_AUDIO]", "You", " you.", "Thank you for watching!", "Thanks for watching." }.Where(t => !Noise(t))
-                    .Concat(new[] { "Thank you.", "Overlord, Reaper 3-1, picture" }.Where(Noise)).ToList();
+                var bad = new[] { "[BLANK_AUDIO]", "You", " you.", "Thank you for watching!", "Thanks for watching.", "Subs by www.zeoranger.co.uk", "Subtitles by the Amara.org community" }.Where(t => !Noise(t))
+                    .Concat(new[] { "Thank you.", "Overlord, Reaper 3-1, picture", "Kallax Approach, request landing.", "Tower, Viper 1-1, ready for departure." }.Where(Noise)).ToList();
                 if (bad.Count > 0) throw new Exception($"#63 Whisper-Stille: {string.Join(" | ", bad)}");
                 Console.WriteLine("OK   #63 Whisper-Stille: [BLANK_AUDIO], You, Thanks for watching = Rauschen; Thank you und echte Rufe nicht");
+            }
+            // failed Piper = no mp3: never transmit it (ExternalAudio would block the frequency for ~10 min)
+            {
+                var tmp = Path.Combine(Path.GetTempPath(), "sendable-test.mp3");
+                File.WriteAllBytes(tmp, new byte[] { 1 });
+                try
+                {
+                    if (Sendable(Path.Combine(Path.GetTempPath(), "sendable-missing.mp3"), 3) || Sendable(tmp, 0) || !Sendable(tmp, 3))
+                        throw new Exception("Sendable: fehlende Datei oder 0 s darf nicht gesendet werden, vorhandene schon");
+                }
+                finally { File.Delete(tmp); }
+                Console.WriteLine("OK   Sendable: ohne Sprachdatei oder 0 s nur Text, mit Datei gesendet");
             }
             // K4: SRS server with COALITION_AUDIO_SECURITY forwards voice only within the coalition -> listen as blue and (second connection) red
             var cs = new SrsListener(5002, lf, _ => false, _ => { });

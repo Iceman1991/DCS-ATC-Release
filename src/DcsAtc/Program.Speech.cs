@@ -312,6 +312,9 @@ static partial class Program
     static bool Hot(IEnumerable<Item> q) => Clock < HotUntil && !q.Any(x => x.Rank <= 2);
     static readonly ConcurrentDictionary<double, Chan> Channels = new();
 
+    /// Failed synth = no file; ExternalAudio waits ~10 min on a missing file and blocks the frequency, so text only instead.
+    internal static bool Sendable(string mp3, double sec) => sec > 0 && File.Exists(mp3);
+
     /// show: text in the game only when transmitting, so text and sound match. maxAge: after that text only (backlog).
     static void Play(string mp3, double freq, string name, Action show, double freq2 = 0, int prio = 1, double sec = 0, double maxAge = 45, int side = 0, int rank = 3, Func<double>? redo = null, string? mod = null)
     {
@@ -333,7 +336,7 @@ static partial class Program
                     bool fresh = (Clock - it.At).TotalSeconds <= it.MaxAge;
                     if (fresh || !Lso(it)) it.Show();   // A19: outdated LSO call not even as text
                     Trace("SENDEN", FormattableString.Invariant($"{Path.GetFileName(it.Mp3)} {it.Name} {f:0.0##} prio {it.Prio} nach {(Clock - it.At).TotalSeconds:0.0} s in der Warteschlange, {it.Sec:0.0} s") + (fresh ? "" : $" -> verworfen, älter als {it.MaxAge:0} s" + (Lso(it) ? "" : " (nur Text)")));
-                    if (fresh) { Transmit(it.Mp3, f, it.Name, it.Freq2, it.Side, it.Mod); lastEnd = Clock; if (it.Rank == 1) HotUntil = Clock.AddSeconds(5); }
+                    if (fresh && File.Exists(it.Mp3)) { Transmit(it.Mp3, f, it.Name, it.Freq2, it.Side, it.Mod); lastEnd = Clock; if (it.Rank == 1) HotUntil = Clock.AddSeconds(5); }
                     lock (c) c.FreeAt = Clock;
                     try { File.Delete(it.Mp3); } catch (IOException) { }
                 }
@@ -466,6 +469,7 @@ static partial class Program
             sec = Synth(tx.Text, voice, mp3, tx.Pilot, tx.Stress, PaceOf(tx));
             airSec = sec;
             Trace("TTS", FormattableString.Invariant($"{Path.GetFileName(mp3)} {tx.Role}{tx.Station} {freq:0.0##}{(freq2 > 0 ? $"/{freq2:0.0##}" : "")} gid {tx.Gid} prio {PrioOf(tx)} Seite {tx.Side} Stimme {voice} Tempo {(tx.Pilot ? 1.0 : Cfg.SpeechRate) * (tx.Stress ? 0.85 : 1) * PaceOf(tx):0.00} {sec:0.0} s, Synth {sw.ElapsedMilliseconds} ms, Rückstau {Backlog(freq):0} s: {tx.Text}"));
+            if (!Sendable(mp3, sec)) { Trace("FEHLER", $"{Path.GetFileName(mp3)}: keine Sprachdatei, nur Text"); Show(); return; }
             if (SayQueue.IsAddingCompleted) { Show(); Transmit(mp3, freq, tx.Station, freq2, tx.Side, mod); }   // --say: wait until sent
             else Play(mp3, freq, tx.Station, Show, freq2, PrioOf(tx), sec, tx.MaxAge > 0 ? tx.MaxAge : tx.Prio == 2 || tx.Role == "AWACS" ? 20 : 45, tx.Side, RankOf(tx),   // AI radio, picture: becomes outdated quickly
                       tx.Live == null ? null : () => tx.Live() is { } t2 && t2 != text ? airSec = Synth(text = t2, voice, mp3, tx.Pilot, tx.Stress, PaceOf(tx)) : -1, mod);   // LD4: re-spoken if the BRAA has changed
